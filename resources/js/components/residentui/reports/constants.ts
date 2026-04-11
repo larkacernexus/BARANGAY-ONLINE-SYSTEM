@@ -44,6 +44,7 @@ export type AffectedPeople = 'individual' | 'multiple' | 'community';
 // ============================================================================
 
 export interface StatusConfig {
+    dot: string;
     label: string;
     color: string;
     textColor: string;
@@ -54,50 +55,55 @@ export interface StatusConfig {
 }
 
 export const STATUS_CONFIG: Record<ReportStatus, StatusConfig> = {
-    pending: { 
-        label: 'Pending', 
-        color: 'bg-yellow-100 dark:bg-yellow-900/30', 
+    pending: {
+        label: 'Pending',
+        color: 'bg-yellow-100 dark:bg-yellow-900/30',
         textColor: 'text-yellow-800 dark:text-yellow-300',
         icon: Clock,
         gradient: 'from-yellow-50 to-yellow-100/50 dark:from-yellow-900/20 dark:to-yellow-800/20',
         description: 'Waiting for review',
-        nextStep: 'Will be assigned for review'
+        nextStep: 'Will be assigned for review',
+        dot: ''
     },
-    under_review: { 
-        label: 'Under Review', 
-        color: 'bg-blue-100 dark:bg-blue-900/30', 
+    under_review: {
+        label: 'Under Review',
+        color: 'bg-blue-100 dark:bg-blue-900/30',
         textColor: 'text-blue-800 dark:text-blue-300',
         icon: Loader2,
         gradient: 'from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/20',
         description: 'Being investigated',
-        nextStep: 'Awaiting resolution'
+        nextStep: 'Awaiting resolution',
+        dot: ''
     },
-    in_progress: { 
-        label: 'In Progress', 
-        color: 'bg-purple-100 dark:bg-purple-900/30', 
+    in_progress: {
+        label: 'In Progress',
+        color: 'bg-purple-100 dark:bg-purple-900/30',
         textColor: 'text-purple-800 dark:text-purple-300',
         icon: TrendingUp,
         gradient: 'from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/20',
         description: 'Work in progress',
-        nextStep: 'Awaiting completion'
+        nextStep: 'Awaiting completion',
+        dot: ''
     },
-    resolved: { 
-        label: 'Resolved', 
-        color: 'bg-green-100 dark:bg-green-900/30', 
+    resolved: {
+        label: 'Resolved',
+        color: 'bg-green-100 dark:bg-green-900/30',
         textColor: 'text-green-800 dark:text-green-300',
         icon: CheckCircle,
         gradient: 'from-green-50 to-green-100/50 dark:from-green-900/20 dark:to-green-800/20',
         description: 'Successfully resolved',
-        nextStep: 'Case closed'
+        nextStep: 'Case closed',
+        dot: ''
     },
-    rejected: { 
-        label: 'Rejected', 
-        color: 'bg-red-100 dark:bg-red-900/30', 
+    rejected: {
+        label: 'Rejected',
+        color: 'bg-red-100 dark:bg-red-900/30',
         textColor: 'text-red-800 dark:text-red-300',
         icon: XCircle,
         gradient: 'from-red-50 to-red-100/50 dark:from-red-900/20 dark:to-red-800/20',
         description: 'Report rejected',
-        nextStep: 'No further action'
+        nextStep: 'No further action',
+        dot: ''
     },
 };
 
@@ -259,28 +265,29 @@ export interface TabConfig {
     id: string;
     label: string;
     icon: any;
+    status: ReportStatus | 'all';  // Add this
+    color: string;                  // Add this
     count?: number;
 }
 
 export const REPORT_TABS: TabConfig[] = [
-    { id: 'all', label: 'All Reports', icon: FileText },
-    { id: 'pending', label: 'Pending', icon: Clock },
-    { id: 'under_review', label: 'Under Review', icon: Loader2 },
-    { id: 'in_progress', label: 'In Progress', icon: TrendingUp },
-    { id: 'resolved', label: 'Resolved', icon: CheckCircle },
-    { id: 'rejected', label: 'Rejected', icon: XCircle },
+    { id: 'all', label: 'All Reports', icon: FileText, status: 'all', color: 'gray' },
+    { id: 'pending', label: 'Pending', icon: Clock, status: 'pending', color: 'yellow' },
+    { id: 'under_review', label: 'Under Review', icon: Loader2, status: 'under_review', color: 'blue' },
+    { id: 'in_progress', label: 'In Progress', icon: TrendingUp, status: 'in_progress', color: 'purple' },
+    { id: 'resolved', label: 'Resolved', icon: CheckCircle, status: 'resolved', color: 'green' },
+    { id: 'rejected', label: 'Rejected', icon: XCircle, status: 'rejected', color: 'red' },
 ];
 
 // Detail view tabs
-export const REPORT_DETAIL_TABS: TabConfig[] = [
+export const REPORT_DETAIL_TABS: Omit<TabConfig, 'status' | 'color'>[] = [
     { id: 'details', label: 'Details', icon: Info },
     { id: 'documents', label: 'Documents', icon: Paperclip },
     { id: 'payments', label: 'Payments', icon: DollarSign },
     { id: 'history', label: 'History', icon: History },
 ];
-
 // Mobile detail view tabs
-export const MOBILE_REPORT_DETAIL_TABS: TabConfig[] = [
+export const MOBILE_REPORT_DETAIL_TABS: Omit<TabConfig, 'status' | 'color'>[] = [
     { id: 'details', label: 'Details', icon: Info },
     { id: 'evidence', label: 'Evidence', icon: Paperclip },
     { id: 'timeline', label: 'Timeline', icon: History },

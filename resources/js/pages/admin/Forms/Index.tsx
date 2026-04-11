@@ -1,5 +1,3 @@
-// pages/admin/forms/index.tsx
-
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -66,22 +64,24 @@ export default function FormsIndex({
     const safeCategories = categories || [];
     const safeAgencies = agencies || [];
     const safeStats = stats || defaultStats;
+    const allForms = safeForms.data || [];
     
-    // State management - FIX: Handle min_size and max_size as numbers
-    const [filtersState, setFiltersState] = useState<Filters>({
-        category: safeFilters.category || 'all',
-        agency: safeFilters.agency || 'all',
-        status: safeFilters.status || 'all',
-        from_date: safeFilters.from_date || '',
-        to_date: safeFilters.to_date || '',
-        sort_by: safeFilters.sort_by || 'created_at',
-        sort_order: safeFilters.sort_order || 'desc',
-        is_featured: safeFilters.is_featured !== undefined ? safeFilters.is_featured : 'all',
-        file_type: safeFilters.file_type || 'all',
-        min_size: typeof safeFilters.min_size === 'number' ? safeFilters.min_size : undefined,
-        max_size: typeof safeFilters.max_size === 'number' ? safeFilters.max_size : undefined
-    });
+    // Filter states - client-side only (removed sort from filters, kept for table sorting)
     const [search, setSearch] = useState(safeFilters.search || '');
+    const [categoryFilter, setCategoryFilter] = useState<string>(safeFilters.category || 'all');
+    const [agencyFilter, setAgencyFilter] = useState<string>(safeFilters.agency || 'all');
+    const [statusFilter, setStatusFilter] = useState<string>(safeFilters.status || 'all');
+    const [featuredFilter, setFeaturedFilter] = useState<string>('all');
+    const [fileTypeFilter, setFileTypeFilter] = useState<string>('');
+    const [fromDate, setFromDate] = useState<string>(safeFilters.from_date || '');
+    const [toDate, setToDate] = useState<string>(safeFilters.to_date || '');
+    const [minSize, setMinSize] = useState<string>('');
+    const [maxSize, setMaxSize] = useState<string>('');
+    
+    // Sorting is now handled by table header only
+    const [sortBy, setSortBy] = useState<string>('created_at');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(15);
@@ -125,54 +125,10 @@ export default function FormsIndex({
         }
     }, [flash]);
 
-    // Immediate search handler
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setSearch(value);
-        
-        const params: Record<string, any> = {
-            ...filtersState,
-            search: value
-        };
-        
-        // Clean up empty values and convert to strings
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            const val = params[k];
-            if (val === undefined || val === null || val === '' || val === 'all') {
-                delete params[k];
-            } else {
-                params[k] = String(val);
-            }
-        });
-        
-        router.get('/admin/forms', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
-    // Filter forms client-side
-    const filteredForms = useMemo(() => {
-        return formUtils.filterForms({
-            forms: safeForms.data,
-            search,
-            filters: filtersState
-        });
-    }, [safeForms.data, search, filtersState]);
-
-    // Pagination
-    const totalItems = filteredForms.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedForms = filteredForms.slice(startIndex, endIndex);
-
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, categoryFilter, agencyFilter, statusFilter, featuredFilter, fileTypeFilter, fromDate, toDate, minSize, maxSize, sortBy, sortOrder]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -181,6 +137,156 @@ export default function FormsIndex({
             setIsSelectAll(false);
         }
     }, [isBulkMode]);
+
+    // Helper function to check file type
+    const checkFileType = (filePath: string | null, typeFilter: string): boolean => {
+        if (!typeFilter) return true;
+        if (!filePath) return false;
+        const extension = filePath.split('.').pop()?.toLowerCase() || '';
+        
+        // Handle group filtering
+        if (typeFilter === 'pdf') return extension === 'pdf';
+        if (typeFilter === 'doc') return extension === 'doc' || extension === 'docx';
+        if (typeFilter === 'xls') return extension === 'xls' || extension === 'xlsx';
+        if (typeFilter === 'jpg') return extension === 'jpg' || extension === 'jpeg' || extension === 'png' || extension === 'gif';
+        return extension === typeFilter;
+    };
+
+    // Filter forms client-side
+    const filteredForms = useMemo(() => {
+        let filtered = [...allForms];
+        
+        // Apply search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(form =>
+                form.title?.toLowerCase().includes(searchLower) ||
+                form.description?.toLowerCase().includes(searchLower) ||
+                form.category?.toLowerCase().includes(searchLower) ||
+                form.issuing_agency?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Apply category filter
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(form => form.category === categoryFilter);
+        }
+        
+        // Apply agency filter
+        if (agencyFilter !== 'all') {
+            filtered = filtered.filter(form => form.issuing_agency === agencyFilter);
+        }
+        
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(form => form.is_active === (statusFilter === 'active'));
+        }
+        
+        // Apply featured filter
+        if (featuredFilter !== 'all') {
+            filtered = filtered.filter(form => form.is_featured === (featuredFilter === 'yes'));
+        }
+        
+        // Apply file type filter
+        if (fileTypeFilter) {
+            filtered = filtered.filter(form => checkFileType(form.file_path, fileTypeFilter));
+        }
+        
+        // Apply date filters
+        if (fromDate) {
+            filtered = filtered.filter(form => form.created_at >= fromDate);
+        }
+        if (toDate) {
+            filtered = filtered.filter(form => form.created_at <= toDate);
+        }
+        
+        // Apply file size filters
+        if (minSize) {
+            const min = parseFloat(minSize) * 1024 * 1024; // Convert MB to bytes
+            filtered = filtered.filter(form => (form.file_size || 0) >= min);
+        }
+        if (maxSize) {
+            const max = parseFloat(maxSize) * 1024 * 1024; // Convert MB to bytes
+            filtered = filtered.filter(form => (form.file_size || 0) <= max);
+        }
+        
+        // Apply sorting (for table header)
+        filtered.sort((a, b) => {
+            let valueA: any;
+            let valueB: any;
+            
+            switch (sortBy) {
+                case 'title':
+                    valueA = a.title || '';
+                    valueB = b.title || '';
+                    break;
+                case 'category':
+                    valueA = a.category || '';
+                    valueB = b.category || '';
+                    break;
+                case 'issuing_agency':
+                    valueA = a.issuing_agency || '';
+                    valueB = b.issuing_agency || '';
+                    break;
+                case 'download_count':
+                    valueA = a.download_count || 0;
+                    valueB = b.download_count || 0;
+                    break;
+                case 'file_size':
+                    valueA = a.file_size || 0;
+                    valueB = b.file_size || 0;
+                    break;
+                case 'status':
+                    valueA = a.is_active ? 1 : 0;
+                    valueB = b.is_active ? 1 : 0;
+                    break;
+                case 'is_featured':
+                    valueA = a.is_featured ? 1 : 0;
+                    valueB = b.is_featured ? 1 : 0;
+                    break;
+                case 'created_at':
+                    valueA = new Date(a.created_at).getTime();
+                    valueB = new Date(b.created_at).getTime();
+                    break;
+                default:
+                    valueA = new Date(a.created_at).getTime();
+                    valueB = new Date(b.created_at).getTime();
+            }
+            
+            if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+            if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        return filtered;
+    }, [allForms, search, categoryFilter, agencyFilter, statusFilter, featuredFilter, fileTypeFilter, fromDate, toDate, minSize, maxSize, sortBy, sortOrder]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        const activeCount = filteredForms.filter(f => f.is_active).length;
+        const totalDownloads = filteredForms.reduce((sum, f) => sum + (f.download_count || 0), 0);
+        const featuredCount = filteredForms.filter(f => f.is_featured).length;
+        const uniqueCategories = new Set(filteredForms.map(f => f.category)).size;
+        const uniqueAgencies = new Set(filteredForms.map(f => f.issuing_agency)).size;
+        const totalFileSize = filteredForms.reduce((sum, f) => sum + (f.file_size || 0), 0);
+        
+        return {
+            total: filteredForms.length,
+            active: activeCount,
+            downloads: totalDownloads,
+            categories_count: uniqueCategories,
+            agencies_count: uniqueAgencies,
+            featured_count: featuredCount,
+            total_file_size: totalFileSize
+        };
+    }, [filteredForms]);
+
+    // Pagination
+    const totalItems = filteredForms.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedForms = filteredForms.slice(startIndex, endIndex);
 
     // Selection handlers
     const handleSelectAllOnPage = () => {
@@ -240,6 +346,25 @@ export default function FormsIndex({
     const selectionStats = useMemo((): SelectionStats => {
         return formUtils.getSelectionStats(selectedFormsData);
     }, [selectedFormsData]);
+
+    // Handle sort change from table header
+    const handleSortChange = (value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    };
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = (): string => {
+        return `${sortBy}-${sortOrder}`;
+    };
+
+    // Handle sort from column click
+    const handleSort = (column: string) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    };
 
     // Bulk operations
     const handleBulkOperation = useCallback(async (operation: BulkOperation) => {
@@ -305,11 +430,44 @@ export default function FormsIndex({
 
                 case 'export':
                 case 'export_csv':
-                    toast.info('Export functionality to be implemented');
+                    const exportData = selectedFormsData.map(form => ({
+                        'Title': form.title || 'N/A',
+                        'Category': form.category || 'N/A',
+                        'Agency': form.issuing_agency || 'N/A',
+                        'Downloads': form.download_count || 0,
+                        'File Size': formUtils.formatFileSize(form.file_size),
+                        'Status': form.is_active ? 'Active' : 'Inactive',
+                        'Featured': form.is_featured ? 'Yes' : 'No',
+                        'Created': formUtils.formatDate(form.created_at),
+                    }));
+                    
+                    const headers = Object.keys(exportData[0]);
+                    const csv = [
+                        headers.join(','),
+                        ...exportData.map(row => 
+                            headers.map(header => {
+                                const value = row[header as keyof typeof row];
+                                return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+                            }).join(',')
+                        )
+                    ].join('\n');
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `forms-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    toast.success(`${selectedForms.length} forms exported`);
                     break;
 
                 case 'download':
-                    toast.info('Bulk download functionality to be implemented');
+                    selectedForms.forEach(id => {
+                        window.open(`/admin/forms/${id}/download`, '_blank');
+                    });
+                    toast.success(`${selectedForms.length} form(s) opened for download`);
                     break;
 
                 case 'change_status':
@@ -323,7 +481,7 @@ export default function FormsIndex({
         } finally {
             setIsPerformingBulkAction(false);
         }
-    }, [selectedForms]);
+    }, [selectedForms, selectedFormsData]);
 
     // Copy selected data to clipboard
     const handleCopySelectedData = () => {
@@ -393,71 +551,20 @@ export default function FormsIndex({
         window.open(`/admin/forms/${form.id}/download`, '_blank');
     };
 
-    const handleSort = (column: string) => {
-        const newSortOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column,
-            sort_order: newSortOrder
-        }));
-        
-        // Trigger server-side sort update
-        const params: Record<string, any> = {
-            ...filtersState,
-            sort_by: column,
-            sort_order: newSortOrder,
-            search: search
-        };
-        
-        // Clean up empty values and convert to strings
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            const val = params[k];
-            if (val === undefined || val === null || val === '' || val === 'all') {
-                delete params[k];
-            } else {
-                params[k] = String(val);
-            }
-        });
-        
-        router.get('/admin/forms', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
     const handleClearFilters = () => {
         setSearch('');
-        setFiltersState({
-            category: 'all',
-            agency: 'all',
-            status: 'all',
-            from_date: '',
-            to_date: '',
-            sort_by: 'created_at',
-            sort_order: 'desc',
-            is_featured: 'all',
-            file_type: 'all',
-            min_size: undefined,
-            max_size: undefined
-        });
-        
-        // Trigger server-side filter clear
-        router.get('/admin/forms', {
-            search: '',
-            category: 'all',
-            agency: 'all',
-            status: 'all',
-            from_date: '',
-            to_date: '',
-            sort_by: 'created_at',
-            sort_order: 'desc'
-        }, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
+        setCategoryFilter('all');
+        setAgencyFilter('all');
+        setStatusFilter('all');
+        setFeaturedFilter('all');
+        setFileTypeFilter('');
+        setFromDate('');
+        setToDate('');
+        setMinSize('');
+        setMaxSize('');
+        setSortBy('created_at');
+        setSortOrder('desc');
+        setCurrentPage(1);
     };
 
     const handleClearSelection = () => {
@@ -465,57 +572,37 @@ export default function FormsIndex({
         setIsSelectAll(false);
     };
 
-    const updateFilter = (key: keyof Filters, value: string) => {
-        // For numeric fields, convert to number or undefined
-        let finalValue: string | number | undefined = value;
-        
-        if (key === 'min_size' || key === 'max_size') {
-            if (value === '' || value === 'all') {
-                finalValue = undefined;
-            } else {
-                const numValue = Number(value);
-                finalValue = isNaN(numValue) ? undefined : numValue;
-            }
+    const updateFilter = (key: string, value: string) => {
+        switch (key) {
+            case 'category':
+                setCategoryFilter(value);
+                break;
+            case 'agency':
+                setAgencyFilter(value);
+                break;
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'from_date':
+                setFromDate(value);
+                break;
+            case 'to_date':
+                setToDate(value);
+                break;
         }
-        
-        setFiltersState(prev => ({ ...prev, [key]: finalValue }));
-        
-        // Trigger server-side filter update
-        const params: Record<string, any> = {
-            ...filtersState,
-            [key]: finalValue,
-            search: search
-        };
-        
-        // Clean up empty values and convert to strings
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            const val = params[k];
-            if (val === undefined || val === null || val === '' || val === 'all') {
-                delete params[k];
-            } else {
-                params[k] = String(val);
-            }
-        });
-        
-        router.get('/admin/forms', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
     };
 
     const hasActiveFilters = Boolean(
         search || 
-        filtersState.category !== 'all' || 
-        filtersState.agency !== 'all' || 
-        filtersState.status !== 'all' ||
-        filtersState.from_date ||
-        filtersState.to_date ||
-        (filtersState.is_featured !== undefined && filtersState.is_featured !== 'all') ||
-        (filtersState.file_type !== undefined && filtersState.file_type !== 'all') ||
-        filtersState.min_size !== undefined ||
-        filtersState.max_size !== undefined
+        categoryFilter !== 'all' || 
+        agencyFilter !== 'all' || 
+        statusFilter !== 'all' ||
+        featuredFilter !== 'all' ||
+        fileTypeFilter ||
+        fromDate ||
+        toDate ||
+        minSize ||
+        maxSize
     );
 
     // Keyboard shortcuts
@@ -523,7 +610,6 @@ export default function FormsIndex({
         if (isMobile) return;
         
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -532,7 +618,6 @@ export default function FormsIndex({
                     handleSelectAllOnPage();
                 }
             }
-            // Escape key
             if (e.key === 'Escape') {
                 if (isBulkMode) {
                     if (selectedForms.length > 0) {
@@ -542,17 +627,14 @@ export default function FormsIndex({
                     }
                 }
             }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 setIsBulkMode(!isBulkMode);
             }
-            // Ctrl/Cmd + F to focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            // Delete key for bulk delete
             if (e.key === 'Delete' && isBulkMode && selectedForms.length > 0) {
                 e.preventDefault();
                 setShowBulkDeleteDialog(true);
@@ -562,6 +644,15 @@ export default function FormsIndex({
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isBulkMode, selectedForms, isMobile]);
+
+    // Create filters object for the Filters component
+    const filtersStateForComponent = {
+        category: categoryFilter,
+        agency: agencyFilter,
+        status: statusFilter,
+        from_date: fromDate,
+        to_date: toDate
+    };
 
     return (
         <AppLayout
@@ -579,13 +670,13 @@ export default function FormsIndex({
                         isMobile={isMobile}
                     />
 
-                    <FormsStats stats={safeStats} />
+                    <FormsStats stats={filteredStats} />
 
                     <FormsFilters
                         search={search}
                         setSearch={setSearch}
-                        onSearchChange={handleSearchChange}
-                        filtersState={filtersState}
+                        onSearchChange={(e) => setSearch(e.target.value)}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
@@ -596,11 +687,23 @@ export default function FormsIndex({
                         startIndex={startIndex}
                         endIndex={endIndex}
                         totalItems={totalItems}
-                        searchInputRef={searchInputRef} isMobile={false}                    />
+                        searchInputRef={searchInputRef}
+                        isMobile={isMobile}
+                        isLoading={isPerformingBulkAction}
+                        handleExport={() => handleBulkOperation('export')}
+                        featuredFilter={featuredFilter}
+                        setFeaturedFilter={setFeaturedFilter}
+                        fileTypeFilter={fileTypeFilter}
+                        setFileTypeFilter={setFileTypeFilter}
+                        minSize={minSize}
+                        setMinSize={setMinSize}
+                        maxSize={maxSize}
+                        setMaxSize={setMaxSize}
+                    />
 
                     <FormsContent
                         forms={paginatedForms}
-                        stats={safeStats}
+                        stats={filteredStats}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -627,12 +730,16 @@ export default function FormsIndex({
                         onCopySelectedData={handleCopySelectedData}
                         onBulkOperation={handleBulkOperation}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
                         categories={safeCategories}
                         agencies={safeAgencies}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Keyboard Shortcuts Help */}

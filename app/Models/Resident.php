@@ -49,6 +49,7 @@ class Resident extends Model
         'purok_name',
         'privileges_list',
         'active_privileges_list',
+        'active_privileges_with_discount_types',
     ];
 
     // ========== ACTIVITY LOG CONFIGURATION ==========
@@ -173,6 +174,7 @@ class Resident extends Model
 
     /**
      * Get the resident privileges for this resident
+     * ResidentPrivilege -> Privilege -> DiscountType
      */
     public function residentPrivileges(): HasMany
     {
@@ -247,20 +249,27 @@ class Resident extends Model
 
     /**
      * Get formatted list of all privileges with details
+     * Goes through: ResidentPrivilege -> Privilege -> DiscountType
      */
     public function getPrivilegesListAttribute(): array
     {
         return $this->residentPrivileges()
-            ->with('privilege')
+            ->with(['privilege.discountType'])
             ->get()
             ->map(function ($residentPrivilege) {
                 $privilege = $residentPrivilege->privilege;
+                $discountType = $privilege ? $privilege->discountType : null;
+                
                 return [
-                    'id' => $privilege->id,
-                    'name' => $privilege->name,
-                    'code' => $privilege->code,
-                    'description' => $privilege->description,
-                    'is_active' => $privilege->is_active,
+                    'id' => $privilege ? $privilege->id : null,
+                    'name' => $privilege ? $privilege->name : null,
+                    'code' => $privilege ? $privilege->code : null,
+                    'description' => $privilege ? $privilege->description : null,
+                    'is_active' => $privilege ? $privilege->is_active : false,
+                    'discount_type_id' => $discountType ? $discountType->id : null,
+                    'discount_type_code' => $discountType ? $discountType->code : null,
+                    'discount_type_name' => $discountType ? $discountType->name : null,
+                    'default_discount_percentage' => $discountType ? $discountType->default_percentage : 0,
                     'id_number' => $residentPrivilege->id_number,
                     'verified_at' => $residentPrivilege->verified_at,
                     'expires_at' => $residentPrivilege->expires_at,
@@ -273,24 +282,63 @@ class Resident extends Model
 
     /**
      * Get formatted list of active privileges
+     * Goes through: ResidentPrivilege -> Privilege -> DiscountType
      */
     public function getActivePrivilegesListAttribute(): array
     {
         return $this->activeResidentPrivileges()
-            ->with('privilege')
+            ->with(['privilege.discountType'])
             ->get()
             ->map(function ($residentPrivilege) {
                 $privilege = $residentPrivilege->privilege;
+                $discountType = $privilege ? $privilege->discountType : null;
+                
                 return [
-                    'id' => $privilege->id,
-                    'name' => $privilege->name,
-                    'code' => $privilege->code,
-                    'discount_percentage' => $privilege->discount_percentage,
+                    'id' => $privilege ? $privilege->id : null,
+                    'name' => $privilege ? $privilege->name : null,
+                    'code' => $privilege ? $privilege->code : null,
+                    'discount_type_id' => $discountType ? $discountType->id : null,
+                    'discount_type_code' => $discountType ? $discountType->code : null,
+                    'discount_type_name' => $discountType ? $discountType->name : null,
+                    'discount_percentage' => $discountType ? $discountType->default_percentage : 0,
                     'id_number' => $residentPrivilege->id_number,
                     'expires_at' => $residentPrivilege->expires_at,
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * Get active privileges with discount types (main method for discounts)
+     * ResidentPrivilege -> Privilege -> DiscountType
+     */
+    public function getActivePrivilegesWithDiscountTypesAttribute()
+    {
+        return $this->activeResidentPrivileges()
+            ->with(['privilege.discountType'])
+            ->get()
+            ->map(function ($residentPrivilege) {
+                $privilege = $residentPrivilege->privilege;
+                $discountType = $privilege ? $privilege->discountType : null;
+                
+                $discountPercentage = $residentPrivilege->discount_percentage 
+                    ?? ($discountType ? $discountType->default_percentage : 0);
+                
+                return [
+                    'id' => $residentPrivilege->id,
+                    'privilege_id' => $privilege ? $privilege->id : null,
+                    'privilege_name' => $privilege ? $privilege->name : null,
+                    'privilege_code' => $privilege ? $privilege->code : null,
+                    'discount_type_id' => $discountType ? $discountType->id : null,
+                    'discount_type_code' => $discountType ? $discountType->code : null,
+                    'discount_type_name' => $discountType ? $discountType->name : null,
+                    'discount_percentage' => $discountPercentage,
+                    'id_number' => $residentPrivilege->id_number,
+                    'verified_at' => $residentPrivilege->verified_at,
+                    'expires_at' => $residentPrivilege->expires_at,
+                    'is_active' => $residentPrivilege->isActive(),
+                ];
+            });
     }
 
     /**
@@ -338,6 +386,26 @@ class Resident extends Model
     }
 
     /**
+     * Get discount type through privilege
+     * ResidentPrivilege -> Privilege -> DiscountType
+     */
+    public function getDiscountTypeForPrivilege(string $privilegeCode): ?DiscountType
+    {
+        $residentPrivilege = $this->activeResidentPrivileges()
+            ->whereHas('privilege', function($q) use ($privilegeCode) {
+                $q->where('code', $privilegeCode);
+            })
+            ->with('privilege.discountType')
+            ->first();
+        
+        if ($residentPrivilege && $residentPrivilege->privilege) {
+            return $residentPrivilege->privilege->discountType;
+        }
+        
+        return null;
+    }
+
+    /**
      * Get privilege ID number if exists
      */
     public function getPrivilegeIdNumber(string $code): ?string
@@ -376,7 +444,7 @@ class Resident extends Model
     // Legacy methods for backward compatibility
     public function isSenior(): bool
     {
-        return $this->hasActivePrivilege('SC') || $this->hasActivePrivilege('OSP') || $this->age >= 60;
+        return $this->hasActivePrivilege('SENIOR') || $this->age >= 60;
     }
 
     public function isPwd(): bool
@@ -386,22 +454,22 @@ class Resident extends Model
 
     public function isSoloParent(): bool
     {
-        return $this->hasActivePrivilege('SP');
+        return $this->hasActivePrivilege('SOLO_PARENT');
     }
 
     public function isIndigent(): bool
     {
-        return $this->hasActivePrivilege('IND');
+        return $this->hasActivePrivilege('INDIGENT');
     }
 
-    public function is4PsBeneficiary(): bool
+    public function isVeteran(): bool
     {
-        return $this->hasActivePrivilege('4PS');
+        return $this->hasActivePrivilege('VETERAN');
     }
 
-    public function isIndigenousPeople(): bool
+    public function isStudent(): bool
     {
-        return $this->hasActivePrivilege('IP');
+        return $this->hasActivePrivilege('STUDENT');
     }
 
     // ========== BUSINESS LOGIC METHODS ==========
@@ -515,14 +583,15 @@ class Resident extends Model
 
     public function logActivity(string $description, array $properties = [], ?Model $causer = null): void
     {
-        $activity = activity()
+        $activityLogger = activity()
             ->performedOn($this)
-            ->withProperties($properties)
-            ->log($description);
-
+            ->withProperties($properties);
+        
         if ($causer) {
-            $activity->causedBy($causer);
+            $activityLogger->causedBy($causer);
         }
+        
+        $activityLogger->log($description);
     }
 
     public function getActivityLogs()
@@ -605,7 +674,7 @@ class Resident extends Model
     {
         return $query->where(function($q) {
             $q->whereHas('residentPrivileges.privilege', function ($q2) {
-                $q2->whereIn('code', ['SC', 'OSP']);
+                $q2->where('code', 'SENIOR');
             })->orWhere(function ($q3) {
                 $q3->whereNotNull('birth_date')
                   ->whereRaw('TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) >= 60');
@@ -629,7 +698,7 @@ class Resident extends Model
     public function scopeIsSoloParent($query)
     {
         return $query->whereHas('residentPrivileges.privilege', function ($q) {
-            $q->where('code', 'SP');
+            $q->where('code', 'SOLO_PARENT');
         });
     }
 
@@ -639,7 +708,7 @@ class Resident extends Model
     public function scopeIsIndigent($query)
     {
         return $query->whereHas('residentPrivileges.privilege', function ($q) {
-            $q->where('code', 'IND');
+            $q->where('code', 'INDIGENT');
         });
     }
 

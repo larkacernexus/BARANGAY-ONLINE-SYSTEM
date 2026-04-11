@@ -10,28 +10,75 @@ import HeaderSection from '@/components/admin/feesCreate/HeaderSection';
 import LeftColumn from '@/components/admin/feesCreate/LeftColumn';
 import RightColumn from '@/components/admin/feesCreate/RightColumn';
 import BulkSelectionModal from '@/components/admin/feesCreate/BulkSelectionModal';
+
+// Import types from centralized fees.ts
 import { 
-    BulkFeeFormData, 
-    FeesCreateProps, 
     FeeType, 
     Resident, 
     Household, 
-    DocumentCategory,
-    DiscountInfo,
+    Permissions,
+    FeesCreateProps,
+    FeeFormData,
+    PrivilegeData,
     DiscountRule,
-    PrivilegeData
-} from '@/types/fees';
-import { 
-    formatCurrency, 
-    parseNumber, 
-    safeString, 
-    calculateTotalAmount,
-    validateFeeForm,
-    getBulkCreationSummary,
-    getDiscountsForFeeType,
-    getDiscountNote,
-    getPhilippineLegalBasis
-} from '@/admin-utils/fees/discount-display-utils';
+    DocumentCategory,
+    DiscountInfo
+} from '@/types/admin/fees/fees';
+
+// Bulk Fee Form Data interface
+interface BulkFeeFormData extends FeeFormData {
+    base_amount: number;
+    payer_name: string;
+    total_amount: number;
+    payer_type: string;
+    household_id: string;
+    business_name: string;
+    address: string;
+    zone: string;
+    billing_period: string;
+    period_start: string;
+    period_end: string;
+    issue_date: string;
+    surcharge_amount: number;
+    penalty_amount: number;
+    discount_amount: number;
+    purpose: string;
+    property_description: string;
+    business_type: string;
+    area: number;
+    remarks: string;
+    requirements_submitted: string[];
+    ph_legal_compliance_notes: string;
+    bulk_type: 'none' | 'residents' | 'households' | 'custom';
+    selected_resident_ids: string[];
+    selected_household_ids: string[];
+    custom_payers: Array<{
+        id: string;
+        name: string;
+        contact_number: string;
+        purok: string;
+        address: string;
+        type: 'custom';
+    }>;
+    apply_to_all_residents: boolean;
+    apply_to_all_households: boolean;
+    filter_purok: string;
+    filter_discount_eligible: boolean;
+    contact_number: string;
+    purok: string;
+}
+
+// Extended props interface
+interface ExtendedFeesCreateProps extends FeesCreateProps {
+    households: Household[];
+    discountRules?: DiscountRule[];
+    preselectedResident?: Resident | null;
+    preselectedHousehold?: Household | null;
+    documentCategories: DocumentCategory[];
+    initialData?: Partial<BulkFeeFormData>;
+    duplicateFrom?: FeeType | null;
+    allPrivileges?: PrivilegeData[];
+}
 
 // ========== DYNAMIC PRIVILEGE HELPER FUNCTIONS ==========
 
@@ -39,11 +86,11 @@ import {
  * Get active privileges from resident
  */
 function getActivePrivileges(resident: Resident): PrivilegeData[] {
-    if (!resident.privileges || !Array.isArray(resident.privileges)) {
+    if (!resident || !resident.privileges || !Array.isArray(resident.privileges)) {
         return [];
     }
     
-    return resident.privileges.filter((p: any) => 
+    return resident.privileges.filter((p: PrivilegeData) => 
         p.status === 'active' || p.status === 'expiring_soon'
     );
 }
@@ -59,40 +106,99 @@ function hasAnyPrivilege(resident: Resident): boolean {
  * Filter residents by discount eligibility (any privilege)
  */
 function filterByDiscountEligibility(residents: Resident[]): Resident[] {
+    if (!residents || !Array.isArray(residents)) return [];
     return residents.filter(resident => hasAnyPrivilege(resident));
 }
 
+/**
+ * Get discounts for fee type
+ */
+function getDiscountsForFeeType(feeType: FeeType, discountRules: DiscountRule[]): DiscountRule[] {
+    if (!discountRules || !Array.isArray(discountRules)) return [];
+    return discountRules.filter(rule => 
+        rule.applies_to_all_fee_types || 
+        rule.applies_to_fee_type_ids?.includes(feeType.id)
+    );
+}
+
+/**
+ * Get discount note
+ */
+function getDiscountNote(discountCodes: string[]): { type: 'warning' | 'info', note: string } {
+    if (discountCodes.includes('senior') && discountCodes.includes('pwd')) {
+        return {
+            type: 'warning',
+            note: 'Note: Only the highest applicable discount will be applied (usually Senior or PWD takes precedence).'
+        };
+    }
+    return {
+        type: 'info',
+        note: 'Eligible discounts will be automatically applied based on resident privileges.'
+    };
+}
+
+/**
+ * Get Philippine legal basis
+ */
+function getPhilippineLegalBasis(discountType: string): string {
+    const legalBasis: Record<string, string> = {
+        senior: 'RA 9994 - Expanded Senior Citizens Act of 2010',
+        pwd: 'RA 10754 - Persons with Disability Benefits Act',
+        solo_parent: 'RA 8972 - Solo Parents Welfare Act of 2000',
+        indigent: 'LGU Ordinance - Based on local government classification'
+    };
+    return legalBasis[discountType] || 'Local Government Ordinance';
+}
+
+/**
+ * Format currency helper
+ */
+const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP',
+        minimumFractionDigits: 2
+    }).format(amount);
+};
+
 export default function FeesCreate({
-    feeTypes,
-    residents,
-    households,
+    fee_types = [],
+    residents = [],
+    households = [],
     discountRules = [],
     preselectedResident,
     preselectedHousehold,
-    puroks,
-    documentCategories,
-    errors,
+    puroks = [],
+    documentCategories = [],
+    errors = {},
     initialData,
     duplicateFrom,
-    allPrivileges = [] // DYNAMIC: All privileges from database
-}: FeesCreateProps) {
+    allPrivileges = []
+}: ExtendedFeesCreateProps) {
     // Default form data
     const defaultFormData: BulkFeeFormData = {
-        fee_type_id: '',
+        fee_type_id: 0,
+        resident_id: 0,
+        amount: 0,
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: 'pending',
+        payment_method: '',
+        payment_reference: '',
+        notes: '',
+        apply_discounts: false,
+        senior_discount: false,
+        pwd_discount: false,
+        solo_parent_discount: false,
+        indigent_discount: false,
         payer_type: preselectedResident
             ? 'resident'
             : preselectedHousehold
               ? 'household'
               : '',
-        resident_id: '',
         household_id: '',
         business_name: '',
-        payer_name:
-            preselectedResident?.full_name || preselectedHousehold?.name || '',
-        contact_number:
-            preselectedResident?.contact_number ||
-            preselectedHousehold?.contact_number ||
-            '',
+        payer_name: preselectedResident?.full_name || preselectedHousehold?.name || '',
+        contact_number: preselectedResident?.phone || preselectedHousehold?.contact_number || '',
         address: '',
         purok: preselectedResident?.purok || preselectedHousehold?.purok || '',
         zone: '',
@@ -100,9 +206,6 @@ export default function FeesCreate({
         period_start: '',
         period_end: '',
         issue_date: new Date().toISOString().split('T')[0],
-        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split('T')[0],
         base_amount: 0,
         surcharge_amount: 0,
         penalty_amount: 0,
@@ -114,7 +217,6 @@ export default function FeesCreate({
         area: 0,
         remarks: '',
         requirements_submitted: [],
-        // DYNAMIC: These will be populated from privileges
         ph_legal_compliance_notes: '',
         bulk_type: 'none',
         selected_resident_ids: [],
@@ -139,49 +241,48 @@ export default function FeesCreate({
         
         return {
             ...data,
-            fee_type_id: safeString(data.fee_type_id),
+            fee_type_id: data.fee_type_id ? Number(data.fee_type_id) : 0,
             payer_type: payerType,
-            resident_id: safeString(data.resident_id),
-            household_id: safeString(data.household_id),
-            business_name: safeString(data.business_name),
-            payer_name: safeString(data.payer_name),
-            contact_number: safeString(data.contact_number),
-            address: safeString(data.address),
-            purok: safeString(data.purok),
-            zone: safeString(data.zone),
-            billing_period: safeString(data.billing_period),
-            period_start: safeString(data.period_start),
-            period_end: safeString(data.period_end),
-            issue_date: safeString(data.issue_date),
-            due_date: safeString(data.due_date),
-            purpose: safeString(data.purpose),
-            property_description: safeString(data.property_description),
-            business_type: safeString(data.business_type),
-            remarks: safeString(data.remarks),
-            base_amount: parseNumber(data.base_amount),
-            surcharge_amount: parseNumber(data.surcharge_amount),
-            penalty_amount: parseNumber(data.penalty_amount),
-            discount_amount: 0,
-            total_amount: parseNumber(data.total_amount),
-            area: parseNumber(data.area),
+            resident_id: data.resident_id ? Number(data.resident_id) : 0,
+            household_id: data.household_id ? String(data.household_id) : '',
+            business_name: data.business_name || '',
+            payer_name: data.payer_name || '',
+            contact_number: data.contact_number || '',
+            address: data.address || '',
+            purok: data.purok || '',
+            zone: data.zone || '',
+            billing_period: data.billing_period || '',
+            period_start: data.period_start || '',
+            period_end: data.period_end || '',
+            issue_date: data.issue_date || '',
+            due_date: data.due_date || '',
+            purpose: data.purpose || '',
+            property_description: data.property_description || '',
+            business_type: data.business_type || '',
+            remarks: data.remarks || '',
+            base_amount: Number(data.base_amount) || 0,
+            surcharge_amount: Number(data.surcharge_amount) || 0,
+            penalty_amount: Number(data.penalty_amount) || 0,
+            discount_amount: Number(data.discount_amount) || 0,
+            total_amount: Number(data.total_amount) || 0,
+            area: Number(data.area) || 0,
             requirements_submitted: Array.isArray(data.requirements_submitted)
                 ? data.requirements_submitted
                 : [],
-            // DYNAMIC: Initialize from privileges if needed
-            ph_legal_compliance_notes: '',
+            ph_legal_compliance_notes: data.ph_legal_compliance_notes || '',
             bulk_type: data.bulk_type || 'none',
             selected_resident_ids: Array.isArray(data.selected_resident_ids) 
-                ? data.selected_resident_ids 
+                ? data.selected_resident_ids.map(String)
                 : [],
             selected_household_ids: Array.isArray(data.selected_household_ids) 
-                ? data.selected_household_ids 
+                ? data.selected_household_ids.map(String)
                 : [],
             custom_payers: Array.isArray(data.custom_payers) 
                 ? data.custom_payers 
                 : [],
             apply_to_all_residents: Boolean(data.apply_to_all_residents),
             apply_to_all_households: Boolean(data.apply_to_all_households),
-            filter_purok: safeString(data.filter_purok),
+            filter_purok: data.filter_purok || '',
             filter_discount_eligible: Boolean(data.filter_discount_eligible),
         };
     };
@@ -206,8 +307,13 @@ export default function FeesCreate({
     const [selectAllHouseholds, setSelectAllHouseholds] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Filter residents - DYNAMIC with privilege support
+    // FIXED: Filter residents - add safety check for residents array
     const filteredResidents = useMemo(() => {
+        // Safety check - ensure residents is an array
+        if (!residents || !Array.isArray(residents)) {
+            return [];
+        }
+        
         let filtered = [...residents];
         
         if (data.filter_purok && data.filter_purok !== 'none') {
@@ -224,11 +330,11 @@ export default function FeesCreate({
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(resident =>
-                resident.full_name.toLowerCase().includes(term) ||
-                resident.contact_number?.toLowerCase().includes(term) ||
+                resident.full_name?.toLowerCase().includes(term) ||
+                resident.phone?.toLowerCase().includes(term) ||
                 resident.purok?.toLowerCase().includes(term) ||
                 // Search in privileges
-                resident.privileges?.some((p: any) => 
+                resident.privileges?.some((p: PrivilegeData) => 
                     p.name?.toLowerCase().includes(term) ||
                     p.code?.toLowerCase().includes(term)
                 )
@@ -238,8 +344,13 @@ export default function FeesCreate({
         return filtered;
     }, [residents, data.filter_purok, data.filter_discount_eligible, searchTerm]);
 
-    // Filter households
+    // FIXED: Filter households - add safety check for households array
     const filteredHouseholds = useMemo(() => {
+        // Safety check - ensure households is an array
+        if (!households || !Array.isArray(households)) {
+            return [];
+        }
+        
         let filtered = [...households];
         
         if (data.filter_purok && data.filter_purok !== 'none') {
@@ -251,11 +362,11 @@ export default function FeesCreate({
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(household =>
-                household.name.toLowerCase().includes(term) ||
+                household.name?.toLowerCase().includes(term) ||
                 household.contact_number?.toLowerCase().includes(term) ||
                 household.purok?.toLowerCase().includes(term) ||
                 // Search in head privileges
-                household.head_privileges?.some((p: any) => 
+                household.head_privileges?.some((p: PrivilegeData) => 
                     p.name?.toLowerCase().includes(term) ||
                     p.code?.toLowerCase().includes(term)
                 )
@@ -267,84 +378,76 @@ export default function FeesCreate({
 
     // Calculate total amount
     useEffect(() => {
-        const total = calculateTotalAmount(
-            data.base_amount,
-            data.surcharge_amount,
-            data.penalty_amount
-        );
+        const total = data.base_amount + data.surcharge_amount + data.penalty_amount - data.discount_amount;
         setData('total_amount', total);
-    }, [data.base_amount, data.surcharge_amount, data.penalty_amount]);
+        setData('amount', total);
+    }, [data.base_amount, data.surcharge_amount, data.penalty_amount, data.discount_amount, setData]);
 
-    // Initialize form
+    // FIXED: Initialize form with safety checks
     useEffect(() => {
         if (data.fee_type_id) {
-            const feeType = feeTypes.find(
-                (ft) => ft.id.toString() === data.fee_type_id.toString(),
+            const feeType = fee_types.find(
+                (ft) => ft.id === data.fee_type_id
             );
             if (feeType) {
                 setSelectedFeeType(feeType);
                 setShowSurcharge(feeType.has_surcharge);
                 setShowPenalty(feeType.has_penalty);
                 
-                if (feeType.surcharge_description) {
-                    setSurchargeExplanation(feeType.surcharge_description);
-                } else if (feeType.has_surcharge && feeType.surcharge_percentage) {
+                if (feeType.has_surcharge && feeType.surcharge_percentage) {
                     setSurchargeExplanation(`A surcharge of ${feeType.surcharge_percentage}% may apply to this fee type.`);
                 }
                 
-                if (feeType.penalty_description) {
-                    setPenaltyExplanation(feeType.penalty_description);
-                } else if (feeType.has_penalty && feeType.penalty_fixed) {
+                if (feeType.has_penalty && feeType.penalty_fixed) {
                     setPenaltyExplanation(`This fee type can have penalties up to ₱${feeType.penalty_fixed} for late payments.`);
                 }
             }
         }
 
-        // Handle initial selection of payer
+        // Handle initial selection of payer - add safety checks
         if (data.payer_type === 'resident' && data.resident_id) {
-            const resident = residents.find(
-                (r) => r.id.toString() === data.resident_id.toString(),
-            );
+            const resident = residents && Array.isArray(residents) 
+                ? residents.find((r) => r.id === data.resident_id)
+                : undefined;
             if (resident) setSelectedPayer(resident);
         } else if (data.payer_type === 'household' && data.household_id) {
-            const household = households.find(
-                (h) => h.id.toString() === data.household_id.toString(),
-            );
+            const household = households && Array.isArray(households)
+                ? households.find((h) => h.id.toString() === data.household_id.toString())
+                : undefined;
             if (household) setSelectedPayer(household);
         }
-    }, []);
+    }, [data.fee_type_id, data.payer_type, data.resident_id, data.household_id, fee_types, residents, households]);
 
     const handleFeeTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const feeTypeId = e.target.value;
-        const selected = feeTypes.find((ft) => ft.id.toString() === feeTypeId);
+        const feeTypeId = parseInt(e.target.value);
+        const selected = fee_types.find((ft) => ft.id === feeTypeId);
 
         setSelectedFeeType(selected || null);
 
         if (selected) {
             setData('fee_type_id', feeTypeId);
-            setData('base_amount', selected.base_amount);
+            const baseAmount = typeof selected.base_amount === 'string' 
+                ? parseFloat(selected.base_amount) 
+                : selected.base_amount;
+            setData('base_amount', baseAmount);
             
             setShowSurcharge(selected.has_surcharge);
             setShowPenalty(selected.has_penalty);
 
-            if (selected.surcharge_description) {
-                setSurchargeExplanation(selected.surcharge_description);
-            } else if (selected.has_surcharge && selected.surcharge_percentage) {
+            if (selected.has_surcharge && selected.surcharge_percentage) {
                 setSurchargeExplanation(`A surcharge of ${selected.surcharge_percentage}% may apply to this fee type.`);
             } else {
                 setSurchargeExplanation('');
             }
             
-            if (selected.penalty_description) {
-                setPenaltyExplanation(selected.penalty_description);
-            } else if (selected.has_penalty && selected.penalty_fixed) {
+            if (selected.has_penalty && selected.penalty_fixed) {
                 setPenaltyExplanation(`This fee type can have penalties up to ₱${selected.penalty_fixed} for late payments.`);
             } else {
                 setPenaltyExplanation('');
             }
 
             if (selected.has_surcharge && selected.surcharge_percentage) {
-                const surcharge = (selected.base_amount * selected.surcharge_percentage) / 100;
+                const surcharge = (baseAmount * selected.surcharge_percentage) / 100;
                 setData('surcharge_amount', surcharge);
             } else {
                 setData('surcharge_amount', 0);
@@ -354,7 +457,7 @@ export default function FeesCreate({
             
         } else {
             setSelectedFeeType(null);
-            setData('fee_type_id', '');
+            setData('fee_type_id', 0);
             setData('base_amount', 0);
             setShowSurcharge(false);
             setShowPenalty(false);
@@ -367,18 +470,18 @@ export default function FeesCreate({
 
     const handlePayerTypeChange = (payerType: string) => {
         setData('payer_type', payerType);
-        setData('resident_id', '');
+        setData('resident_id', 0);
         setData('household_id', '');
         setData('business_name', '');
         setSelectedPayer(null);
 
         if (payerType === 'resident' && preselectedResident) {
             setData('resident_id', preselectedResident.id);
-            setData('payer_name', preselectedResident.full_name);
-            setData('contact_number', preselectedResident.contact_number || '');
+            setData('payer_name', preselectedResident.full_name || '');
+            setData('contact_number', preselectedResident.phone || '');
             setData('purok', preselectedResident.purok || '');
         } else if (payerType === 'household' && preselectedHousehold) {
-            setData('household_id', preselectedHousehold.id);
+            setData('household_id', preselectedHousehold.id.toString());
             setData('payer_name', preselectedHousehold.name);
             setData('contact_number', preselectedHousehold.contact_number || '');
             setData('purok', preselectedHousehold.purok || '');
@@ -389,20 +492,26 @@ export default function FeesCreate({
         }
     };
 
+    // FIXED: Update handleResidentSelect with safety check
     const handleResidentSelect = (residentId: string) => {
-        const resident = residents.find((r) => r.id.toString() === residentId);
+        const resident = residents && Array.isArray(residents)
+            ? residents.find((r) => r.id.toString() === residentId)
+            : undefined;
         if (resident) {
             setSelectedPayer(resident);
-            setData('resident_id', residentId);
+            setData('resident_id', resident.id);
             setData('payer_type', 'resident');
-            setData('payer_name', resident.full_name);
-            setData('contact_number', resident.contact_number || '');
+            setData('payer_name', resident.full_name || '');
+            setData('contact_number', resident.phone || '');
             setData('purok', resident.purok || '');
         }
     };
 
+    // FIXED: Update handleHouseholdSelect with safety check
     const handleHouseholdSelect = (householdId: string) => {
-        const household = households.find((h) => h.id.toString() === householdId);
+        const household = households && Array.isArray(households)
+            ? households.find((h) => h.id.toString() === householdId)
+            : undefined;
         if (household) {
             setSelectedPayer(household);
             setData('household_id', householdId);
@@ -415,12 +524,12 @@ export default function FeesCreate({
 
     const handleResetForm = () => {
         Object.entries(mergedInitialData).forEach(([key, value]) => {
-            setData(key as keyof BulkFeeFormData, value);
+            setData(key as keyof BulkFeeFormData, value as any);
         });
 
         if (mergedInitialData.fee_type_id) {
-            const feeType = feeTypes.find(
-                (ft) => ft.id.toString() === mergedInitialData.fee_type_id.toString(),
+            const feeType = fee_types.find(
+                (ft) => ft.id === mergedInitialData.fee_type_id
             );
             if (feeType) {
                 setSelectedFeeType(feeType);
@@ -554,16 +663,20 @@ export default function FeesCreate({
         
         if (previousBulkType !== 'none' && bulkType === 'none') {
             if (data.payer_type === 'resident' && data.resident_id) {
-                const resident = residents.find(r => r.id.toString() === data.resident_id.toString());
+                const resident = residents && Array.isArray(residents)
+                    ? residents.find(r => r.id === data.resident_id)
+                    : undefined;
                 if (resident) setSelectedPayer(resident);
             } else if (data.payer_type === 'household' && data.household_id) {
-                const household = households.find(h => h.id.toString() === data.household_id.toString());
+                const household = households && Array.isArray(households)
+                    ? households.find(h => h.id.toString() === data.household_id.toString())
+                    : undefined;
                 if (household) setSelectedPayer(household);
             }
         }
         
         if (previousBulkType === 'none' && bulkType !== 'none') {
-            setData('resident_id', '');
+            setData('resident_id', 0);
             setData('household_id', '');
             setData('business_name', '');
             setData('payer_name', '');
@@ -597,13 +710,12 @@ export default function FeesCreate({
     };
 
     const filteredFeeTypes = useMemo(() => {
-        if (selectedCategory === 'all') return feeTypes;
-        return feeTypes.filter(
+        if (selectedCategory === 'all') return fee_types;
+        return fee_types.filter(
             (feeType) =>
-                feeType.document_category_id &&
-                feeType.document_category_id.toString() === selectedCategory,
+                feeType.category && feeType.category.toString() === selectedCategory,
         );
-    }, [selectedCategory, feeTypes]);
+    }, [selectedCategory, fee_types]);
 
     const getSelectedCategoryName = () => {
         if (selectedCategory === 'all') return 'All Categories';
@@ -613,9 +725,9 @@ export default function FeesCreate({
         return category ? category.name : 'Select Category';
     };
 
-    // Get supported discount info - DYNAMIC
+    // Get supported discount info - DYNAMIC with safety
     const discountInfo = useMemo((): DiscountInfo | null => {
-        if (!selectedFeeType || !selectedFeeType.is_discountable) return null;
+        if (!selectedFeeType) return null;
         
         const applicableDiscounts = getDiscountsForFeeType(selectedFeeType, discountRules);
         
@@ -630,25 +742,51 @@ export default function FeesCreate({
             requirements: d.verification_document ? [d.verification_document] : undefined
         }));
         
-        // DYNAMIC: Build legal notes from privileges
-        const legalNotes = [];
         const discountCodes = applicableDiscounts.map(d => d.discount_type);
         const note = getDiscountNote(discountCodes);
         
         return {
             eligibleDiscounts,
-            legalNotes,
+            legalNotes: [],
             warnings: note.type === 'warning' ? [note.note] : []
         };
     }, [selectedFeeType, discountRules]);
 
+    // Fixed submit function with proper data transformation
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        const validationError = validateFeeForm(data, data.bulk_type);
-        if (validationError) {
-            alert(validationError);
+        // Basic validation
+        if (!data.fee_type_id) {
+            alert('Please select a fee type');
             return;
+        }
+
+        if (data.bulk_type === 'none') {
+            if (!data.payer_type) {
+                alert('Please select a payer type');
+                return;
+            }
+            
+            if (data.payer_type === 'resident' && !data.resident_id) {
+                alert('Please select a resident');
+                return;
+            }
+            
+            if (data.payer_type === 'household' && !data.household_id) {
+                alert('Please select a household');
+                return;
+            }
+            
+            if (data.payer_type === 'business' && !data.business_name) {
+                alert('Please enter a business name');
+                return;
+            }
+            
+            if ((data.payer_type === 'visitor' || data.payer_type === 'other') && !data.payer_name) {
+                alert('Please enter a name');
+                return;
+            }
         }
 
         if (data.bulk_type === 'custom') {
@@ -661,17 +799,106 @@ export default function FeesCreate({
 
         if (totalPayersCount > 1) {
             const confirmed = confirm(
-                getBulkCreationSummary(
-                    totalPayersCount, 
-                    totalEstimatedAmount, 
-                    data.bulk_type
-                )
+                `You are about to create ${totalPayersCount} fees with a total amount of ${formatCurrency(totalEstimatedAmount)}. Do you want to continue?`
             );
             
             if (!confirmed) return;
         }
 
-        post('/admin/fees');
+        // Transform data for submission - only include fields that backend expects
+        const submitData: any = {
+            // Core fee data
+            fee_type_id: data.fee_type_id,
+            amount: data.total_amount,
+            due_date: data.due_date,
+            status: data.status,
+            payment_method: data.payment_method,
+            payment_reference: data.payment_reference,
+            notes: data.notes,
+            
+            // Financial breakdown
+            total_amount: data.total_amount,
+            base_amount: data.base_amount,
+            surcharge_amount: data.surcharge_amount,
+            penalty_amount: data.penalty_amount,
+            discount_amount: data.discount_amount,
+            
+            // Payer information
+            payer_type: data.payer_type,
+            payer_name: data.payer_name,
+            contact_number: data.contact_number,
+            purok: data.purok,
+            
+            // Bulk type
+            bulk_type: data.bulk_type,
+        };
+
+        // Add conditional fields based on payer type
+        if (data.payer_type === 'resident') {
+            submitData.resident_id = data.resident_id;
+        } else if (data.payer_type === 'household') {
+            submitData.household_id = data.household_id;
+        } else if (data.payer_type === 'business') {
+            submitData.business_name = data.business_name;
+            submitData.address = data.address;
+            submitData.business_type = data.business_type;
+        } else if (data.payer_type === 'visitor' || data.payer_type === 'other') {
+            submitData.address = data.address;
+        }
+
+        // Add bulk-specific data
+        if (data.bulk_type === 'residents') {
+            if (data.apply_to_all_residents) {
+                submitData.apply_to_all_residents = true;
+                submitData.filter_purok = data.filter_purok;
+                submitData.filter_discount_eligible = data.filter_discount_eligible;
+            } else {
+                submitData.selected_resident_ids = data.selected_resident_ids;
+            }
+        } else if (data.bulk_type === 'households') {
+            if (data.apply_to_all_households) {
+                submitData.apply_to_all_households = true;
+                submitData.filter_purok = data.filter_purok;
+            } else {
+                submitData.selected_household_ids = data.selected_household_ids;
+            }
+        } else if (data.bulk_type === 'custom') {
+            submitData.custom_payers = data.custom_payers;
+        }
+
+        // Add optional fields if they have values
+        if (data.issue_date) submitData.issue_date = data.issue_date;
+        if (data.billing_period) submitData.billing_period = data.billing_period;
+        if (data.period_start) submitData.period_start = data.period_start;
+        if (data.period_end) submitData.period_end = data.period_end;
+        if (data.purpose) submitData.purpose = data.purpose;
+        if (data.property_description) submitData.property_description = data.property_description;
+        if (data.area) submitData.area = data.area;
+        if (data.remarks) submitData.remarks = data.remarks;
+        if (data.requirements_submitted && data.requirements_submitted.length > 0) {
+            submitData.requirements_submitted = data.requirements_submitted;
+        }
+        if (data.ph_legal_compliance_notes) submitData.ph_legal_compliance_notes = data.ph_legal_compliance_notes;
+        if (data.zone) submitData.zone = data.zone;
+        
+        // Add discount flags if applicable
+        if (data.apply_discounts) {
+            submitData.apply_discounts = true;
+            if (data.senior_discount) submitData.senior_discount = true;
+            if (data.pwd_discount) submitData.pwd_discount = true;
+            if (data.solo_parent_discount) submitData.solo_parent_discount = true;
+            if (data.indigent_discount) submitData.indigent_discount = true;
+        }
+
+        // Remove any undefined values
+        Object.keys(submitData).forEach(key => {
+            if (submitData[key] === undefined) {
+                delete submitData[key];
+            }
+        });
+
+        // Send to server
+        post('/admin/fees', submitData);
     };
 
     const feeFormDataForChild = useMemo(() => {
@@ -777,7 +1004,7 @@ export default function FeesCreate({
                             filteredFeeTypes={filteredFeeTypes}
                             documentCategories={documentCategories}
                             getSelectedCategoryName={getSelectedCategoryName}
-                            feeTypes={feeTypes}
+                            feeTypes={fee_types}
                             selectedPayer={selectedPayer}
                             payerType={data.payer_type}
                             formatCurrency={formatCurrency}

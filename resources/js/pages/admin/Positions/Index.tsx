@@ -1,4 +1,3 @@
-// resources/js/pages/admin/positions/index.tsx
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -40,6 +39,20 @@ const defaultStats: PositionStats = {
     unassigned: 0
 };
 
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
+const getSafeSortOrder = (value: any): 'asc' | 'desc' => {
+    if (value === 'asc') return 'asc';
+    if (value === 'desc') return 'desc';
+    return 'asc';
+};
+
 export default function PositionsIndex({ 
     positions, 
     filters, 
@@ -47,19 +60,27 @@ export default function PositionsIndex({
 }: PositionsPageProps) {
     const { flash } = usePage().props as any;
     
-    // State management
-    const [search, setSearch] = useState(filters.search || '');
-    const [filtersState, setFiltersState] = useState<PositionFilters>({
-        status: filters.status || 'all',
-        requires_account: filters.requires_account || 'all',
-        sort_by: filters.sort_by || 'order',
-        sort_order: filters.sort_order || 'asc'
-    });
+    // Safe data extraction
+    const safePositions = positions || { data: [], current_page: 1, last_page: 1, total: 0, per_page: 10, from: 0, to: 0 };
+    const allPositions = safePositions.data || [];
+    const safeFilters = filters || {};
+    
+    // Filter states - all client-side
+    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
+    const [requiresAccountFilter, setRequiresAccountFilter] = useState<string>(getSafeString(safeFilters.requires_account, 'all'));
+    const [officialsRange, setOfficialsRange] = useState<string>(getSafeString(safeFilters.officials_range, ''));
+    
+    // Sorting is now handled by table header, not in filters
+    const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'order'));
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     
     // Bulk selection states
     const [selectedPositions, setSelectedPositions] = useState<number[]>([]);
@@ -69,43 +90,9 @@ export default function PositionsIndex({
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    // Debounced search function
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value || undefined,
-                status: filtersState.status === 'all' ? undefined : filtersState.status,
-                requires_account: filtersState.requires_account === 'all' ? undefined : filtersState.requires_account,
-            };
-            
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (params[k] === undefined || params[k] === '') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/positions', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 300),
-        [filtersState]
-    );
-
-    // Cleanup debounce on unmount
-    useEffect(() => {
-        return () => {
-            debouncedSearch.cancel();
-        };
-    }, [debouncedSearch]);
 
     // Handle window resize
     useEffect(() => {
@@ -142,38 +129,10 @@ export default function PositionsIndex({
         }
     }, [flash]);
 
-    // Filter positions
-    const filteredPositions = useMemo(() => {
-        return positionUtils.filterPositions({
-            positions: positions.data,
-            search,
-            filters: filtersState
-        });
-    }, [positions.data, search, filtersState]);
-
-    const filteredStats = useMemo(() => {
-        return {
-            total: filteredPositions.length,
-            active: filteredPositions.filter(p => p.is_active).length,
-            requires_account: filteredPositions.filter(p => p.requires_account).length,
-            kagawad_count: filteredPositions.filter(p => p.code?.startsWith('KAG')).length,
-            inactive: filteredPositions.filter(p => !p.is_active).length,
-            assigned: filteredPositions.filter(p => (p.officials_count ?? 0) > 0).length,
-            unassigned: filteredPositions.filter(p => (p.officials_count ?? 0) === 0).length
-        };
-    }, [filteredPositions]);
-
-    // Pagination
-    const totalItems = filteredPositions.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedPositions = filteredPositions.slice(startIndex, endIndex);
-
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, statusFilter, requiresAccountFilter, officialsRange, sortBy, sortOrder]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -183,48 +142,137 @@ export default function PositionsIndex({
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
+    // Filter positions client-side
+    const filteredPositions = useMemo(() => {
+        if (!allPositions || allPositions.length === 0) {
+            return [];
+        }
         
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
+        let filtered = [...allPositions];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(position =>
+                position?.name?.toLowerCase().includes(searchLower) ||
+                position?.code?.toLowerCase().includes(searchLower) ||
+                position?.description?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Status filter
+        if (statusFilter && statusFilter !== 'all') {
+            filtered = filtered.filter(position => position?.is_active === (statusFilter === 'active'));
+        }
+        
+        // Requires account filter
+        if (requiresAccountFilter && requiresAccountFilter !== 'all') {
+            filtered = filtered.filter(position => position?.requires_account === (requiresAccountFilter === 'yes'));
+        }
+        
+        // Officials count range filter
+        if (officialsRange) {
+            filtered = filtered.filter(position => {
+                const count = position?.officials_count || 0;
+                switch (officialsRange) {
+                    case '0': return count === 0;
+                    case '1': return count === 1;
+                    case '2-3': return count >= 2 && count <= 3;
+                    case '4-5': return count >= 4 && count <= 5;
+                    case '6+': return count >= 6;
+                    default: return true;
                 }
-            }
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedPositions.length > 0) {
-                        setSelectedPositions([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
+            });
+        }
+        
+        // Apply sorting (now handled client-side since positions are small data)
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'order':
+                        valueA = a?.order || 0;
+                        valueB = b?.order || 0;
+                        break;
+                    case 'name':
+                        valueA = a?.name || '';
+                        valueB = b?.name || '';
+                        break;
+                    case 'code':
+                        valueA = a?.code || '';
+                        valueB = b?.code || '';
+                        break;
+                    case 'description':
+                        valueA = a?.description || '';
+                        valueB = b?.description || '';
+                        break;
+                    case 'committee':
+                        valueA = a?.committee?.name || '';
+                        valueB = b?.committee?.name || '';
+                        break;
+                    case 'officials_count':
+                        valueA = a?.officials_count || 0;
+                        valueB = b?.officials_count || 0;
+                        break;
+                    case 'status':
+                        valueA = a?.is_active ? 1 : 0;
+                        valueB = b?.is_active ? 1 : 0;
+                        break;
+                    case 'requires_account':
+                        valueA = a?.requires_account ? 1 : 0;
+                        valueB = b?.requires_account ? 1 : 0;
+                        break;
+                    case 'created_at':
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.order || 0;
+                        valueB = b?.order || 0;
                 }
-            }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            if (e.key === 'Delete' && isBulkMode && selectedPositions.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [allPositions, search, statusFilter, requiresAccountFilter, officialsRange, sortBy, sortOrder]);
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedPositions, isMobile]);
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        if (!filteredPositions || filteredPositions.length === 0) {
+            return stats;
+        }
+        
+        return {
+            total: filteredPositions.length,
+            active: filteredPositions.filter(p => p?.is_active).length,
+            requires_account: filteredPositions.filter(p => p?.requires_account).length,
+            kagawad_count: filteredPositions.filter(p => p?.code?.startsWith('KAG')).length,
+            inactive: filteredPositions.filter(p => !p?.is_active).length,
+            assigned: filteredPositions.filter(p => (p?.officials_count ?? 0) > 0).length,
+            unassigned: filteredPositions.filter(p => (p?.officials_count ?? 0) === 0).length
+        };
+    }, [filteredPositions, stats]);
+
+    // Pagination
+    const totalItems = filteredPositions.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedPositions = filteredPositions.slice(startIndex, endIndex);
 
     // Selection handlers
-    const handleSelectAllOnPage = () => {
+    const handleSelectAllOnPage = useCallback(() => {
         const pageIds = paginatedPositions.map(position => position.id);
         if (isSelectAll) {
             setSelectedPositions(prev => prev.filter(id => !pageIds.includes(id)));
@@ -234,9 +282,9 @@ export default function PositionsIndex({
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    };
+    }, [paginatedPositions, isSelectAll, selectedPositions]);
 
-    const handleSelectAllFiltered = () => {
+    const handleSelectAllFiltered = useCallback(() => {
         const allIds = filteredPositions.map(position => position.id);
         if (selectedPositions.length === allIds.length && allIds.every(id => selectedPositions.includes(id))) {
             setSelectedPositions(prev => prev.filter(id => !allIds.includes(id)));
@@ -245,17 +293,17 @@ export default function PositionsIndex({
             setSelectedPositions(newSelected);
             setSelectionMode('filtered');
         }
-    };
+    }, [filteredPositions, selectedPositions]);
 
-    const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${positions.total || 0} positions. This action may take a moment.`)) {
-            const allIds = positions.data.map(p => p.id);
+    const handleSelectAll = useCallback(() => {
+        if (confirm(`This will select ALL ${totalItems} positions. This action may take a moment.`)) {
+            const allIds = filteredPositions.map(position => position.id);
             setSelectedPositions(allIds);
             setSelectionMode('all');
         }
-    };
+    }, [filteredPositions, totalItems]);
 
-    const handleItemSelect = (id: number) => {
+    const handleItemSelect = useCallback((id: number) => {
         setSelectedPositions(prev => {
             if (prev.includes(id)) {
                 return prev.filter(itemId => itemId !== id);
@@ -263,7 +311,7 @@ export default function PositionsIndex({
                 return [...prev, id];
             }
         });
-    };
+    }, []);
 
     // Check if all items on current page are selected
     useEffect(() => {
@@ -281,6 +329,18 @@ export default function PositionsIndex({
     const selectionStats = useMemo(() => {
         return positionUtils.getSelectionStats(selectedPositionsData);
     }, [selectedPositionsData]);
+
+    // Handle sort change from dropdown (for table header)
+    const handleSortChange = useCallback((value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    }, []);
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = useCallback((): string => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
 
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation) => {
@@ -306,6 +366,7 @@ export default function PositionsIndex({
                         onSuccess: () => {
                             setSelectedPositions([]);
                             toast.success(`${selectedPositions.length} positions activated successfully`);
+                            router.reload({ only: ['positions'] });
                         },
                         onError: () => {
                             toast.error('Failed to activate positions');
@@ -322,6 +383,7 @@ export default function PositionsIndex({
                         onSuccess: () => {
                             setSelectedPositions([]);
                             toast.success(`${selectedPositions.length} positions deactivated successfully`);
+                            router.reload({ only: ['positions'] });
                         },
                         onError: () => {
                             toast.error('Failed to deactivate positions');
@@ -336,16 +398,14 @@ export default function PositionsIndex({
                 case 'export':
                 case 'export_csv':
                     const exportData = selectedPositionsData.map(position => ({
-                        'ID': position.id,
-                        'Code': position.code,
                         'Name': position.name,
+                        'Code': position.code,
                         'Description': position.description || '',
                         'Committee': position.committee?.name || '',
                         'Display Order': position.order,
                         'Officials Count': position.officials_count || 0,
                         'Requires Account': position.requires_account ? 'Yes' : 'No',
                         'Status': position.is_active ? 'Active' : 'Inactive',
-                        'Created At': position.created_at,
                     }));
                     
                     if (exportData.length > 0) {
@@ -367,9 +427,7 @@ export default function PositionsIndex({
                         const a = document.createElement('a');
                         a.href = url;
                         a.download = `positions-export-${new Date().toISOString().split('T')[0]}.csv`;
-                        document.body.appendChild(a);
                         a.click();
-                        document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
                         
                         toast.success(`${selectedPositions.length} positions exported successfully`);
@@ -428,6 +486,7 @@ export default function PositionsIndex({
                     setBulkEditValue('');
                     setShowBulkStatusDialog(false);
                     toast.success(`${selectedPositions.length} position account requirements updated successfully`);
+                    router.reload({ only: ['positions'] });
                 },
                 onError: () => {
                     toast.error('Failed to update position account requirements');
@@ -453,6 +512,7 @@ export default function PositionsIndex({
                     setSelectedPositions([]);
                     setShowBulkDeleteDialog(false);
                     toast.success(`${selectedPositions.length} positions deleted successfully`);
+                    router.reload({ only: ['positions'] });
                 },
                 onError: () => {
                     toast.error('Failed to delete positions');
@@ -466,6 +526,7 @@ export default function PositionsIndex({
         }
     };
 
+    // Individual position operations
     const handleDelete = (position: Position) => {
         if (confirm(`Are you sure you want to delete position "${position.name || 'Untitled'}"?`)) {
             router.delete(`/admin/positions/${position.id}`, {
@@ -473,6 +534,7 @@ export default function PositionsIndex({
                 onSuccess: () => {
                     setSelectedPositions(selectedPositions.filter(id => id !== position.id));
                     toast.success('Position deleted successfully');
+                    router.reload({ only: ['positions'] });
                 },
                 onError: () => {
                     toast.error('Failed to delete position');
@@ -481,64 +543,28 @@ export default function PositionsIndex({
         }
     };
 
-    const handleSort = (column: string) => {
-        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
-        
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column as any,
-            sort_order: newOrder
-        }));
-        
-        const params = {
-            ...filtersState,
-            sort_by: column,
-            sort_order: newOrder,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/positions', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+    const handleSort = useCallback((column: string) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    }, [sortBy, sortOrder]);
 
-    const handleClearFilters = () => {
+    const handleClearFilters = useCallback(() => {
         setSearch('');
-        setFiltersState({
-            status: 'all',
-            requires_account: 'all',
-            sort_by: 'order',
-            sort_order: 'asc'
-        });
-        
-        router.get('/admin/positions', {
-            search: '',
-            status: 'all',
-            requires_account: 'all',
-            sort_by: 'order',
-            sort_order: 'asc'
-        }, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+        setStatusFilter('all');
+        setRequiresAccountFilter('all');
+        setOfficialsRange('');
+        setSortBy('order');
+        setSortOrder('asc');
+        setCurrentPage(1);
+    }, []);
 
-    const handleClearSelection = () => {
+    const handleClearSelection = useCallback(() => {
         setSelectedPositions([]);
         setIsSelectAll(false);
-    };
+    }, []);
 
-    const handleCopySelectedData = () => {
+    const handleCopySelectedData = useCallback(() => {
         if (selectedPositionsData.length === 0) {
             toast.error('No data to copy');
             return;
@@ -564,36 +590,76 @@ export default function PositionsIndex({
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
-    };
+    }, [selectedPositionsData]);
 
-    const updateFilter = (key: keyof PositionFilters, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
-        
-        const params = {
-            ...filtersState,
-            [key]: value,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/positions', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+    const updateFilter = useCallback((key: keyof PositionFilters, value: string) => {
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'requires_account':
+                setRequiresAccountFilter(value);
+                break;
+            case 'officials_range':
+                setOfficialsRange(value);
+                break;
+        }
+        setCurrentPage(1);
+    }, []);
 
     const hasActiveFilters = Boolean(
         search || 
-        filtersState.status !== 'all' ||
-        filtersState.requires_account !== 'all'
+        (statusFilter && statusFilter !== 'all') ||
+        (requiresAccountFilter && requiresAccountFilter !== 'all') ||
+        officialsRange
     );
+
+    // Create filters object for the Filters component
+  const filtersStateForComponent: PositionFilters = {
+    status: statusFilter,
+    requires_account: requiresAccountFilter as "all" | "yes" | "no",
+    officials_range: officialsRange
+};
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedPositions.length > 0) {
+                        setSelectedPositions([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedPositions.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedPositions, isMobile]);
 
     return (
         <AppLayout
@@ -622,9 +688,8 @@ export default function PositionsIndex({
                         setSearch={setSearch}
                         onSearchChange={(value) => {
                             setSearch(value);
-                            debouncedSearch(value);
                         }}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
@@ -640,6 +705,7 @@ export default function PositionsIndex({
 
                     <PositionsContent
                         positions={paginatedPositions}
+                        stats={filteredStats}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -665,10 +731,14 @@ export default function PositionsIndex({
                         onCopySelectedData={handleCopySelectedData}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {isBulkMode && !isMobile && (

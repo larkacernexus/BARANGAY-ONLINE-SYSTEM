@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, Calendar, MapPin, AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { IncidentTypeDropdown } from './IncidentTypeDropdown';
-import { IncidentType } from './BlotterTypes';
+import { IncidentType } from '@/types/admin/blotters/blotter';
 
 interface IncidentDetailsCardProps {
     selectedType: IncidentType | null;

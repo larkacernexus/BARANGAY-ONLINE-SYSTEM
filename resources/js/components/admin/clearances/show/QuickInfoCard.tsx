@@ -15,7 +15,7 @@ import {
     MapPin,
     Home
 } from 'lucide-react';
-import { ClearanceRequest } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance';
 import { useState } from 'react';
 import { toast } from 'sonner';
 

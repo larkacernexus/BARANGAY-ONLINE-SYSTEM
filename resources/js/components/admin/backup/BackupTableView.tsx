@@ -1,5 +1,6 @@
 // resources/js/components/admin/backup/BackupTableView.tsx
-import React from 'react';
+
+import React, { JSX } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -37,14 +38,16 @@ import {
     ChevronRight,
 } from 'lucide-react';
 
+import type { BackupFile } from '@/types/admin/backup/backup';
+
 interface BackupTableViewProps {
-    backups: any[];
+    backups: BackupFile[];
     isBulkMode: boolean;
-    selectedBackups: number[];
-    onItemSelect: (id: number) => void;
-    onDelete: (backup: any) => void;
-    onDownload: (backup: any) => void;
-    onToggleProtection: (backup: any) => void;
+    selectedBackups: string[]; // Changed from number[] to string[]
+    onItemSelect: (id: string) => void; // Changed from number to string
+    onDelete: (backup: BackupFile) => void;
+    onDownload: (backup: BackupFile) => void;
+    onToggleProtection: (backup: BackupFile) => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
@@ -108,6 +111,9 @@ export default function BackupTableView({
     onSort,
     filtersState
 }: BackupTableViewProps) {
+    // Convert backup.id to string for comparison
+    const getBackupId = (backup: BackupFile): string => backup.id.toString();
+
     return (
         <>
             <div className="overflow-x-auto">
@@ -186,14 +192,14 @@ export default function BackupTableView({
                                     <TableRow 
                                         key={backup.id}
                                         className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors border-gray-200 dark:border-gray-700 ${
-                                            selectedBackups.includes(backup.id) ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
+                                            selectedBackups.includes(getBackupId(backup)) ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
                                         }`}
                                     >
                                         {isBulkMode && (
                                             <TableCell className="px-4 py-3">
                                                 <Checkbox
-                                                    checked={selectedBackups.includes(backup.id)}
-                                                    onCheckedChange={() => onItemSelect(backup.id)}
+                                                    checked={selectedBackups.includes(getBackupId(backup))}
+                                                    onCheckedChange={() => onItemSelect(getBackupId(backup))}
                                                     disabled={isPerformingBulkAction}
                                                     className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600"
                                                 />

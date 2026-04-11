@@ -1,4 +1,4 @@
-import { StatItem } from '@/components/admin/dashboard/types/dashboard';
+import { StatItem } from '@/types/admin/dashboard/dashboard';
 import { StatCard } from './StatCard';
 
 interface StatsGridProps {

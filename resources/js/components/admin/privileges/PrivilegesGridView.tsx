@@ -31,6 +31,10 @@ interface DiscountType {
     id: number;
     name: string;
     code: string;
+    percentage?: number;
+    requires_verification?: boolean;
+    requires_id_number?: boolean;
+    validity_days?: number;
 }
 
 interface Privilege {
@@ -40,15 +44,12 @@ interface Privilege {
     description: string | null;
     is_active: boolean;
     discount_type_id: number;
-    default_discount_percentage: string | number;
-    requires_id_number: boolean;
-    requires_verification: boolean;
-    validity_years: number | null;
     created_at: string;
     updated_at: string;
-    discount_type?: DiscountType;
     residents_count?: number;
     active_residents_count?: number;
+    // ✅ FIXED: Use discountType relationship instead of direct fields
+    discountType?: DiscountType | null;
 }
 
 interface PrivilegesGridViewProps {
@@ -71,7 +72,7 @@ interface PrivilegesGridViewProps {
     };
 }
 
-// Helper function to get status color (matching community reports pattern)
+// Helper function to get status color
 const getStatusColor = (isActive: boolean) => {
     return isActive
         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
@@ -103,11 +104,30 @@ export default function PrivilegesGridView({
         return text.substring(0, maxLength) + '...';
     };
 
+    // ✅ FIXED: Get discount type name from discountType relationship
     const getDiscountTypeName = (privilege: Privilege) => {
-        if (privilege.discount_type) {
-            return privilege.discount_type.name;
-        }
-        return discountTypes.find(t => t.id === privilege.discount_type_id)?.name || 'N/A';
+        return privilege?.discountType?.name || 'N/A';
+    };
+
+    // ✅ FIXED: Get discount percentage from discountType relationship
+    const getDiscountPercentage = (privilege: Privilege) => {
+        return privilege?.discountType?.percentage || 0;
+    };
+
+    // ✅ FIXED: Get requires verification from discountType relationship
+    const getRequiresVerification = (privilege: Privilege) => {
+        return privilege?.discountType?.requires_verification || false;
+    };
+
+    // ✅ FIXED: Get requires ID number from discountType relationship
+    const getRequiresIdNumber = (privilege: Privilege) => {
+        return privilege?.discountType?.requires_id_number || false;
+    };
+
+    // ✅ FIXED: Get validity years from discountType relationship
+    const getValidityYears = (privilege: Privilege) => {
+        const days = privilege?.discountType?.validity_days;
+        return days ? Math.floor(days / 365) : null;
     };
 
     const formatDate = (dateString: string) => {
@@ -139,7 +159,6 @@ export default function PrivilegesGridView({
         });
     };
 
-    // Toggle card expansion
     const toggleCardExpansion = (id: number, e?: React.MouseEvent) => {
         if (e) {
             e.stopPropagation();
@@ -156,7 +175,6 @@ export default function PrivilegesGridView({
         });
     };
 
-    // Handle card click
     const handleCardClick = (privilegeId: number, e: React.MouseEvent) => {
         if (isBulkMode) {
             e.stopPropagation();
@@ -192,7 +210,6 @@ export default function PrivilegesGridView({
                 const isSelected = selectedPrivileges.includes(privilege.id);
                 const isExpanded = expandedCards.has(privilege.id);
                 
-                // Truncation lengths based on view
                 const nameLength = isCompactView ? 20 : 30;
                 const descriptionLength = isCompactView ? 60 : 120;
                 
@@ -264,23 +281,23 @@ export default function PrivilegesGridView({
                             
                             {/* Primary Info - always visible */}
                             <div className="space-y-1.5 mb-2">
-                                {/* Discount Info */}
+                                {/* ✅ FIXED: Discount Info using discountType relationship */}
                                 <div className="flex items-center gap-1.5">
                                     <Percent className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                     <span className="text-xs text-gray-700 dark:text-gray-300">
-                                        {getDiscountTypeName(privilege)} • {privilege.default_discount_percentage}% off
+                                        {getDiscountTypeName(privilege)} • {getDiscountPercentage(privilege)}% off
                                     </span>
                                 </div>
                                 
-                                {/* Requirements badges */}
+                                {/* ✅ FIXED: Requirements badges using discountType relationship */}
                                 <div className="flex flex-wrap gap-1">
-                                    {privilege.requires_verification && (
+                                    {getRequiresVerification(privilege) && (
                                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
                                             <Shield className="h-2 w-2 mr-0.5" />
                                             Verify
                                         </Badge>
                                     )}
-                                    {privilege.requires_id_number && (
+                                    {getRequiresIdNumber(privilege) && (
                                         <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
                                             <IdCard className="h-2 w-2 mr-0.5" />
                                             ID Req
@@ -336,24 +353,24 @@ export default function PrivilegesGridView({
                                         </div>
                                     )}
 
-                                    {/* Validity Period */}
+                                    {/* ✅ FIXED: Validity Period using discountType relationship */}
                                     <div className="flex items-center gap-1.5 text-xs">
                                         <Clock className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                         <span className="text-gray-600 dark:text-gray-400">Validity:</span>
                                         <span className="font-medium text-gray-900 dark:text-white">
-                                            {privilege.validity_years ? `${privilege.validity_years} year(s)` : 'Lifetime'}
+                                            {getValidityYears(privilege) ? `${getValidityYears(privilege)} year(s)` : 'Lifetime'}
                                         </span>
                                     </div>
 
-                                    {/* Requirements Details */}
+                                    {/* ✅ FIXED: Requirements Details using discountType relationship */}
                                     <div className="space-y-1 text-xs">
                                         <p className="font-medium text-gray-600 dark:text-gray-400">Requirements:</p>
                                         <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-0.5">
-                                            <li className={privilege.requires_verification ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600'}>
-                                                Verification {privilege.requires_verification ? 'required' : 'not required'}
+                                            <li className={getRequiresVerification(privilege) ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600'}>
+                                                Verification {getRequiresVerification(privilege) ? 'required' : 'not required'}
                                             </li>
-                                            <li className={privilege.requires_id_number ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600'}>
-                                                ID Number {privilege.requires_id_number ? 'required' : 'not required'}
+                                            <li className={getRequiresIdNumber(privilege) ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600'}>
+                                                ID Number {getRequiresIdNumber(privilege) ? 'required' : 'not required'}
                                             </li>
                                         </ul>
                                     </div>

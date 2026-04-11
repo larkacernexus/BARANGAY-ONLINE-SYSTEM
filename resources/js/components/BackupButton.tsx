@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Database, Download } from 'lucide-react';
-import { BackupType } from '@/types/backup';
+import { BackupType } from '@/types/admin/backup/backup';
 import { route } from 'ziggy-js';
 
 interface BackupButtonProps {

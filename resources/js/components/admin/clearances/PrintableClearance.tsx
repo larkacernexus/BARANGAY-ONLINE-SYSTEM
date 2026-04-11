@@ -2,7 +2,7 @@
 
 import React, { forwardRef } from 'react';
 import { format } from 'date-fns';
-import { ClearanceRequest, Resident, ClearanceType } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest, Resident, ClearanceType } from '@/types/admin/clearances/clearance';
 
 interface PrintableClearanceProps {
     clearance: ClearanceRequest;

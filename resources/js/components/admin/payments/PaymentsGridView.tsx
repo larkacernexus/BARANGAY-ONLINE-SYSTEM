@@ -14,35 +14,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { useState } from 'react';
-import {
-    Receipt,
-    User,
-    Users,
-    Phone,
-    DollarSign,
-    CreditCard,
-    CheckCircle,
-    Clock,
-    XCircle,
-    FileText,
-    Calendar,
-    Eye,
-    Printer,
-    Copy,
-    Trash2,
-    ChevronDown,
-    ChevronUp,
-    ExternalLink,
-    MapPin,
-    Home,
-    Building,
-    Hash,
-    Info,
-    MoreVertical,
-    Square,
-    CheckSquare
-} from 'lucide-react';
-import { Payment } from '@/types/payments.types';
+// prettier-ignore
+import { Receipt, User, Users, Phone, DollarSign, CreditCard, CheckCircle, Clock, XCircle, FileText, Calendar, Eye, Printer, Copy, Trash2, ChevronDown, ChevronUp, ExternalLink, MapPin, Home, Building, Hash, Info, MoreVertical, Square, CheckSquare } from 'lucide-react';
+import { Payment } from '@/types/admin/payments/payments';
 
 interface PaymentsGridViewProps {
     payments: Payment[];

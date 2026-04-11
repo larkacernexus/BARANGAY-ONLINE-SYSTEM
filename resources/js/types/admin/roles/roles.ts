@@ -4,6 +4,7 @@ import { PageProps } from '@inertiajs/react';
 // ==================== Core Type Definitions ====================
 
 export interface Role {
+    is_active: boolean;
     slug?: any;
     id: number;
     name: string;
@@ -62,11 +63,15 @@ export type BulkOperation =
     | 'export_permissions' 
     | 'duplicate' 
     | 'archive' 
-    | 'generate_report';
+    | 'generate_report'
+    | 'print'
+    | 'send_notification'
+    | 'assign_permissions';
 
 export type SelectionMode = 'page' | 'filtered' | 'all';
 
 export interface SelectionStats {
+    deletable: number;
     total: number;
     systemRoles: number;
     customRoles: number;
@@ -77,8 +82,8 @@ export interface SelectionStats {
 
 // ==================== Component Props ====================
 
-// Custom props (without PageProps)
-export interface RolesIndexCustomProps {
+// Add index signatures to satisfy PageProps constraint
+export interface RolesIndexProps {
     roles: {
         data: Role[];
         meta: {
@@ -95,30 +100,25 @@ export interface RolesIndexCustomProps {
         type: string;
     };
     stats: RoleStats;
+    [key: string]: unknown; // Index signature
 }
 
-// Use imported PageProps from Inertia
-export type RolesIndexProps = RolesIndexCustomProps & PageProps;
-
-// Similar for other props
-export interface RoleCreateCustomProps {
+export interface RoleCreateProps {
     permissions?: Permission[];
     validation_errors?: Record<string, string>;
     success_message?: string;
+    [key: string]: unknown; // Index signature
 }
 
-export type RoleCreateProps = RoleCreateCustomProps & PageProps;
-
-export interface RoleEditCustomProps {
+export interface RoleEditProps {
     role: Role;
     permissions?: Permission[];
     validation_errors?: Record<string, string>;
     success_message?: string;
+    [key: string]: unknown; // Index signature
 }
 
-export type RoleEditProps = RoleEditCustomProps & PageProps;
-
-export interface RoleShowCustomProps {
+export interface RoleShowProps {
     role: Role & {
         permissions?: Permission[];
         users?: User[];
@@ -127,9 +127,8 @@ export interface RoleShowCustomProps {
         users_count: number;
         permissions_count: number;
     };
+    [key: string]: unknown; // Index signature
 }
-
-export type RoleShowProps = RoleShowCustomProps & PageProps;
 
 // ==================== Form Data Types ====================
 

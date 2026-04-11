@@ -1,6 +1,7 @@
 // admin-utils/rolePermissionsUtils.ts
 
-import {
+// Import types from the types file (these are just for type checking, not exported)
+import type {
     RolePermission,
     Role,
     Permission,
@@ -13,6 +14,18 @@ import {
     RolePermissionResponse,
     PermissionGroup
 } from '@/types/admin/rolepermissions/rolePermissions.types';
+
+// Re-export types that are needed by components
+export type { 
+    RolePermission, 
+    FilterState, 
+    SelectionStats, 
+    BadgeVariant, 
+    SortIcon, 
+    ExportRow, 
+    RolePermissionResponse, 
+    PermissionGroup 
+};
 
 // ==================== Date Formatting Utilities ====================
 
@@ -140,6 +153,20 @@ export const getAssignedAt = (permission: RolePermission): string => {
     return formatDate(permission.granted_at);
 };
 
+/**
+ * Get granter name
+ */
+export const getGranterName = (permission: RolePermission): string => {
+    return permission.granter?.name || permission.granted_by_name || 'System';
+};
+
+/**
+ * Get permission module
+ */
+export const getPermissionModule = (permission: RolePermission): string => {
+    return permission.permission?.module || permission.module || 'General';
+};
+
 // ==================== Badge Variant Utilities ====================
 
 /**
@@ -202,7 +229,7 @@ export const getSelectionStats = (selectedPermissions: RolePermission[]): Select
     const uniquePermissions = new Set(selectedPermissions.map(rp => rp.permission_id)).size;
     const uniqueModules = new Set(
         selectedPermissions
-            .map(rp => rp.permission?.module)
+            .map(rp => rp.permission?.module || rp.module)
             .filter(Boolean)
     ).size;
     const systemRoles = selectedPermissions.filter(rp => rp.role?.is_system_role).length;
@@ -235,12 +262,12 @@ export const formatForExport = (permissions: RolePermission[]): string => {
     
     const exportData: ExportRow[] = permissions.map(rp => ({
         'ID': rp.id,
-        'Role Name': rp.role?.name || 'N/A',
+        'Role Name': rp.role?.name || rp.role_name || 'N/A',
         'Role Type': rp.role?.is_system_role ? 'System' : 'Custom',
-        'Permission Name': rp.permission?.name || 'N/A',
-        'Permission Display': rp.permission?.display_name || 'N/A',
-        'Module': rp.permission?.module || 'N/A',
-        'Granted By': rp.granter?.name || 'System',
+        'Permission Name': rp.permission?.name || rp.permission_name || 'N/A',
+        'Permission Display': rp.permission?.display_name || rp.permission_display_name || 'N/A',
+        'Module': rp.permission?.module || rp.module || 'N/A',
+        'Granted By': rp.granter?.name || rp.granted_by_name || 'System',
         'Granted At': formatDate(rp.granted_at),
         'Permission Status': rp.permission?.is_active ? 'Active' : 'Inactive',
         'Role Users': rp.role?.users_count || 0,
@@ -302,16 +329,30 @@ export const safeNormalizeData = (data: any): RolePermissionResponse => {
 export const normalizeRolePermission = (item: any): RolePermission | null => {
     if (!item || typeof item !== 'object') return null;
     
+    // Helper to safely get nested values
+    const getNested = (obj: any, path: string, defaultValue: any = null) => {
+        return path.split('.').reduce((acc, part) => acc?.[part], obj) ?? defaultValue;
+    };
+    
     return {
-        id: item.id || 0,
-        role_id: item.role_id || 0,
-        permission_id: item.permission_id || 0,
-        granted_by: item.granted_by || 0,
-        granted_at: item.granted_at || new Date().toISOString(),
-        expires_at: item.expires_at || null,
-        role: item.role,
-        permission: item.permission,
-        granter: item.granter,
+        id: item.id ?? 0,
+        role_id: item.role_id ?? 0,
+        permission_id: item.permission_id ?? 0,
+        granted_by: item.granted_by ?? 0,
+        granted_at: item.granted_at ?? new Date().toISOString(),
+        expires_at: item.expires_at ?? null,
+        granted_by_name: item.granted_by_name ?? getNested(item, 'granter.name', 'System'),
+        created_at: item.created_at ?? item.granted_at ?? new Date().toISOString(),
+        module: item.module ?? getNested(item, 'permission.module', 'General'),
+        roles_count: item.roles_count ?? 0,
+        granter_id: item.granter_id ?? item.granted_by ?? 0,
+        role_name: item.role_name ?? getNested(item, 'role.name', ''),
+        permission_name: item.permission_name ?? getNested(item, 'permission.name', ''),
+        permission_display_name: item.permission_display_name ?? getNested(item, 'permission.display_name', ''),
+        is_active: item.is_active ?? getNested(item, 'permission.is_active', true),
+        role: item.role ?? null,
+        permission: item.permission ?? null,
+        granter: item.granter ?? null,
     };
 };
 
@@ -320,12 +361,14 @@ export const normalizeRolePermission = (item: any): RolePermission | null => {
 /**
  * Check if filters are active
  */
-export const hasActiveFilters = (filters: FilterState): boolean => {
+export const checkHasActiveFilters = (filters: FilterState): boolean => {
     return Boolean(
         filters.search ||
         filters.role !== 'all' ||
         filters.module !== 'all' ||
-        filters.granter !== 'all'
+        filters.granter !== 'all' ||
+        filters.date_range ||
+        filters.roles_count_range
     );
 };
 
@@ -340,15 +383,17 @@ export const getFilterSummary = (
     const parts: string[] = [];
     
     if (filters.search) parts.push(`Search: "${filters.search}"`);
-    if (filters.role !== 'all') {
+    if (filters.role && filters.role !== 'all') {
         const role = roles.find(r => r.id.toString() === filters.role);
         if (role) parts.push(`Role: ${role.name}`);
     }
-    if (filters.module !== 'all') parts.push(`Module: ${filters.module}`);
-    if (filters.granter !== 'all') {
+    if (filters.module && filters.module !== 'all') parts.push(`Module: ${filters.module}`);
+    if (filters.granter && filters.granter !== 'all') {
         const granter = granters.find(g => g.id.toString() === filters.granter);
         if (granter) parts.push(`Granted by: ${granter.name}`);
     }
+    if (filters.date_range) parts.push(`Date: ${filters.date_range}`);
+    if (filters.roles_count_range) parts.push(`Usage: ${filters.roles_count_range}`);
     
     return parts.join(' • ');
 };
@@ -390,9 +435,9 @@ export const groupPermissionsByModule = (permissions: Permission[]): PermissionG
     });
     
     return Array.from(grouped.entries())
-        .map(([module, permissions]) => ({
+        .map(([module, perms]) => ({
             module,
-            permissions: permissions.sort((a, b) => a.display_name.localeCompare(b.display_name))
+            permissions: perms.sort((a, b) => a.display_name.localeCompare(b.display_name))
         }))
         .sort((a, b) => a.module.localeCompare(b.module));
 };

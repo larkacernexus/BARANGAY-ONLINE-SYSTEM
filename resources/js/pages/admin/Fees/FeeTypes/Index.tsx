@@ -1,5 +1,3 @@
-// pages/admin/fee-types/index.tsx
-
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -41,6 +39,20 @@ import type {
     PageProps
 } from '@/types/admin/fee-types/fee.types';
 
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
+const getSafeSortOrder = (value: any): 'asc' | 'desc' => {
+    if (value === 'asc') return 'asc';
+    if (value === 'desc') return 'desc';
+    return 'asc';
+};
+
 export default function FeeTypesIndex() {
     const { props } = usePage<PageProps>();
     const { 
@@ -51,19 +63,21 @@ export default function FeeTypesIndex() {
     
     const safeFeeTypes: FeeType[] = Array.isArray(feeTypes) ? feeTypes : [];
     
-    // State management
-    const [search, setSearch] = useState<string>(filters.search || '');
-    const [filtersState, setFiltersState] = useState<FilterState>({
-        search: filters.search || '',
-        category: filters.category || 'all',
-        status: filters.status || 'all',
-        hasDiscount: filters.hasDiscount || 'all',  // Added
-        hasPenalty: filters.hasPenalty || 'all',   // Added
-        frequency: filters.frequency || 'all'      // Added
-    });
+    // Filter states - client-side only
+    const [search, setSearch] = useState<string>(getSafeString(filters.search));
+    const [categoryFilter, setCategoryFilter] = useState<string>(getSafeString(filters.category, 'all'));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(filters.status, 'all'));
+    const [hasDiscountFilter, setHasDiscountFilter] = useState<string>(getSafeString(filters.hasDiscount, 'all'));
+    const [hasPenaltyFilter, setHasPenaltyFilter] = useState<string>(getSafeString(filters.hasPenalty, 'all'));
+    const [frequencyFilter, setFrequencyFilter] = useState<string>(getSafeString(filters.frequency, 'all'));
+    const [sortBy, setSortBy] = useState<string>('name');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [itemsPerPage] = useState<number>(15);
     
     // Bulk selection states
     const [selectedFeeTypes, setSelectedFeeTypes] = useState<number[]>([]);
@@ -80,15 +94,6 @@ export default function FeeTypesIndex() {
     const [bulkEditField, setBulkEditField] = useState<BulkEditField>('status');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    // Debounced search function
-    const debouncedSearch = useMemo(
-        () => debounce((value: string) => {
-            setFiltersState(prev => ({ ...prev, search: value }));
-            updateFilter('search', value);
-        }, 300),
-        []
-    );
 
     // Handle window resize
     useEffect(() => {
@@ -108,6 +113,11 @@ export default function FeeTypesIndex() {
         return () => window.removeEventListener('resize', handleResize);
     }, [viewMode]);
 
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, categoryFilter, statusFilter, hasDiscountFilter, hasPenaltyFilter, frequencyFilter, sortBy, sortOrder]);
+
     // Reset selection when exiting bulk mode
     useEffect(() => {
         if (!isBulkMode) {
@@ -116,81 +126,144 @@ export default function FeeTypesIndex() {
         }
     }, [isBulkMode]);
 
-    // Handle search input change
-    const handleSearchChange = (value: string) => {
-        setSearch(value);
-        debouncedSearch(value);
-    };
-
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedFeeTypes.length > 0) {
-                        setSelectedFeeTypes([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Ctrl/Cmd + F to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            // Delete key for bulk delete
-            if (e.key === 'Delete' && isBulkMode && selectedFeeTypes.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedFeeTypes, isMobile]);
-
-    // Filter fee types client-side for selection
+    // Filter fee types client-side
     const filteredFeeTypes = useMemo(() => {
-        return filterFeeTypes(
-            safeFeeTypes,
-            filtersState.search,
-            filtersState,
-            'name',
-            'asc'
-        );
-    }, [safeFeeTypes, filtersState]);
+        if (!safeFeeTypes || safeFeeTypes.length === 0) {
+            return [];
+        }
+        
+        let filtered = [...safeFeeTypes];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(feeType =>
+                feeType?.name?.toLowerCase().includes(searchLower) ||
+                feeType?.code?.toLowerCase().includes(searchLower) ||
+                feeType?.description?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Category filter
+        if (categoryFilter && categoryFilter !== 'all') {
+            filtered = filtered.filter(feeType => feeType?.document_category_id?.toString() === categoryFilter);
+        }
+        
+        // Status filter
+        if (statusFilter && statusFilter !== 'all') {
+            filtered = filtered.filter(feeType => feeType?.is_active === (statusFilter === 'active'));
+        }
+        
+        // Has discount filter
+        if (hasDiscountFilter && hasDiscountFilter !== 'all') {
+            filtered = filtered.filter(feeType => 
+                (feeType?.has_senior_discount || feeType?.has_pwd_discount || feeType?.has_solo_parent_discount || feeType?.has_indigent_discount) === (hasDiscountFilter === 'yes')
+            );
+        }
+        
+        // Has penalty filter
+        if (hasPenaltyFilter && hasPenaltyFilter !== 'all') {
+            filtered = filtered.filter(feeType => feeType?.has_penalty === (hasPenaltyFilter === 'yes'));
+        }
+        
+        // Frequency filter
+        if (frequencyFilter && frequencyFilter !== 'all') {
+            filtered = filtered.filter(feeType => feeType?.frequency === frequencyFilter);
+        }
+        
+        // Apply sorting
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'name':
+                        valueA = a?.name || '';
+                        valueB = b?.name || '';
+                        break;
+                    case 'code':
+                        valueA = a?.code || '';
+                        valueB = b?.code || '';
+                        break;
+                    case 'base_amount':
+                        valueA = Number(a?.base_amount) || 0;
+                        valueB = Number(b?.base_amount) || 0;
+                        break;
+                    case 'category':
+                        valueA = a?.document_category?.name || '';
+                        valueB = b?.document_category?.name || '';
+                        break;
+                    case 'frequency':
+                        valueA = a?.frequency || '';
+                        valueB = b?.frequency || '';
+                        break;
+                    case 'status':
+                        valueA = a?.is_active ? 1 : 0;
+                        valueB = b?.is_active ? 1 : 0;
+                        break;
+                    case 'has_penalty':
+                        valueA = a?.has_penalty ? 1 : 0;
+                        valueB = b?.has_penalty ? 1 : 0;
+                        break;
+                    case 'created_at':
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.name || '';
+                        valueB = b?.name || '';
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [safeFeeTypes, search, categoryFilter, statusFilter, hasDiscountFilter, hasPenaltyFilter, frequencyFilter, sortBy, sortOrder]);
 
-    // Calculate pagination
-    const [currentPage, setCurrentPage] = useState<number>(1);
-    const [itemsPerPage] = useState<number>(10);
+    // Statistics for filtered items
+    const stats = useMemo(() => {
+        const totalAmount = filteredFeeTypes.reduce((sum, ft) => {
+            const amount = ft?.base_amount;
+            if (amount === null || amount === undefined) return sum;
+            const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+            return sum + (isNaN(numAmount) ? 0 : numAmount);
+        }, 0);
+
+        return {
+            total: filteredFeeTypes.length,
+            active: filteredFeeTypes.filter(ft => ft?.is_active).length,
+            inactive: filteredFeeTypes.filter(ft => !ft?.is_active).length,
+            mandatory: filteredFeeTypes.filter(ft => ft?.is_mandatory).length,
+            autoGenerate: filteredFeeTypes.filter(ft => ft?.auto_generate).length,
+            totalAmount: totalAmount
+        };
+    }, [filteredFeeTypes]);
+
+    // Category counts
+    const categoryCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        filteredFeeTypes.forEach(feeType => {
+            const categoryId = feeType?.document_category_id?.toString() || 'uncategorized';
+            counts[categoryId] = (counts[categoryId] || 0) + 1;
+        });
+        return counts;
+    }, [filteredFeeTypes]);
+
+    // Pagination
     const totalItems = filteredFeeTypes.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
     const paginatedFeeTypes = filteredFeeTypes.slice(startIndex, endIndex);
-
-    // Reset to first page when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filtersState]);
 
     // Selection handlers
     const handleSelectAllOnPage = useCallback(() => {
@@ -217,12 +290,12 @@ export default function FeeTypesIndex() {
     }, [filteredFeeTypes, selectedFeeTypes]);
 
     const handleSelectAll = useCallback(() => {
-        if (confirm(`This will select ALL ${safeFeeTypes.length} fee types. This action may take a moment.`)) {
+        if (confirm(`This will select ALL ${totalItems} fee types. This action may take a moment.`)) {
             const allIds = filteredFeeTypes.map(feeType => feeType.id);
             setSelectedFeeTypes(allIds);
             setSelectionMode('all');
         }
-    }, [safeFeeTypes.length, filteredFeeTypes]);
+    }, [filteredFeeTypes, totalItems]);
 
     const handleItemSelect = useCallback((id: number) => {
         setSelectedFeeTypes(prev => {
@@ -251,52 +324,17 @@ export default function FeeTypesIndex() {
         return getSelectionStats(selectedFeeTypesData);
     }, [selectedFeeTypesData]);
 
-    // Statistics for all filtered items
-    const stats = useMemo(() => {
-        const totalAmount = filteredFeeTypes.reduce((sum, ft) => {
-            const amount = ft.base_amount;
-            if (amount === null || amount === undefined || amount === '') return sum;
-            const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
-            return sum + (isNaN(numAmount) ? 0 : numAmount);
-        }, 0);
+    // Handle sort change from dropdown
+    const handleSortChange = useCallback((value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    }, []);
 
-        return {
-            total: filteredFeeTypes.length,
-            active: filteredFeeTypes.filter(ft => ft.is_active).length,
-            inactive: filteredFeeTypes.filter(ft => !ft.is_active).length,
-            mandatory: filteredFeeTypes.filter(ft => ft.is_mandatory).length,
-            autoGenerate: filteredFeeTypes.filter(ft => ft.auto_generate).length,
-            totalAmount: totalAmount
-        };
-    }, [filteredFeeTypes]);
-
-    // Category counts
-    const categoryCounts = useMemo(() => {
-        const counts: Record<string, number> = {};
-        filteredFeeTypes.forEach(feeType => {
-            const categoryId = feeType.document_category_id?.toString() || 'uncategorized';
-            counts[categoryId] = (counts[categoryId] || 0) + 1;
-        });
-        return counts;
-    }, [filteredFeeTypes]);
-
-    // Update filter function
-    const updateFilter = (key: keyof FilterState, value: string) => {
-        const params: Record<string, any> = {};
-        
-        const newFilters = { ...filtersState, [key]: value };
-        Object.entries(newFilters).forEach(([k, v]) => {
-            if (v && v !== 'all') {
-                params[k] = v;
-            }
-        });
-        
-        router.get(route('fee-types.index'), params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+    // Get current sort value for dropdown
+    const getCurrentSortValue = useCallback((): string => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
 
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation) => {
@@ -321,27 +359,13 @@ export default function FeeTypesIndex() {
                 case 'export':
                 case 'export_csv':
                     const exportData = selectedFeeTypesData.map(feeType => ({
-                        'ID': feeType.id,
-                        'Code': feeType.code,
                         'Name': feeType.name,
-                        'Short Name': feeType.short_name || '',
-                        'Description': feeType.description || '',
+                        'Code': feeType.code,
                         'Category': feeType.document_category?.name || 'Uncategorized',
                         'Base Amount': formatCurrency(feeType.base_amount),
-                        'Amount Type': feeType.amount_type || 'fixed',
                         'Frequency': feeType.frequency || 'one_time',
-                        'Validity Days': feeType.validity_days || '',
-                        'Senior Discount': feeType.has_senior_discount ? `${feeType.senior_discount_percentage}%` : 'No',
-                        'PWD Discount': feeType.has_pwd_discount ? `${feeType.pwd_discount_percentage}%` : 'No',
-                        'Solo Parent Discount': feeType.has_solo_parent_discount ? `${feeType.solo_parent_discount_percentage}%` : 'No',
-                        'Indigent Discount': feeType.has_indigent_discount ? `${feeType.indigent_discount_percentage}%` : 'No',
-                        'Has Surcharge': feeType.has_surcharge ? 'Yes' : 'No',
-                        'Has Penalty': feeType.has_penalty ? 'Yes' : 'No',
                         'Status': feeType.is_active ? 'Active' : 'Inactive',
-                        'Mandatory': feeType.is_mandatory ? 'Yes' : 'No',
-                        'Auto Generate': feeType.auto_generate ? 'Yes' : 'No',
-                        'Created At': formatDate(feeType.created_at),
-                        'Updated At': formatDate(feeType.updated_at),
+                        'Has Penalty': feeType.has_penalty ? 'Yes' : 'No'
                     }));
                     
                     const headers = Object.keys(exportData[0]);
@@ -362,9 +386,7 @@ export default function FeeTypesIndex() {
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = `fee-types-export-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                     
                     toast.success('Export completed successfully');
@@ -382,7 +404,6 @@ export default function FeeTypesIndex() {
                             },
                             onError: (errors) => {
                                 toast.error('Failed to duplicate fee types');
-                                console.error('Duplicate errors:', errors);
                             }
                         });
                     }
@@ -390,60 +411,6 @@ export default function FeeTypesIndex() {
 
                 case 'update_category':
                     setShowBulkCategoryDialog(true);
-                    break;
-
-                case 'enable_discounts':
-                    if (confirm(`Enable discounts for ${selectedFeeTypes.length} selected fee type(s)?`)) {
-                        await router.post(route('fee-types.bulk-enable-discounts'), {
-                            ids: selectedFeeTypes
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                toast.success(`${selectedFeeTypes.length} fee type(s) discounts enabled`);
-                                setSelectedFeeTypes([]);
-                            },
-                            onError: (errors) => {
-                                toast.error('Failed to enable discounts');
-                                console.error('Enable discounts errors:', errors);
-                            }
-                        });
-                    }
-                    break;
-
-                case 'disable_discounts':
-                    if (confirm(`Disable discounts for ${selectedFeeTypes.length} selected fee type(s)?`)) {
-                        await router.post(route('fee-types.bulk-disable-discounts'), {
-                            ids: selectedFeeTypes
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                toast.success(`${selectedFeeTypes.length} fee type(s) discounts disabled`);
-                                setSelectedFeeTypes([]);
-                            },
-                            onError: (errors) => {
-                                toast.error('Failed to disable discounts');
-                                console.error('Disable discounts errors:', errors);
-                            }
-                        });
-                    }
-                    break;
-
-                case 'apply_standard_discounts':
-                    if (confirm(`Apply Philippine standard discounts (Senior:20%, PWD:20%, Solo Parent:10%, Indigent:50%) to ${selectedFeeTypes.length} selected fee type(s)?`)) {
-                        await router.post(route('fee-types.bulk-apply-standard-discounts'), {
-                            ids: selectedFeeTypes
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                toast.success(`Standard discounts applied to ${selectedFeeTypes.length} fee type(s)`);
-                                setSelectedFeeTypes([]);
-                            },
-                            onError: (errors) => {
-                                toast.error('Failed to apply standard discounts');
-                                console.error('Apply standard discounts errors:', errors);
-                            }
-                        });
-                    }
                     break;
 
                 default:
@@ -458,23 +425,34 @@ export default function FeeTypesIndex() {
     };
 
     // Copy selected data to clipboard
-    const handleCopySelectedData = () => {
+    const handleCopySelectedData = useCallback(() => {
         if (selectedFeeTypesData.length === 0) {
             toast.error('No data to copy');
             return;
         }
         
-        const csv = formatForClipboard(selectedFeeTypesData);
+        const data = selectedFeeTypesData.map(feeType => ({
+            'Name': feeType.name,
+            'Code': feeType.code,
+            'Category': feeType.document_category?.name || 'Uncategorized',
+            'Amount': formatCurrency(feeType.base_amount),
+            'Status': feeType.is_active ? 'Active' : 'Inactive'
+        }));
+        
+        const csv = [
+            Object.keys(data[0]).join('\t'),
+            ...data.map(row => Object.values(row).join('\t'))
+        ].join('\n');
         
         navigator.clipboard.writeText(csv).then(() => {
-            toast.success('Selected data copied to clipboard as CSV');
+            toast.success(`${selectedFeeTypesData.length} records copied to clipboard`);
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
-    };
+    }, [selectedFeeTypesData]);
 
     // Individual fee type operations
-    const handleToggleStatus = (feeType: FeeType) => {
+    const handleToggleStatus = useCallback((feeType: FeeType) => {
         if (confirm(`Are you sure you want to ${feeType.is_active ? 'deactivate' : 'activate'} "${feeType.name}"?`)) {
             router.post(route('fee-types.toggle-status', feeType.id), {}, {
                 preserveScroll: true,
@@ -486,9 +464,9 @@ export default function FeeTypesIndex() {
                 },
             });
         }
-    };
+    }, []);
 
-    const handleDuplicate = (feeType: FeeType) => {
+    const handleDuplicate = useCallback((feeType: FeeType) => {
         if (confirm(`Duplicate "${feeType.name}" fee type?`)) {
             router.post(route('fee-types.duplicate', feeType.id), {}, {
                 preserveScroll: true,
@@ -500,66 +478,134 @@ export default function FeeTypesIndex() {
                 },
             });
         }
-    };
+    }, []);
 
-    const handleDelete = (feeType: FeeType) => {
+    const handleDelete = useCallback((feeType: FeeType) => {
         if (confirm(`Are you sure you want to delete "${feeType.name}"? This action cannot be undone.`)) {
             router.delete(route('fee-types.destroy', feeType.id));
         }
-    };
+    }, []);
 
-    const handleCopyToClipboard = (text: string, label: string) => {
+    const handleCopyToClipboard = useCallback((text: string, label: string) => {
         navigator.clipboard.writeText(text).then(() => {
             toast.success(`${label} copied to clipboard`);
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
-    };
+    }, []);
 
-    const handleSort = (column: string) => {
-        toast.info(`Sort by ${column} - to be implemented`);
-    };
+    const handleSort = useCallback((column: string) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    }, [sortBy, sortOrder]);
 
-    const handleClearFilters = () => {
+    const handleClearFilters = useCallback(() => {
         setSearch('');
-        setFiltersState({
-            search: '',
-            category: 'all',
-            status: 'all',
-            hasDiscount: 'all',
-            hasPenalty: 'all',
-            frequency: 'all'
-        });
-        
-        router.get(route('fee-types.index'), {}, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
+        setCategoryFilter('all');
+        setStatusFilter('all');
+        setHasDiscountFilter('all');
+        setHasPenaltyFilter('all');
+        setFrequencyFilter('all');
+        setSortBy('name');
+        setSortOrder('asc');
+        setCurrentPage(1);
+    }, []);
 
-    const handleClearSelection = () => {
+    const handleClearSelection = useCallback(() => {
         setSelectedFeeTypes([]);
         setIsSelectAll(false);
-    };
+    }, []);
 
-    const handlePageChange = (page: number) => {
+    const handlePageChange = useCallback((page: number) => {
         setCurrentPage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+    }, []);
 
-    const handleViewPhoto = (feeType: FeeType) => {
+    const handleViewPhoto = useCallback(() => {
         toast.info('Feature to be implemented');
+    }, []);
+
+    const updateFilter = useCallback((key: string, value: string) => {
+        switch (key) {
+            case 'category':
+                setCategoryFilter(value);
+                break;
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'hasDiscount':
+                setHasDiscountFilter(value);
+                break;
+            case 'hasPenalty':
+                setHasPenaltyFilter(value);
+                break;
+            case 'frequency':
+                setFrequencyFilter(value);
+                break;
+        }
+    }, []);
+
+    const hasActiveFilters = Boolean(
+        search || 
+        (categoryFilter && categoryFilter !== 'all') || 
+        (statusFilter && statusFilter !== 'all') ||
+        (hasDiscountFilter && hasDiscountFilter !== 'all') ||
+        (hasPenaltyFilter && hasPenaltyFilter !== 'all') ||
+        (frequencyFilter && frequencyFilter !== 'all')
+    );
+
+    // Create filters object for the Filters component
+    const filtersStateForComponent = {
+        category: categoryFilter,
+        status: statusFilter,
+        hasDiscount: hasDiscountFilter,
+        hasPenalty: hasPenaltyFilter,
+        frequency: frequencyFilter,
+        search: search
     };
 
-    const hasActiveFilters = 
-        search !== '' || 
-        filtersState.category !== 'all' || 
-        filtersState.status !== 'all' ||
-        filtersState.hasDiscount !== 'all' ||
-        filtersState.hasPenalty !== 'all' ||
-        filtersState.frequency !== 'all';
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedFeeTypes.length > 0) {
+                        setSelectedFeeTypes([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedFeeTypes.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
 
-    // Add error boundary fallback
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedFeeTypes, isMobile]);
+
+    // Error boundary fallback
     if (!Array.isArray(safeFeeTypes)) {
         return (
             <AppLayout
@@ -609,8 +655,8 @@ export default function FeeTypesIndex() {
 
                     <FeeTypesFilters
                         search={search}
-                        setSearch={handleSearchChange}
-                        filtersState={filtersState}
+                        setSearch={setSearch}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
@@ -655,7 +701,7 @@ export default function FeeTypesIndex() {
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
                         setShowBulkCategoryDialog={setShowBulkCategoryDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
@@ -663,6 +709,10 @@ export default function FeeTypesIndex() {
                         getCategoryDetails={getCategoryDetails}
                         formatCurrency={formatCurrency}
                         formatDate={formatDate}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Keyboard Shortcuts Help */}

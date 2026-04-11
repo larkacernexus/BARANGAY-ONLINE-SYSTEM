@@ -40,6 +40,14 @@ export const PaymentsTab = ({
     cashPayments,
     onlinePayments
 }: PaymentsTabProps) => {
+    // Helper to safely convert to number
+    const toNumber = (value: number | string | undefined | null): number => {
+        if (value === undefined || value === null) return 0;
+        if (typeof value === 'number') return value;
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? 0 : parsed;
+    };
+
     // Group payments by status for better organization
     const paymentsByStatus = useMemo(() => {
         return {
@@ -106,8 +114,9 @@ export const PaymentsTab = ({
         }
     };
 
-    const formatAmount = (amount: number): string => {
-        return `₱${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formatAmount = (amount: number | string | undefined | null): string => {
+        const num = toNumber(amount);
+        return `₱${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const formatDateSafe = (date?: string): string => {
@@ -116,78 +125,89 @@ export const PaymentsTab = ({
     };
 
     const renderPaymentList = (paymentsList: Payment[]) => {
+        if (!paymentsList || paymentsList.length === 0) return null;
+        
         return (
             <div className="space-y-3">
-                {paymentsList.map((payment) => (
-                    <div key={payment.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 flex-wrap mb-2">
-                                    <div className="flex items-center gap-2">
-                                        {getPaymentMethodIcon(payment.payment_method)}
-                                        <h3 className="font-semibold dark:text-gray-100">
-                                            {payment.receipt_number ? `Receipt #${payment.receipt_number}` : `Payment #${payment.id}`}
-                                        </h3>
-                                    </div>
-                                    {getPaymentStatusBadge(payment.status)}
-                                    <Badge variant="outline" className="flex items-center gap-1 dark:border-gray-600">
-                                        {getPaymentMethodIcon(payment.payment_method)}
-                                        {getPaymentMethodBadge(payment.payment_method)}
-                                    </Badge>
-                                </div>
-                                
-                                {payment.notes && (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                                        {payment.notes}
-                                    </p>
-                                )}
-                                
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-gray-500 dark:text-gray-400">Amount</p>
-                                        <p className="font-medium dark:text-gray-200">{formatAmount(payment.amount)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 dark:text-gray-400">Total Amount</p>
-                                        <p className="font-medium dark:text-gray-200">{formatAmount(payment.total_amount || payment.amount)}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-gray-500 dark:text-gray-400">Payment Date</p>
-                                        <p className="font-medium dark:text-gray-200">
-                                            {formatDateSafe(payment.payment_date)}
-                                        </p>
-                                    </div>
-                                    {payment.reference_number && (
-                                        <div>
-                                            <p className="text-gray-500 dark:text-gray-400">Reference #</p>
-                                            <p className="font-mono text-xs dark:text-gray-300">{payment.reference_number}</p>
+                {paymentsList.map((payment) => {
+                    const amount = toNumber(payment.amount);
+                    const totalAmountValue = toNumber(payment.total_amount);
+                    const displayTotalAmount = totalAmountValue > 0 ? totalAmountValue : amount;
+                    
+                    return (
+                        <div key={payment.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
+                            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                                        <div className="flex items-center gap-2">
+                                            {getPaymentMethodIcon(payment.payment_method)}
+                                            <h3 className="font-semibold dark:text-gray-100">
+                                                {payment.receipt_number ? `Receipt #${payment.receipt_number}` : `Payment #${payment.id}`}
+                                            </h3>
                                         </div>
+                                        {getPaymentStatusBadge(payment.status)}
+                                        <Badge variant="outline" className="flex items-center gap-1 dark:border-gray-600">
+                                            {getPaymentMethodIcon(payment.payment_method)}
+                                            {getPaymentMethodBadge(payment.payment_method)}
+                                        </Badge>
+                                    </div>
+                                    
+                                    {payment.notes && (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                            {payment.notes}
+                                        </p>
+                                    )}
+                                    
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Amount</p>
+                                            <p className="font-medium dark:text-gray-200">{formatAmount(amount)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Total Amount</p>
+                                            <p className="font-medium dark:text-gray-200">{formatAmount(displayTotalAmount)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-gray-500 dark:text-gray-400">Payment Date</p>
+                                            <p className="font-medium dark:text-gray-200">
+                                                {formatDateSafe(payment.payment_date)}
+                                            </p>
+                                        </div>
+                                        {payment.reference_number && (
+                                            <div>
+                                                <p className="text-gray-500 dark:text-gray-400">Reference #</p>
+                                                <p className="font-mono text-xs dark:text-gray-300 break-all">{payment.reference_number}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    {payment.receipt_number && (
+                                        <p className="text-xs text-gray-400 mt-2">Receipt #: {payment.receipt_number}</p>
                                     )}
                                 </div>
                                 
-                                {payment.receipt_number && (
-                                    <p className="text-xs text-gray-400 mt-2">Receipt #: {payment.receipt_number}</p>
-                                )}
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                                <Link href={route('admin.payments.show', payment.id)}>
-                                    <Button variant="ghost" size="sm" title="View Details">
-                                        <Eye className="h-4 w-4" />
-                                    </Button>
-                                </Link>
-                                {payment.status === 'completed' && (
-                                    <Button variant="ghost" size="sm" title="Download Receipt">
-                                        <Download className="h-4 w-4" />
-                                    </Button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    <Link href={route('admin.payments.show', payment.id)}>
+                                        <Button variant="ghost" size="sm" title="View Details">
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                    </Link>
+                                    {payment.status === 'completed' && (
+                                        <Button variant="ghost" size="sm" title="Download Receipt">
+                                            <Download className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         );
     };
+
+    // Calculate total amount safely
+    const safeTotalAmount = toNumber(totalAmount);
 
     return (
         <div className="space-y-6">
@@ -197,7 +217,7 @@ export const PaymentsTab = ({
                     <CardContent className="pt-6">
                         <div className="text-center space-y-2">
                             <CreditCard className="h-8 w-8 text-blue-500 mx-auto" />
-                            <p className="text-2xl font-bold dark:text-gray-100">{totalPayments}</p>
+                            <p className="text-2xl font-bold dark:text-gray-100">{toNumber(totalPayments)}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Total Payments</p>
                         </div>
                     </CardContent>
@@ -206,7 +226,7 @@ export const PaymentsTab = ({
                     <CardContent className="pt-6">
                         <div className="text-center space-y-2">
                             <Banknote className="h-8 w-8 text-green-500 mx-auto" />
-                            <p className="text-2xl font-bold dark:text-gray-100">{formatAmount(totalAmount)}</p>
+                            <p className="text-2xl font-bold dark:text-gray-100">{formatAmount(safeTotalAmount)}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Total Amount</p>
                         </div>
                     </CardContent>
@@ -215,7 +235,7 @@ export const PaymentsTab = ({
                     <CardContent className="pt-6">
                         <div className="text-center space-y-2">
                             <Banknote className="h-8 w-8 text-green-500 mx-auto" />
-                            <p className="text-2xl font-bold dark:text-gray-100">{cashPayments}</p>
+                            <p className="text-2xl font-bold dark:text-gray-100">{toNumber(cashPayments)}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Cash Payments</p>
                         </div>
                     </CardContent>
@@ -224,7 +244,7 @@ export const PaymentsTab = ({
                     <CardContent className="pt-6">
                         <div className="text-center space-y-2">
                             <Smartphone className="h-8 w-8 text-blue-500 mx-auto" />
-                            <p className="text-2xl font-bold dark:text-gray-100">{onlinePayments}</p>
+                            <p className="text-2xl font-bold dark:text-gray-100">{toNumber(onlinePayments)}</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">Online Payments</p>
                         </div>
                     </CardContent>
@@ -234,7 +254,7 @@ export const PaymentsTab = ({
             {/* Payments List */}
             <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
                         <CardTitle className="dark:text-gray-100">Payment History</CardTitle>
                         <Link href={route('admin.payments.create', { household_id: householdId })}>
                             <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
@@ -245,7 +265,7 @@ export const PaymentsTab = ({
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {payments.length === 0 ? (
+                    {!payments || payments.length === 0 ? (
                         <div className="text-center py-12">
                             <CreditCard className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
                             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No payments found</h3>
@@ -283,6 +303,16 @@ export const PaymentsTab = ({
                                         Failed Payments ({paymentsByStatus.failed.length})
                                     </h4>
                                     {renderPaymentList(paymentsByStatus.failed)}
+                                </div>
+                            )}
+
+                            {/* Refunded Payments Section */}
+                            {paymentsByStatus.refunded.length > 0 && (
+                                <div>
+                                    <h4 className="font-semibold text-gray-600 dark:text-gray-400 mb-3 flex items-center gap-2">
+                                        Refunded Payments ({paymentsByStatus.refunded.length})
+                                    </h4>
+                                    {renderPaymentList(paymentsByStatus.refunded)}
                                 </div>
                             )}
                         </div>

@@ -33,6 +33,7 @@ export interface CommitteesIndexProps {
         meta?: PaginationMeta;
     };
     filters?: {
+        positions_range(positions_range: any, arg1: string): string | (() => string);
         search?: string;
         status?: string;
         sort_by?: string;

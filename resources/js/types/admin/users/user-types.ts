@@ -21,6 +21,7 @@ export interface UserRole {
   is_system_role?: boolean;
   created_at?: string;
   updated_at?: string;
+  permissions: any;
   pivot?: {
     model_type: string;
     model_id: number;
@@ -100,6 +101,8 @@ export interface LaravelPaginatedData<T> {
 export type SortOrder = 'asc' | 'desc';
 
 export interface UserFilters {
+  email_verified(email_verified: any, arg1: string): string | (() => string);
+  last_login_range(last_login_range: any, arg1: string): string | (() => string);
   search?: string;
   role_id?: string | number;
   status?: UserStatus | string;
@@ -179,6 +182,7 @@ export interface UserStat {
   value: number;
   change?: number;
   icon?: string;
+  new_this_month: any;
   color?: string;
   trend?: 'up' | 'down' | 'stable';
   description?: string;
@@ -383,9 +387,23 @@ export interface UsersHeaderProps {
 }
 
 export interface UsersStatsProps {
-  stats: UserStat[];
+  stats: UserStat[] | {
+    total: number;
+    active: number;
+    inactive: number;
+    new_this_month?: any;
+    by_role?: Record<string, number>;
+    by_status?: {
+      active: number;
+      inactive: number;
+      suspended: number;
+      pending: number;
+    };
+    email_verified?: number;
+    never_logged_in?: number;
+  };
   isLoading?: boolean;
-  onStatClick?: (stat: UserStat) => void;
+  onStatClick?: (stat: UserStat | { label: string; value: number }) => void;
 }
 
 export interface UsersFiltersProps {
@@ -410,12 +428,15 @@ export interface UsersFiltersProps {
   users: LaravelPaginatedData<User>;
   selectionMode: SelectionMode;
   setSelectionMode: (mode: SelectionMode) => void;
-  onSelectAllOnPage: () => void;
-  onSelectAllFiltered: () => void;
-  onSelectAll: () => void;
   isLoading?: boolean;
   perPage?: number;
   onPerPageChange?: (perPage: number) => void;
+  
+  // Add these missing properties:
+  emailVerifiedFilter?: string;
+  setEmailVerifiedFilter?: (value: string) => void;
+  lastLoginRange?: string;
+  setLastLoginRange?: (value: string) => void;
 }
 
 export interface UsersContentProps {
@@ -534,4 +555,49 @@ export interface UserModuleConfig {
   allowedStatuses: UserStatus[];
   defaultPerPage: number;
   perPageOptions: number[];
+}
+
+export interface UserActivityLog {
+  id: number;
+  user_id: number;
+  action: string;
+  description: string;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface UserStats {
+  total_logins?: number;
+  last_login?: string | null;
+  sessions_count?: number;
+  permissions_count?: number;
+  roles_count?: number;
+  devices_count?: number;
+}
+
+export interface UserShowProps {
+  user: User & {
+    permissions?: Permission[];
+    role?: UserRole & {
+      permissions?: Permission[];
+    };
+    sessions?: Array<{
+      id: string;
+      last_activity: number;
+      device?: string;
+      ip_address?: string;
+    }>;
+    require_password_change?: boolean;
+    two_factor_confirmed_at?: string | null;
+  };
+  activityLogs?: UserActivityLog[];
+  stats?: UserStats;
+  can?: {
+    edit_user?: boolean;
+    delete_user?: boolean;
+    impersonate?: boolean;
+    manage_permissions?: boolean;
+  };
 }

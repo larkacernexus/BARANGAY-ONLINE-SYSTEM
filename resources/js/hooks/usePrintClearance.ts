@@ -1,6 +1,6 @@
 import { RefObject } from 'react';
 import { toast } from 'sonner';
-import { ClearanceRequest } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance';
 
 export function usePrintClearance(printRef: RefObject<HTMLDivElement | null>) { // Allow null
     const handlePrintClearance = (clearance: ClearanceRequest, onComplete?: () => void) => {

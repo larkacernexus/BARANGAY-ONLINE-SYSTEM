@@ -33,7 +33,7 @@ import {
     RefreshCw,
     Award
 } from 'lucide-react';
-import { Resident, Household, Privilege } from '@/types/fees';
+import { Resident, Household, PrivilegeData } from '@/types/admin/fees/fees';
 import { useState, useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -42,9 +42,9 @@ interface BulkSelectionPanelProps {
     residents: Resident[];
     households: Household[];
     puroks: string[];
-    allPrivileges?: Privilege[]; // Added
-    selectedResidentIds: (string | number)[];
-    selectedHouseholdIds: (string | number)[];
+    allPrivileges?: PrivilegeData[];
+    selectedResidentIds: string[];
+    selectedHouseholdIds: string[];
     customPayers: Array<{
         id: string;
         name: string;
@@ -114,19 +114,16 @@ export default function BulkSelectionPanel({
 
     // Dynamically get resident badges from privileges
     const getResidentBadges = (resident: Resident) => {
-        const badges = [];
+        const badges: Array<{ code: string; label: string; icon: string; color: string; id_number?: string }> = [];
         
         if (resident.privileges && resident.privileges.length > 0) {
-            resident.privileges.forEach((rp: any) => {
-                // Find matching privilege for icon/color
-                const privilegeDef = allPrivileges.find(p => p.code === rp.code);
-                
+            resident.privileges.forEach((rp: PrivilegeData) => {
                 badges.push({
                     code: rp.code,
                     label: rp.name,
                     icon: getPrivilegeIcon(rp.code),
                     color: getPrivilegeColor(rp.code),
-                    id_number: rp.id_number
+                    id_number: (rp as any).id_number
                 });
             });
         }
@@ -137,10 +134,14 @@ export default function BulkSelectionPanel({
     // Helper to get privilege icon
     const getPrivilegeIcon = (code: string): string => {
         const icons: Record<string, string> = {
+            'senior': '👴',
             'SC': '👴',
             'OSP': '👴',
+            'pwd': '♿',
             'PWD': '♿',
+            'solo_parent': '👨‍👧',
             'SP': '👨‍👧',
+            'indigent': '🏠',
             'IND': '🏠',
             '4PS': '📦',
             'IP': '🌿',
@@ -156,20 +157,24 @@ export default function BulkSelectionPanel({
     // Helper to get privilege color
     const getPrivilegeColor = (code: string): string => {
         const colors: Record<string, string> = {
-            'SC': 'bg-blue-100 text-blue-800 border-blue-200',
-            'OSP': 'bg-blue-100 text-blue-800 border-blue-200',
-            'PWD': 'bg-purple-100 text-purple-800 border-purple-200',
-            'SP': 'bg-green-100 text-green-800 border-green-200',
-            'IND': 'bg-orange-100 text-orange-800 border-orange-200',
-            '4PS': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-            'IP': 'bg-teal-100 text-teal-800 border-teal-200',
-            'FRM': 'bg-brown-100 text-brown-800 border-brown-200',
-            'FSH': 'bg-cyan-100 text-cyan-800 border-cyan-200',
-            'OFW': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-            'SCH': 'bg-pink-100 text-pink-800 border-pink-200',
-            'UNE': 'bg-gray-100 text-gray-800 border-gray-200',
+            'senior': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'SC': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'OSP': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'pwd': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+            'PWD': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+            'solo_parent': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+            'SP': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+            'indigent': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+            'IND': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+            '4PS': 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
+            'IP': 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800',
+            'FRM': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+            'FSH': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800',
+            'OFW': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
+            'SCH': 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
+            'UNE': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
         };
-        return colors[code] || 'bg-gray-100 text-gray-800 border-gray-200';
+        return colors[code] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     };
 
     // Filter residents by discount eligibility (dynamically using privileges)
@@ -178,23 +183,63 @@ export default function BulkSelectionPanel({
         return (resident.privileges && resident.privileges.length > 0) || false;
     };
 
+    // Filtered residents based on search and purok
+    const filteredResidents = useMemo(() => {
+        let filtered = [...residents];
+        
+        if (filterPurok && filterPurok !== '') {
+            filtered = filtered.filter(resident => resident.purok === filterPurok);
+        }
+        
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(resident =>
+                (resident.full_name && resident.full_name.toLowerCase().includes(term)) ||
+                (resident.phone && resident.phone.toLowerCase().includes(term)) ||
+                (resident.purok && resident.purok.toLowerCase().includes(term))
+            );
+        }
+        
+        return filtered;
+    }, [residents, filterPurok, searchTerm]);
+
+    // Filtered households based on search and purok
+    const filteredHouseholds = useMemo(() => {
+        let filtered = [...households];
+        
+        if (filterPurok && filterPurok !== '') {
+            filtered = filtered.filter(household => household.purok === filterPurok);
+        }
+        
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(household =>
+                (household.name && household.name.toLowerCase().includes(term)) ||
+                (household.contact_number && household.contact_number.toLowerCase().includes(term)) ||
+                (household.purok && household.purok.toLowerCase().includes(term))
+            );
+        }
+        
+        return filtered;
+    }, [households, filterPurok, searchTerm]);
+
     const getSelectionStats = () => {
         if (bulkType === 'residents') {
-            const eligibleCount = residents.filter(r => r.privileges && r.privileges.length > 0).length;
-            const selectedCount = applyToAllResidents ? residents.length : selectedResidentIds.length;
+            const eligibleCount = filteredResidents.filter(r => r.privileges && r.privileges.length > 0).length;
+            const selectedCount = applyToAllResidents ? filteredResidents.length : selectedResidentIds.length;
             return { 
-                total: residents.length, 
+                total: filteredResidents.length, 
                 selected: selectedCount, 
                 eligible: eligibleCount,
-                selectedPercentage: residents.length > 0 ? Math.round((selectedCount / residents.length) * 100) : 0
+                selectedPercentage: filteredResidents.length > 0 ? Math.round((selectedCount / filteredResidents.length) * 100) : 0
             };
         } else if (bulkType === 'households') {
-            const selectedCount = applyToAllHouseholds ? households.length : selectedHouseholdIds.length;
+            const selectedCount = applyToAllHouseholds ? filteredHouseholds.length : selectedHouseholdIds.length;
             return { 
-                total: households.length, 
+                total: filteredHouseholds.length, 
                 selected: selectedCount, 
                 eligible: 0,
-                selectedPercentage: households.length > 0 ? Math.round((selectedCount / households.length) * 100) : 0
+                selectedPercentage: filteredHouseholds.length > 0 ? Math.round((selectedCount / filteredHouseholds.length) * 100) : 0
             };
         } else {
             return { 
@@ -211,7 +256,7 @@ export default function BulkSelectionPanel({
     return (
         <div className="h-full flex flex-col">
             <Card className="border-2 border-primary/10 h-full flex flex-col overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 flex-shrink-0">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-white pb-4 flex-shrink-0 dark:from-gray-900 dark:to-gray-950">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="rounded-lg bg-primary/10 p-2">
@@ -220,14 +265,14 @@ export default function BulkSelectionPanel({
                                 {bulkType === 'custom' && <User className="h-6 w-6 text-primary" />}
                             </div>
                             <div>
-                                <CardTitle className="text-xl flex items-center gap-2">
+                                <CardTitle className="text-xl flex items-center gap-2 dark:text-gray-100">
                                     {bulkType === 'residents' ? 'Resident Selection' : 
                                      bulkType === 'households' ? 'Household Selection' : 'Custom Payers'}
-                                    <Badge variant="secondary" className="px-3 py-1">
+                                    <Badge variant="secondary" className="px-3 py-1 dark:bg-gray-800 dark:text-gray-300">
                                         {stats.selected} selected
                                     </Badge>
                                 </CardTitle>
-                                <CardDescription className="mt-1">
+                                <CardDescription className="mt-1 dark:text-gray-400">
                                     {bulkType === 'residents' && 'Select residents to apply the same fee configuration'}
                                     {bulkType === 'households' && 'Select households to apply the same fee configuration'}
                                     {bulkType === 'custom' && 'Add custom payers not currently in the system'}
@@ -243,7 +288,7 @@ export default function BulkSelectionPanel({
                                             variant="outline"
                                             size="sm"
                                             onClick={() => setShowFilters(!showFilters)}
-                                            className="gap-2"
+                                            className="gap-2 dark:border-gray-700 dark:text-gray-300"
                                         >
                                             {showFilters ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                             {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -259,23 +304,23 @@ export default function BulkSelectionPanel({
 
                     {/* Quick Stats Bar */}
                     <div className="mt-4 grid grid-cols-4 gap-3">
-                        <div className="rounded-lg bg-gray-100 p-3">
-                            <div className="text-xs font-medium text-gray-600 uppercase tracking-wider">Total</div>
-                            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                        <div className="rounded-lg bg-gray-100 p-3 dark:bg-gray-800">
+                            <div className="text-xs font-medium text-gray-600 uppercase tracking-wider dark:text-gray-400">Total</div>
+                            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</div>
                         </div>
                         <div className="rounded-lg bg-primary/10 p-3">
                             <div className="text-xs font-medium text-primary uppercase tracking-wider">Selected</div>
                             <div className="text-2xl font-bold text-primary">{stats.selected}</div>
                         </div>
                         {bulkType === 'residents' && (
-                            <div className="rounded-lg bg-blue-50 p-3">
-                                <div className="text-xs font-medium text-blue-600 uppercase tracking-wider">With Privileges</div>
-                                <div className="text-2xl font-bold text-blue-700">{stats.eligible}</div>
+                            <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+                                <div className="text-xs font-medium text-blue-600 uppercase tracking-wider dark:text-blue-400">With Privileges</div>
+                                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats.eligible}</div>
                             </div>
                         )}
-                        <div className="rounded-lg bg-green-50 p-3">
-                            <div className="text-xs font-medium text-green-600 uppercase tracking-wider">Coverage</div>
-                            <div className="text-2xl font-bold text-green-700">{stats.selectedPercentage}%</div>
+                        <div className="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+                            <div className="text-xs font-medium text-green-600 uppercase tracking-wider dark:text-green-400">Coverage</div>
+                            <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.selectedPercentage}%</div>
                         </div>
                     </div>
                 </CardHeader>
@@ -283,13 +328,13 @@ export default function BulkSelectionPanel({
                 <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
                     {/* Filters Section */}
                     {showFilters && (bulkType === 'residents' || bulkType === 'households') && (
-                        <div className="space-y-6 border-b bg-gradient-to-r from-gray-50 to-white p-4">
+                        <div className="space-y-6 border-b bg-gradient-to-r from-gray-50 to-white p-4 dark:from-gray-900 dark:to-gray-950 dark:border-gray-800">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-gray-200 p-2">
-                                        <Filter className="h-5 w-5 text-gray-700" />
+                                    <div className="rounded-lg bg-gray-200 p-2 dark:bg-gray-800">
+                                        <Filter className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                                     </div>
-                                    <h3 className="text-lg font-semibold">Filters & Search</h3>
+                                    <h3 className="text-lg font-semibold dark:text-gray-100">Filters & Search</h3>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button
@@ -301,7 +346,7 @@ export default function BulkSelectionPanel({
                                             setData('filter_discount_eligible', false);
                                             setSearchTerm('');
                                         }}
-                                        className="gap-2"
+                                        className="gap-2 dark:text-gray-300"
                                     >
                                         <RefreshCw className="h-4 w-4" />
                                         Reset All
@@ -311,7 +356,7 @@ export default function BulkSelectionPanel({
 
                             <div className="grid gap-4 md:grid-cols-3">
                                 <div className="space-y-2">
-                                    <Label htmlFor="search" className="flex items-center gap-2 text-sm">
+                                    <Label htmlFor="search" className="flex items-center gap-2 text-sm dark:text-gray-300">
                                         <Search className="h-4 w-4" />
                                         Search
                                     </Label>
@@ -322,13 +367,13 @@ export default function BulkSelectionPanel({
                                             placeholder="Search by name, contact, or purok..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="pl-9 h-10"
+                                            className="pl-9 h-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="filter-purok" className="flex items-center gap-2 text-sm">
+                                    <Label htmlFor="filter-purok" className="flex items-center gap-2 text-sm dark:text-gray-300">
                                         <MapPin className="h-4 w-4" />
                                         Filter by Purok
                                     </Label>
@@ -336,13 +381,13 @@ export default function BulkSelectionPanel({
                                         value={filterPurok || ''}
                                         onValueChange={(value) => setData('filter_purok', value || '')}
                                     >
-                                        <SelectTrigger className="h-10">
+                                        <SelectTrigger className="h-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                             <SelectValue placeholder="All Puroks" />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="">All Puroks</SelectItem>
+                                        <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
+                                            <SelectItem value="" className="dark:text-gray-300">All Puroks</SelectItem>
                                             {puroks.map((purok) => (
-                                                <SelectItem key={purok} value={purok}>
+                                                <SelectItem key={purok} value={purok} className="dark:text-gray-300">
                                                     Purok {purok}
                                                 </SelectItem>
                                             ))}
@@ -352,7 +397,7 @@ export default function BulkSelectionPanel({
 
                                 {bulkType === 'residents' && (
                                     <div className="space-y-2">
-                                        <Label className="flex items-center gap-2 text-sm">
+                                        <Label className="flex items-center gap-2 text-sm dark:text-gray-300">
                                             <Award className="h-4 w-4" />
                                             Quick Filters
                                         </Label>
@@ -373,7 +418,7 @@ export default function BulkSelectionPanel({
                             </div>
 
                             {/* Apply to all toggle */}
-                            <div className="rounded-lg border bg-white p-3">
+                            <div className="rounded-lg border bg-white p-3 dark:bg-gray-900 dark:border-gray-700">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-3">
                                         <Checkbox
@@ -390,14 +435,14 @@ export default function BulkSelectionPanel({
                                         <div className="flex-1">
                                             <Label
                                                 htmlFor={`apply-to-all-${bulkType}`}
-                                                className="cursor-pointer font-semibold"
+                                                className="cursor-pointer font-semibold dark:text-gray-200"
                                             >
                                                 Apply to ALL {bulkType === 'residents' ? 'residents' : 'households'}
                                             </Label>
-                                            <p className="text-xs text-gray-600 mt-1">
+                                            <p className="text-xs text-gray-600 mt-1 dark:text-gray-400">
                                                 {filterPurok 
-                                                    ? `Filtered to Purok ${filterPurok} • Showing ${stats.total} of ${bulkType === 'residents' ? 'all residents' : 'all households'}`
-                                                    : `All ${stats.total} ${bulkType} in the system`
+                                                    ? `Filtered to Purok ${filterPurok} • Showing ${stats.total} of ${bulkType === 'residents' ? 'filtered residents' : 'filtered households'}`
+                                                    : `All ${stats.total} ${bulkType} in the current view`
                                                 }
                                             </p>
                                         </div>
@@ -432,7 +477,7 @@ export default function BulkSelectionPanel({
                     <div className="flex-1 overflow-hidden flex flex-col">
                         {/* View Controls */}
                         {!applyToAllResidents && !applyToAllHouseholds && bulkType !== 'custom' && (
-                            <div className="flex-shrink-0 p-3 border-b">
+                            <div className="flex-shrink-0 p-3 border-b dark:border-gray-800">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="flex gap-2">
@@ -472,7 +517,7 @@ export default function BulkSelectionPanel({
                                         )}
                                     </div>
                                     
-                                    <div className="text-xs text-gray-500">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
                                         Showing {stats.total} {bulkType}
                                         {filterPurok && ` in Purok ${filterPurok}`}
                                     </div>
@@ -486,25 +531,26 @@ export default function BulkSelectionPanel({
                                 showPreview ? (
                                     // Preview Mode
                                     <div className="h-full flex flex-col">
-                                        <div className="p-3 border-b bg-gray-50 flex-shrink-0">
-                                            <h4 className="font-semibold">Selected Items Preview</h4>
-                                            <p className="text-xs text-gray-500">Review the {bulkType} that will receive fees</p>
+                                        <div className="p-3 border-b bg-gray-50 flex-shrink-0 dark:bg-gray-900 dark:border-gray-800">
+                                            <h4 className="font-semibold dark:text-gray-100">Selected Items Preview</h4>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">Review the {bulkType} that will receive fees</p>
                                         </div>
                                         <ScrollArea className="flex-1">
                                             <div className="p-3 space-y-2">
                                                 {bulkType === 'residents' && 
-                                                    residents
-                                                        .filter(r => selectedResidentIds.includes(r.id.toString()))
+                                                    filteredResidents
+                                                        .filter(r => selectedResidentIds.includes(String(r.id)))
                                                         .map(resident => {
                                                             const badges = getResidentBadges(resident);
                                                             return (
-                                                                <div key={resident.id} className="rounded-lg bg-gradient-to-r from-gray-50 to-white p-3 border">
+                                                                <div key={resident.id} className="rounded-lg bg-gradient-to-r from-gray-50 to-white p-3 border dark:from-gray-900 dark:to-gray-950 dark:border-gray-700">
                                                                     <div className="flex items-center justify-between">
-                                                                        <div className="font-medium">{resident.full_name}</div>
+                                                                        <div className="font-medium dark:text-gray-200">{resident.full_name}</div>
                                                                         <div className="flex gap-1">
                                                                             {badges.slice(0, 2).map((badge, idx) => (
                                                                                 <Badge key={idx} className={`text-xs ${badge.color}`}>
-                                                                                    {badge.icon} {badge.label}
+                                                                                    <span className="mr-1">{badge.icon}</span>
+                                                                                    {badge.label}
                                                                                 </Badge>
                                                                             ))}
                                                                             {badges.length > 2 && (
@@ -514,29 +560,29 @@ export default function BulkSelectionPanel({
                                                                             )}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="text-xs text-gray-600 mt-1">
+                                                                    <div className="text-xs text-gray-600 mt-1 dark:text-gray-400">
                                                                         {resident.purok && `Purok ${resident.purok}`}
-                                                                        {resident.contact_number && ` • ${resident.contact_number}`}
+                                                                        {resident.phone && ` • ${resident.phone}`}
                                                                     </div>
                                                                 </div>
                                                             );
                                                         })
                                                 }
                                                 {bulkType === 'households' && 
-                                                    households
-                                                        .filter(h => selectedHouseholdIds.includes(h.id.toString()))
+                                                    filteredHouseholds
+                                                        .filter(h => selectedHouseholdIds.includes(String(h.id)))
                                                         .map(household => (
-                                                            <div key={household.id} className="rounded-lg bg-gradient-to-r from-gray-50 to-white p-3 border">
-                                                                <div className="font-medium">{household.name}</div>
-                                                                <div className="text-xs text-gray-600 mt-1">
+                                                            <div key={household.id} className="rounded-lg bg-gradient-to-r from-gray-50 to-white p-3 border dark:from-gray-900 dark:to-gray-950 dark:border-gray-700">
+                                                                <div className="font-medium dark:text-gray-200">{household.name}</div>
+                                                                <div className="text-xs text-gray-600 mt-1 dark:text-gray-400">
                                                                     {household.purok && `Purok ${household.purok}`}
                                                                     {household.contact_number && ` • ${household.contact_number}`}
-                                                                    {household.member_count && ` • ${household.member_count} members`}
+                                                                    {(household as any).member_count && ` • ${(household as any).member_count} members`}
                                                                 </div>
                                                                 {household.head_privileges && household.head_privileges.length > 0 && (
                                                                     <div className="mt-2 flex gap-1">
-                                                                        {household.head_privileges.slice(0, 2).map((p: any, idx: number) => (
-                                                                            <Badge key={idx} variant="outline" className="text-xs bg-purple-50">
+                                                                        {household.head_privileges.slice(0, 2).map((p: PrivilegeData, idx: number) => (
+                                                                            <Badge key={idx} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400">
                                                                                 {p.name}
                                                                             </Badge>
                                                                         ))}
@@ -547,9 +593,9 @@ export default function BulkSelectionPanel({
                                                 }
                                             </div>
                                         </ScrollArea>
-                                        <div className="p-3 border-t bg-gray-50 flex-shrink-0">
+                                        <div className="p-3 border-t bg-gray-50 flex-shrink-0 dark:bg-gray-900 dark:border-gray-800">
                                             <div className="flex items-center justify-between">
-                                                <div className="text-xs text-gray-600">
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">
                                                     Total: {stats.selected} {bulkType}
                                                 </div>
                                                 <Button
@@ -566,12 +612,12 @@ export default function BulkSelectionPanel({
                                     // Selection Mode
                                     <ScrollArea className="h-full">
                                         {bulkType === 'residents' && (
-                                            <div className="divide-y">
-                                                {residents.length === 0 ? (
+                                            <div className="divide-y dark:divide-gray-800">
+                                                {filteredResidents.length === 0 ? (
                                                     <div className="flex flex-col items-center justify-center p-8 text-center">
                                                         <AlertCircle className="h-8 w-8 text-gray-300 mb-3" />
-                                                        <h3 className="font-semibold text-gray-700">No residents found</h3>
-                                                        <p className="mt-1 text-gray-500 text-sm">
+                                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">No residents found</h3>
+                                                        <p className="mt-1 text-gray-500 text-sm dark:text-gray-400">
                                                             Try adjusting your search or filter criteria.
                                                         </p>
                                                         <Button
@@ -588,17 +634,17 @@ export default function BulkSelectionPanel({
                                                         </Button>
                                                     </div>
                                                 ) : viewMode === 'list' ? (
-                                                    residents
+                                                    filteredResidents
                                                         .filter(r => isDiscountEligible(r))
                                                         .map((resident) => {
-                                                            const isSelected = selectedResidentIds.includes(resident.id.toString());
+                                                            const isSelected = selectedResidentIds.includes(String(resident.id));
                                                             const badges = getResidentBadges(resident);
-                                                            const isExpanded = expandedItems.has(resident.id.toString());
+                                                            const isExpanded = expandedItems.has(String(resident.id));
 
                                                             return (
                                                                 <div
                                                                     key={resident.id}
-                                                                    className={`p-4 transition-all hover:bg-gray-50 ${
+                                                                    className={`p-4 transition-all hover:bg-gray-50 dark:hover:bg-gray-900/50 ${
                                                                         isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''
                                                                     }`}
                                                                 >
@@ -610,8 +656,8 @@ export default function BulkSelectionPanel({
                                                                                 className="mt-1 h-4 w-4"
                                                                             />
                                                                             <div className="flex-1 min-w-0">
-                                                                                <div className="flex items-center gap-2 mb-1">
-                                                                                    <div className="font-semibold truncate">
+                                                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                                                    <div className="font-semibold truncate dark:text-gray-200">
                                                                                         {resident.full_name}
                                                                                     </div>
                                                                                     <div className="flex flex-wrap gap-1">
@@ -636,11 +682,11 @@ export default function BulkSelectionPanel({
                                                                                     </div>
                                                                                 </div>
                                                                                 
-                                                                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
-                                                                                    {resident.contact_number && (
+                                                                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 dark:text-gray-400">
+                                                                                    {resident.phone && (
                                                                                         <div className="flex items-center gap-1">
                                                                                             <Phone className="h-3 w-3 flex-shrink-0" />
-                                                                                            <span className="truncate">{resident.contact_number}</span>
+                                                                                            <span className="truncate">{resident.phone}</span>
                                                                                         </div>
                                                                                     )}
                                                                                     {resident.purok && (
@@ -649,22 +695,12 @@ export default function BulkSelectionPanel({
                                                                                             <span>Purok {resident.purok}</span>
                                                                                         </div>
                                                                                     )}
-                                                                                    {resident.age && (
-                                                                                        <div>
-                                                                                            <span className="font-medium">Age:</span> {resident.age}
-                                                                                        </div>
-                                                                                    )}
-                                                                                    {resident.gender && (
-                                                                                        <div>
-                                                                                            <span className="font-medium">Gender:</span> {resident.gender}
-                                                                                        </div>
-                                                                                    )}
                                                                                 </div>
 
                                                                                 {isExpanded && resident.address && (
-                                                                                    <div className="mt-3 rounded bg-gray-100 p-3 text-xs">
-                                                                                        <div className="font-medium mb-1">Complete Address:</div>
-                                                                                        <div className="text-gray-700">{resident.address}</div>
+                                                                                    <div className="mt-3 rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">
+                                                                                        <div className="font-medium mb-1 dark:text-gray-300">Complete Address:</div>
+                                                                                        <div className="text-gray-700 dark:text-gray-400">{resident.address}</div>
                                                                                     </div>
                                                                                 )}
                                                                             </div>
@@ -674,7 +710,7 @@ export default function BulkSelectionPanel({
                                                                                 type="button"
                                                                                 variant="ghost"
                                                                                 size="sm"
-                                                                                onClick={() => toggleExpand(resident.id.toString())}
+                                                                                onClick={() => toggleExpand(String(resident.id))}
                                                                                 className="h-7 w-7 p-0"
                                                                             >
                                                                                 {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -687,17 +723,17 @@ export default function BulkSelectionPanel({
                                                 ) : (
                                                     // Grid View for Residents
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3">
-                                                        {residents
+                                                        {filteredResidents
                                                             .filter(r => isDiscountEligible(r))
                                                             .map((resident) => {
-                                                            const isSelected = selectedResidentIds.includes(resident.id.toString());
+                                                            const isSelected = selectedResidentIds.includes(String(resident.id));
                                                             const badges = getResidentBadges(resident);
 
                                                             return (
                                                                 <div
                                                                     key={resident.id}
                                                                     className={`border rounded-lg p-3 transition-all hover:shadow-md ${
-                                                                        isSelected ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-gray-200'
+                                                                        isSelected ? 'border-primary ring-1 ring-primary/20 bg-primary/5' : 'border-gray-200 dark:border-gray-700'
                                                                     }`}
                                                                 >
                                                                     <div className="flex items-start justify-between mb-2">
@@ -717,12 +753,12 @@ export default function BulkSelectionPanel({
                                                                             ))}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="font-semibold text-sm mb-1 truncate">{resident.full_name}</div>
-                                                                    <div className="space-y-1 text-xs text-gray-600">
-                                                                        {resident.contact_number && (
+                                                                    <div className="font-semibold text-sm mb-1 truncate dark:text-gray-200">{resident.full_name}</div>
+                                                                    <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                                                                        {resident.phone && (
                                                                             <div className="flex items-center gap-1">
                                                                                 <Phone className="h-3 w-3" />
-                                                                                <span className="truncate">{resident.contact_number}</span>
+                                                                                <span className="truncate">{resident.phone}</span>
                                                                             </div>
                                                                         )}
                                                                         {resident.purok && (
@@ -741,24 +777,24 @@ export default function BulkSelectionPanel({
                                         )}
 
                                         {bulkType === 'households' && (
-                                            <div className="divide-y">
-                                                {households.length === 0 ? (
+                                            <div className="divide-y dark:divide-gray-800">
+                                                {filteredHouseholds.length === 0 ? (
                                                     <div className="flex flex-col items-center justify-center p-8 text-center">
                                                         <Home className="h-8 w-8 text-gray-300 mb-3" />
-                                                        <h3 className="font-semibold text-gray-700">No households found</h3>
-                                                        <p className="mt-1 text-gray-500 text-sm">
+                                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">No households found</h3>
+                                                        <p className="mt-1 text-gray-500 text-sm dark:text-gray-400">
                                                             Try adjusting your search or filter criteria.
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    households.map((household) => {
-                                                        const isSelected = selectedHouseholdIds.includes(household.id.toString());
-                                                        const isExpanded = expandedItems.has(household.id.toString());
+                                                    filteredHouseholds.map((household) => {
+                                                        const isSelected = selectedHouseholdIds.includes(String(household.id));
+                                                        const isExpanded = expandedItems.has(String(household.id));
 
                                                         return (
                                                             <div
                                                                 key={household.id}
-                                                                className={`p-4 transition-all hover:bg-gray-50 ${
+                                                                className={`p-4 transition-all hover:bg-gray-50 dark:hover:bg-gray-900/50 ${
                                                                     isSelected ? 'bg-primary/5 border-l-2 border-l-primary' : ''
                                                                 }`}
                                                             >
@@ -771,15 +807,15 @@ export default function BulkSelectionPanel({
                                                                         />
                                                                         <div className="flex-1 min-w-0">
                                                                             <div className="flex items-center gap-2 mb-1">
-                                                                                <div className="font-semibold">{household.name}</div>
-                                                                                {household.member_count && (
-                                                                                    <Badge variant="outline" className="text-xs">
-                                                                                        👨‍👩‍👧‍👦 {household.member_count} members
+                                                                                <div className="font-semibold dark:text-gray-200">{household.name}</div>
+                                                                                {(household as any).member_count && (
+                                                                                    <Badge variant="outline" className="text-xs dark:border-gray-700">
+                                                                                        👨‍👩‍👧‍👦 {(household as any).member_count} members
                                                                                     </Badge>
                                                                                 )}
                                                                             </div>
                                                                             
-                                                                            <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
+                                                                            <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 dark:text-gray-400">
                                                                                 {household.contact_number && (
                                                                                     <div className="flex items-center gap-1">
                                                                                         <Phone className="h-3 w-3 flex-shrink-0" />
@@ -792,18 +828,13 @@ export default function BulkSelectionPanel({
                                                                                         <span>Purok {household.purok}</span>
                                                                                     </div>
                                                                                 )}
-                                                                                {household.head_of_family && (
-                                                                                    <div className="col-span-2">
-                                                                                        <span className="font-medium">Head:</span> {household.head_of_family}
-                                                                                    </div>
-                                                                                )}
                                                                             </div>
 
                                                                             {/* Show head's privileges if any */}
                                                                             {household.head_privileges && household.head_privileges.length > 0 && (
                                                                                 <div className="mt-2 flex gap-1">
-                                                                                    {household.head_privileges.map((p: any, idx: number) => (
-                                                                                        <Badge key={idx} variant="outline" className="text-xs bg-purple-50">
+                                                                                    {household.head_privileges.map((p: PrivilegeData, idx: number) => (
+                                                                                        <Badge key={idx} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400">
                                                                                             {p.name}
                                                                                         </Badge>
                                                                                     ))}
@@ -811,9 +842,9 @@ export default function BulkSelectionPanel({
                                                                             )}
 
                                                                             {isExpanded && household.address && (
-                                                                                <div className="mt-3 rounded bg-gray-100 p-3 text-xs">
-                                                                                    <div className="font-medium mb-1">Complete Address:</div>
-                                                                                    <div className="text-gray-700">{household.address}</div>
+                                                                                <div className="mt-3 rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">
+                                                                                    <div className="font-medium mb-1 dark:text-gray-300">Complete Address:</div>
+                                                                                    <div className="text-gray-700 dark:text-gray-400">{household.address}</div>
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -823,7 +854,7 @@ export default function BulkSelectionPanel({
                                                                             type="button"
                                                                             variant="ghost"
                                                                             size="sm"
-                                                                            onClick={() => toggleExpand(household.id.toString())}
+                                                                            onClick={() => toggleExpand(String(household.id))}
                                                                             className="h-7 w-7 p-0"
                                                                         >
                                                                             {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -845,8 +876,8 @@ export default function BulkSelectionPanel({
                                         <div className="bg-primary/10 rounded-full p-4 inline-flex mb-4">
                                             <Check className="h-6 w-6 text-primary" />
                                         </div>
-                                        <h3 className="text-lg font-bold mb-2">Applying to All {bulkType}</h3>
-                                        <p className="text-gray-600 text-sm mb-4">
+                                        <h3 className="text-lg font-bold mb-2 dark:text-gray-100">Applying to All {bulkType}</h3>
+                                        <p className="text-gray-600 text-sm mb-4 dark:text-gray-400">
                                             This fee will be applied to all {stats.total} {bulkType}
                                             {filterPurok && ` in Purok ${filterPurok}`}.
                                         </p>
@@ -880,11 +911,11 @@ export default function BulkSelectionPanel({
                     {/* Custom Payers Section */}
                     {bulkType === 'custom' && (
                         <div className="flex-1 overflow-hidden flex flex-col">
-                            <div className="p-3 border-b bg-gray-50 flex-shrink-0">
+                            <div className="p-3 border-b bg-gray-50 flex-shrink-0 dark:bg-gray-900 dark:border-gray-800">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <h3 className="font-semibold">Custom Payers</h3>
-                                        <p className="text-xs text-gray-500">
+                                        <h3 className="font-semibold dark:text-gray-100">Custom Payers</h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                             Add payers not in the resident or household database
                                         </p>
                                     </div>
@@ -905,12 +936,12 @@ export default function BulkSelectionPanel({
                             <ScrollArea className="flex-1">
                                 <div className="p-3">
                                     {customPayers.length === 0 ? (
-                                        <div className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
+                                        <div className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center dark:border-gray-700">
                                             <User className="mx-auto h-8 w-8 text-gray-400 mb-3" />
-                                            <h3 className="font-semibold text-gray-900 mb-1">
+                                            <h3 className="font-semibold text-gray-900 mb-1 dark:text-gray-100">
                                                 No custom payers added yet
                                             </h3>
-                                            <p className="text-gray-500 text-sm mb-4 max-w-md mx-auto">
+                                            <p className="text-gray-500 text-sm mb-4 max-w-md mx-auto dark:text-gray-400">
                                                 Add custom payers manually
                                             </p>
                                             <Button onClick={addCustomPayer} size="sm">
@@ -921,12 +952,12 @@ export default function BulkSelectionPanel({
                                     ) : (
                                         <div className="space-y-3">
                                             {customPayers.map((payer) => (
-                                                <div key={payer.id} className="rounded-lg border bg-white p-3">
+                                                <div key={payer.id} className="rounded-lg border bg-white p-3 dark:bg-gray-900 dark:border-gray-700">
                                                     <div className="mb-3 flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <Building className="h-4 w-4 text-gray-600" />
-                                                            <span className="font-semibold">Custom Payer</span>
-                                                            <Badge variant="outline" className="text-xs">
+                                                            <Building className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                                                            <span className="font-semibold dark:text-gray-200">Custom Payer</span>
+                                                            <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-400">
                                                                 Custom
                                                             </Badge>
                                                         </div>
@@ -942,7 +973,7 @@ export default function BulkSelectionPanel({
                                                     </div>
                                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                                         <div className="space-y-1">
-                                                            <Label htmlFor={`name-${payer.id}`} className="text-xs font-medium">
+                                                            <Label htmlFor={`name-${payer.id}`} className="text-xs font-medium dark:text-gray-300">
                                                                 Full Name *
                                                             </Label>
                                                             <Input
@@ -953,11 +984,11 @@ export default function BulkSelectionPanel({
                                                                 }
                                                                 placeholder="Juan Dela Cruz"
                                                                 required
-                                                                className="h-8 text-sm"
+                                                                className="h-8 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
                                                             />
                                                         </div>
                                                         <div className="space-y-1">
-                                                            <Label htmlFor={`contact-${payer.id}`} className="text-xs font-medium">
+                                                            <Label htmlFor={`contact-${payer.id}`} className="text-xs font-medium dark:text-gray-300">
                                                                 Contact Number
                                                             </Label>
                                                             <Input
@@ -968,11 +999,11 @@ export default function BulkSelectionPanel({
                                                                 }
                                                                 placeholder="09123456789"
                                                                 type="tel"
-                                                                className="h-8 text-sm"
+                                                                className="h-8 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
                                                             />
                                                         </div>
                                                         <div className="space-y-1">
-                                                            <Label htmlFor={`purok-${payer.id}`} className="text-xs font-medium">
+                                                            <Label htmlFor={`purok-${payer.id}`} className="text-xs font-medium dark:text-gray-300">
                                                                 Purok
                                                             </Label>
                                                             <Select
@@ -981,13 +1012,13 @@ export default function BulkSelectionPanel({
                                                                     updateCustomPayer(payer.id, 'purok', value)
                                                                 }
                                                             >
-                                                                <SelectTrigger className="h-8 text-sm">
+                                                                <SelectTrigger className="h-8 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
                                                                     <SelectValue placeholder="Select Purok" />
                                                                 </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="">No Purok</SelectItem>
+                                                                <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
+                                                                    <SelectItem value="" className="dark:text-gray-300">No Purok</SelectItem>
                                                                     {puroks.map((purok) => (
-                                                                        <SelectItem key={purok} value={purok}>
+                                                                        <SelectItem key={purok} value={purok} className="dark:text-gray-300">
                                                                             Purok {purok}
                                                                         </SelectItem>
                                                                     ))}
@@ -995,7 +1026,7 @@ export default function BulkSelectionPanel({
                                                             </Select>
                                                         </div>
                                                         <div className="space-y-1">
-                                                            <Label htmlFor={`address-${payer.id}`} className="text-xs font-medium">
+                                                            <Label htmlFor={`address-${payer.id}`} className="text-xs font-medium dark:text-gray-300">
                                                                 Complete Address
                                                             </Label>
                                                             <Input
@@ -1005,12 +1036,12 @@ export default function BulkSelectionPanel({
                                                                     updateCustomPayer(payer.id, 'address', e.target.value)
                                                                 }
                                                                 placeholder="Street, Barangay, City"
-                                                                className="h-8 text-sm"
+                                                                className="h-8 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
                                                             />
                                                         </div>
                                                     </div>
-                                                    <div className="mt-3 pt-2 border-t">
-                                                        <p className="text-xs text-gray-500">
+                                                    <div className="mt-3 pt-2 border-t dark:border-gray-700">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
                                                             This payer will receive a separate fee invoice.
                                                         </p>
                                                     </div>
@@ -1022,7 +1053,7 @@ export default function BulkSelectionPanel({
                             </ScrollArea>
                             
                             {customPayers.length > 0 && (
-                                <div className="p-3 border-t bg-gray-50 flex-shrink-0">
+                                <div className="p-3 border-t bg-gray-50 flex-shrink-0 dark:bg-gray-900 dark:border-gray-800">
                                     <div className="flex justify-center">
                                         <Button
                                             type="button"

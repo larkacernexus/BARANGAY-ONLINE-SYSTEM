@@ -1,6 +1,6 @@
 // pages/admin/Dashboard.tsx
 import AppLayout from '@/layouts/admin-app-layout';
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem } from '@/types/breadcrumbs';
 import { Head, usePage, router } from '@inertiajs/react';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
@@ -30,7 +30,7 @@ import {
     type ActivityItem,
     type PrivilegeStatsData,
     type SystemStatus as SystemStatusType
-} from '@/components/admin/dashboard/types/dashboard';
+} from '@/types/admin/dashboard/dashboard';
 
 // Import icons
 import { 

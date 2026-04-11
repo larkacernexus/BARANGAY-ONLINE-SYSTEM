@@ -187,6 +187,86 @@
         animation-name: slide-in-from-top-2;
     }
 
+    /* ===== HIDE SCROLLBAR UTILITIES ===== */
+    .scrollbar-hide {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE and Edge */
+    }
+
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+    }
+
+    /* ===== VISIBLE SCROLLBAR UTILITIES ===== */
+    .scrollbar-visible {
+        scrollbar-width: thin; /* Firefox */
+        scrollbar-color: #cbd5e1 #f1f5f9; /* Firefox */
+    }
+
+    .scrollbar-visible::-webkit-scrollbar {
+        display: block;
+        width: 6px;
+    }
+
+    .scrollbar-visible::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+
+    .scrollbar-visible::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .scrollbar-visible::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+
+    /* Dark mode visible scrollbar */
+    .dark .scrollbar-visible {
+        scrollbar-color: #374151 #1f2937;
+    }
+
+    .dark .scrollbar-visible::-webkit-scrollbar-track {
+        background: #1f2937;
+    }
+
+    .dark .scrollbar-visible::-webkit-scrollbar-thumb {
+        background: #374151;
+    }
+
+    .dark .scrollbar-visible::-webkit-scrollbar-thumb:hover {
+        background: #4b5563;
+    }
+
+    /* Show scrollbar on container hover */
+    .group:hover .scrollbar-hide {
+        scrollbar-width: thin;
+    }
+
+    .group:hover .scrollbar-hide::-webkit-scrollbar {
+        display: block;
+        width: 6px;
+    }
+
+    .group:hover .scrollbar-hide::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+
+    .group:hover .scrollbar-hide::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .dark .group:hover .scrollbar-hide::-webkit-scrollbar-track {
+        background: #1f2937;
+    }
+
+    .dark .group:hover .scrollbar-hide::-webkit-scrollbar-thumb {
+        background: #374151;
+    }
+
     /* Custom scrollbar */
     .custom-scrollbar::-webkit-scrollbar {
         width: 8px;

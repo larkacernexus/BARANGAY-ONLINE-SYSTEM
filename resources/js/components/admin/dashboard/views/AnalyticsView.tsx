@@ -1,5 +1,5 @@
 import { TrendingUp, Clock, Activity, Users } from 'lucide-react';
-import type { PageProps } from '@/components/admin/dashboard/types/dashboard';
+import type { PageProps } from '@/types/admin/dashboard/dashboard';
 
 interface AnalyticsViewProps {
     collectionStats: PageProps['collectionStats'];

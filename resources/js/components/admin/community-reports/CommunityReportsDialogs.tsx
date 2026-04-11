@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { BulkOperation } from '@/types/communityReportTypes';
+import { BulkOperation } from '@/types/admin/reports/communityReportTypes';
 import { Loader2 } from 'lucide-react';
 
 interface SelectionStats {

@@ -40,7 +40,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ClearanceType, Resident, Household, Business } from '@/types/admin/clearances/clearance-types';
+import { ClearanceType, Resident, Household, Business } from '@/types/admin/clearances/clearance';
 
 // --- Page Props Interface ---
 interface PageProps {

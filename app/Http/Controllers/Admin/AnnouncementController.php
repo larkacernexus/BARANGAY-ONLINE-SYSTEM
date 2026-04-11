@@ -50,6 +50,12 @@ class AnnouncementController extends Controller
             $query->where('audience_type', $request->audience_type);
         }
         
+        // ✅ FIXED: Filter by priority (convert to integer for database)
+        if ($request->filled('priority') && $request->priority !== 'all') {
+            $priorityValue = (int) $request->priority;
+            $query->where('priority', $priorityValue);
+        }
+        
         // Filter by status
         if ($request->filled('status') && $request->status !== 'all') {
             switch ($request->status) {
@@ -68,7 +74,7 @@ class AnnouncementController extends Controller
             }
         }
         
-        // Date range filter
+        // Date range filter (created_at)
         if ($request->filled('from_date')) {
             $query->whereDate('created_at', '>=', $request->from_date);
         }
@@ -77,17 +83,7 @@ class AnnouncementController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
         
-        // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortOrder = $request->get('sort_order', 'desc');
-        
-        $allowedSorts = ['title', 'type', 'priority', 'is_active', 'start_date', 'end_date', 'created_at', 'audience_type'];
-        
-        if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortOrder);
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
+        // ✅ REMOVED sorting from filters - sorting is now handled client-side by table header
         
         $announcements = $query->paginate($request->get('per_page', 15))
             ->withQueryString()
@@ -145,7 +141,8 @@ class AnnouncementController extends Controller
         
         return Inertia::render('admin/Announcements/Index', [
             'announcements' => $announcements,
-            'filters' => $request->only(['search', 'type', 'audience_type', 'status', 'from_date', 'to_date', 'sort_by', 'sort_order']),
+            // ✅ Include priority in filters
+            'filters' => $request->only(['search', 'type', 'audience_type', 'priority', 'status', 'from_date', 'to_date']),
             'types' => Announcement::getTypes(),
             'priorities' => Announcement::getPriorityOptions(),
             'audience_types' => Announcement::getAudienceTypes(),
@@ -159,7 +156,6 @@ class AnnouncementController extends Controller
      */
     public function create()
     {
-        // Get data for audience targeting options
         $roles = Role::orderBy('name')->get(['id', 'name']);
         $puroks = Purok::orderBy('name')->get(['id', 'name']);
         $households = Household::with('purok')
@@ -180,7 +176,7 @@ class AnnouncementController extends Controller
             'households' => $households,
             'businesses' => $businesses,
             'users' => $users,
-            'maxFileSize' => config('announcements.max_file_size', 10), // 10MB default
+            'maxFileSize' => config('announcements.max_file_size', 10),
             'allowedFileTypes' => config('announcements.allowed_file_types', [
                 'image/*', 
                 '.pdf', 
@@ -223,18 +219,15 @@ class AnnouncementController extends Controller
             'target_users' => 'nullable|array',
             'target_users.*' => 'exists:users,id',
             'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240', // 10MB max per file, optional
+            'attachments.*' => 'file|max:10240',
         ]);
         
-        // Add created_by
         $validated['created_by'] = Auth::id();
         
-        // Set default is_active if not provided
         if (!isset($validated['is_active'])) {
             $validated['is_active'] = true;
         }
         
-        // Convert empty arrays to null
         foreach (['target_roles', 'target_puroks', 'target_households', 'target_businesses', 'target_users'] as $field) {
             if (empty($validated[$field])) {
                 $validated[$field] = null;
@@ -244,10 +237,8 @@ class AnnouncementController extends Controller
         DB::beginTransaction();
         
         try {
-            // Create announcement
             $announcement = Announcement::create($validated);
             
-            // Handle file uploads - only if attachments exist
             if ($request->hasFile('attachments') && !empty($request->file('attachments'))) {
                 foreach ($request->file('attachments') as $file) {
                     $path = $file->store('announcements/' . date('Y/m'), 'public');
@@ -263,10 +254,8 @@ class AnnouncementController extends Controller
                 }
             }
             
-            // Send notifications to target audience if active
             if ($announcement->is_active) {
                 $notificationCount = $announcement->notifyTargetAudience('created');
-                
                 $message = "Announcement created successfully. Notifications sent to {$notificationCount} users.";
             } else {
                 $message = "Announcement created successfully as draft.";
@@ -292,7 +281,6 @@ class AnnouncementController extends Controller
             $q->orderBy('created_at', 'desc');
         }]);
         
-        // Get audience details
         $audienceDetails = [];
         
         switch ($announcement->audience_type) {
@@ -318,7 +306,6 @@ class AnnouncementController extends Controller
                 break;
         }
         
-        // Get notification stats
         $notificationStats = $announcement->getNotificationStats();
         
         return Inertia::render('admin/Announcements/Show', [
@@ -388,7 +375,6 @@ class AnnouncementController extends Controller
     {
         $announcement->load('attachments');
         
-        // Get data for audience targeting options
         $roles = Role::orderBy('name')->get(['id', 'name']);
         $puroks = Purok::orderBy('name')->get(['id', 'name']);
         $households = Household::with('purok')
@@ -481,27 +467,23 @@ class AnnouncementController extends Controller
             'target_users' => 'nullable|array',
             'target_users.*' => 'exists:users,id',
             'new_attachments' => 'nullable|array',
-            'new_attachments.*' => 'file|max:10240', // Optional
+            'new_attachments.*' => 'file|max:10240',
             'keep_attachments' => 'nullable|array',
             'keep_attachments.*' => 'exists:announcement_attachments,id',
         ]);
         
-        // Add updated_by
         $validated['updated_by'] = Auth::id();
         
-        // Set default is_active if not provided
         if (!isset($validated['is_active'])) {
             $validated['is_active'] = $announcement->is_active;
         }
         
-        // Convert empty arrays to null
         foreach (['target_roles', 'target_puroks', 'target_households', 'target_businesses', 'target_users'] as $field) {
             if (empty($validated[$field])) {
                 $validated[$field] = null;
             }
         }
         
-        // Check if important fields changed
         $wasInactive = !$announcement->is_active;
         $audienceChanged = $announcement->audience_type !== $validated['audience_type'] ||
                            $announcement->target_roles != ($validated['target_roles'] ?? null) ||
@@ -515,11 +497,8 @@ class AnnouncementController extends Controller
         try {
             $announcement->update($validated);
             
-            // Handle attachments to keep - only if keep_attachments is provided
             if ($request->has('keep_attachments')) {
                 $keepIds = $validated['keep_attachments'] ?? [];
-                
-                // Delete attachments not in keep list
                 $toDelete = $announcement->attachments()
                     ->whereNotIn('id', $keepIds)
                     ->get();
@@ -530,7 +509,6 @@ class AnnouncementController extends Controller
                 }
             }
             
-            // Handle new file uploads - only if attachments exist
             if ($request->hasFile('new_attachments') && !empty($request->file('new_attachments'))) {
                 foreach ($request->file('new_attachments') as $file) {
                     $path = $file->store('announcements/' . date('Y/m'), 'public');
@@ -546,9 +524,6 @@ class AnnouncementController extends Controller
                 }
             }
             
-            // Send notifications if:
-            // 1. It was inactive and now becomes active (published)
-            // 2. Audience changed and announcement is active
             if (($wasInactive && $announcement->is_active) || ($audienceChanged && $announcement->is_active)) {
                 $notificationCount = $announcement->notifyTargetAudience('updated');
             }
@@ -572,15 +547,11 @@ class AnnouncementController extends Controller
         DB::beginTransaction();
         
         try {
-            // Delete all attachment files from storage
             foreach ($announcement->attachments as $attachment) {
                 Storage::disk('public')->delete($attachment->file_path);
             }
             
-            // Delete attachments records
             $announcement->attachments()->delete();
-            
-            // Delete announcement
             $announcement->delete();
             
             DB::commit();
@@ -674,7 +645,6 @@ class AnnouncementController extends Controller
                 'updated_by' => Auth::id(),
             ]);
             
-            // Send notifications if activating
             if ($newStatus) {
                 $notificationCount = $announcement->notifyTargetAudience('published');
                 $message = 'Announcement activated and notifications sent to ' . $notificationCount . ' users.';
@@ -706,10 +676,9 @@ class AnnouncementController extends Controller
             $newAnnouncement->updated_by = null;
             $newAnnouncement->created_at = now();
             $newAnnouncement->updated_at = now();
-            $newAnnouncement->is_active = false; // Set as draft by default
+            $newAnnouncement->is_active = false;
             $newAnnouncement->save();
             
-            // Duplicate attachments (copy files)
             foreach ($announcement->attachments as $attachment) {
                 $newPath = 'announcements/' . date('Y/m') . '/' . uniqid() . '_' . $attachment->file_name;
                 
@@ -774,7 +743,6 @@ class AnnouncementController extends Controller
     {
         $query = Announcement::query()->with(['creator']);
         
-        // Apply filters similar to index
         if ($request->filled('search')) {
             $query->where('title', 'like', "%{$request->search}%");
         }
@@ -785,6 +753,11 @@ class AnnouncementController extends Controller
         
         if ($request->filled('audience_type') && $request->audience_type !== 'all') {
             $query->where('audience_type', $request->audience_type);
+        }
+        
+        // ✅ FIXED: Convert priority to integer for export filter
+        if ($request->filled('priority') && $request->priority !== 'all') {
+            $query->where('priority', (int) $request->priority);
         }
         
         if ($request->filled('status') && $request->status !== 'all') {
@@ -806,7 +779,6 @@ class AnnouncementController extends Controller
         
         $announcements = $query->orderBy('created_at', 'desc')->get();
         
-        // Generate CSV
         $filename = 'announcements-' . now()->format('Y-m-d-His') . '.csv';
         $headers = [
             'Content-Type' => 'text/csv',
@@ -816,7 +788,6 @@ class AnnouncementController extends Controller
         $callback = function() use ($announcements) {
             $file = fopen('php://output', 'w');
             
-            // Headers
             fputcsv($file, [
                 'ID',
                 'Title',
@@ -835,7 +806,6 @@ class AnnouncementController extends Controller
                 'Notification Stats (Read/Total)'
             ]);
             
-            // Data
             foreach ($announcements as $announcement) {
                 $stats = $announcement->getNotificationStats();
                 

@@ -20,18 +20,32 @@ class ResidentProfileController extends Controller
 {
     /**
      * Get all active privileges - DYNAMIC FROM DATABASE
+     * FIXED: Uses discountType relationship instead of default_discount_percentage column
      */
     private function getAllPrivileges(): array
     {
         return Cache::remember('all_active_privileges', 3600, function () {
-            return Privilege::where('is_active', true)
+            return Privilege::with('discountType') // Eager load discount type
+                ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'code', 'description'])
+                ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
                 ->map(fn($p) => [
                     'id' => $p->id,
                     'name' => $p->name,
                     'code' => $p->code,
                     'description' => $p->description,
+                    'discount_type_id' => $p->discount_type_id,
+                    'default_discount_percentage' => (float) ($p->discountType?->percentage ?? 0),
+                    'discount_type' => $p->discountType ? [
+                        'id' => $p->discountType->id,
+                        'code' => $p->discountType->code,
+                        'name' => $p->discountType->name,
+                        'percentage' => (float) $p->discountType->percentage,
+                        'requires_id_number' => (bool) $p->discountType->requires_id_number,
+                        'requires_verification' => (bool) $p->discountType->requires_verification,
+                        'verification_document' => $p->discountType->verification_document,
+                        'validity_days' => $p->discountType->validity_days,
+                    ] : null,
                 ])
                 ->toArray();
         });
@@ -39,26 +53,67 @@ class ResidentProfileController extends Controller
 
     /**
      * Get resident's active privileges - DYNAMIC
+     * FIXED: Includes discount percentage from discount type
      */
-    private function getResidentPrivileges(Resident $resident): array
-    {
-        if (!$resident->relationLoaded('residentPrivileges')) {
-            $resident->load('residentPrivileges.privilege');
-        }
+  private function getResidentPrivileges(Resident $resident): array
+{
+    if (!$resident->relationLoaded('residentPrivileges')) {
+        $resident->load('residentPrivileges.privilege.discountType');
+    }
 
-        return $resident->residentPrivileges
-            ->filter(fn($rp) => $rp->isActive())
-            ->map(fn($rp) => [
+    return $resident->residentPrivileges
+        ->filter(function ($rp) {
+            return $rp->isActive();
+        })
+        ->map(function ($rp) {
+            $privilege = $rp->privilege;
+            $discountPercentage = $rp->discount_percentage 
+                ?? $privilege->discountType?->percentage 
+                ?? 0;
+            
+            return [
                 'id' => $rp->id,
-                'privilege_id' => $rp->privilege->id,
-                'code' => $rp->privilege->code,
-                'name' => $rp->privilege->name,
+                'privilege_id' => $privilege->id,
+                'code' => $privilege->code,
+                'name' => $privilege->name,
                 'id_number' => $rp->id_number,
+                'discount_percentage' => (float) $discountPercentage,
                 'verified_at' => $rp->verified_at?->toISOString(),
                 'expires_at' => $rp->expires_at?->toISOString(),
-            ])
-            ->values()
-            ->toArray();
+                'status' => $this->getPrivilegeStatus($rp),
+                'discount_type' => $privilege->discountType ? [
+                    'id' => $privilege->discountType->id,
+                    'code' => $privilege->discountType->code,
+                    'name' => $privilege->discountType->name,
+                    'percentage' => (float) $privilege->discountType->percentage,
+                ] : null,
+            ];
+        })
+        ->values()
+        ->toArray();
+}
+    /**
+     * Get privilege status based on expiry
+     */
+    private function getPrivilegeStatus($residentPrivilege): string
+    {
+        if (!$residentPrivilege->verified_at) {
+            return 'pending';
+        }
+        
+        if ($residentPrivilege->expires_at) {
+            $daysUntilExpiry = now()->diffInDays($residentPrivilege->expires_at, false);
+            
+            if ($daysUntilExpiry <= 0) {
+                return 'expired';
+            }
+            
+            if ($daysUntilExpiry <= 30) {
+                return 'expiring_soon';
+            }
+        }
+        
+        return 'active';
     }
 
     /**
@@ -86,12 +141,12 @@ class ResidentProfileController extends Controller
         ]);
         
         if ($resident) {
-            $resident->load(['purok', 'residentPrivileges.privilege']);
+            $resident->load(['purok', 'residentPrivileges.privilege.discountType']);
             
             if ($user->household) {
                 $user->household->load([
                     'purok',
-                    'householdMembers.resident.residentPrivileges.privilege',
+                    'householdMembers.resident.residentPrivileges.privilege.discountType',
                 ]);
                 
                 $headOfHousehold = $user->household->head_of_household;
@@ -101,7 +156,7 @@ class ResidentProfileController extends Controller
                         $resident = $member->resident;
                         if (!$resident) return null;
                         
-                        $resident->loadMissing(['purok', 'residentPrivileges.privilege']);
+                        $resident->loadMissing(['purok', 'residentPrivileges.privilege.discountType']);
                         $memberPrivileges = $this->getResidentPrivileges($resident);
                         
                         $memberData = [
@@ -157,6 +212,7 @@ class ResidentProfileController extends Controller
                             $memberData["is_{$code}"] = true;
                             $memberData["has_{$code}"] = true;
                             $memberData["{$code}_id_number"] = $priv['id_number'];
+                            $memberData["{$code}_discount_percentage"] = $priv['discount_percentage'];
                         }
 
                         return $memberData;
@@ -291,6 +347,7 @@ class ResidentProfileController extends Controller
             $data["is_{$code}"] = true;
             $data["has_{$code}"] = true;
             $data["{$code}_id_number"] = $priv['id_number'];
+            $data["{$code}_discount_percentage"] = $priv['discount_percentage'];
         }
 
         return $data;
@@ -375,7 +432,7 @@ class ResidentProfileController extends Controller
         $resident = $user->currentResident;
         
         if ($resident) {
-            $resident->load(['purok', 'residentPrivileges.privilege']);
+            $resident->load(['purok', 'residentPrivileges.privilege.discountType']);
         }
 
         $qrCodeUrl = $this->getQrCodeUrl($user);

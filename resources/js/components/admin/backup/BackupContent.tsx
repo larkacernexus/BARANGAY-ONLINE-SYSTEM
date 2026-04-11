@@ -1,4 +1,5 @@
 // resources/js/components/admin/backup/BackupContent.tsx
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,10 @@ import {
     calculateSelectionStats
 } from '@/admin-utils/backupUtils';
 
-// Helper components (these are small and UI-specific, okay to keep here)
+// Import types
+import type { BackupFile, SelectionStats } from '@/types/admin/backup/backup';
+
+// Helper components
 const FileIcon = ({ type, className }: { type: string; className?: string }) => {
     const IconComponent = getFileIconComponent(type);
     return <IconComponent className={className} />;
@@ -31,9 +35,9 @@ const ProtectionIcon = ({ isProtected, className }: { isProtected?: boolean; cla
 };
 
 interface BackupContentProps {
-    backups: any[];
+    backups: BackupFile[];
     isBulkMode: boolean;
-    selectedBackups: number[];
+    selectedBackups: string[];
     viewMode: 'table' | 'grid';
     setViewMode: (mode: 'table' | 'grid') => void;
     isMobile: boolean;
@@ -43,11 +47,11 @@ interface BackupContentProps {
         sort_by: string;
         sort_order: 'asc' | 'desc';
     };
-    onItemSelect: (id: number) => void;
+    onItemSelect: (id: string) => void;
     onSort: (column: string) => void;
-    onDelete: (backup: any) => void;
-    onDownload: (backup: any) => void;
-    onToggleProtection: (backup: any) => void;
+    onDelete: (backup: BackupFile) => void;
+    onDownload: (backup: BackupFile) => void;
+    onToggleProtection: (backup: BackupFile) => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
@@ -61,13 +65,13 @@ interface BackupContentProps {
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     onCreateBackup: () => void;
-    filteredBackups: any[];
+    filteredBackups: BackupFile[];
     setIsBulkMode: (value: boolean) => void;
     showSelectionOptions: boolean;
     setShowSelectionOptions: (value: boolean) => void;
-    selectionRef: React.RefObject<HTMLDivElement>;
+    selectionRef: React.RefObject<HTMLDivElement | null>; // Add | null here
     isPerformingBulkAction?: boolean;
-    selectionStats?: any;
+    selectionStats?: SelectionStats;
     onCopySelectedData?: () => void;
     setShowBulkDeleteDialog?: (value: boolean) => void;
 }
@@ -102,13 +106,13 @@ export default function BackupContent({
     setIsBulkMode,
     showSelectionOptions,
     setShowSelectionOptions,
-    selectionRef,
+    selectionRef, // Now accepts HTMLDivElement | null
     isPerformingBulkAction = false,
     selectionStats,
     onCopySelectedData,
     setShowBulkDeleteDialog
 }: BackupContentProps) {
-
+    
     const getSortIcon = (column: string) => {
         if (filtersState.sort_by !== column) return null;
         return filtersState.sort_order === 'asc' ? '↑' : '↓';
@@ -170,7 +174,9 @@ export default function BackupContent({
         FileIcon,
         ProtectionIcon,
         startIndex,
-        endIndex
+        endIndex,
+        onSort, // Add onSort for table view
+        filtersState // Add filtersState for table view
     };
 
     return (
@@ -256,7 +262,7 @@ export default function BackupContent({
                 {viewMode === 'grid' ? (
                     <BackupGridView {...viewProps} />
                 ) : (
-                    <BackupTableView {...viewProps} onSort={onSort} filtersState={filtersState} />
+                    <BackupTableView {...viewProps} />
                 )}
 
                 {/* Empty State */}

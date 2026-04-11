@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Shield } from 'lucide-react';
 import { SearchableResidentSelect } from './SearchableResidentSelect';
-import { Resident } from './BlotterTypes';
+import { Resident } from '@/types/admin/blotters/blotter';
 
 interface RespondentInfoCardProps {
     residents: Resident[];

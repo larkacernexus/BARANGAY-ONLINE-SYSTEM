@@ -1,4 +1,4 @@
-// components/admin/feesEdit/LeftColumn.tsx
+// components/admin/feesCreate/feesEdit/LeftColumn.tsx
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -23,8 +23,39 @@ import {
     Award,
     Shield
 } from 'lucide-react';
-import { FeeFormData, FeeType, Resident, Household, DocumentCategory, DiscountInfo, Privilege } from '@/types/fees';
+import { FeeType, Resident, Household, DocumentCategory, DiscountInfo, PrivilegeData } from '@/types/admin/fees/fees';
 import { useMemo, useState, useEffect } from 'react';
+
+// Fee Form Data interface
+interface FeeFormData {
+    fee_type_id: string;
+    payer_type: string;
+    resident_id: string;
+    household_id: string;
+    business_name: string;
+    payer_name: string;
+    contact_number: string;
+    address: string;
+    purok: string;
+    zone: string;
+    billing_period: string;
+    period_start: string;
+    period_end: string;
+    issue_date: string;
+    due_date: string;
+    base_amount: number;
+    surcharge_amount: number;
+    penalty_amount: number;
+    discount_amount: number;
+    total_amount: number;
+    purpose: string;
+    property_description: string;
+    business_type: string;
+    area: number;
+    remarks: string;
+    requirements_submitted: string[];
+    ph_legal_compliance_notes: string;
+}
 
 interface LeftColumnProps {
     data: FeeFormData;
@@ -44,11 +75,11 @@ interface LeftColumnProps {
     feeTypes: FeeType[];
     selectedPayer: Resident | Household | null;
     payerType: string;
-    formatCurrency: (amount: any) => string;
+    formatCurrency: (amount: number) => string;
     selectedFeeTypeId?: string | number;
     discountInfo?: DiscountInfo | null;
     hasPrivileges?: boolean;
-    allPrivileges?: Privilege[];
+    allPrivileges?: PrivilegeData[];
 }
 
 // Helper function to ensure non-empty string values for Select.Item
@@ -62,28 +93,13 @@ const safeSelectValue = (value: any): string => {
 
 // Helper function to filter items with valid IDs
 const filterValidItems = <T,>(items: T[], getId: (item: T) => any): T[] => {
-    return (items || []).filter(item => {
+    if (!items || !Array.isArray(items)) return [];
+    return items.filter(item => {
         const id = getId(item);
         return id !== null && 
                id !== undefined && 
                String(id).trim() !== '';
     });
-};
-
-// Helper component for safe SelectItem rendering
-const SafeSelectItem = ({ value, children, ...props }: any) => {
-    const safeValue = safeSelectValue(value);
-    
-    if (safeValue.startsWith('error-')) {
-        console.warn('Skipping SelectItem with invalid value:', value);
-        return null;
-    }
-    
-    return (
-        <SelectItem value={safeValue} {...props}>
-            {children}
-        </SelectItem>
-    );
 };
 
 export default function LeftColumn({
@@ -133,11 +149,11 @@ export default function LeftColumn({
     };
 
     const safeDocumentCategories = useMemo(() => {
-        return filterValidItems(documentCategories, cat => cat.id);
+        return filterValidItems(documentCategories || [], cat => cat?.id);
     }, [documentCategories]);
 
     const safeFilteredFeeTypes = useMemo(() => {
-        return filterValidItems(filteredFeeTypes, ft => ft.id);
+        return filterValidItems(filteredFeeTypes || [], ft => ft?.id);
     }, [filteredFeeTypes]);
 
     const handleCategoryChange = (value: string) => {
@@ -231,17 +247,17 @@ export default function LeftColumn({
                                                 </SelectValue>
                                             </SelectTrigger>
                                             <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <SafeSelectItem value="all" className="dark:text-gray-300 dark:focus:bg-gray-700">
+                                                <SelectItem value="all" className="dark:text-gray-300 dark:focus:bg-gray-700">
                                                     All Categories
-                                                </SafeSelectItem>
+                                                </SelectItem>
                                                 {safeDocumentCategories.map((category) => (
-                                                    <SafeSelectItem
+                                                    <SelectItem
                                                         key={category.id}
-                                                        value={category.id}
+                                                        value={String(category.id)}
                                                         className="dark:text-gray-300 dark:focus:bg-gray-700"
                                                     >
                                                         {category.name}
-                                                    </SafeSelectItem>
+                                                    </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -271,7 +287,6 @@ export default function LeftColumn({
                                         value={feeType.id}
                                     >
                                         {feeType.code} - {feeType.name}
-                                        {feeType.document_category && ` (${feeType.document_category.name})`}
                                         {feeType.has_penalty && ' [Has Penalty]'}
                                         {feeType.is_discountable && ' [Discountable]'}
                                     </option>
@@ -302,31 +317,16 @@ export default function LeftColumn({
                         {selectedFeeType && (
                             <div className="rounded-md bg-gray-50 dark:bg-gray-900/50 p-4 space-y-3 border border-gray-200 dark:border-gray-700">
                                 <div className="grid grid-cols-2 gap-3 text-sm">
-                                    {selectedFeeType.document_category && (
-                                        <div>
-                                            <span className="font-medium text-gray-600 dark:text-gray-400">
-                                                Category:
-                                            </span>{' '}
-                                            <span className="font-semibold dark:text-gray-300">
-                                                {selectedFeeType.document_category.name}
-                                            </span>
-                                        </div>
-                                    )}
                                     <div>
                                         <span className="font-medium text-gray-600 dark:text-gray-400">
                                             Base Amount:
                                         </span>{' '}
                                         <span className="font-semibold text-primary dark:text-blue-400">
-                                            {formatCurrency(selectedFeeType.base_amount)}
+                                            {formatCurrency(typeof selectedFeeType.base_amount === 'string' 
+                                                ? parseFloat(selectedFeeType.base_amount) 
+                                                : selectedFeeType.base_amount)}
                                         </span>
                                     </div>
-                                    {selectedFeeType.validity_days && (
-                                        <div className="flex items-center gap-1">
-                                            <Clock className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                            <span className="font-medium text-gray-600 dark:text-gray-400">Validity:</span>{' '}
-                                            <span className="dark:text-gray-300">{selectedFeeType.validity_days} days</span>
-                                        </div>
-                                    )}
                                     {selectedFeeType.has_penalty && (
                                         <div className="col-span-2">
                                             <Badge
@@ -354,7 +354,7 @@ export default function LeftColumn({
                 </Card>
 
                 {/* Payer Privileges Card */}
-                {hasPrivileges && (
+                {hasPrivileges && selectedPayer && 'privileges' in selectedPayer && (
                     <Card className="border-purple-200 bg-purple-50/50 dark:bg-purple-900/20 dark:border-purple-800">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm flex items-center gap-2 text-purple-700 dark:text-purple-400">
@@ -369,9 +369,8 @@ export default function LeftColumn({
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                {selectedPayer && 'privileges' in selectedPayer && 
-                                 selectedPayer.privileges && selectedPayer.privileges.length > 0 ? (
-                                    selectedPayer.privileges.map((privilege: any, idx: number) => (
+                                {selectedPayer.privileges && selectedPayer.privileges.length > 0 ? (
+                                    selectedPayer.privileges.map((privilege: PrivilegeData, idx: number) => (
                                         <div key={idx} className="bg-white dark:bg-gray-900 rounded-md p-3 border border-purple-100 dark:border-purple-900">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
@@ -380,17 +379,17 @@ export default function LeftColumn({
                                                         {privilege.code}
                                                     </Badge>
                                                 </div>
-                                                {privilege.id_number && (
+                                                {(privilege as any).id_number && (
                                                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                        ID: {privilege.id_number}
+                                                        ID: {(privilege as any).id_number}
                                                     </span>
                                                 )}
                                             </div>
                                             
-                                            {privilege.expiry_date && (
+                                            {privilege.valid_until && (
                                                 <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                                     <span className="font-medium">Valid until: </span>
-                                                    {new Date(privilege.expiry_date).toLocaleDateString()}
+                                                    {new Date(privilege.valid_until).toLocaleDateString()}
                                                 </div>
                                             )}
                                         </div>
@@ -528,7 +527,7 @@ export default function LeftColumn({
                                     {surchargeExplanation && (
                                         <div className="ml-2 group relative">
                                             <HelpCircle className="h-4 w-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 dark:bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
                                                 {surchargeExplanation}
                                             </div>
                                         </div>
@@ -567,7 +566,7 @@ export default function LeftColumn({
                                     {penaltyExplanation && (
                                         <div className="ml-2 group relative">
                                             <HelpCircle className="h-4 w-4 text-gray-400 dark:text-gray-500 cursor-help" />
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 dark:bg-gray-900 text-white text-xs rounded shadow-lg z-10">
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-10">
                                                 {penaltyExplanation}
                                             </div>
                                         </div>
@@ -744,7 +743,6 @@ export default function LeftColumn({
                         </Alert>
                     </CardContent>
                 </Card>
-
             </div>
         );
     } catch (error) {
@@ -759,7 +757,7 @@ export default function LeftColumn({
                 </CardHeader>
                 <CardContent>
                     <p className="text-red-600 dark:text-red-400">An error occurred while rendering this component.</p>
-                    <pre className="mt-2 text-xs text-red-800 dark:text-red-400 bg-red-100 dark:bg-red-900/30 p-2 rounded">
+                    <pre className="mt-2 text-xs text-red-800 dark:text-red-400 bg-red-100 dark:bg-red-900/30 p-2 rounded overflow-auto max-h-40">
                         {error instanceof Error ? error.stack : String(error)}
                     </pre>
                 </CardContent>

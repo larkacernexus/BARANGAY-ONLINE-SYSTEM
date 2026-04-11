@@ -4,6 +4,16 @@ import { ReactNode } from 'react';
 
 // Base Form interface
 export interface Form {
+    valid_from: any;
+    valid_until: any;
+    is_public: any;
+    requires_login: any;
+    language: string;
+    pages: any;
+    tags: boolean;
+    last_viewed_at: any;
+    last_viewed_by: any;
+    last_downloaded_by: any;
     mime_type(mime_type: any): ReactNode;
     version: string;
     created_by: any;

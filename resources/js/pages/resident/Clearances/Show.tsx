@@ -72,7 +72,7 @@ export default function ClearanceDetail({ clearance, payment_items = [] }: PageP
     const feeAmount = typeof clearance.fee_amount === 'string' ? parseFloat(clearance.fee_amount) : clearance.fee_amount;
     const balance = calculateBalance(feeAmount, totalPaid);
     const isPaymentRequired = checkPaymentRequired(clearance);
-    const isReadyForPayment = clearance.status === 'ready_for_payment' || clearance.status === 'processing';
+    const isReadyForPayment = clearance.status === 'pending_payment' || clearance.status === 'processing';
 
     const tabsConfig = [
         { id: 'details', label: 'Details', icon: Layers },

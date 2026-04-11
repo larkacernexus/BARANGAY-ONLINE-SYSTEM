@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { BarChart3, PieChart, FileText } from 'lucide-react';
 import { DailyCollectionsChart } from '../charts/DailyCollectionsChart';
-import type { PageProps } from '@/components/admin/dashboard/types/dashboard';
+import type { PageProps } from '@/types/admin/dashboard/dashboard';
 
 interface DetailedViewProps {
     paymentStats: PageProps['paymentStats'];

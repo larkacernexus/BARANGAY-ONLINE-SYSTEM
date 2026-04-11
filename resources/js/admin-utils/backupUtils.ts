@@ -1,5 +1,5 @@
 // resources/js/admin-utils/backupUtils.ts
-import { BackupFile, BackupProgress, SelectionStats } from '@/types/backup';
+import { BackupFile, BackupProgress, SelectionStats } from '@/types/admin/backup/backup';
 import { 
   Clock4, 
   RefreshCw, 

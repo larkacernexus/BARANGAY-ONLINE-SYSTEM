@@ -27,6 +27,7 @@ class ReceiptsController extends Controller
         $receiptType = $request->input('receipt_type', '');
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
+        $amountRange = $request->input('amount_range', '');
         $perPage = $request->input('per_page', 15);
         
         // Build query with eager loading
@@ -58,12 +59,12 @@ class ReceiptsController extends Controller
         }
         
         // Apply payment method filter
-        if ($paymentMethod) {
+        if ($paymentMethod && $paymentMethod !== 'all') {
             $query->where('payment_method', $paymentMethod);
         }
         
         // Apply receipt type filter
-        if ($receiptType) {
+        if ($receiptType && $receiptType !== 'all') {
             $query->where('receipt_type', $receiptType);
         }
         
@@ -75,15 +76,20 @@ class ReceiptsController extends Controller
             $query->whereDate('issued_date', '<=', Carbon::parse($dateTo));
         }
         
+        // ✅ Apply amount range filter
+        if ($amountRange && $amountRange !== 'all') {
+            $this->applyAmountRangeFilter($query, $amountRange);
+        }
+        
         // Paginate results
         $receipts = $query->paginate($perPage)
             ->through(fn($receipt) => $this->formatReceipt($receipt));
         
         // Calculate statistics
-        $stats = $this->getStatistics();
+        $stats = $this->getStatistics($request);
         
         // Get recent clearance requests without receipts
-        $pendingClearances = collect(); // Default empty collection
+        $pendingClearances = collect();
         
         try {
             $pendingClearances = ClearanceRequest::with(['resident', 'clearanceType'])
@@ -95,7 +101,6 @@ class ReceiptsController extends Controller
                 ->limit(5)
                 ->get()
                 ->map(function($clearance) {
-                    // Safely access properties with null checks
                     $residentName = 'Unknown';
                     if ($clearance->resident) {
                         $residentName = $clearance->resident->full_name ?? 
@@ -104,7 +109,7 @@ class ReceiptsController extends Controller
                     }
                     
                     $clearanceTypeName = $clearance->clearanceType->name ?? 'Clearance';
-                    $feeAmount = $clearance->clearanceType->fee_amount ?? 0;
+                    $feeAmount = $clearance->clearanceType->fee ?? $clearance->clearanceType->fee_amount ?? 0;
                     
                     return [
                         'id' => $clearance->id,
@@ -128,6 +133,7 @@ class ReceiptsController extends Controller
                 'receipt_type' => $receiptType,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
+                'amount_range' => $amountRange,
                 'per_page' => $perPage,
             ],
             'stats' => $stats,
@@ -153,6 +159,30 @@ class ReceiptsController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Apply amount range filter to query
+     */
+    private function applyAmountRangeFilter($query, string $range): void
+    {
+        switch ($range) {
+            case '0-100':
+                $query->whereBetween('total_amount', [0, 100]);
+                break;
+            case '101-500':
+                $query->whereBetween('total_amount', [101, 500]);
+                break;
+            case '501-1000':
+                $query->whereBetween('total_amount', [501, 1000]);
+                break;
+            case '1001-5000':
+                $query->whereBetween('total_amount', [1001, 5000]);
+                break;
+            case '5000+':
+                $query->where('total_amount', '>=', 5000);
+                break;
+        }
     }
 
     /**
@@ -215,239 +245,230 @@ class ReceiptsController extends Controller
         ]);
     }
 
-   /**
- * Store a newly created receipt
- */
-public function store(Request $request)
-{
-    // Log the incoming request for debugging
-    Log::info('Receipt store request received', [
-        'all_data' => $request->all(),
-        'has_receipt_number' => $request->has('receipt_number'),
-        'has_fee_breakdown' => $request->has('fee_breakdown'),
-        'wants_json' => $request->wantsJson(),
-        'method' => $request->method(),
-        'url' => $request->url()
-    ]);
+    /**
+     * Store a newly created receipt
+     */
+    public function store(Request $request)
+    {
+        Log::info('Receipt store request received', [
+            'all_data' => $request->all(),
+            'has_receipt_number' => $request->has('receipt_number'),
+            'has_fee_breakdown' => $request->has('fee_breakdown'),
+            'wants_json' => $request->wantsJson(),
+            'method' => $request->method(),
+            'url' => $request->url()
+        ]);
 
-    // Check if this is a full receipt save from PrintableReceipt
-    if ($request->has('receipt_number') && $request->has('fee_breakdown')) {
-        Log::info('Processing full receipt save', ['data' => $request->except(['fee_breakdown'])]);
-        
-        // Validate full receipt data
-        try {
-            $validated = $request->validate([
-                'receipt_number' => 'required|string|unique:receipts,receipt_number',
-                'or_number' => 'nullable|string',
-                'receipt_type' => 'required|string',
-                'receipt_type_label' => 'required|string',
-                'payer_name' => 'required|string',
-                'payer_address' => 'nullable|string',
-                'payer_type' => 'nullable|in:resident,household',
-                'contact_number' => 'nullable|string',
-                'subtotal' => 'required|numeric',
-                'surcharge' => 'required|numeric',
-                'penalty' => 'required|numeric',
-                'discount' => 'required|numeric',
-                'total_amount' => 'required|numeric',
-                'amount_paid' => 'required|numeric',
-                'change_due' => 'required|numeric',
-                'payment_method' => 'required|string',
-                'payment_method_label' => 'required|string',
-                'reference_number' => 'nullable|string',
-                'payment_date' => 'required|string',
-                'issued_date' => 'required|string',
-                'issued_by' => 'required|string',
-                'fee_breakdown' => 'required|array',
-                'fee_breakdown.*.fee_name' => 'required|string',
-                'fee_breakdown.*.fee_code' => 'nullable|string',
-                'fee_breakdown.*.description' => 'nullable|string',
-                'fee_breakdown.*.base_amount' => 'required|numeric',
-                'fee_breakdown.*.surcharge' => 'nullable|numeric',
-                'fee_breakdown.*.penalty' => 'nullable|numeric',
-                'fee_breakdown.*.total_amount' => 'required|numeric',
-                'notes' => 'nullable|string',
-                'purpose' => 'nullable|string',
-                'collection_type' => 'nullable|string',
-                'remarks' => 'nullable|string',
-                'certificate_type' => 'nullable|string',
-                'certificate_type_display' => 'nullable|string',
-                'payment_id' => 'nullable|integer|exists:payments,id',
-                'clearance_request_id' => 'nullable|integer|exists:clearance_requests,id',
-                'metadata' => 'nullable|array'
-            ]);
-
-            Log::info('Full receipt validation passed');
-
+        // Check if this is a full receipt save from PrintableReceipt
+        if ($request->has('receipt_number') && $request->has('fee_breakdown')) {
+            Log::info('Processing full receipt save', ['data' => $request->except(['fee_breakdown'])]);
+            
             try {
-                DB::beginTransaction();
-                Log::info('Transaction started');
+                $validated = $request->validate([
+                    'receipt_number' => 'required|string|unique:receipts,receipt_number',
+                    'or_number' => 'nullable|string',
+                    'receipt_type' => 'required|string',
+                    'receipt_type_label' => 'required|string',
+                    'payer_name' => 'required|string',
+                    'payer_address' => 'nullable|string',
+                    'payer_type' => 'nullable|in:resident,household',
+                    'contact_number' => 'nullable|string',
+                    'subtotal' => 'required|numeric',
+                    'surcharge' => 'required|numeric',
+                    'penalty' => 'required|numeric',
+                    'discount' => 'required|numeric',
+                    'total_amount' => 'required|numeric',
+                    'amount_paid' => 'required|numeric',
+                    'change_due' => 'required|numeric',
+                    'payment_method' => 'required|string',
+                    'payment_method_label' => 'required|string',
+                    'reference_number' => 'nullable|string',
+                    'payment_date' => 'required|string',
+                    'issued_date' => 'required|string',
+                    'issued_by' => 'required|string',
+                    'fee_breakdown' => 'required|array',
+                    'fee_breakdown.*.fee_name' => 'required|string',
+                    'fee_breakdown.*.fee_code' => 'nullable|string',
+                    'fee_breakdown.*.description' => 'nullable|string',
+                    'fee_breakdown.*.base_amount' => 'required|numeric',
+                    'fee_breakdown.*.surcharge' => 'nullable|numeric',
+                    'fee_breakdown.*.penalty' => 'nullable|numeric',
+                    'fee_breakdown.*.total_amount' => 'required|numeric',
+                    'notes' => 'nullable|string',
+                    'purpose' => 'nullable|string',
+                    'collection_type' => 'nullable|string',
+                    'remarks' => 'nullable|string',
+                    'certificate_type' => 'nullable|string',
+                    'certificate_type_display' => 'nullable|string',
+                    'payment_id' => 'nullable|integer|exists:payments,id',
+                    'clearance_request_id' => 'nullable|integer|exists:clearance_requests,id',
+                    'metadata' => 'nullable|array'
+                ]);
 
-                // Check if receipt with this number already exists
-                if (Receipt::where('receipt_number', $validated['receipt_number'])->exists()) {
-                    Log::warning('Receipt number already exists', ['receipt_number' => $validated['receipt_number']]);
+                Log::info('Full receipt validation passed');
+
+                try {
+                    DB::beginTransaction();
+                    Log::info('Transaction started');
+
+                    if (Receipt::where('receipt_number', $validated['receipt_number'])->exists()) {
+                        Log::warning('Receipt number already exists', ['receipt_number' => $validated['receipt_number']]);
+                        return response()->json([
+                            'success' => false,
+                            'errors' => ['receipt_number' => ['Receipt number already exists.']]
+                        ], 422);
+                    }
+
+                    $receipt = Receipt::create([
+                        'receipt_number' => $validated['receipt_number'],
+                        'or_number' => $validated['or_number'] ?? null,
+                        'receipt_type' => $validated['receipt_type'],
+                        'receipt_type_label' => $validated['receipt_type_label'],
+                        'payer_name' => $validated['payer_name'],
+                        'payer_address' => $validated['payer_address'] ?? null,
+                        'payer_type' => $validated['payer_type'] ?? null,
+                        'contact_number' => $validated['contact_number'] ?? null,
+                        'subtotal' => $validated['subtotal'],
+                        'surcharge' => $validated['surcharge'],
+                        'penalty' => $validated['penalty'],
+                        'discount' => $validated['discount'],
+                        'total_amount' => $validated['total_amount'],
+                        'amount_paid' => $validated['amount_paid'],
+                        'change_due' => $validated['change_due'],
+                        'payment_method' => $validated['payment_method'],
+                        'payment_method_label' => $validated['payment_method_label'],
+                        'reference_number' => $validated['reference_number'] ?? null,
+                        'payment_date' => Carbon::parse($validated['payment_date']),
+                        'issued_date' => Carbon::parse($validated['issued_date']),
+                        'issued_by' => $validated['issued_by'],
+                        'fee_breakdown' => $validated['fee_breakdown'],
+                        'notes' => $validated['notes'] ?? null,
+                        'purpose' => $validated['purpose'] ?? null,
+                        'collection_type' => $validated['collection_type'] ?? null,
+                        'remarks' => $validated['remarks'] ?? null,
+                        'certificate_type' => $validated['certificate_type'] ?? null,
+                        'certificate_type_display' => $validated['certificate_type_display'] ?? null,
+                        'payment_id' => $validated['payment_id'] ?? null,
+                        'clearance_request_id' => $validated['clearance_request_id'] ?? null,
+                        'metadata' => $validated['metadata'] ?? null,
+                    ]);
+
+                    Log::info('Receipt created', ['receipt_id' => $receipt->id, 'receipt_number' => $receipt->receipt_number]);
+
+                    DB::commit();
+                    Log::info('Transaction committed');
+
+                    if ($request->wantsJson()) {
+                        return response()->json([
+                            'success' => true,
+                            'message' => 'Receipt saved successfully',
+                            'receipt' => $this->formatReceipt($receipt)
+                        ], 201);
+                    }
+
+                    return redirect()->route('admin.receipts.show', $receipt->id)
+                        ->with('success', 'Receipt saved successfully.');
+
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    Log::error('Failed to save receipt in transaction: ' . $e->getMessage(), [
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    
+                    if ($request->wantsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Failed to save receipt',
+                            'error' => $e->getMessage()
+                        ], 500);
+                    }
+                    
+                    return back()->withErrors(['error' => 'Failed to save receipt. Please try again.']);
+                }
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                Log::error('Validation failed for full receipt', [
+                    'errors' => $e->errors(),
+                    'data' => $request->all()
+                ]);
+                
+                if ($request->wantsJson()) {
                     return response()->json([
                         'success' => false,
-                        'errors' => ['receipt_number' => ['Receipt number already exists.']]
+                        'errors' => $e->errors()
                     ], 422);
                 }
+                
+                throw $e;
+            }
+        }
+        
+        // Original code for simple receipt creation from payment
+        Log::info('Processing simple receipt creation from payment', ['data' => $request->all()]);
+        
+        $validated = $request->validate([
+            'payment_id' => 'required|exists:payments,id',
+            'receipt_type' => 'required|in:official,clearance,certificate,fee',
+            'notes' => 'nullable|string|max:500',
+        ]);
 
-                // Create the receipt
-                $receipt = Receipt::create([
-                    'receipt_number' => $validated['receipt_number'],
-                    'or_number' => $validated['or_number'] ?? null,
-                    'receipt_type' => $validated['receipt_type'],
-                    'receipt_type_label' => $validated['receipt_type_label'],
-                    'payer_name' => $validated['payer_name'],
-                    'payer_address' => $validated['payer_address'] ?? null,
-                    'payer_type' => $validated['payer_type'] ?? null,
-                    'contact_number' => $validated['contact_number'] ?? null,
-                    'subtotal' => $validated['subtotal'],
-                    'surcharge' => $validated['surcharge'],
-                    'penalty' => $validated['penalty'],
-                    'discount' => $validated['discount'],
-                    'total_amount' => $validated['total_amount'],
-                    'amount_paid' => $validated['amount_paid'],
-                    'change_due' => $validated['change_due'],
-                    'payment_method' => $validated['payment_method'],
-                    'payment_method_label' => $validated['payment_method_label'],
-                    'reference_number' => $validated['reference_number'] ?? null,
-                    'payment_date' => Carbon::parse($validated['payment_date']),
-                    'issued_date' => Carbon::parse($validated['issued_date']),
-                    'issued_by' => $validated['issued_by'],
-                    'fee_breakdown' => $validated['fee_breakdown'],
-                    'notes' => $validated['notes'] ?? null,
-                    'purpose' => $validated['purpose'] ?? null,
-                    'collection_type' => $validated['collection_type'] ?? null,
-                    'remarks' => $validated['remarks'] ?? null,
-                    'certificate_type' => $validated['certificate_type'] ?? null,
-                    'certificate_type_display' => $validated['certificate_type_display'] ?? null,
-                    'payment_id' => $validated['payment_id'] ?? null,
-                    'clearance_request_id' => $validated['clearance_request_id'] ?? null,
-                    'metadata' => $validated['metadata'] ?? null,
+        try {
+            DB::beginTransaction();
+            Log::info('Transaction started for simple receipt', ['payment_id' => $validated['payment_id']]);
+
+            $payment = Payment::with(['items', 'discounts.rule'])->findOrFail($validated['payment_id']);
+            
+            $existingReceipt = Receipt::where('payment_id', $payment->id)->first();
+            if ($existingReceipt) {
+                Log::warning('Receipt already exists for payment', [
+                    'payment_id' => $payment->id,
+                    'existing_receipt_id' => $existingReceipt->id
                 ]);
-
-                Log::info('Receipt created', ['receipt_id' => $receipt->id, 'receipt_number' => $receipt->receipt_number]);
-
-                DB::commit();
-                Log::info('Transaction committed');
-
-                // If this is an API request (from PrintableReceipt), return JSON
-                if ($request->wantsJson()) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Receipt saved successfully',
-                        'receipt' => $this->formatReceipt($receipt)
-                    ], 201);
-                }
-
-                // Otherwise redirect to show page
-                return redirect()->route('admin.receipts.show', $receipt->id)
-                    ->with('success', 'Receipt saved successfully.');
-
-            } catch (\Exception $e) {
+                
                 DB::rollBack();
-                Log::error('Failed to save receipt in transaction: ' . $e->getMessage(), [
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                
-                if ($request->wantsJson()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Failed to save receipt',
-                        'error' => $e->getMessage()
-                    ], 500);
-                }
-                
-                return back()->withErrors(['error' => 'Failed to save receipt. Please try again.']);
+                return back()->withErrors(['payment_id' => 'A receipt already exists for this payment.']);
             }
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Validation failed for full receipt', [
-                'errors' => $e->errors(),
-                'data' => $request->all()
-            ]);
-            
-            if ($request->wantsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'errors' => $e->errors()
-                ], 422);
-            }
-            
-            throw $e;
-        }
-    }
-    
-    // Original code for simple receipt creation from payment
-    Log::info('Processing simple receipt creation from payment', ['data' => $request->all()]);
-    
-    $validated = $request->validate([
-        'payment_id' => 'required|exists:payments,id',
-        'receipt_type' => 'required|in:official,clearance,certificate,fee',
-        'notes' => 'nullable|string|max:500',
-    ]);
 
-    try {
-        DB::beginTransaction();
-        Log::info('Transaction started for simple receipt', ['payment_id' => $validated['payment_id']]);
-
-        $payment = Payment::with(['items', 'discounts.rule'])->findOrFail($validated['payment_id']);
-        
-        // Check if receipt already exists
-        $existingReceipt = Receipt::where('payment_id', $payment->id)->first();
-        if ($existingReceipt) {
-            Log::warning('Receipt already exists for payment', [
+            Log::info('Creating receipt from payment', [
                 'payment_id' => $payment->id,
-                'existing_receipt_id' => $existingReceipt->id
+                'receipt_type' => $validated['receipt_type']
+            ]);
+
+            $receipt = Receipt::createFromPayment($payment, $validated['receipt_type']);
+            
+            if (!empty($validated['notes'])) {
+                $receipt->notes = $validated['notes'];
+                $receipt->save();
+            }
+
+            DB::commit();
+            Log::info('Receipt created successfully', [
+                'receipt_id' => $receipt->id,
+                'receipt_number' => $receipt->receipt_number
+            ]);
+
+            return redirect()->route('admin.receipts.show', $receipt->id)
+                ->with('success', 'Receipt generated successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to create receipt from payment: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'payment_id' => $validated['payment_id'] ?? null
             ]);
             
-            DB::rollBack();
-            return back()->withErrors(['payment_id' => 'A receipt already exists for this payment.']);
+            return back()->withErrors(['error' => 'Failed to generate receipt. Please try again.']);
         }
-
-        Log::info('Creating receipt from payment', [
-            'payment_id' => $payment->id,
-            'receipt_type' => $validated['receipt_type']
-        ]);
-
-        // Create receipt from payment
-        $receipt = Receipt::createFromPayment($payment, $validated['receipt_type']);
-        
-        if (!empty($validated['notes'])) {
-            $receipt->notes = $validated['notes'];
-            $receipt->save();
-        }
-
-        DB::commit();
-        Log::info('Receipt created successfully', [
-            'receipt_id' => $receipt->id,
-            'receipt_number' => $receipt->receipt_number
-        ]);
-
-        return redirect()->route('admin.receipts.show', $receipt->id)
-            ->with('success', 'Receipt generated successfully.');
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Failed to create receipt from payment: ' . $e->getMessage(), [
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString(),
-            'payment_id' => $validated['payment_id'] ?? null
-        ]);
-        
-        return back()->withErrors(['error' => 'Failed to generate receipt. Please try again.']);
     }
-}
 
     /**
      * Generate receipt from payment
      */
     public function generateFromPayment(Request $request, Payment $payment)
     {
-        // Check if receipt already exists
         $existingReceipt = Receipt::where('payment_id', $payment->id)->first();
         if ($existingReceipt) {
             return redirect()->route('admin.receipts.show', $existingReceipt->id)
@@ -477,7 +498,6 @@ public function store(Request $request)
      */
     public function generateFromClearance(Request $request, ClearanceRequest $clearance)
     {
-        // Check if clearance has payment
         if (!$clearance->payment) {
             return back()->with('error', 'Clearance request has no associated payment.');
         }
@@ -497,7 +517,6 @@ public function store(Request $request)
             'voider'
         ]);
         
-        // Load clearance request through polymorphic relationship if needed
         $clearanceData = null;
         
         if ($receipt->receiptable_type === 'App\\Models\\ClearanceRequest' && $receipt->receiptable) {
@@ -528,7 +547,6 @@ public function store(Request $request)
     {
         $receipt->load(['payment.items', 'issuer']);
         
-        // Load clearance request through polymorphic if needed
         if ($receipt->receiptable_type === 'App\\Models\\ClearanceRequest') {
             $receipt->load('receiptable.resident');
         }
@@ -572,15 +590,27 @@ public function store(Request $request)
     }
 
     /**
-     * Get statistics
+     * Get statistics with optional filters
      */
-    private function getStatistics()
+    private function getStatistics(Request $request = null)
     {
         $today = Carbon::today();
         $thisMonth = Carbon::now()->startOfMonth();
         
-        $totalReceipts = Receipt::count();
-        $totalAmount = Receipt::where('is_voided', false)->sum('total_amount');
+        $baseQuery = Receipt::query();
+        
+        // Apply filters to stats if provided
+        if ($request && ($request->filled('date_from') || $request->filled('date_to'))) {
+            if ($request->filled('date_from')) {
+                $baseQuery->whereDate('issued_date', '>=', Carbon::parse($request->date_from));
+            }
+            if ($request->filled('date_to')) {
+                $baseQuery->whereDate('issued_date', '<=', Carbon::parse($request->date_to));
+            }
+        }
+        
+        $totalReceipts = $baseQuery->count();
+        $totalAmount = $baseQuery->where('is_voided', false)->sum('total_amount');
         
         $todayStats = [
             'count' => Receipt::whereDate('issued_date', $today)->count(),
@@ -602,7 +632,7 @@ public function store(Request $request)
                     'method' => $item->payment_method,
                     'method_label' => $this->getPaymentMethodLabel($item->payment_method),
                     'count' => $item->count,
-                    'total' => $item->total,
+                    'total' => (float) $item->total,
                     'formatted_total' => '₱' . number_format($item->total, 2),
                 ];
             });
@@ -623,17 +653,17 @@ public function store(Request $request)
         return [
             'total' => [
                 'count' => $totalReceipts,
-                'amount' => $totalAmount,
+                'amount' => (float) $totalAmount,
                 'formatted_amount' => '₱' . number_format($totalAmount, 2),
             ],
             'today' => [
                 'count' => $todayStats['count'],
-                'amount' => $todayStats['amount'],
+                'amount' => (float) $todayStats['amount'],
                 'formatted_amount' => '₱' . number_format($todayStats['amount'], 2),
             ],
             'this_month' => [
                 'count' => $thisMonthStats['count'],
-                'amount' => $thisMonthStats['amount'],
+                'amount' => (float) $thisMonthStats['amount'],
                 'formatted_amount' => '₱' . number_format($thisMonthStats['amount'], 2),
             ],
             'voided' => Receipt::where('is_voided', true)->count(),
@@ -647,10 +677,8 @@ public function store(Request $request)
      */
     private function formatReceipt(Receipt $receipt)
     {
-        // Get receipt data as array
         $data = $receipt->toArray();
         
-        // Ensure numeric values are actually numbers, not strings
         $numericFields = [
             'subtotal', 'surcharge', 'penalty', 'discount', 
             'total_amount', 'amount_paid', 'change_due', 'printed_count'
@@ -662,7 +690,6 @@ public function store(Request $request)
             }
         }
         
-        // Format fee_breakdown items to ensure all amounts are numbers
         $feeBreakdown = [];
         if ($receipt->fee_breakdown && is_array($receipt->fee_breakdown)) {
             foreach ($receipt->fee_breakdown as $fee) {
@@ -677,7 +704,6 @@ public function store(Request $request)
             }
         }
         
-        // Format discount_breakdown items
         $discountBreakdown = [];
         if ($receipt->discount_breakdown && is_array($receipt->discount_breakdown)) {
             foreach ($receipt->discount_breakdown as $discount) {
@@ -700,7 +726,6 @@ public function store(Request $request)
             'payer_name' => $receipt->payer_name,
             'payer_address' => $receipt->payer_address,
             
-            // Financial breakdown - ensure these are numbers
             'subtotal' => (float) $receipt->subtotal,
             'surcharge' => (float) $receipt->surcharge,
             'penalty' => (float) $receipt->penalty,
@@ -709,7 +734,6 @@ public function store(Request $request)
             'amount_paid' => (float) $receipt->amount_paid,
             'change_due' => (float) $receipt->change_due,
             
-            // Formatted financials
             'formatted_subtotal' => '₱' . number_format($receipt->subtotal ?? 0, 2),
             'formatted_surcharge' => '₱' . number_format($receipt->surcharge ?? 0, 2),
             'formatted_penalty' => '₱' . number_format($receipt->penalty ?? 0, 2),
@@ -718,41 +742,33 @@ public function store(Request $request)
             'formatted_amount_paid' => '₱' . number_format($receipt->amount_paid ?? 0, 2),
             'formatted_change' => '₱' . number_format($receipt->change_due ?? 0, 2),
             
-            // Payment details
             'payment_method' => $receipt->payment_method,
             'payment_method_label' => $receipt->payment_method_label,
             'reference_number' => $receipt->reference_number,
             'payment_date' => $receipt->payment_date?->format('Y-m-d H:i:s'),
             'formatted_payment_date' => $receipt->payment_date?->format('M d, Y h:i A'),
             
-            // Issuance details
             'issued_date' => $receipt->issued_date->format('Y-m-d H:i:s'),
             'formatted_issued_date' => $receipt->issued_date->format('M d, Y h:i A'),
             'issued_by' => $receipt->issuer?->name ?? 'System',
             'issued_by_id' => $receipt->issued_by,
             
-            // Status
             'is_voided' => $receipt->is_voided,
             'status' => $receipt->status,
             'status_badge' => $receipt->status_badge,
             
-            // Void details
             'void_reason' => $receipt->void_reason,
             'voided_by' => $receipt->voider?->name,
             'voided_at' => $receipt->voided_at?->format('M d, Y h:i A'),
             
-            // Printing
             'printed_count' => (int) $receipt->printed_count,
             'last_printed_at' => $receipt->last_printed_at?->format('M d, Y h:i A'),
             
-            // Breakdowns - with properly formatted numbers
             'fee_breakdown' => $feeBreakdown,
             'discount_breakdown' => $discountBreakdown,
             
-            // Notes
             'notes' => $receipt->notes,
             
-            // Timestamps
             'created_at' => $receipt->created_at->format('Y-m-d H:i:s'),
             'updated_at' => $receipt->updated_at->format('Y-m-d H:i:s'),
         ];
@@ -765,7 +781,6 @@ public function store(Request $request)
     {
         $amountDue = $payment->total_amount - $payment->discount;
         
-        // Format items with proper number casting
         $items = [];
         foreach ($payment->items as $item) {
             $items[] = [
@@ -864,7 +879,6 @@ public function store(Request $request)
         ]);
 
         try {
-            // Here you would implement email sending logic
             $receipt->markEmailSent();
             
             Log::info('Receipt email sent', [
@@ -890,7 +904,6 @@ public function store(Request $request)
         ]);
 
         try {
-            // Here you would implement SMS sending logic
             $receipt->markSmsSent();
             
             Log::info('Receipt SMS sent', [
@@ -913,7 +926,6 @@ public function store(Request $request)
     {
         $receipt->load(['payment.items', 'issuer']);
         
-        // For now, redirect to print view with download parameter
         return Inertia::render('admin/receipts/Print', [
             'receipt' => $this->formatReceipt($receipt),
             'barangay' => [

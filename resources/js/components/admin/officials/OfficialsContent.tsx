@@ -1,11 +1,17 @@
-// components/admin/officials/OfficialsContent.tsx
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Shield, Grid3X3, List } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Shield, Grid3X3, List, ArrowUpDown } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
 import { Pagination } from '@/components/adminui/pagination';
@@ -53,6 +59,10 @@ interface OfficialsContentProps {
     positions: Record<string, { name: string; order: number }>;
     committees: Record<string, string>;
     windowWidth: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function OfficialsContent({
@@ -89,7 +99,11 @@ export default function OfficialsContent({
     selectionStats,
     positions,
     committees,
-    windowWidth
+    windowWidth,
+    sortBy = 'order',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'order-asc'
 }: OfficialsContentProps) {
     
     // Toggle handler for bulk mode
@@ -191,6 +205,37 @@ export default function OfficialsContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="order-asc">Order (Low to High)</SelectItem>
+                                        <SelectItem value="order-desc">Order (High to Low)</SelectItem>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="position-asc">Position (A to Z)</SelectItem>
+                                        <SelectItem value="position-desc">Position (Z to A)</SelectItem>
+                                        <SelectItem value="committee-asc">Committee (A to Z)</SelectItem>
+                                        <SelectItem value="committee-desc">Committee (Z to A)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="type-asc">Type (Ex-Officio to Regular)</SelectItem>
+                                        <SelectItem value="type-desc">Type (Regular to Ex-Officio)</SelectItem>
+                                        <SelectItem value="start_date-asc">Start Date (Oldest first)</SelectItem>
+                                        <SelectItem value="start_date-desc">Start Date (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && officials.length > 0 && (
                             <div className="flex items-center gap-2">

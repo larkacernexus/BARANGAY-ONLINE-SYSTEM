@@ -1,12 +1,26 @@
 // types/fee.ts
 
+// Define FeeTypeObject separately to avoid index signature issues
+export interface FeeTypeObject {
+    id: number;
+    name: string;
+    description?: string;
+    amount?: number;
+}
+
+// For dynamic properties, create a more flexible type if needed
+export interface FlexibleFeeTypeObject extends FeeTypeObject {
+    [key: string]: any;
+}
+
 /**
  * Core Fee interface - single source of truth for all fee-related types
  */
 export interface Fee {
     id: number;
     fee_code?: string;
-    fee_type?: string;
+    fee_type?: FeeTypeObject | string | null;
+    name?: any;
     fee_type_name?: string;
     category?: string;
     amount?: number;
@@ -27,12 +41,106 @@ export interface Fee {
     original_name?: string;
     file_size?: number;
     formatted_size?: string;
-    [key: string]: any; // Allow for additional properties
+    
+    // Additional properties from your component
+    purpose?: string;
+    is_own_fee?: boolean;
+    resident_info?: {
+        full_name: string;
+        contact_number?: string;
+        [key: string]: any;
+    };
+    balance?: number;
+    base_amount?: number;
+    surcharge_amount?: number;
+    penalty_amount?: number;
+    discount_amount?: number;
+    total_amount?: number;
+    amount_paid?: number;
+    issue_date?: string;
+    billing_period?: string;
+    remarks?: string;
+    payer_name?: string;
+    payer_type?: string;
+    address?: string;
+    purok?: string;
+    zone?: string;
+    business_name?: string;
+    business_type?: string;
+    property_description?: string;
+    area?: number;
+    valid_from?: string;
+    valid_until?: string;
+    certificate_number?: string;
+    or_number?: string;
+    requirements_submitted?: string[] | string;
+    
+    [key: string]: any;
 }
 
-/**
- * Paginated response structure for fees
- */
+// Helper function to safely get fee type name
+export const getFeeTypeName = (fee: Fee): string => {
+    if (!fee.fee_type) {
+        return fee.fee_type_name || 'N/A';
+    }
+    
+    // Check if fee_type is an object (has name property)
+    if (typeof fee.fee_type === 'object' && fee.fee_type !== null && 'name' in fee.fee_type) {
+        return fee.fee_type.name;
+    }
+    
+    // If it's a string
+    if (typeof fee.fee_type === 'string') {
+        return fee.fee_type;
+    }
+    
+    return fee.fee_type_name || 'N/A';
+};
+
+// Helper function to get fee type as string for grouping
+export const getFeeTypeString = (fee: Fee): string => {
+    if (!fee) return 'other';
+    
+    // Handle object case
+    if (fee.fee_type && typeof fee.fee_type === 'object' && 'name' in fee.fee_type) {
+        return fee.fee_type.name || 'other';
+    }
+    
+    // Handle string case
+    if (typeof fee.fee_type === 'string') {
+        return fee.fee_type;
+    }
+    
+    // Fallback to fee_type_name
+    if (fee.fee_type_name) {
+        return fee.fee_type_name;
+    }
+    
+    // Default
+    return 'other';
+};
+
+// Type guard to check if fee_type is an object
+export const isFeeTypeObject = (feeType: any): feeType is FeeTypeObject => {
+    return feeType && typeof feeType === 'object' && 'id' in feeType && 'name' in feeType;
+};
+
+// Rest of your interfaces
+export interface FeeAttachment {
+    id: number;
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+    fee_id?: number;
+    created_at?: string;
+    uploaded_by?: string;
+    mime_type?: string;
+    file_path?: string;
+    original_name?: string;
+    [key: string]: any;
+}
+
 export interface FeesPaginatedResponse {
     data: Fee[];
     current_page: number;
@@ -47,7 +155,6 @@ export interface FeesPaginatedResponse {
         active: boolean;
     }>;
 }
-
 
 export interface Resident {
     id: number;
@@ -68,13 +175,8 @@ export interface Resident {
     address?: string;
     is_voter?: boolean;
     status?: string;
-    
 }
 
-
-/**
- * Fee statistics structure
- */
 export interface FeeStats {
     total_fees?: number;
     paid_fees?: number;
@@ -88,9 +190,6 @@ export interface FeeStats {
     [key: string]: any;
 }
 
-/**
- * Fee type structure
- */
 export interface FeeType {
     id: number;
     name: string;
@@ -102,9 +201,6 @@ export interface FeeType {
     [key: string]: any;
 }
 
-/**
- * Fee payment structure
- */
 export interface FeePayment {
     id: number;
     fee_id: number;
@@ -117,9 +213,6 @@ export interface FeePayment {
     [key: string]: any;
 }
 
-/**
- * Fee filter structure
- */
 export interface FeeFilters {
     search?: string;
     status?: string;
@@ -134,9 +227,6 @@ export interface FeeFilters {
     [key: string]: any;
 }
 
-/**
- * Fee form data structure for create/update
- */
 export interface FeeFormData {
     resident_id?: number;
     fee_type_id?: number;
@@ -148,9 +238,6 @@ export interface FeeFormData {
     [key: string]: any;
 }
 
-/**
- * Fee summary card data
- */
 export interface FeeSummaryCard {
     title: string;
     value: string | number;
@@ -161,9 +248,6 @@ export interface FeeSummaryCard {
     color?: string;
 }
 
-/**
- * Fee export options
- */
 export interface FeeExportOptions {
     format: 'csv' | 'pdf' | 'excel';
     includeHeaders?: boolean;
@@ -175,9 +259,6 @@ export interface FeeExportOptions {
     feeTypes?: number[];
 }
 
-/**
- * Fee notification settings
- */
 export interface FeeNotificationSettings {
     email_notifications: boolean;
     sms_notifications: boolean;
@@ -185,24 +266,11 @@ export interface FeeNotificationSettings {
     overdue_reminders: boolean;
 }
 
-/**
- * Utility type for fee status
- */
 export type FeeStatus = 'paid' | 'pending' | 'overdue' | 'cancelled' | 'refunded';
-
-/**
- * Utility type for fee frequency
- */
 export type FeeFrequency = 'one-time' | 'monthly' | 'quarterly' | 'yearly';
-
-/**
- * Utility type for payment method
- */
 export type PaymentMethod = 'cash' | 'check' | 'bank_transfer' | 'online_payment' | 'gcash' | 'paymaya';
 
-/**
- * Helper function to check if a fee is overdue
- */
+// Helper functions
 export const isFeeOverdue = (fee: Fee): boolean => {
     if (!fee.due_date || fee.status === 'paid') return false;
     const dueDate = new Date(fee.due_date);
@@ -210,16 +278,10 @@ export const isFeeOverdue = (fee: Fee): boolean => {
     return dueDate < today;
 };
 
-/**
- * Helper function to check if a fee is paid
- */
 export const isFeePaid = (fee: Fee): boolean => {
     return fee.status === 'paid';
 };
 
-/**
- * Helper function to get fee status label
- */
 export const getFeeStatusLabel = (status?: string): string => {
     switch (status) {
         case 'paid':
@@ -237,9 +299,6 @@ export const getFeeStatusLabel = (status?: string): string => {
     }
 };
 
-/**
- * Helper function to get fee status color
- */
 export const getFeeStatusColor = (status?: string): string => {
     switch (status) {
         case 'paid':
@@ -257,9 +316,6 @@ export const getFeeStatusColor = (status?: string): string => {
     }
 };
 
-/**
- * Helper function to format fee amount
- */
 export const formatFeeAmount = (amount?: number): string => {
     if (!amount && amount !== 0) return '₱0.00';
     return new Intl.NumberFormat('en-PH', {
@@ -270,44 +326,31 @@ export const formatFeeAmount = (amount?: number): string => {
     }).format(amount);
 };
 
-/**
- * Helper function to calculate total amount from fees
- */
 export const calculateTotalAmount = (fees: Fee[]): number => {
     return fees.reduce((total, fee) => total + (fee.amount || 0), 0);
 };
 
-/**
- * Helper function to calculate paid amount from fees
- */
 export const calculatePaidAmount = (fees: Fee[]): number => {
     return fees
         .filter(fee => fee.status === 'paid')
         .reduce((total, fee) => total + (fee.amount || 0), 0);
 };
 
-/**
- * Helper function to calculate pending amount from fees
- */
 export const calculatePendingAmount = (fees: Fee[]): number => {
     return fees
         .filter(fee => fee.status === 'pending')
         .reduce((total, fee) => total + (fee.amount || 0), 0);
 };
 
-/**
- * Helper function to calculate overdue amount from fees
- */
 export const calculateOverdueAmount = (fees: Fee[]): number => {
     return fees
         .filter(fee => fee.status === 'overdue')
         .reduce((total, fee) => total + (fee.amount || 0), 0);
 };
 
-/**
- * Helper function to group fees by status
- */
 export const groupFeesByStatus = (fees: Fee[]): Record<string, Fee[]> => {
+    if (!fees || !Array.isArray(fees)) return {};
+    
     return fees.reduce((groups, fee) => {
         const status = fee.status || 'unknown';
         if (!groups[status]) {
@@ -318,12 +361,12 @@ export const groupFeesByStatus = (fees: Fee[]): Record<string, Fee[]> => {
     }, {} as Record<string, Fee[]>);
 };
 
-/**
- * Helper function to group fees by fee type
- */
 export const groupFeesByType = (fees: Fee[]): Record<string, Fee[]> => {
+    if (!fees || !Array.isArray(fees)) return {};
+    
     return fees.reduce((groups, fee) => {
-        const type = fee.fee_type || fee.fee_type_name || 'other';
+        const type = getFeeTypeString(fee);
+        
         if (!groups[type]) {
             groups[type] = [];
         }
@@ -332,17 +375,11 @@ export const groupFeesByType = (fees: Fee[]): Record<string, Fee[]> => {
     }, {} as Record<string, Fee[]>);
 };
 
-/**
- * Helper function to filter fees by status
- */
 export const filterFeesByStatus = (fees: Fee[], status?: string): Fee[] => {
     if (!status || status === 'all') return fees;
     return fees.filter(fee => fee.status === status);
 };
 
-/**
- * Helper function to filter fees by date range
- */
 export const filterFeesByDateRange = (fees: Fee[], startDate?: string, endDate?: string): Fee[] => {
     if (!startDate && !endDate) return fees;
     
@@ -362,10 +399,9 @@ export const filterFeesByDateRange = (fees: Fee[], startDate?: string, endDate?:
     });
 };
 
-/**
- * Helper function to sort fees
- */
 export const sortFees = (fees: Fee[], sortBy: keyof Fee, sortOrder: 'asc' | 'desc' = 'desc'): Fee[] => {
+    if (!fees || !Array.isArray(fees)) return [];
+    
     return [...fees].sort((a, b) => {
         const aValue = a[sortBy];
         const bValue = b[sortBy];

@@ -1,6 +1,9 @@
 // types/portal/receipts/receipt.types.ts
 
 export interface ReceiptItem {
+    description: any;
+    payor_name: any;
+    amount: any;
     id: number;
     receipt_number: string;
     or_number: string | null;

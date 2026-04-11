@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Eye, Download, Image, File, FileText } from 'lucide-react';
 import { useState } from 'react';
-import { Attachment } from '@/components/admin/blotters/show/types';
+import { Attachment } from '@/types/admin/blotters/blotter';
 import { formatFileSize } from '@/components/admin/blotters/show/utils/helpers';
 
 interface AttachmentCardProps {

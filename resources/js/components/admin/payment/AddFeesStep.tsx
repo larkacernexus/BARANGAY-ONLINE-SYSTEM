@@ -8,183 +8,27 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calculator, Package, User, Users, Home, Building, UserCircle, ChevronRight, DollarSign, FileCheck, Shield, FileText, AlertTriangle, Receipt, Search, CheckCircle, Phone, MapPin, FileSearch, FileBadge, Loader2, X, Plus, Info } from 'lucide-react';
+
+import { ResidentAvatar } from './ResidentAvatar';
+
 import {
-    Calculator,
-    Package,
-    User,
-    Users,
-    Home,
-    Building,
-    UserCircle,
-    Trash2,
-    ChevronRight,
-    DollarSign,
-    FileCheck,
-    Shield,
-    FileText,
-    AlertTriangle,
-    Receipt,
-    Search,
-    Calendar,
-    CheckCircle,
-    AlertCircle,
-    Phone,
-    MapPin,
-    Hash,
-    FileSearch,
-    CreditCard,
-    Info,
-    FileBadge,
-    BadgeCheck,
-    Loader2,
-    Clock,
-    FileDigit,
-    X,
-    Filter
-} from 'lucide-react';
+    PaymentFormData,
+    PaymentItem,
+    OutstandingFee,
+    ClearanceRequest,
+    FeeType
+} from '@/types/admin/payments/payments';
 
 import { LatePaymentSettings } from './LatePaymentSettings';
 
-interface FeeType {
-    id: string | number;
-    name: string;
-    code: string;
-    base_amount: number | string;
-    category: string;
-    has_surcharge?: boolean;
-    surcharge_rate?: number;
-    surcharge_fixed?: number;
-    has_penalty?: boolean;
-    penalty_rate?: number;
-    penalty_fixed?: number;
-}
-
-interface OutstandingFee {
-    id: string | number;
-    fee_type_id: string | number;
-    fee_type?: FeeType;
-    fee_code: string;
-    payer_name: string;
-    payer_type?: string;
-    payer_id?: string | number;
-    due_date: string;
-    base_amount: string;
-    surcharge_amount?: string;
-    penalty_amount: string;
-    discount_amount?: string;
-    amount_paid: string;
-    balance: string;
-    status: string;
-    purpose?: string;
-    fee_type_name?: string;
-    fee_type_category?: string;
-    category?: string;
-    applicableDiscounts?: any[];
-    canApplyDiscount?: boolean;
-    months_late?: number;
-    business_name?: string;
-    business_type?: string;
-    contact_number?: string;
-    address?: string;
-    purok?: string;
-    is_clearance_fee?: boolean;
-    clearance_request_id?: string | number;
-    clearance_type?: string;
-    clearance_type_name?: string;
-    clearance_code?: string;
-    reference_number?: string;
-}
-
-interface ClearanceRequest {
-    id: string | number;
-    resident_id: string | number;
-    clearance_type_id: string | number;
-    reference_number: string;
-    purpose: string;
-    specific_purpose?: string;
-    fee_amount: number | string;
-    status: string;
-    status_display?: string;
-    can_be_paid?: boolean;
-    already_paid?: boolean;
-    clearance_type?: {
-        id: string | number;
-        name: string;
-        code: string;
-        fee: number;
-        formatted_fee?: string;
-        validity_days?: number;
-        processing_days?: number;
-        description?: string;
-        has_senior_discount?: boolean;
-        senior_discount_percentage?: number;
-        has_pwd_discount?: boolean;
-        pwd_discount_percentage?: number;
-        has_solo_parent_discount?: boolean;
-        solo_parent_discount_percentage?: number;
-        has_indigent_discount?: boolean;
-        indigent_discount_percentage?: number;
-    };
-    resident?: {
-        id: string | number;
-        name: string;
-        contact_number?: string;
-        address?: string;
-        purok?: string;
-        household_number?: string;
-    };
-    applicableDiscounts?: any[];
-    canApplyDiscount?: boolean;
-}
-
-interface PaymentItem {
-    id: number;
-    fee_id: string | number;
-    fee_name: string;
-    fee_code: string;
-    base_amount: number;
-    surcharge?: number;
-    penalty: number;
-    discount?: number;
-    total_amount: number;
-    category: string;
-    period_covered?: string;
-    months_late?: number;
-    metadata?: {
-        is_clearance_fee?: boolean;
-        clearance_request_id?: string | number;
-        clearance_type_id?: string | number;
-        clearance_type_code?: string;
-        reference_number?: string;
-        is_prefilled_clearance?: boolean;
-        is_outstanding_fee?: boolean;
-        appliedDiscount?: any;
-        is_business_fee?: boolean;
-        business_id?: string | number;
-        business_name?: string;
-        original_fee_data?: any;
-    };
-}
-
-interface PaymentFormData {
-    payer_type: string;
-    payer_name: string;
-    contact_number: string;
-    address: string;
-    purok: string;
-    household_number?: string;
-    payer_id?: string | number;
-    clearance_request_id?: string | number;
-    clearance_type?: string;
-    clearance_type_id?: string | number;
-    clearance_code?: string;
-}
-
+// ========== PROPS INTERFACE ==========
 interface AddFeesStepProps {
     data: PaymentFormData;
+    setData: (data: any) => void;
     setStep: (step: number) => void;
     paymentItems: PaymentItem[];
-    removePaymentItem: (id: number) => void;
+    removePaymentItem: (id: string | number) => void;
     payerOutstandingFees: OutstandingFee[];
     payerClearanceRequests?: ClearanceRequest[];
     selectedFee: OutstandingFee | null;
@@ -210,10 +54,11 @@ interface AddFeesStepProps {
     } | null;
     payerSource?: 'clearance' | 'residents' | 'households' | 'businesses' | 'fees' | 'other';
     selectedFeeDetails?: any;
-    clearanceTypes?: any;
+    clearanceTypes?: Record<string, string>;
     clearanceTypesDetails?: any[];
 }
 
+// ========== HELPER FUNCTIONS ==========
 function parseCurrencyString(amount: string | number | null | undefined): number {
     if (amount === null || amount === undefined || amount === '') return 0;
     if (typeof amount === 'number') return parseFloat(amount.toFixed(2));
@@ -233,24 +78,25 @@ function formatCurrency(amount: number): string {
 }
 
 function isFutureFee(fee: OutstandingFee): boolean {
-    const dueDate = new Date(fee.due_date);
-    const today = new Date();
-    return dueDate > today;
+    if (!fee.period_covered) return false;
+    return false;
 }
 
 const getCorrectedBalance = (fee: OutstandingFee): number => {
+    // For pending and pending_payment fees, use the balance field
+    if (fee.status === 'pending' || fee.status === 'pending_payment') {
+        const balance = parseCurrencyString(fee.balance);
+        return Math.max(0, parseFloat(balance.toFixed(2)));
+    }
+    
     const balanceFromDB = parseCurrencyString(fee.balance);
     if (balanceFromDB >= 0) return parseFloat(balanceFromDB.toFixed(2));
     
     const base = parseCurrencyString(fee.base_amount);
-    const surcharge = parseCurrencyString(fee.surcharge_amount || '0');
-    const penalty = parseCurrencyString(fee.penalty_amount || '0');
-    const discount = parseCurrencyString(fee.discount_amount || '0');
-    const amountPaid = parseCurrencyString(fee.amount_paid || '0');
+    const totalFromFee = parseCurrencyString(fee.total_amount);
     
-    const totalAmount = base + surcharge + penalty - discount;
-    const calculatedBalance = totalAmount - amountPaid;
-    return Math.max(0, parseFloat(calculatedBalance.toFixed(2)));
+    const totalAmount = totalFromFee > 0 ? totalFromFee : base;
+    return Math.max(0, parseFloat(totalAmount.toFixed(2)));
 };
 
 const getCategoryIcon = (category: string) => {
@@ -263,9 +109,10 @@ const getCategoryIcon = (category: string) => {
         'fine': AlertTriangle,
         'business': Building,
         'document': FileText,
+        'fee': Receipt,
         'other': Receipt
     };
-    const IconComponent = icons[category] || FileText;
+    const IconComponent = icons[category] || Receipt;
     return <IconComponent className="h-3.5 w-3.5" />;
 };
 
@@ -283,15 +130,14 @@ const getPayerTypeIcon = (type: string) => {
 const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string, color: string }> = {
         'issued': { label: 'Issued', color: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' },
-        'overdue': { label: 'Overdue', color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' },
+        'pending_payment': { label: 'Pending Payment', color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800' },
+        'pending': { label: 'Pending', color: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' },
         'partially_paid': { label: 'Partial', color: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800' },
         'paid': { label: 'Paid', color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' },
-        'pending_payment': { label: 'Pending', color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800' },
-        'pending': { label: 'Pending', color: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' },
-        'approved': { label: 'Approved', color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' }
+        'overdue': { label: 'Overdue', color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' },
     };
     
-    const configItem = config[status] || { label: status, color: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700' };
+    const configItem = config[status] || { label: status.replace('_', ' '), color: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700' };
     return (
         <Badge className={`text-xs px-1.5 py-0 ${configItem.color}`}>
             {configItem.label}
@@ -301,6 +147,7 @@ const getStatusBadge = (status: string) => {
 
 export function AddFeesStep({
     data,
+    setData,
     setStep,
     paymentItems,
     removePaymentItem,
@@ -327,61 +174,52 @@ export function AddFeesStep({
     clearanceTypesDetails = []
 }: AddFeesStepProps) {
     
-    // ========== DEBUG LOGS ==========
-    console.log('🔍 ========== ADD FEES STEP RENDERED ==========');
-    console.log('🔍 Props received:', {
-        payerClearanceRequestsCount: payerClearanceRequests?.length || 0,
-        payerOutstandingFeesCount: payerOutstandingFees?.length || 0,
-        paymentItemsCount: paymentItems?.length || 0,
-        data: {
-            payer_type: data.payer_type,
-            payer_name: data.payer_name,
-            payer_id: data.payer_id
-        }
-    });
-
-    // Debug log for paymentItems changes
-    useEffect(() => {
-        console.log('📦 AddFeesStep - paymentItems updated:', {
-            count: paymentItems.length,
-            items: paymentItems.map(item => ({
-                id: item.id,
-                name: item.fee_name,
-                isClearance: item.metadata?.is_clearance_fee === true || item.category === 'clearance',
-                amount: item.total_amount,
-                category: item.category
-            }))
-        });
-    }, [paymentItems]);
-
-    // Log each clearance request in detail
-    if (payerClearanceRequests && payerClearanceRequests.length > 0) {
-        console.log('📋 Clearance requests details:', payerClearanceRequests.map(cr => ({
-            id: cr.id,
-            reference: cr.reference_number,
-            amount: cr.fee_amount,
-            status: cr.status,
-            type: cr.clearance_type?.name,
-            resident: cr.resident?.name
-        })));
-    } else {
-        console.log('❌ No clearance requests received in props');
-    }
-
-    if (payerOutstandingFees && payerOutstandingFees.length > 0) {
-        console.log('📋 Outstanding fees details:', payerOutstandingFees.map(fee => ({
-            id: fee.id,
-            code: fee.fee_code,
-            amount: fee.balance,
-            status: fee.status
-        })));
-    }
-
+    // ========== STATE ==========
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isAddingFee, setIsAddingFee] = useState<boolean>(false);
     const [addingFeeId, setAddingFeeId] = useState<string | number | null>(null);
-    const [activeTab, setActiveTab] = useState<string>('clearances');
+    const [activeTab, setActiveTab] = useState<string>(() => {
+        const hasClearances = payerClearanceRequests && payerClearanceRequests.length > 0;
+        const hasFees = payerOutstandingFees && payerOutstandingFees.length > 0;
+        
+        if (hasClearances && !hasFees) return 'clearances';
+        if (hasFees && !hasClearances) return 'fees';
+        
+        return hasClearances ? 'clearances' : 'fees';
+    });
     
+    // ========== DEBUG: Log received fees ==========
+    useEffect(() => {
+        console.log('🔍 ========== FEES RECEIVED FROM BACKEND ==========');
+        console.log('Total fees count:', payerOutstandingFees?.length);
+        console.log('Raw fees data:', payerOutstandingFees);
+        
+        if (payerOutstandingFees && payerOutstandingFees.length > 0) {
+            console.log('Fees by status:', payerOutstandingFees.reduce((acc, fee) => {
+                acc[fee.status] = (acc[fee.status] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>));
+            
+            console.log('Pending payment fees:', payerOutstandingFees.filter(f => f.status === 'pending_payment'));
+            console.log('Pending fees:', payerOutstandingFees.filter(f => f.status === 'pending'));
+            console.log('Paid fees:', payerOutstandingFees.filter(f => f.status === 'paid'));
+            
+            // Log first fee details
+            if (payerOutstandingFees[0]) {
+                console.log('Sample fee:', {
+                    id: payerOutstandingFees[0].id,
+                    fee_code: payerOutstandingFees[0].fee_code,
+                    status: payerOutstandingFees[0].status,
+                    balance: payerOutstandingFees[0].balance,
+                    total_amount: payerOutstandingFees[0].total_amount
+                });
+            }
+        } else {
+            console.log('❌ No fees received from backend!');
+        }
+    }, [payerOutstandingFees]);
+    
+    // ========== MEMOIZED VALUES ==========
     const isFeeAlreadyAdded = useCallback((feeId: string | number) => {
         const stringFeeId = String(feeId);
         return paymentItems.some(item => String(item.fee_id) === stringFeeId);
@@ -393,6 +231,161 @@ export function AddFeesStep({
         );
     }, [paymentItems]);
     
+    const totalSelectedAmount = useMemo(() => {
+        return paymentItems.reduce((total, item) => total + parseCurrencyString(item.total_amount), 0);
+    }, [paymentItems]);
+    
+    const filteredClearances = useMemo(() => {
+        if (!payerClearanceRequests || payerClearanceRequests.length === 0) return [];
+        
+        return payerClearanceRequests
+            .filter(cr => {
+                if (cr.already_paid) return false;
+                const feeAmount = parseFloat(String(cr.fee_amount));
+                if (feeAmount <= 0) return false;
+                
+                if (isClearanceAlreadyAdded(cr.id)) return false;
+                
+                if (!searchQuery) return true;
+                
+                const query = searchQuery.toLowerCase();
+                return (
+                    cr.reference_number?.toLowerCase().includes(query) ||
+                    cr.clearance_type?.name?.toLowerCase().includes(query) ||
+                    cr.clearance_type?.code?.toLowerCase().includes(query) ||
+                    cr.purpose?.toLowerCase().includes(query) ||
+                    cr.specific_purpose?.toLowerCase().includes(query) ||
+                    cr.resident?.name?.toLowerCase().includes(query)
+                );
+            });
+    }, [payerClearanceRequests, searchQuery, isClearanceAlreadyAdded]);
+
+    const filteredFees = useMemo(() => {
+        if (!payerOutstandingFees || payerOutstandingFees.length === 0) return [];
+        
+        console.log('🔍 Filtering fees. Total before filter:', payerOutstandingFees.length);
+        
+        const filtered = payerOutstandingFees
+            .filter(fee => {
+                // Calculate the actual amount that can be paid
+                let payableAmount = 0;
+                
+                // For pending/pending_payment, use balance
+                if (fee.status === 'pending' || fee.status === 'pending_payment') {
+                    payableAmount = parseCurrencyString(fee.balance);
+                    console.log(`Fee ${fee.id} (${fee.status}) - balance: ${fee.balance}, payable: ${payableAmount}`);
+                } 
+                // For paid fees, skip them
+                else if (fee.status === 'paid') {
+                    console.log(`Fee ${fee.id} is paid, skipping`);
+                    return false;
+                }
+                // For other statuses, use balance or calculate from total
+                else {
+                    payableAmount = parseCurrencyString(fee.balance);
+                    if (payableAmount <= 0) {
+                        const total = parseCurrencyString(fee.total_amount);
+                        const paid = parseCurrencyString(fee.amount_paid);
+                        payableAmount = Math.max(0, total - paid);
+                    }
+                    console.log(`Fee ${fee.id} (${fee.status}) - payable: ${payableAmount}`);
+                }
+                
+                // Skip if nothing to pay
+                if (payableAmount <= 0) {
+                    console.log(`Fee ${fee.id} has no payable amount, skipping`);
+                    return false;
+                }
+                
+                // Skip if already added
+                if (isFeeAlreadyAdded(fee.id)) {
+                    console.log(`Fee ${fee.id} already added, skipping`);
+                    return false;
+                }
+                
+                // Apply search filter
+                if (!searchQuery) return true;
+                
+                const query = searchQuery.toLowerCase();
+                return (
+                    fee.fee_code?.toLowerCase().includes(query) ||
+                    fee.fee_name?.toLowerCase().includes(query) ||
+                    fee.category?.toLowerCase().includes(query)
+                );
+            });
+        
+        console.log('🔍 Filtered fees result:', filtered.length, 'fees');
+        console.log('Filtered fees details:', filtered.map(f => ({ id: f.id, status: f.status, balance: f.balance })));
+        
+        return filtered;
+    }, [payerOutstandingFees, searchQuery, isFeeAlreadyAdded]);
+    
+    // Debug filtered fees changes
+    useEffect(() => {
+        console.log('🔍 ========== FILTERED FEES UPDATED ==========');
+        console.log('Filtered fees count:', filteredFees.length);
+        console.log('Filtered fees:', filteredFees.map(f => ({ id: f.id, status: f.status, fee_code: f.fee_code, balance: f.balance })));
+        console.log('Search query:', searchQuery);
+        console.log('Active tab:', activeTab);
+    }, [filteredFees, searchQuery, activeTab]);
+    
+    // ========== FIXED: Get resident data for avatar from data prop ==========
+    const residentForAvatar = useMemo(() => {
+        console.log('🔍 AddFeesStep - Building residentForAvatar...');
+        console.log('📊 data.payer_type:', data.payer_type);
+        console.log('📊 data.photo_path:', data.photo_path);
+        console.log('📊 data.photo_url:', data.photo_url);
+        
+        // Only for resident payer type
+        if (data.payer_type !== 'resident') {
+            console.log('❌ Not a resident payer type, skipping avatar');
+            return null;
+        }
+        
+        // Get photo from data first (passed from parent)
+        let photoPath = (data as any).photo_path;
+        let photoUrl = (data as any).photo_url;
+        
+        // If no photo in data, try selectedFeeDetails
+        if (!photoPath && selectedFeeDetails?.resident_discount_info) {
+            console.log('📸 Found photo in selectedFeeDetails.resident_discount_info');
+            photoPath = selectedFeeDetails.resident_discount_info.photo_path;
+            photoUrl = selectedFeeDetails.resident_discount_info.photo_url;
+        }
+        
+        // If still no photo, try clearanceRequest
+        if (!photoPath && clearanceRequest?.resident) {
+            console.log('📸 Found photo in clearanceRequest.resident');
+            photoPath = clearanceRequest.resident.photo_path;
+            photoUrl = clearanceRequest.resident.photo_url;
+        }
+        
+        // Build the full image URL
+        let fullPhotoUrl = photoUrl;
+        if (photoPath && !fullPhotoUrl) {
+            if (photoPath.startsWith('http')) {
+                fullPhotoUrl = photoPath;
+            } else if (photoPath.startsWith('/storage')) {
+                fullPhotoUrl = photoPath;
+            } else {
+                fullPhotoUrl = `/storage/${photoPath}`;
+            }
+        }
+        
+        const residentData = {
+            id: Number(data.payer_id),
+            name: data.payer_name,
+            photo_path: photoPath,
+            photo_url: fullPhotoUrl
+        };
+        
+        console.log('🎯 Final residentForAvatar:', residentData);
+        console.log('🖼️ Will load image from:', fullPhotoUrl);
+        
+        return residentData;
+    }, [data.payer_type, data.payer_id, data.payer_name, (data as any).photo_path, (data as any).photo_url, selectedFeeDetails, clearanceRequest]);
+    
+    // ========== HANDLERS ==========
     const safeAddFee = useCallback(async (fee: OutstandingFee) => {
         if (isAddingFee) return;
         if (isFeeAlreadyAdded(fee.id)) {
@@ -411,6 +404,7 @@ export function AddFeesStep({
             }
         } catch (error) {
             console.error('Error adding fee:', error);
+            alert('Failed to add fee. Please try again.');
         } finally {
             setTimeout(() => {
                 setIsAddingFee(false);
@@ -434,63 +428,8 @@ export function AddFeesStep({
             return;
         }
 
-        console.log('📋 Adding clearance:', clearance);
         onAddClearanceRequest(clearance);
     };
-    
-    const totalSelectedAmount = React.useMemo(() => {
-        return paymentItems.reduce((total, item) => total + parseCurrencyString(item.total_amount), 0);
-    }, [paymentItems]);
-    
-    // Filtered clearance requests
-    const filteredClearances = React.useMemo(() => {
-        if (!payerClearanceRequests) return [];
-        
-        return payerClearanceRequests
-            .filter(cr => {
-                if (cr.already_paid) return false;
-                if (parseFloat(String(cr.fee_amount)) <= 0) return false;
-                
-                // Apply search query
-                if (!searchQuery) return true;
-                
-                const query = searchQuery.toLowerCase();
-                return (
-                    cr.reference_number?.toLowerCase().includes(query) ||
-                    cr.clearance_type?.name?.toLowerCase().includes(query) ||
-                    cr.purpose?.toLowerCase().includes(query) ||
-                    cr.resident?.name?.toLowerCase().includes(query)
-                );
-            })
-            .map(cr => ({
-                ...cr,
-                isAdded: isClearanceAlreadyAdded(cr.id)
-            }));
-    }, [payerClearanceRequests, searchQuery, isClearanceAlreadyAdded]);
-
-    // Filtered fees
-    const filteredFees = React.useMemo(() => {
-        return payerOutstandingFees
-            .filter(fee => {
-                if (parseFloat(fee.balance) <= 0) return false;
-                
-                // Apply search query
-                if (!searchQuery) return true;
-                
-                const query = searchQuery.toLowerCase();
-                return (
-                    fee.fee_code.toLowerCase().includes(query) ||
-                    fee.fee_type_name?.toLowerCase().includes(query) ||
-                    fee.purpose?.toLowerCase().includes(query) ||
-                    fee.business_name?.toLowerCase().includes(query) ||
-                    fee.reference_number?.toLowerCase().includes(query)
-                );
-            })
-            .map(fee => ({
-                ...fee,
-                isAdded: isFeeAlreadyAdded(fee.id)
-            }));
-    }, [payerOutstandingFees, searchQuery, isFeeAlreadyAdded]);
     
     const handleContinue = () => {
         if (paymentItems.length === 0) {
@@ -502,6 +441,7 @@ export function AddFeesStep({
     
     const handleBack = () => setStep(1);
     
+    // ========== COMPUTED VALUES ==========
     const isBusinessMode = data.payer_type === 'business' || payerSource === 'businesses';
     const isFeePayment = payerSource === 'fees' || !!pre_filled_data?.fee_id;
     const isClearanceMode = isClearancePayment && payerSource !== 'fees';
@@ -509,240 +449,251 @@ export function AddFeesStep({
     const clearanceCount = filteredClearances.length;
     const feesCount = filteredFees.length;
     
-    // Handle tab change without triggering form validation
     const handleTabChange = (value: string) => {
         setActiveTab(value);
-        // Don't trigger any form submission or validation
+        setSearchQuery('');
     };
     
+    // ========== RENDER ==========
     return (
-        <div className="grid gap-4 lg:grid-cols-3">
-            {/* Left Column - Payer Info */}
-            <div className="lg:col-span-1">
-                <Card className="dark:bg-gray-900">
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2 dark:text-gray-100">
-                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
+        <div className="space-y-4">
+            {/* Payer Information Header - with Avatar */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 rounded-lg border border-blue-100 dark:border-gray-700 p-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                        {/* Show Resident Avatar for residents */}
+                        {data.payer_type === 'resident' && residentForAvatar ? (
+                            <ResidentAvatar 
+                                resident={residentForAvatar} 
+                                size="lg"
+                                className="flex-shrink-0 shadow-sm"
+                            />
+                        ) : data.payer_type === 'resident' && !residentForAvatar ? (
+                            <div className="h-12 w-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center shadow-sm">
+                                <User className="h-6 w-6 text-white" />
+                            </div>
+                        ) : (
+                            <div className="h-10 w-10 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center shadow-sm">
                                 {getPayerTypeIcon(data.payer_type)}
                             </div>
-                            Payer Information
-                            {(isBusinessMode || isFeePayment || isClearanceMode) && (
-                                <Badge variant="outline" className={`text-xs ${
-                                    isBusinessMode ? 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' :
-                                    isFeePayment ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' :
-                                    'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800'
-                                }`}>
-                                    {isBusinessMode ? 'Business' : isFeePayment ? 'Fee' : 'Clearance'}
-                                </Badge>
-                            )}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <Label className="text-xs text-gray-500 dark:text-gray-400">Name</Label>
-                                <div className="font-medium truncate dark:text-gray-200">{data.payer_name || 'Juan Dela Cruz Sr.'}</div>
-                            </div>
-                            <div>
-                                <Label className="text-xs text-gray-500 dark:text-gray-400">Contact</Label>
-                                <div className="font-medium flex items-center gap-1 dark:text-gray-200">
-                                    <Phone className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                                    {data.contact_number || '09171234567'}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Address</Label>
-                            <div className="font-medium flex items-center gap-1 text-sm dark:text-gray-200">
-                                <MapPin className="h-3 w-3 flex-shrink-0 text-gray-400 dark:text-gray-500" />
-                                <span className="truncate">{data.address || '24158 Catherine Plain'}</span>
-                            </div>
-                        </div>
-                        
-                        {data.purok && (
-                            <div>
-                                <Label className="text-xs text-gray-500 dark:text-gray-400">Purok</Label>
-                                <div className="font-medium dark:text-gray-200">{data.purok || 'West Kibawe'}</div>
-                            </div>
                         )}
-                        
-                        <Separator className="my-2 dark:bg-gray-700" />
-                        
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full h-8 text-xs dark:text-gray-400 dark:hover:text-white"
-                            onClick={handleBack}
-                        >
-                            Change Payer
-                        </Button>
-                    </CardContent>
-                </Card>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">{data.payer_name || 'N/A'}</h3>
+                                {(isBusinessMode || isFeePayment || isClearanceMode) && (
+                                    <Badge variant="outline" className={`text-xs ${
+                                        isBusinessMode ? 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' :
+                                        isFeePayment ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' :
+                                        'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800'
+                                    }`}>
+                                        {isBusinessMode ? 'Business' : isFeePayment ? 'Fee Payment' : 'Clearance'}
+                                    </Badge>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                                <span className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {data.contact_number || 'N/A'}
+                                </span>
+                                <span className="text-gray-300 dark:text-gray-600">|</span>
+                                <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {data.address || 'N/A'}
+                                </span>
+                                {data.purok && (
+                                    <>
+                                        <span className="text-gray-300 dark:text-gray-600">|</span>
+                                        <span>Purok {data.purok}</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+                        onClick={handleBack}
+                    >
+                        Change Payer
+                    </Button>
+                </div>
             </div>
 
-            {/* Middle Column - Payable Items with Tabs */}
-            <div className="lg:col-span-1">
-                <Card className="dark:bg-gray-900">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base flex items-center gap-2 dark:text-gray-100">
-                                <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
-                                    <FileCheck className="h-3 w-3 text-white" />
+            {/* Rest of the component remains the same */}
+            <div className="grid gap-6 lg:grid-cols-2">
+                {/* Left Column - Payable Items */}
+                <div className="lg:col-span-1">
+                    <Card className="dark:bg-gray-900 shadow-sm">
+                        <CardHeader className="pb-3 border-b dark:border-gray-700">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="text-lg flex items-center gap-2 dark:text-gray-100">
+                                        <div className="h-7 w-7 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center shadow-sm">
+                                            <FileCheck className="h-3.5 w-3.5 text-white" />
+                                        </div>
+                                        Payable Items
+                                    </CardTitle>
+                                    <CardDescription className="text-xs mt-1 dark:text-gray-400">
+                                        {isBusinessMode ? "Select business fees to pay" : 
+                                         isFeePayment ? "Select additional fees (optional)" : 
+                                         isClearanceMode ? "Select additional fees (optional)" : 
+                                         "Select items to pay"}
+                                    </CardDescription>
                                 </div>
-                                Payable Items
-                            </CardTitle>
-                            <div className="flex items-center gap-2">
-                                {clearanceCount > 0 && (
-                                    <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
-                                        {clearanceCount} clearance
-                                    </Badge>
-                                )}
-                                {feesCount > 0 && (
-                                    <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-                                        {feesCount} fees
-                                    </Badge>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {clearanceCount > 0 && (
+                                        <Badge className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0">
+                                            {clearanceCount} clearance{clearanceCount !== 1 ? 's' : ''}
+                                        </Badge>
+                                    )}
+                                    {feesCount > 0 && (
+                                        <Badge className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0">
+                                            {feesCount} fee{feesCount !== 1 ? 's' : ''}
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                        <CardDescription className="text-xs dark:text-gray-400">
-                            {isBusinessMode ? "Select business fees to pay" : 
-                             isFeePayment ? "Select additional fees (optional)" : 
-                             isClearanceMode ? "Select additional fees (optional)" : 
-                             "Select items to pay"}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {showLateSettings && selectedFee && (
-                            <div className="mb-3">
-                                <LatePaymentSettings
-                                    selectedFee={selectedFee}
-                                    isLatePayment={isLatePayment}
-                                    setIsLatePayment={setIsLatePayment}
-                                    monthsLate={monthsLate}
-                                    setMonthsLate={setMonthsLate}
-                                    handleAddWithLateSettings={onAddWithLateSettings}
-                                    handleCancelLateSettings={onCancelLateSettings}
-                                />
-                            </div>
-                        )}
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            {showLateSettings && selectedFee && (
+                                <div className="mb-4">
+                                    <LatePaymentSettings
+                                        selectedFee={selectedFee}
+                                        isLatePayment={isLatePayment}
+                                        setIsLatePayment={setIsLatePayment}
+                                        monthsLate={monthsLate}
+                                        setMonthsLate={setMonthsLate}
+                                        handleAddWithLateSettings={onAddWithLateSettings}
+                                        handleCancelLateSettings={onCancelLateSettings}
+                                    />
+                                </div>
+                            )}
 
-                        <div className="mb-3 space-y-2">
-                            {/* Search bar */}
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                            <div className="relative mb-4">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                                 <Input
-                                    placeholder={`Search ${activeTab}...`}
-                                    className="pl-8 h-8 text-sm dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
+                                    placeholder={`Search ${activeTab === 'clearances' ? 'clearance requests' : 'fees'}...`}
+                                    className="pl-9 h-9 text-sm dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
                             
-                            {/* Tabs - with type="button" to prevent form submission */}
-                            <Tabs defaultValue="clearances" value={activeTab} onValueChange={handleTabChange} className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="clearances" className="flex items-center gap-1" type="button">
-                                        <FileBadge className="h-3.5 w-3.5" />
+                            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+                                <TabsList className="grid w-full grid-cols-2 mb-4">
+                                    <TabsTrigger value="clearances" className="flex items-center gap-2 text-sm" type="button">
+                                        <FileBadge className="h-4 w-4" />
                                         Clearances
                                         {clearanceCount > 0 && (
-                                            <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 rounded-full">
+                                            <span className="ml-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-800 dark:text-purple-200 px-1.5 rounded-full">
                                                 {clearanceCount}
                                             </span>
                                         )}
                                     </TabsTrigger>
-                                    <TabsTrigger value="fees" className="flex items-center gap-1" type="button">
-                                        <Receipt className="h-3.5 w-3.5" />
+                                    <TabsTrigger value="fees" className="flex items-center gap-2 text-sm" type="button">
+                                        <Receipt className="h-4 w-4" />
                                         Fees
                                         {feesCount > 0 && (
-                                            <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 rounded-full">
+                                            <span className="ml-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-200 px-1.5 rounded-full">
                                                 {feesCount}
                                             </span>
                                         )}
                                     </TabsTrigger>
                                 </TabsList>
                                 
-                                <TabsContent value="clearances" className="mt-3">
-                                    <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                                <TabsContent value="clearances" className="mt-0">
+                                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
                                         {filteredClearances.length > 0 ? (
                                             filteredClearances.map((cr) => (
                                                 <div
                                                     key={`clearance-${cr.id}`}
-                                                    className={`p-2 border rounded-md text-sm transition-all ${
-                                                        cr.isAdded ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 opacity-60' :
-                                                        'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/30 cursor-pointer'
-                                                    }`}
-                                                    onClick={() => !cr.isAdded && handleSelectClearance(cr)}
+                                                    className="group p-3 border rounded-lg text-sm transition-all bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 hover:shadow-sm cursor-pointer"
+                                                    onClick={() => handleSelectClearance(cr)}
                                                 >
-                                                    <div className="flex items-center justify-between">
+                                                    <div className="flex items-start justify-between">
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-1.5 mb-0.5">
-                                                                <FileBadge className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                                                                <span className="font-medium truncate text-xs dark:text-gray-200">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <FileBadge className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                                                <span className="font-medium text-sm truncate dark:text-gray-200">
                                                                     {cr.clearance_type?.name || 'Barangay Clearance'}
                                                                 </span>
-                                                                <div className="flex gap-0.5">
-                                                                    {getStatusBadge(cr.status)}
-                                                                </div>
+                                                                {getStatusBadge(cr.status)}
                                                             </div>
                                                             
-                                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                                <span className="truncate">{cr.reference_number}</span>
+                                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                                <span className="truncate font-mono">{cr.reference_number}</span>
                                                                 {cr.resident?.name && (
-                                                                    <span className="truncate text-purple-600 dark:text-purple-400">
-                                                                        {cr.resident.name}
-                                                                    </span>
+                                                                    <>
+                                                                        <span className="text-gray-300 dark:text-gray-600">•</span>
+                                                                        <span className="truncate text-purple-600 dark:text-purple-400">
+                                                                            {cr.resident.name}
+                                                                        </span>
+                                                                    </>
                                                                 )}
                                                             </div>
                                                             
                                                             {cr.purpose && (
-                                                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                                                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                                                     {cr.purpose}
                                                                 </div>
                                                             )}
                                                         </div>
                                                         
-                                                        <div className="flex items-center gap-2 ml-2">
+                                                        <div className="flex items-center gap-3 ml-3">
                                                             <div className="text-right">
-                                                                <div className="text-sm font-bold text-purple-700 dark:text-purple-400">
+                                                                <div className="text-base font-bold text-purple-700 dark:text-purple-400">
                                                                     {formatCurrency(parseFloat(String(cr.fee_amount)))}
                                                                 </div>
                                                             </div>
                                                             
-                                                            {!cr.isAdded ? (
-                                                                <Button
-                                                                    type="button"
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="h-7 px-2 text-xs text-purple-700 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleSelectClearance(cr);
-                                                                    }}
-                                                                >
-                                                                    Add
-                                                                </Button>
-                                                            ) : (
-                                                                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                            )}
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                className="h-8 px-3 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleSelectClearance(cr);
+                                                                }}
+                                                            >
+                                                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                                                Add
+                                                            </Button>
                                                         </div>
                                                     </div>
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="text-center py-6 border rounded-md dark:border-gray-700">
-                                                <FileSearch className="h-8 w-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                    {searchQuery ? 'No clearance requests match your search' : 'No clearance requests available'}
-                                                </p>
+                                            <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
+                                                {searchQuery ? (
+                                                    <>
+                                                        <FileSearch className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                                                        <p className="text-sm text-gray-500 dark:text-gray-400">No clearance requests match your search</p>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="mt-3"
+                                                            onClick={() => setSearchQuery('')}
+                                                        >
+                                                            Clear search
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-300 dark:text-green-600" />
+                                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No pending clearance requests</p>
+                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">All clearances have been processed</p>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>
                                 </TabsContent>
                                 
-                                <TabsContent value="fees" className="mt-3">
-                                    <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                                <TabsContent value="fees" className="mt-0">
+                                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
                                         {filteredFees.length > 0 ? (
                                             filteredFees.map((fee) => {
                                                 const correctedBalance = getCorrectedBalance(fee);
@@ -751,195 +702,218 @@ export function AddFeesStep({
                                                 return (
                                                     <div
                                                         key={`fee-${fee.id}`}
-                                                        className={`p-2 border rounded-md text-sm transition-all ${
-                                                            fee.isAdded ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 opacity-60' :
-                                                            'hover:border-primary dark:hover:border-blue-700 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer border-gray-200 dark:border-gray-700'
-                                                        }`}
-                                                        onClick={() => !fee.isAdded && !isAdding && handleSelectFee(fee)}
+                                                        className="group p-3 border rounded-lg text-sm transition-all hover:border-blue-400 dark:hover:border-blue-700 hover:shadow-sm cursor-pointer border-gray-200 dark:border-gray-700"
+                                                        onClick={() => !isAdding && handleSelectFee(fee)}
                                                     >
-                                                        <div className="flex items-center justify-between">
+                                                        <div className="flex items-start justify-between">
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-1.5 mb-0.5">
-                                                                    {getCategoryIcon(fee.fee_type_category || fee.category || 'other')}
-                                                                    <span className="font-medium truncate text-xs dark:text-gray-200">
-                                                                        {fee.fee_type_name || fee.fee_type?.name || 'Fee'}
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    {getCategoryIcon(fee.category || 'fee')}
+                                                                    <span className="font-medium text-sm truncate dark:text-gray-200">
+                                                                        {fee.fee_name || fee.fee_code}
                                                                     </span>
-                                                                    <div className="flex gap-0.5">
-                                                                        {getStatusBadge(fee.status)}
-                                                                        {isFutureFee(fee) && (
-                                                                            <Badge className="text-xs px-1 py-0 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                                                                                Future
-                                                                            </Badge>
-                                                                        )}
-                                                                    </div>
+                                                                    {getStatusBadge(fee.status)}
                                                                 </div>
                                                                 
                                                                 <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                                    <span className="truncate">{fee.fee_code}</span>
-                                                                    {fee.reference_number && (
-                                                                        <span className="truncate text-purple-600 dark:text-purple-400">#{fee.reference_number}</span>
+                                                                    <span className="truncate font-mono">{fee.fee_code}</span>
+                                                                    {fee.period_covered && (
+                                                                        <>
+                                                                            <span className="text-gray-300 dark:text-gray-600">•</span>
+                                                                            <span className="truncate">{fee.period_covered}</span>
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </div>
                                                             
-                                                            <div className="flex items-center gap-2 ml-2">
+                                                            <div className="flex items-center gap-3 ml-3">
                                                                 <div className="text-right">
-                                                                    <div className="text-sm font-bold text-primary dark:text-blue-400">
+                                                                    <div className="text-base font-bold text-blue-600 dark:text-blue-400">
                                                                         {formatCurrency(correctedBalance)}
                                                                     </div>
                                                                 </div>
                                                                 
-                                                                {!fee.isAdded ? (
-                                                                    <Button
-                                                                        type="button"
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        className="h-7 px-2 text-xs dark:text-gray-400 dark:hover:text-white"
-                                                                        disabled={isAdding || isAddingFee}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleSelectFee(fee);
-                                                                        }}
-                                                                    >
-                                                                        {isAdding ? (
-                                                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                                                        ) : (
-                                                                            'Add'
-                                                                        )}
-                                                                    </Button>
-                                                                ) : (
-                                                                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                                )}
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                                                                    disabled={isAdding || isAddingFee}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleSelectFee(fee);
+                                                                    }}
+                                                                >
+                                                                    {isAdding ? (
+                                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                    ) : (
+                                                                        <>
+                                                                            <Plus className="h-3.5 w-3.5 mr-1" />
+                                                                            Add
+                                                                        </>
+                                                                    )}
+                                                                </Button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 );
                                             })
                                         ) : (
-                                            <div className="text-center py-6 border rounded-md dark:border-gray-700">
-                                                <Receipt className="h-8 w-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                    {searchQuery ? 'No fees match your search' : 'No fees available'}
-                                                </p>
+                                            <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
+                                                {searchQuery ? (
+                                                    <>
+                                                        <Receipt className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                                                        <p className="text-sm text-gray-500 dark:text-gray-400">No fees match your search</p>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="mt-3"
+                                                            onClick={() => setSearchQuery('')}
+                                                        >
+                                                            Clear search
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckCircle className="h-12 w-12 mx-auto mb-3 text-green-300 dark:text-green-600" />
+                                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No outstanding fees</p>
+                                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">All fees have been paid</p>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>
                                 </TabsContent>
                             </Tabs>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
-            {/* Right Column - Selected Items */}
-            <div className="lg:col-span-1">
-                <Card className="dark:bg-gray-900">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base flex items-center gap-2 dark:text-gray-100">
-                                <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
-                                    <Calculator className="h-3 w-3 text-white" />
+                {/* Right Column - Selected Items */}
+                <div className="lg:col-span-1">
+                    <Card className="dark:bg-gray-900 shadow-sm h-full">
+                        <CardHeader className="pb-3 border-b dark:border-gray-700">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="text-lg flex items-center gap-2 dark:text-gray-100">
+                                        <div className="h-7 w-7 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center shadow-sm">
+                                            <Calculator className="h-3.5 w-3.5 text-white" />
+                                        </div>
+                                        Selected Items
+                                    </CardTitle>
+                                    <CardDescription className="text-xs mt-1 dark:text-gray-400">
+                                        Review items before payment
+                                    </CardDescription>
                                 </div>
-                                Selected
-                            </CardTitle>
-                            {paymentItems.length > 0 && (
-                                <Badge className="dark:bg-gray-700 dark:text-gray-300">{paymentItems.length}</Badge>
-                            )}
-                        </div>
-                        <CardDescription className="text-xs dark:text-gray-400">
-                            Review items before payment
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {paymentItems.length === 0 ? (
-                            <div className="text-center py-6 border rounded-md dark:border-gray-700">
-                                <Package className="h-8 w-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
-                                <p className="text-sm text-gray-500 dark:text-gray-400">No items selected</p>
+                                {paymentItems.length > 0 && (
+                                    <Badge className="text-sm bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0 px-2 py-1">
+                                        {paymentItems.length} item{paymentItems.length !== 1 ? 's' : ''}
+                                    </Badge>
+                                )}
                             </div>
-                        ) : (
-                            <div className="space-y-3">
-                                <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                                    {paymentItems.map((item) => {
-                                        // Properly identify clearance items
-                                        const isClearanceFee = item.metadata?.is_clearance_fee === true || item.category === 'clearance';
-                                        const isBusinessFee = item.metadata?.is_business_fee === true || item.category === 'business';
-                                        const itemTotal = parseCurrencyString(item.total_amount);
-                                        
-                                        return (
-                                            <div key={item.id} className={`p-2 border rounded-md ${
-                                                isClearanceFee ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 
-                                                isBusinessFee ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' : 
-                                                'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
-                                            }`}>
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-1.5 mb-0.5">
-                                                            {isClearanceFee ? (
-                                                                <FileBadge className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                                                            ) : isBusinessFee ? (
-                                                                <Building className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
-                                                            ) : (
-                                                                getCategoryIcon(item.category)
-                                                            )}
-                                                            <span className="font-medium text-xs truncate dark:text-gray-200">{item.fee_name}</span>
-                                                            {isClearanceFee && item.metadata?.reference_number && (
-                                                                <Badge variant="outline" className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800">
-                                                                    #{item.metadata.reference_number}
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                            {item.fee_code}
-                                                        </div>
-                                                        {isClearanceFee && item.metadata?.clearance_type_id && (
-                                                            <div className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">
-                                                                Clearance Request
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    {/* Allow removal for all items, including clearance */}
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-5 w-5 p-0 hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600 dark:hover:text-red-400"
-                                                        onClick={() => removePaymentItem(item.id)}
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                                
-                                                <div className="flex justify-between items-center mt-1 pt-1 border-t dark:border-gray-700 text-xs">
-                                                    <span className="text-gray-500 dark:text-gray-400">Total:</span>
-                                                    <span className="font-bold text-primary dark:text-blue-400">{formatCurrency(itemTotal)}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            {paymentItems.length === 0 ? (
+                                <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
+                                    <Package className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No items selected</p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                        Select items from the list to add them here
+                                    </p>
                                 </div>
-                                
-                                <div className="pt-2 border-t dark:border-gray-700">
-                                    <div className="flex justify-between items-center mb-3 text-sm">
-                                        <span className="font-medium dark:text-gray-300">Total Amount:</span>
-                                        <span className="text-lg font-bold text-primary dark:text-blue-400">
-                                            {formatCurrency(totalSelectedAmount)}
-                                        </span>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                                        {paymentItems.map((item) => {
+                                            const isClearanceFee = item.metadata?.is_clearance_fee === true || item.category === 'clearance';
+                                            const isBusinessFee = item.metadata?.is_business_fee === true || item.category === 'business';
+                                            const itemTotal = parseCurrencyString(item.total_amount);
+                                            
+                                            return (
+                                                <div key={item.id} className={`p-3 rounded-lg border ${
+                                                    isClearanceFee ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 
+                                                    isBusinessFee ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' : 
+                                                    'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                                }`}>
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                {isClearanceFee ? (
+                                                                    <FileBadge className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                                                ) : isBusinessFee ? (
+                                                                    <Building className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                                                ) : (
+                                                                    getCategoryIcon(item.category)
+                                                                )}
+                                                                <span className="font-medium text-sm truncate dark:text-gray-200">{item.fee_name}</span>
+                                                                {isClearanceFee && item.metadata?.reference_number && (
+                                                                    <Badge variant="outline" className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800">
+                                                                        #{item.metadata.reference_number}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate font-mono">
+                                                                {item.fee_code}
+                                                            </div>
+                                                            {isClearanceFee && item.metadata?.clearance_type_id && (
+                                                                <div className="text-[10px] text-purple-600 dark:text-purple-400 mt-1">
+                                                                    Clearance Request
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 w-7 p-0 rounded-full hover:bg-red-100 dark:hover:bg-red-950/50 hover:text-red-600 dark:hover:text-red-400"
+                                                            onClick={() => removePaymentItem(item.id)}
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                    
+                                                    <div className="flex justify-between items-center pt-2 border-t dark:border-gray-700">
+                                                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Amount:</span>
+                                                        <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{formatCurrency(itemTotal)}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                     
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        className="w-full h-8 text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
-                                        onClick={handleContinue}
-                                    >
-                                        Continue
-                                        <ChevronRight className="h-3 w-3 ml-1" />
-                                    </Button>
+                                    <div className="pt-4 border-t dark:border-gray-700">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <span className="text-base font-semibold dark:text-gray-300">Total Amount:</span>
+                                            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-500 dark:to-indigo-500 bg-clip-text text-transparent">
+                                                {formatCurrency(totalSelectedAmount)}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="flex gap-3">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="flex-1 h-10 dark:border-gray-600 dark:text-gray-300"
+                                                onClick={handleBack}
+                                            >
+                                                Back
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                className="flex-1 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm"
+                                                onClick={handleContinue}
+                                            >
+                                                Continue
+                                                <ChevronRight className="h-4 w-4 ml-1" />
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     );

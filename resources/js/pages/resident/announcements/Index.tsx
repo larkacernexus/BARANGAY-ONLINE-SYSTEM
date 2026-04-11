@@ -1,6 +1,6 @@
 // /Pages/resident/Announcements/Index.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,13 +18,11 @@ import { SearchBar } from '@/components/portal/announcements/index/SearchBar';
 import { ResultsSummary } from '@/components/portal/announcements/index/ResultsSummary';
 import { ModernPagination } from '@/components/residentui/modern-pagination';
 import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
-import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
 
-// Import types and constants
+// Import types
 import { Announcement, AnnouncementStats, AnnouncementFilters, AnnouncementsPaginatedResponse } from '@/types/portal/announcements/announcement.types';
-import { ANNOUNCEMENT_TYPE_CONFIGS, PRIORITY_CONFIGS } from '@/components/portal/announcements/index/constants';
 
-interface PageProps {
+interface PageProps extends Record<string, any> {
     announcements: AnnouncementsPaginatedResponse;
     featuredAnnouncement?: Announcement | null;
     filters: AnnouncementFilters;
@@ -34,24 +32,36 @@ interface PageProps {
     stats: AnnouncementStats;
 }
 
-export default function AnnouncementsIndex({ 
-    announcements: initialAnnouncements, 
-    featuredAnnouncement,
-    filters,
-    types,
-    priorityOptions,
-    statusOptions,
-    stats
-}: PageProps) {
-    const [search, setSearch] = useState(filters.search || '');
-    const [selectedType, setSelectedType] = useState(filters.type || 'all');
-    const [selectedPriority, setSelectedPriority] = useState(filters.priority || 'all');
-    const [selectedStatus, setSelectedStatus] = useState(filters.status || 'all');
+export default function AnnouncementsIndex() {
+    const { props } = usePage<PageProps>();
+    
+    // ✅ Extract the data array from paginated response
+    const allAnnouncements = props.announcements?.data || [];
+    const featuredAnnouncement = props.featuredAnnouncement || null;
+    const types = props.types || {};
+    const priorityOptions = props.priorityOptions || {};
+    const statusOptions = props.statusOptions || {};
+    const stats = props.stats || {
+        total: 0,
+        published: 0,
+        draft: 0,
+        archived: 0,
+        personalized: 0,
+    };
+    
+    // ✅ CLIENT-SIDE FILTER STATE - NO ROUTER.GET CALLS!
+    const [search, setSearch] = useState('');
+    const [selectedType, setSelectedType] = useState('all');
+    const [selectedPriority, setSelectedPriority] = useState('all');
+    const [selectedStatus, setSelectedStatus] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [bookmarkedIds, setBookmarkedIds] = useState<number[]>([]);
+    
+    const itemsPerPage = 9; // 3 columns x 3 rows
     
     const [actionStatus, setActionStatus] = useState<{
         type: 'success' | 'error' | 'info' | null;
@@ -83,125 +93,108 @@ export default function AnnouncementsIndex({
         return () => window.removeEventListener('resize', checkMobile);
     }, [mounted]);
 
-    const applyFilters = () => {
-        if (loading) return;
+    // ✅ CLIENT-SIDE FILTERING - INSTANT, NO PAGE RELOADS!
+    const filteredAnnouncements = useMemo(() => {
+        let filtered = [...allAnnouncements];
         
-        setLoading(true);
+        // Search filter
+        if (search) {
+            const query = search.toLowerCase();
+            filtered = filtered.filter(announcement => 
+                announcement.title?.toLowerCase().includes(query) ||
+                announcement.content?.toLowerCase().includes(query) ||
+                announcement.excerpt?.toLowerCase().includes(query)
+            );
+        }
         
-        const params: Record<string, string> = {};
-        if (selectedType !== 'all') params.type = selectedType;
-        if (selectedPriority !== 'all') params.priority = selectedPriority;
-        if (selectedStatus !== 'all') params.status = selectedStatus;
+        // Type filter
+        if (selectedType !== 'all') {
+            filtered = filtered.filter(announcement => 
+                announcement.type === selectedType
+            );
+        }
         
-        router.get('/portal/announcements', params, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
-    };
-
-    const handleTypeChange = (value: string) => {
-        setSelectedType(value);
+        // Priority filter
+        if (selectedPriority !== 'all') {
+            const priorityValue = parseInt(selectedPriority);
+            filtered = filtered.filter(announcement => 
+                announcement.priority === priorityValue
+            );
+        }
         
-        setLoading(true);
+        // Status filter
+        if (selectedStatus !== 'all') {
+            filtered = filtered.filter(announcement => 
+                announcement.status === selectedStatus
+            );
+        }
         
-        const params: Record<string, string> = {};
-        if (search) params.search = search;
-        if (value !== 'all') params.type = value;
-        if (selectedPriority !== 'all') params.priority = selectedPriority;
-        if (selectedStatus !== 'all') params.status = selectedStatus;
-        
-        router.get('/portal/announcements', params, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
-        
-        setIsFilterSheetOpen(false);
-    };
-
-    const handlePriorityChange = (value: string) => {
-        setSelectedPriority(value);
-        
-        setLoading(true);
-        
-        const params: Record<string, string> = {};
-        if (search) params.search = search;
-        if (selectedType !== 'all') params.type = selectedType;
-        if (value !== 'all') params.priority = value;
-        if (selectedStatus !== 'all') params.status = selectedStatus;
-        
-        router.get('/portal/announcements', params, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
+        // Sort by created_at desc (newest first)
+        filtered.sort((a, b) => {
+            const dateA = new Date(a.created_at || 0).getTime();
+            const dateB = new Date(b.created_at || 0).getTime();
+            return dateB - dateA;
         });
         
-        setIsFilterSheetOpen(false);
+        return filtered;
+    }, [allAnnouncements, search, selectedType, selectedPriority, selectedStatus]);
+    
+    // Pagination
+    const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
+    const paginatedAnnouncements = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        return filteredAnnouncements.slice(start, end);
+    }, [filteredAnnouncements, currentPage]);
+    
+    // Reset to first page when filters change
+    const handleFilterChange = (filterType: string, value: string) => {
+        setCurrentPage(1);
+        
+        switch (filterType) {
+            case 'search':
+                setSearch(value);
+                break;
+            case 'type':
+                setSelectedType(value);
+                break;
+            case 'priority':
+                setSelectedPriority(value);
+                break;
+            case 'status':
+                setSelectedStatus(value);
+                break;
+        }
+        
+        if (isMobile) setIsFilterSheetOpen(false);
     };
-
-    const handleStatusChange = (value: string) => {
-        setSelectedStatus(value);
-        
-        setLoading(true);
-        
-        const params: Record<string, string> = {};
-        if (search) params.search = search;
-        if (selectedType !== 'all') params.type = selectedType;
-        if (selectedPriority !== 'all') params.priority = selectedPriority;
-        if (value !== 'all') params.status = value;
-        
-        router.get('/portal/announcements', params, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
-        
-        setIsFilterSheetOpen(false);
-    };
-
-    const handleSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        applyFilters();
-    };
-
-    const handleSearchClear = () => {
-        setSearch('');
-        
-        const params: Record<string, string> = {};
-        if (selectedType !== 'all') params.type = selectedType;
-        if (selectedPriority !== 'all') params.priority = selectedPriority;
-        if (selectedStatus !== 'all') params.status = selectedStatus;
-        
-        router.get('/portal/announcements', params, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
-        
-        setActionStatus({ type: 'info', message: 'Search cleared' });
-        setTimeout(() => setActionStatus({ type: null, message: '' }), 3000);
-    };
-
+    
+    const hasActiveFilters = search !== '' || 
+                            selectedType !== 'all' || 
+                            selectedPriority !== 'all' || 
+                            selectedStatus !== 'all';
+    
     const clearFilters = () => {
         setSearch('');
         setSelectedType('all');
         setSelectedPriority('all');
         setSelectedStatus('all');
+        setCurrentPage(1);
         
-        router.get('/portal/announcements', {}, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
+        if (isMobile) setIsFilterSheetOpen(false);
         
         setActionStatus({ type: 'success', message: 'All filters cleared' });
         setTimeout(() => setActionStatus({ type: null, message: '' }), 3000);
-        setIsFilterSheetOpen(false);
+    };
+    
+    const handleSearchSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+    };
+    
+    const handleSearchClear = () => {
+        handleFilterChange('search', '');
+        setActionStatus({ type: 'info', message: 'Search cleared' });
+        setTimeout(() => setActionStatus({ type: null, message: '' }), 3000);
     };
 
     const toggleBookmark = (id: number, e: React.MouseEvent) => {
@@ -246,9 +239,9 @@ export default function AnnouncementsIndex({
         return strippedContent.substring(0, maxLength) + '...';
     };
 
-    const hasActiveFilters = useMemo(() => {
-        return selectedType !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all';
-    }, [selectedType, selectedPriority, selectedStatus]);
+    const tabHasData = paginatedAnnouncements.length > 0;
+    const from = tabHasData ? (currentPage - 1) * itemsPerPage + 1 : 0;
+    const to = tabHasData ? Math.min(currentPage * itemsPerPage, filteredAnnouncements.length) : 0;
 
     if (!mounted) {
         return (
@@ -314,7 +307,7 @@ export default function AnnouncementsIndex({
                         
                         <Badge variant="outline" className="text-sm px-3 py-1.5 bg-white dark:bg-gray-900 shadow-sm dark:border-gray-700">
                             <TrendingUp className="h-3 w-3 mr-1.5 text-gray-600 dark:text-gray-400" />
-                            <span className="dark:text-gray-300">{initialAnnouncements.total} Total</span>
+                            <span className="dark:text-gray-300">{filteredAnnouncements.length} Total</span>
                         </Badge>
                     </div>
                 </div>
@@ -322,20 +315,20 @@ export default function AnnouncementsIndex({
                 {/* Search Bar */}
                 <SearchBar
                     value={search}
-                    onChange={setSearch}
+                    onChange={(value) => handleFilterChange('search', value)}
                     onSubmit={handleSearchSubmit}
                     onClear={handleSearchClear}
-                    loading={loading}
+                    loading={false}
                 />
 
                 {/* Featured Announcement */}
-                {featuredAnnouncement && !hasActiveFilters && (
+                {featuredAnnouncement && !hasActiveFilters && currentPage === 1 && (
                     <div className="px-4 sm:px-0">
                         <FeaturedAnnouncement announcement={featuredAnnouncement} />
                     </div>
                 )}
 
-                {/* Filters */}
+                {/* Desktop Filters */}
                 {!isMobile && (
                     <DesktopFilters
                         selectedType={selectedType}
@@ -344,10 +337,10 @@ export default function AnnouncementsIndex({
                         types={types}
                         priorityOptions={priorityOptions}
                         statusOptions={statusOptions}
-                        onTypeChange={handleTypeChange}
-                        onPriorityChange={handlePriorityChange}
-                        onStatusChange={handleStatusChange}
-                        loading={loading}
+                        onTypeChange={(value) => handleFilterChange('type', value)}
+                        onPriorityChange={(value) => handleFilterChange('priority', value)}
+                        onStatusChange={(value) => handleFilterChange('status', value)}
+                        loading={false}
                     />
                 )}
 
@@ -359,18 +352,18 @@ export default function AnnouncementsIndex({
                     types={types}
                     priorityOptions={priorityOptions}
                     statusOptions={statusOptions}
-                    onTypeChange={handleTypeChange}
-                    onPriorityChange={handlePriorityChange}
-                    onStatusChange={handleStatusChange}
+                    onTypeChange={(value) => handleFilterChange('type', value)}
+                    onPriorityChange={(value) => handleFilterChange('priority', value)}
+                    onStatusChange={(value) => handleFilterChange('status', value)}
                     onClearFilters={clearFilters}
-                    loading={loading}
+                    loading={false}
                 />
 
                 {/* Results Summary */}
                 <ResultsSummary
-                    total={initialAnnouncements.total}
-                    from={initialAnnouncements.from}
-                    to={initialAnnouncements.to}
+                    total={filteredAnnouncements.length}
+                    from={from}
+                    to={to}
                     selectedType={selectedType}
                     types={types}
                     personalizedCount={stats.personalized}
@@ -378,10 +371,10 @@ export default function AnnouncementsIndex({
 
                 {/* Announcements Grid */}
                 <div className="px-4 sm:px-0">
-                    {initialAnnouncements.data.length > 0 ? (
+                    {tabHasData ? (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                                {initialAnnouncements.data.map((announcement) => (
+                                {paginatedAnnouncements.map((announcement) => (
                                     <AnnouncementCard
                                         key={announcement.id}
                                         announcement={announcement}
@@ -393,25 +386,13 @@ export default function AnnouncementsIndex({
                                 ))}
                             </div>
                             
-                            {initialAnnouncements.last_page > 1 && (
+                            {totalPages > 1 && (
                                 <div className="mt-6 pt-6 border-t dark:border-gray-800">
                                     <ModernPagination
-                                        currentPage={initialAnnouncements.current_page}
-                                        lastPage={initialAnnouncements.last_page}
-                                        onPageChange={(page) => {
-                                            const params: Record<string, string> = {};
-                                            if (search) params.search = search;
-                                            if (selectedType !== 'all') params.type = selectedType;
-                                            if (selectedPriority !== 'all') params.priority = selectedPriority;
-                                            if (selectedStatus !== 'all') params.status = selectedStatus;
-                                            params.page = page.toString();
-                                            
-                                            router.get('/portal/announcements', params, {
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                            });
-                                        }}
-                                        loading={loading}
+                                        currentPage={currentPage}
+                                        lastPage={totalPages}
+                                        onPageChange={setCurrentPage}
+                                        loading={false}
                                     />
                                 </div>
                             )}
@@ -437,14 +418,12 @@ export default function AnnouncementsIndex({
                 types={types}
                 priorityOptions={priorityOptions}
                 statusOptions={statusOptions}
-                onTypeChange={handleTypeChange}
-                onPriorityChange={handlePriorityChange}
-                onStatusChange={handleStatusChange}
+                onTypeChange={(value) => handleFilterChange('type', value)}
+                onPriorityChange={(value) => handleFilterChange('priority', value)}
+                onStatusChange={(value) => handleFilterChange('status', value)}
                 onClearFilters={clearFilters}
                 hasActiveFilters={hasActiveFilters}
             />
-
-            <ModernLoadingOverlay loading={loading} message="Loading announcements..." />
         </ResidentLayout>
     );
 }

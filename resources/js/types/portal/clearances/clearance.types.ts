@@ -156,6 +156,8 @@ export interface Household {
 
 // ========== CLEARANCE REQUEST ==========
 export interface ClearanceRequest {
+    issued_at: any;
+    clearance_type_name: any;
     id: number;
     resident_id: number;
     clearance_type_id: number;

@@ -1,9 +1,6 @@
-// resources/js/pages/admin/puroks/index.tsx
-
-import { useState, useMemo, useEffect, useCallback, useRef, SetStateAction } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import { 
     Purok, 
@@ -42,6 +39,26 @@ const defaultStats = {
     totalResidents: 0
 };
 
+// Helper function to extract numeric value from purok name
+const getPurokNumber = (name: string): number => {
+    const match = name.match(/\d+/);
+    return match ? parseInt(match[0], 10) : 0;
+};
+
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
+const getSafeSortOrder = (value: any): 'asc' | 'desc' => {
+    if (value === 'asc') return 'asc';
+    if (value === 'desc') return 'desc';
+    return 'asc';
+};
+
 export default function PuroksIndex({ 
     puroks, 
     filters, 
@@ -49,18 +66,25 @@ export default function PuroksIndex({
 }: PuroksPageProps) {
     const { flash } = usePage().props as any;
     
-    // State management
-    const [search, setSearch] = useState(filters.search || '');
-    const [filtersState, setFiltersState] = useState<PurokFilters>({
-        status: filters.status || 'all',
-        sort_by: filters.sort_by || 'name',
-        sort_order: filters.sort_order || 'asc'
-    });
+    // Safe data extraction
+    const safePuroks = puroks || { data: [], current_page: 1, last_page: 1, total: 0, per_page: 10, from: 0, to: 0 };
+    const allPuroks = safePuroks.data || [];
+    const safeFilters = filters || {};
+    
+    // Filter states - all client-side
+    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
+    const [populationRange, setPopulationRange] = useState<string>(getSafeString(safeFilters.population_range, ''));
+    const [householdRange, setHouseholdRange] = useState<string>(getSafeString(safeFilters.household_range, ''));
+    const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'name'));
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     
     // Bulk selection states
     const [selectedPuroks, setSelectedPuroks] = useState<number[]>([]);
@@ -70,42 +94,9 @@ export default function PuroksIndex({
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    // Debounced search function
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value || undefined,
-                status: filtersState.status === 'all' ? undefined : filtersState.status,
-            };
-            
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (params[k] === undefined || params[k] === '') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/puroks', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 300),
-        [filtersState]
-    );
-
-    // Cleanup debounce on unmount
-    useEffect(() => {
-        return () => {
-            debouncedSearch.cancel();
-        };
-    }, [debouncedSearch]);
 
     // Handle window resize
     useEffect(() => {
@@ -142,22 +133,142 @@ export default function PuroksIndex({
         }
     }, [flash]);
 
-    // Filter puroks
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, statusFilter, populationRange, householdRange, sortBy, sortOrder]);
+
+    // Reset selection when exiting bulk mode
+    useEffect(() => {
+        if (!isBulkMode) {
+            setSelectedPuroks([]);
+            setIsSelectAll(false);
+        }
+    }, [isBulkMode]);
+
+    // Filter puroks client-side
     const filteredPuroks = useMemo(() => {
-        return purokUtils.filterPuroks({
-            puroks: puroks.data,
-            search,
-            filters: filtersState
-        });
-    }, [puroks.data, search, filtersState]);
+        if (!allPuroks || allPuroks.length === 0) {
+            return [];
+        }
+        
+        let filtered = [...allPuroks];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(purok =>
+                purok?.name?.toLowerCase().includes(searchLower) ||
+                purok?.description?.toLowerCase().includes(searchLower) ||
+                purok?.leader_name?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Status filter
+        if (statusFilter && statusFilter !== 'all') {
+            filtered = filtered.filter(purok => purok?.status === statusFilter);
+        }
+        
+        // Population range filter
+        if (populationRange) {
+            filtered = filtered.filter(purok => {
+                const residents = purok?.total_residents || 0;
+                switch (populationRange) {
+                    case '0-50': return residents <= 50;
+                    case '51-100': return residents >= 51 && residents <= 100;
+                    case '101-200': return residents >= 101 && residents <= 200;
+                    case '201-500': return residents >= 201 && residents <= 500;
+                    case '500+': return residents >= 500;
+                    default: return true;
+                }
+            });
+        }
+        
+        // Household range filter
+        if (householdRange) {
+            filtered = filtered.filter(purok => {
+                const households = purok?.total_households || 0;
+                switch (householdRange) {
+                    case '0-10': return households <= 10;
+                    case '11-20': return households >= 11 && households <= 20;
+                    case '21-50': return households >= 21 && households <= 50;
+                    case '51-100': return households >= 51 && households <= 100;
+                    case '100+': return households >= 100;
+                    default: return true;
+                }
+            });
+        }
+        
+        // Apply sorting with numerical support for purok names
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'name':
+                        const numA = getPurokNumber(a?.name || '');
+                        const numB = getPurokNumber(b?.name || '');
+                        valueA = numA;
+                        valueB = numB;
+                        break;
+                    case 'total_households':
+                        valueA = a?.total_households || 0;
+                        valueB = b?.total_households || 0;
+                        break;
+                    case 'total_residents':
+                        valueA = a?.total_residents || 0;
+                        valueB = b?.total_residents || 0;
+                        break;
+                    case 'leader_name':
+                        valueA = a?.leader_name || '';
+                        valueB = b?.leader_name || '';
+                        break;
+                    case 'status':
+                        valueA = a?.status || '';
+                        valueB = b?.status || '';
+                        break;
+                    case 'created_at':
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                        break;
+                    default:
+                        const defaultNumA = getPurokNumber(a?.name || '');
+                        const defaultNumB = getPurokNumber(b?.name || '');
+                        valueA = defaultNumA;
+                        valueB = defaultNumB;
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [allPuroks, search, statusFilter, populationRange, householdRange, sortBy, sortOrder]);
 
     // Calculate filtered stats
     const filteredStats = useMemo(() => {
+        if (!filteredPuroks || filteredPuroks.length === 0) {
+            return {
+                total: 0,
+                active: 0,
+                totalHouseholds: 0,
+                totalResidents: 0
+            };
+        }
+        
         return {
             total: filteredPuroks.length,
-            active: filteredPuroks.filter(p => p.status === 'active').length,
-            totalHouseholds: filteredPuroks.reduce((sum, p) => sum + (p.total_households || 0), 0),
-            totalResidents: filteredPuroks.reduce((sum, p) => sum + (p.total_residents || 0), 0)
+            active: filteredPuroks.filter(p => p?.status === 'active').length,
+            totalHouseholds: filteredPuroks.reduce((sum, p) => sum + (p?.total_households || 0), 0),
+            totalResidents: filteredPuroks.reduce((sum, p) => sum + (p?.total_residents || 0), 0)
         };
     }, [filteredPuroks]);
 
@@ -168,66 +279,8 @@ export default function PuroksIndex({
     const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
     const paginatedPuroks = filteredPuroks.slice(startIndex, endIndex);
 
-    // Reset to first page when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [search, filtersState]);
-
-    // Reset selection when exiting bulk mode
-    useEffect(() => {
-        if (!isBulkMode) {
-            setSelectedPuroks([]);
-            setIsSelectAll(false);
-        }
-    }, [isBulkMode]);
-
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedPuroks.length > 0) {
-                        setSelectedPuroks([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Ctrl/Cmd + F to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            // Delete key for bulk delete
-            if (e.key === 'Delete' && isBulkMode && selectedPuroks.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedPuroks, isMobile]);
-
     // Selection handlers
-    const handleSelectAllOnPage = () => {
+    const handleSelectAllOnPage = useCallback(() => {
         const pageIds = paginatedPuroks.map(purok => purok.id);
         if (isSelectAll) {
             setSelectedPuroks(prev => prev.filter(id => !pageIds.includes(id)));
@@ -237,9 +290,9 @@ export default function PuroksIndex({
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    };
+    }, [paginatedPuroks, isSelectAll, selectedPuroks]);
 
-    const handleSelectAllFiltered = () => {
+    const handleSelectAllFiltered = useCallback(() => {
         const allIds = filteredPuroks.map(purok => purok.id);
         if (selectedPuroks.length === allIds.length && allIds.every(id => selectedPuroks.includes(id))) {
             setSelectedPuroks(prev => prev.filter(id => !allIds.includes(id)));
@@ -248,17 +301,17 @@ export default function PuroksIndex({
             setSelectedPuroks(newSelected);
             setSelectionMode('filtered');
         }
-    };
+    }, [filteredPuroks, selectedPuroks]);
 
-    const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${puroks.total || 0} puroks. This action may take a moment.`)) {
-            const allIds = puroks.data.map(p => p.id);
+    const handleSelectAll = useCallback(() => {
+        if (confirm(`This will select ALL ${totalItems} puroks. This action may take a moment.`)) {
+            const allIds = filteredPuroks.map(purok => purok.id);
             setSelectedPuroks(allIds);
             setSelectionMode('all');
         }
-    };
+    }, [filteredPuroks, totalItems]);
 
-    const handleItemSelect = (id: number) => {
+    const handleItemSelect = useCallback((id: number) => {
         setSelectedPuroks(prev => {
             if (prev.includes(id)) {
                 return prev.filter(itemId => itemId !== id);
@@ -266,7 +319,7 @@ export default function PuroksIndex({
                 return [...prev, id];
             }
         });
-    };
+    }, []);
 
     // Check if all items on current page are selected
     useEffect(() => {
@@ -284,6 +337,18 @@ export default function PuroksIndex({
     const selectionStats = useMemo(() => {
         return purokUtils.getSelectionStats(selectedPuroksData);
     }, [selectedPuroksData]);
+
+    // Handle sort change from dropdown
+    const handleSortChange = useCallback((value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    }, []);
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = useCallback((): string => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
 
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation) => {
@@ -307,16 +372,13 @@ export default function PuroksIndex({
                 case 'export':
                 case 'export_csv':
                     const exportData = selectedPuroksData.map(purok => ({
-                        'ID': purok.id,
                         'Name': purok.name,
                         'Description': purok.description || '',
                         'Leader Name': purok.leader_name || '',
                         'Leader Contact': purok.leader_contact || '',
-                        'Google Maps URL': purok.google_maps_url || '',
                         'Total Households': purok.total_households,
                         'Total Residents': purok.total_residents,
                         'Status': purok.status,
-                        'Created At': purok.created_at,
                     }));
                     
                     const headers = Object.keys(exportData[0]);
@@ -337,9 +399,7 @@ export default function PuroksIndex({
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = `puroks-export-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                     
                     toast.success(`${selectedPuroks.length} puroks exported successfully`);
@@ -413,6 +473,8 @@ export default function PuroksIndex({
                     setBulkEditValue('');
                     setShowBulkStatusDialog(false);
                     toast.success(`${selectedPuroks.length} purok statuses updated successfully`);
+                    // Refresh the page data
+                    router.reload({ only: ['puroks'] });
                 },
                 onError: () => {
                     toast.error('Failed to update purok status');
@@ -439,6 +501,8 @@ export default function PuroksIndex({
                     setSelectedPuroks([]);
                     setShowBulkDeleteDialog(false);
                     toast.success(`${selectedPuroks.length} puroks deleted successfully`);
+                    // Refresh the page data
+                    router.reload({ only: ['puroks'] });
                 },
                 onError: () => {
                     toast.error('Failed to delete puroks');
@@ -460,6 +524,8 @@ export default function PuroksIndex({
                 onSuccess: () => {
                     setSelectedPuroks(selectedPuroks.filter(id => id !== purok.id));
                     toast.success('Purok deleted successfully');
+                    // Refresh the page data
+                    router.reload({ only: ['puroks'] });
                 },
                 onError: () => {
                     toast.error('Failed to delete purok');
@@ -474,6 +540,8 @@ export default function PuroksIndex({
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success('Statistics updated successfully');
+                    // Refresh the page data
+                    router.reload({ only: ['puroks'] });
                 },
                 onError: () => {
                     toast.error('Failed to update statistics');
@@ -482,62 +550,28 @@ export default function PuroksIndex({
         }
     };
 
-    const handleSort = (column: string) => {
-        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
-        
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column as any,
-            sort_order: newOrder
-        }));
-        
-        const params = {
-            ...filtersState,
-            sort_by: column,
-            sort_order: newOrder,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/puroks', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+    const handleSort = useCallback((column: string) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    }, [sortBy, sortOrder]);
 
-    const handleClearFilters = () => {
+    const handleClearFilters = useCallback(() => {
         setSearch('');
-        setFiltersState({
-            status: 'all',
-            sort_by: 'name',
-            sort_order: 'asc'
-        });
-        
-        router.get('/admin/puroks', {
-            search: '',
-            status: 'all',
-            sort_by: 'name',
-            sort_order: 'asc'
-        }, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+        setStatusFilter('all');
+        setPopulationRange('');
+        setHouseholdRange('');
+        setSortBy('name');
+        setSortOrder('asc');
+        setCurrentPage(1);
+    }, []);
 
-    const handleClearSelection = () => {
+    const handleClearSelection = useCallback(() => {
         setSelectedPuroks([]);
         setIsSelectAll(false);
-    };
+    }, []);
 
-    const handleCopySelectedData = () => {
+    const handleCopySelectedData = useCallback(() => {
         if (selectedPuroksData.length === 0) {
             toast.error('No data to copy');
             return;
@@ -562,35 +596,84 @@ export default function PuroksIndex({
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
-    };
+    }, [selectedPuroksData]);
 
-    const updateFilter = (key: keyof PurokFilters, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
-        
-        const params = {
-            ...filtersState,
-            [key]: value,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/puroks', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+    const updateFilter = useCallback((key: keyof PurokFilters, value: string) => {
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'population_range':
+                setPopulationRange(value);
+                break;
+            case 'household_range':
+                setHouseholdRange(value);
+                break;
+            case 'sort_by':
+                setSortBy(value);
+                break;
+            case 'sort_order':
+                setSortOrder(value as 'asc' | 'desc');
+                break;
+        }
+        setCurrentPage(1);
+    }, []);
 
     const hasActiveFilters = Boolean(
         search || 
-        filtersState.status !== 'all'
+        (statusFilter && statusFilter !== 'all') ||
+        populationRange ||
+        householdRange
     );
+
+    // Create filters object for the Filters component
+const filtersStateForComponent: PurokFilters = {
+    status: statusFilter,
+    sort_by: sortBy as "name" | "status" | "created_at" | "total_households" | "total_residents" | "leader_name",
+    sort_order: sortOrder,
+    population_range: populationRange,
+    household_range: householdRange
+};
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedPuroks.length > 0) {
+                        setSelectedPuroks([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedPuroks.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedPuroks, isMobile]);
 
     return (
         <AppLayout
@@ -615,14 +698,13 @@ export default function PuroksIndex({
                         isLoading={isPerformingBulkAction}
                     />
 
-                   <PuroksFilters
+                    <PuroksFilters
                         search={search}
                         setSearch={setSearch}
-                        onSearchChange={(value: string) => {  // ← Change to string, not SetStateAction<string>
+                        onSearchChange={(value: string) => {
                             setSearch(value);
-                            debouncedSearch(value);
                         }}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
@@ -635,6 +717,7 @@ export default function PuroksIndex({
                         searchInputRef={searchInputRef}
                         isLoading={isPerformingBulkAction}
                     />
+                    
                     <PuroksContent
                         puroks={paginatedPuroks}
                         isBulkMode={isBulkMode}
@@ -662,10 +745,14 @@ export default function PuroksIndex({
                         onCopySelectedData={handleCopySelectedData}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Keyboard Shortcuts Help */}

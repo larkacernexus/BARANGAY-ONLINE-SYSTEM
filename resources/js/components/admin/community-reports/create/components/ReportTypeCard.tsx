@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, X, AlertCircle, Megaphone, Clock, Camera, Check } from 'lucide-react';
-import { ReportType } from '@/components/admin/community-reports/create/types/community-report';
+import { ReportType } from '@/types/admin/reports/community-report';
 
 const iconMap: Record<string, any> = {
     'alert-circle': AlertCircle,

@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Check } from 'lucide-react';
-import { ReportType } from '@/components/admin/community-reports/create/types/community-report';
+import { ReportType } from '@/types/admin/reports/community-report';
 
 interface ReviewCardProps {
     isAnonymous: boolean;

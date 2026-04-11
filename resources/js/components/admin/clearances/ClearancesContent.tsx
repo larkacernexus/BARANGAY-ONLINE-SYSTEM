@@ -1,11 +1,16 @@
-// components/admin/clearances/ClearancesContent.tsx
-
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     FileSpreadsheet, 
     Printer, 
@@ -18,7 +23,8 @@ import {
     FileCheck,
     AlertCircle,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    ArrowUpDown
 } from 'lucide-react';
 import { memo, useCallback, useMemo, useState, useEffect } from 'react';
 
@@ -35,41 +41,31 @@ import {
     ClearanceType, 
     StatusOption, 
     BulkOperation 
-} from '@/types/admin/clearances/clearance-types';
+} from '@/types/admin/clearances/clearance';
 
-// Separate interfaces for better organization
 interface ClearancesContentProps {
-    // Data props
     clearances: ClearanceRequest[];
     totalItems: number;
     stats?: any;
     clearanceTypes: ClearanceType[];
     statusOptions: StatusOption[];
     filtersState: any;
-    
-    // Selection props
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
     selectedClearances: number[];
     selectionMode: 'page' | 'filtered' | 'all';
     selectionStats?: any;
-    
-    // UI props
     viewMode: 'table' | 'grid';
     setViewMode: (mode: 'table' | 'grid') => void;
     isMobile: boolean;
     hasActiveFilters: boolean;
     isLoading: boolean;
     isPerformingBulkAction: boolean;
-    
-    // Pagination props
     currentPage: number;
     totalPages: number;
     itemsPerPage: number;
     onPageChange: (page: number) => void;
-    
-    // Action handlers
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
@@ -83,6 +79,10 @@ interface ClearancesContentProps {
     onCopySelectedData: () => void;
     handleRecordPayment: (clearance: ClearanceRequest) => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 // Separate component for the header to reduce re-renders
@@ -97,7 +97,11 @@ const ClearancesHeader = memo(({
     onSelectAllOnPage,
     currentPage,
     totalPages,
-    onClearSelection
+    onClearSelection,
+    sortBy,
+    sortOrder,
+    onSortChange,
+    getCurrentSortValue
 }: {
     viewMode: 'table' | 'grid';
     setViewMode: (mode: 'table' | 'grid') => void;
@@ -110,6 +114,10 @@ const ClearancesHeader = memo(({
     currentPage: number;
     totalPages: number;
     onClearSelection: () => void;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }) => {
     const handleBulkModeToggle = useCallback(() => {
         setIsBulkMode(!isBulkMode);
@@ -139,6 +147,41 @@ const ClearancesHeader = memo(({
                 />
             </div>
             <div className="flex items-center gap-3">
+                {/* Sort By Dropdown */}
+                {!isMobile && onSortChange && getCurrentSortValue && (
+                    <div className="flex items-center gap-2">
+                        <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        <Select
+                            value={getCurrentSortValue()}
+                            onValueChange={onSortChange}
+                        >
+                            <SelectTrigger className="w-[180px] h-8 text-xs">
+                                <SelectValue placeholder="Sort by..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="reference_number-asc">Reference # (A to Z)</SelectItem>
+                                <SelectItem value="reference_number-desc">Reference # (Z to A)</SelectItem>
+                                <SelectItem value="resident_name-asc">Resident Name (A to Z)</SelectItem>
+                                <SelectItem value="resident_name-desc">Resident Name (Z to A)</SelectItem>
+                                <SelectItem value="status-asc">Status (A to Z)</SelectItem>
+                                <SelectItem value="status-desc">Status (Z to A)</SelectItem>
+                                <SelectItem value="payment_status-asc">Payment Status (A to Z)</SelectItem>
+                                <SelectItem value="payment_status-desc">Payment Status (Z to A)</SelectItem>
+                                <SelectItem value="fee_amount-asc">Fee Amount (Low to High)</SelectItem>
+                                <SelectItem value="fee_amount-desc">Fee Amount (High to Low)</SelectItem>
+                                <SelectItem value="amount_paid-asc">Amount Paid (Low to High)</SelectItem>
+                                <SelectItem value="amount_paid-desc">Amount Paid (High to Low)</SelectItem>
+                                <SelectItem value="urgency-asc">Urgency (Low to High)</SelectItem>
+                                <SelectItem value="urgency-desc">Urgency (High to Low)</SelectItem>
+                                <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                <SelectItem value="issue_date-asc">Issue Date (Oldest first)</SelectItem>
+                                <SelectItem value="issue_date-desc">Issue Date (Newest first)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+
                 {/* Grid view select all checkbox */}
                 {viewMode === 'grid' && isBulkMode && (
                     <div className="flex items-center gap-2">
@@ -229,7 +272,11 @@ const ClearancesContent = memo(({
     onBulkOperation,
     onCopySelectedData,
     handleRecordPayment,
-    setShowBulkDeleteDialog
+    setShowBulkDeleteDialog,
+    sortBy = 'created_at',
+    sortOrder = 'desc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'created_at-desc'
 }: ClearancesContentProps) => {
     
     // Memoize bulk actions configuration
@@ -442,6 +489,10 @@ const ClearancesContent = memo(({
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onClearSelection={onClearSelection}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSortChange={onSortChange}
+                getCurrentSortValue={getCurrentSortValue}
             />
             
             <CardContent className="p-0 dark:bg-gray-900">

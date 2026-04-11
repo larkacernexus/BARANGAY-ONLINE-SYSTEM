@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePage, router } from '@inertiajs/react';
-import { PageProps } from '@/components/admin/dashboard/types/dashboard';
+import { PageProps } from '@/types/admin/dashboard/dashboard';
 
 export const DASHBOARD_URL = '/admin/dashboard';
 

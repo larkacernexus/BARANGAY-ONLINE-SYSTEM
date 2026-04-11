@@ -1,4 +1,3 @@
-// /components/residentui/reports/DesktopHeader.tsx
 import { Button } from '@/components/ui/button';
 import { Printer, Download, Plus } from 'lucide-react';
 import { Link } from '@inertiajs/react';

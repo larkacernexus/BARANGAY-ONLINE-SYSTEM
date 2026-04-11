@@ -1,6 +1,6 @@
 // resources/js/components/admin/community-reports/show/components/flash-message.tsx
 import { CheckCircle, AlertCircle } from 'lucide-react';
-import { FlashMessage } from './types';
+import { FlashMessage } from '@/types/admin/reports/community-report';
 
 interface FlashMessageProps {
     flash: FlashMessage | null;

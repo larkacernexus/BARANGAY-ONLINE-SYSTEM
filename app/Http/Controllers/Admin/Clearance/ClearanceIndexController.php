@@ -35,19 +35,77 @@ class ClearanceIndexController extends Controller
             });
         }
 
+        // ✅ Clearance Number filter
+        if ($clearanceNumber = $request->input('clearance_number')) {
+            $query->where(function ($q) use ($clearanceNumber) {
+                $q->where('clearance_number', 'like', "%{$clearanceNumber}%")
+                  ->orWhere('reference_number', 'like', "%{$clearanceNumber}%");
+            });
+        }
+
+        // ✅ Applicant Type filter
+        if ($applicantType = $request->input('applicant_type')) {
+            if ($applicantType !== 'all') {
+                switch ($applicantType) {
+                    case 'resident':
+                        $query->whereNotNull('resident_id')->whereNull('business_id');
+                        break;
+                    case 'business':
+                        $query->whereNotNull('business_id');
+                        break;
+                    case 'senior':
+                        $query->where('applicant_type', 'senior');
+                        break;
+                    case 'pwd':
+                        $query->where('applicant_type', 'pwd');
+                        break;
+                }
+            }
+        }
+
         // Status filter
         if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
 
         // Payment status filter
-        if ($payment_status = $request->input('payment_status')) {
-            $query->where('payment_status', $payment_status);
+        if ($paymentStatus = $request->input('payment_status')) {
+            $query->where('payment_status', $paymentStatus);
         }
 
         // Type filter
         if ($type = $request->input('type')) {
             $query->where('clearance_type_id', $type);
+        }
+
+        // Urgency filter
+        if ($urgency = $request->input('urgency')) {
+            $query->where('urgency', $urgency);
+        }
+
+        // ✅ Date range filter
+        if ($fromDate = $request->input('from_date')) {
+            $query->whereDate('created_at', '>=', $fromDate);
+        }
+        if ($toDate = $request->input('to_date')) {
+            $query->whereDate('created_at', '<=', $toDate);
+        }
+
+        // ✅ Amount range filter
+        if ($amountRange = $request->input('amount_range')) {
+            $this->applyAmountRangeFilter($query, $amountRange);
+        }
+
+        // ✅ Sorting (for table header - client-side sorting is handled in frontend)
+        // We still support basic sorting for initial load
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        $allowedSorts = ['reference_number', 'created_at', 'status', 'payment_status', 'fee_amount', 'amount_paid', 'urgency'];
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('created_at', 'desc');
         }
 
         // Get paginated results
@@ -66,15 +124,58 @@ class ClearanceIndexController extends Controller
         // Status options
         $statusOptions = $this->getStatusOptions();
         $paymentStatusOptions = $this->getPaymentStatusOptions();
+        
+        // Urgency options
+        $urgencyOptions = [
+            ['value' => 'normal', 'label' => 'Normal'],
+            ['value' => 'rush', 'label' => 'Rush'],
+            ['value' => 'express', 'label' => 'Express'],
+        ];
 
         return Inertia::render('admin/Clearances/Index', [
             'clearances' => $clearances,
             'stats' => $stats,
             'clearanceTypes' => $clearanceTypes,
-            'filters' => $request->only(['search', 'status', 'type', 'payment_status']),
+            'filters' => $request->only([
+                'search', 
+                'status', 
+                'type', 
+                'payment_status', 
+                'urgency', 
+                'from_date', 
+                'to_date',
+                'clearance_number',
+                'applicant_type',
+                'amount_range'
+            ]),
             'statusOptions' => $statusOptions,
             'paymentStatusOptions' => $paymentStatusOptions,
+            'urgencyOptions' => $urgencyOptions,
         ]);
+    }
+
+    /**
+     * Apply amount range filter to query
+     */
+    private function applyAmountRangeFilter($query, string $range): void
+    {
+        switch ($range) {
+            case '0-100':
+                $query->whereBetween('fee_amount', [0, 100]);
+                break;
+            case '101-500':
+                $query->whereBetween('fee_amount', [101, 500]);
+                break;
+            case '501-1000':
+                $query->whereBetween('fee_amount', [501, 1000]);
+                break;
+            case '1001-5000':
+                $query->whereBetween('fee_amount', [1001, 5000]);
+                break;
+            case '5000+':
+                $query->where('fee_amount', '>=', 5000);
+                break;
+        }
     }
 
     private function formatClearance($clearance)
@@ -178,6 +279,8 @@ class ClearanceIndexController extends Controller
             'partially_paid' => ClearanceRequest::where('payment_status', 'partially_paid')->count(),
             'paid' => ClearanceRequest::where('payment_status', 'paid')->count(),
             'pending_payment' => ClearanceRequest::where('status', 'pending_payment')->count(),
+            'expressRequests' => ClearanceRequest::where('urgency', 'express')->count(),
+            'rushRequests' => ClearanceRequest::where('urgency', 'rush')->count(),
         ];
     }
 

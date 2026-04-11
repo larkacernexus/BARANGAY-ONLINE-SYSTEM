@@ -1,7 +1,7 @@
 // resources/js/Pages/Admin/FeeTypes/components/statistics-cards.tsx
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Statistic } from '../types';
+import { Statistic } from '@/types/admin/fee-types/fee.types';
 import { getIconComponent, getColorClass } from '../utils/helpers';
 
 interface Props {

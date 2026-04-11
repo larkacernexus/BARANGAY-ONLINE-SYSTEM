@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { User, X, UserCheck, Mail, Phone, Hash, Plus, Briefcase, Building2, MapPin } from 'lucide-react';
-import { CommunityReport, StaffMember } from './types';
+import { CommunityReport, StaffMember } from '@/types/admin/reports/community-report';
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 

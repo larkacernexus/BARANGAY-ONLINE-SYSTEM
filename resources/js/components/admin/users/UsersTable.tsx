@@ -1,4 +1,3 @@
-// components/admin/users/UsersTable.tsx
 import { JSX, useState } from 'react';
 import {
   Table,
@@ -139,17 +138,32 @@ export default function UsersTable({
     });
   };
 
-  const truncateText = (text: string | null, maxLength: number = 30): string => {
-    if (!text) return '';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+  // FIXED: Safe truncate function that handles any input type
+  const truncateText = (text: any, maxLength: number = 30): string => {
+    // Handle null, undefined, or non-string values
+    if (text === null || text === undefined) return '';
+    
+    // Convert to string if it's not already
+    let stringValue = text;
+    if (typeof text !== 'string') {
+      stringValue = String(text);
+    }
+    
+    // Now safely call substring
+    if (stringValue.length <= maxLength) return stringValue;
+    return stringValue.substring(0, maxLength) + '...';
   };
 
-  const truncateEmail = (email: string, maxLength: number = 25): string => {
+  // FIXED: Safe email truncation
+  const truncateEmail = (email: any, maxLength: number = 25): string => {
     if (!email) return '';
-    if (email.length <= maxLength) return email;
-    const [local, domain] = email.split('@');
-    if (!domain) return truncateText(email, maxLength);
+    
+    // Convert to string if needed
+    let emailStr = typeof email === 'string' ? email : String(email);
+    
+    if (emailStr.length <= maxLength) return emailStr;
+    const [local, domain] = emailStr.split('@');
+    if (!domain) return truncateText(emailStr, maxLength);
     
     const maxLocal = Math.floor(maxLength / 2);
     const maxDomain = maxLength - maxLocal - 1;
@@ -253,7 +267,6 @@ export default function UsersTable({
               getStatusIcon={getStatusIcon}
               getRoleBadgeVariant={getRoleBadgeVariant}
               formatDate={formatDate}
-              // Map props correctly
               onDelete={onUserDelete}
               onToggleStatus={handleStatusChange}
               onCopyToClipboard={onCopyToClipboard}

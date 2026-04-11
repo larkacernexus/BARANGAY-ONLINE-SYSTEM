@@ -1,18 +1,20 @@
-// /components/residentui/forms/TabHeader.tsx
+// /components/portal/forms/index/TabHeader.tsx
 import { SortDropdown } from './SortDropdown';
 import { ViewToggle } from './ViewToggle';
 import { SelectionModeButton } from './SelectionModeButton';
 
 interface TabHeaderProps {
-    displayTab: string;
-    count: number;
+    displayStatus: string;  // ✅ Changed from displayTab
+    from: number;           // ✅ Added
+    to: number;             // ✅ Added
+    total: number;          // ✅ Added
     selectMode: boolean;
     selectedCount: number;
     hasFilters: boolean;
     viewMode: 'grid' | 'list';
     setViewMode: (mode: 'grid' | 'list') => void;
     sortBy: string;
-    sortOrder: string;
+    sortOrder: 'asc' | 'desc';  // ✅ Better typing
     onSortChange: (sort: string) => void;
     onSortOrderToggle: () => void;
     onToggleSelectMode: () => void;
@@ -20,8 +22,10 @@ interface TabHeaderProps {
 }
 
 export const TabHeader = ({
-    displayTab,
-    count,
+    displayStatus,
+    from,
+    to,
+    total,
     selectMode,
     selectedCount,
     hasFilters,
@@ -37,15 +41,16 @@ export const TabHeader = ({
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {displayTab} Forms
+                {displayStatus} Forms
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-                {count > 0 
-                    ? `Showing ${count} form${count !== 1 ? 's' : ''}`
-                    : `No forms found`
+                {tabHasData 
+                    ? `Showing ${from}-${to} of ${total} form${total !== 1 ? 's' : ''}`
+                    : `No ${displayStatus.toLowerCase()} forms found`
                 }
                 {selectMode && selectedCount > 0 && ` • ${selectedCount} selected`}
                 {hasFilters && ' (filtered)'}
+                {selectMode && ' • Selection Mode'}
             </p>
         </div>
         

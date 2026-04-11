@@ -2,7 +2,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X, Download } from 'lucide-react';
-import { Resident } from '@/types';
+import { Resident } from '@/types/admin/residents/residents-types';
 
 interface PhotoViewModalProps {
     isOpen: boolean;

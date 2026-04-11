@@ -15,24 +15,20 @@ import {
     XCircle,
     MessageSquare,
 } from 'lucide-react';
-import { Fee, Permissions } from '../types';
+import { Fee, Permissions } from '@/types/admin/fees/fees';
+import { formatCurrency, formatDate, getStatusColor, calculateDaysOverdue } from '@/types/admin/fees/fees';
 
 interface Props {
     fee: Fee;
     permissions: Permissions;
     isProcessing: boolean;
     isOverdue: boolean;
-    getStatusVariant: (status: string) => any;
-    getStatusIcon: (status: string) => JSX.Element | null;
-    getPaymentProgress: () => number;
     onRecordPayment: () => void;
     onApprove: () => void;
     onCollect: () => void;
     onSendReminder: () => void;
     onWaive: () => void;
     onCancel: () => void;
-    formatDate: (date?: string) => string;
-    formatCurrency: (amount: number | string | undefined) => string;
 }
 
 export const FeeStatusSidebar = ({
@@ -40,18 +36,65 @@ export const FeeStatusSidebar = ({
     permissions,
     isProcessing,
     isOverdue,
-    getStatusVariant,
-    getStatusIcon,
-    getPaymentProgress,
     onRecordPayment,
     onApprove,
     onCollect,
     onSendReminder,
     onWaive,
     onCancel,
-    formatDate,
-    formatCurrency
 }: Props) => {
+    // Calculate payment progress
+    const getPaymentProgress = (): number => {
+        const total = fee.total_amount || fee.amount;
+        const paid = fee.amount_paid || fee.paid_amount || 0;
+        if (!total || total === 0) return 0;
+        return Math.min((paid / total) * 100, 100);
+    };
+
+    // Get status display text
+    const getStatusDisplay = (status: string): string => {
+        const statusMap: Record<string, string> = {
+            pending: 'Pending',
+            paid: 'Paid',
+            overdue: 'Overdue',
+            cancelled: 'Cancelled',
+            refunded: 'Refunded',
+            issued: 'Issued',
+            partial: 'Partially Paid',
+            partially_paid: 'Partially Paid'
+        };
+        return statusMap[status] || status;
+    };
+
+    // Get status variant for Badge component
+    const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+        const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+            paid: "default",
+            pending: "secondary",
+            overdue: "destructive",
+            issued: "default",
+            partial: "secondary",
+            partially_paid: "secondary",
+            cancelled: "secondary",
+            refunded: "secondary"
+        };
+        return variants[status] || "secondary";
+    };
+
+    const progress = getPaymentProgress();
+    const totalAmount = fee.total_amount || fee.amount;
+    const paidAmount = fee.amount_paid || fee.paid_amount || 0;
+    const balance = fee.balance || (totalAmount - paidAmount);
+    const surchargeAmount = fee.surcharge_amount || 0;
+    const penaltyAmount = fee.penalty_amount || 0;
+    const discountAmount = fee.discount_amount || 0;
+
+    // Check if fee can be collected (issued status means it's ready for collection)
+    const canCollect = fee.status === 'issued';
+    
+    // Check if fee can be approved (pending status)
+    const canApprove = fee.status === 'pending';
+
     return (
         <div className="space-y-6">
             {/* Status Summary */}
@@ -65,9 +108,11 @@ export const FeeStatusSidebar = ({
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Status</p>
-                        <Badge variant={getStatusVariant(fee.status)} className="flex items-center gap-1 w-fit">
-                            {getStatusIcon(fee.status)}
-                            {fee.status_display || fee.status}
+                        <Badge 
+                            variant={getStatusVariant(fee.status)} 
+                            className={`flex items-center gap-1 w-fit ${getStatusColor(fee.status)}`}
+                        >
+                            {getStatusDisplay(fee.status)}
                         </Badge>
                     </div>
 
@@ -75,33 +120,38 @@ export const FeeStatusSidebar = ({
                         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Payment Progress</p>
                         <div className="space-y-1">
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-600 dark:text-gray-300">Paid: {formatCurrency(fee.amount_paid)}</span>
-                                <span className="font-medium dark:text-gray-100">{getPaymentProgress()}%</span>
+                                <span className="text-gray-600 dark:text-gray-300">Paid: {formatCurrency(paidAmount)}</span>
+                                <span className="font-medium dark:text-gray-100">{Math.round(progress)}%</span>
                             </div>
                             <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                 <div 
                                     className="h-full bg-green-500 rounded-full transition-all duration-300"
-                                    style={{ width: `${getPaymentProgress()}%` }}
+                                    style={{ width: `${progress}%` }}
                                 />
                             </div>
                             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                                 <span>₱0</span>
-                                <span>{formatCurrency(fee.total_amount)}</span>
+                                <span>{formatCurrency(totalAmount)}</span>
                             </div>
                         </div>
                     </div>
 
-                    {fee.valid_until && (
+                    {fee.due_date && (
                         <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Valid Until</p>
-                            <p className="text-sm dark:text-gray-300">{formatDate(fee.valid_until)}</p>
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Due Date</p>
+                            <p className="text-sm dark:text-gray-300">{formatDate(fee.due_date)}</p>
+                            {isOverdue && (
+                                <p className="text-xs text-red-600 dark:text-red-400">
+                                    Overdue by {calculateDaysOverdue(fee.due_date)} days
+                                </p>
+                            )}
                         </div>
                     )}
 
-                    {fee.remarks && (
+                    {fee.notes && (
                         <div className="space-y-2">
-                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Remarks</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">{fee.remarks}</p>
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Notes</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">{fee.notes}</p>
                         </div>
                     )}
                 </CardContent>
@@ -119,44 +169,44 @@ export const FeeStatusSidebar = ({
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="text-gray-600 dark:text-gray-300">Base Amount</span>
-                            <span className="font-medium dark:text-gray-100">{formatCurrency(fee.base_amount)}</span>
+                            <span className="font-medium dark:text-gray-100">{formatCurrency(totalAmount - surchargeAmount - penaltyAmount + discountAmount)}</span>
                         </div>
-                        {fee.surcharge_amount > 0 && (
+                        {surchargeAmount > 0 && (
                             <div className="flex justify-between items-center">
                                 <span className="text-orange-600 dark:text-orange-400">Surcharge</span>
-                                <span className="font-medium text-orange-600 dark:text-orange-400">+ {formatCurrency(fee.surcharge_amount)}</span>
+                                <span className="font-medium text-orange-600 dark:text-orange-400">+ {formatCurrency(surchargeAmount)}</span>
                             </div>
                         )}
-                        {fee.penalty_amount > 0 && (
+                        {penaltyAmount > 0 && (
                             <div className="flex justify-between items-center">
                                 <span className="text-red-600 dark:text-red-400">Penalty</span>
-                                <span className="font-medium text-red-600 dark:text-red-400">+ {formatCurrency(fee.penalty_amount)}</span>
+                                <span className="font-medium text-red-600 dark:text-red-400">+ {formatCurrency(penaltyAmount)}</span>
                             </div>
                         )}
                         <Separator className="dark:bg-gray-700" />
                         <div className="flex justify-between items-center">
                             <span className="text-gray-600 dark:text-gray-300">Subtotal</span>
-                            <span className="font-medium dark:text-gray-100">{formatCurrency(fee.base_amount + fee.surcharge_amount + fee.penalty_amount)}</span>
+                            <span className="font-medium dark:text-gray-100">{formatCurrency(totalAmount + discountAmount)}</span>
                         </div>
-                        {fee.discount_amount > 0 && (
+                        {discountAmount > 0 && (
                             <div className="flex justify-between items-center">
                                 <span className="text-green-600 dark:text-green-400">Discount</span>
-                                <span className="font-medium text-green-600 dark:text-green-400">- {formatCurrency(fee.discount_amount)}</span>
+                                <span className="font-medium text-green-600 dark:text-green-400">- {formatCurrency(discountAmount)}</span>
                             </div>
                         )}
                         <Separator className="dark:bg-gray-700" />
                         <div className="flex justify-between items-center">
-                            <span className="font-semibold dark:text-gray-100">Total</span>
-                            <span className="text-xl font-bold dark:text-gray-100">{formatCurrency(fee.total_amount)}</span>
+                            <span className="font-semibold dark:text-gray-100">Total Amount</span>
+                            <span className="text-xl font-bold dark:text-gray-100">{formatCurrency(totalAmount)}</span>
                         </div>
                         <Separator className="dark:bg-gray-700" />
                         <div className="flex justify-between items-center">
                             <span className="text-green-600 dark:text-green-400">Amount Paid</span>
-                            <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(fee.amount_paid)}</span>
+                            <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(paidAmount)}</span>
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-red-600 dark:text-red-400">Balance Due</span>
-                            <span className="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(fee.balance)}</span>
+                            <span className="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(balance)}</span>
                         </div>
                     </div>
                 </CardContent>
@@ -171,7 +221,7 @@ export const FeeStatusSidebar = ({
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                    {permissions.can_record_payment && fee.balance > 0 && (
+                    {permissions.can_record_payment && balance > 0 && fee.status !== 'paid' && fee.status !== 'cancelled' && (
                         <Button 
                             className="w-full justify-start" 
                             onClick={onRecordPayment}
@@ -182,7 +232,7 @@ export const FeeStatusSidebar = ({
                         </Button>
                     )}
 
-                    {permissions.can_approve && fee.status === 'pending' && (
+                    {permissions.can_approve && canApprove && (
                         <Button 
                             className="w-full justify-start" 
                             onClick={onApprove}
@@ -193,7 +243,7 @@ export const FeeStatusSidebar = ({
                         </Button>
                     )}
 
-                    {permissions.can_collect && fee.status === 'approved' && (
+                    {permissions.can_collect && canCollect && (
                         <Button 
                             className="w-full justify-start" 
                             onClick={onCollect}
@@ -204,7 +254,7 @@ export const FeeStatusSidebar = ({
                         </Button>
                     )}
 
-                    {isOverdue && (
+                    {isOverdue && fee.status !== 'paid' && fee.status !== 'cancelled' && (
                         <Button 
                             variant="outline" 
                             className="w-full justify-start"
@@ -216,7 +266,7 @@ export const FeeStatusSidebar = ({
                         </Button>
                     )}
 
-                    {permissions.can_waive && fee.balance > 0 && (
+                    {permissions.can_waive && balance > 0 && fee.status !== 'paid' && fee.status !== 'cancelled' && (
                         <Button 
                             variant="outline" 
                             className="w-full justify-start text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/50"
@@ -228,7 +278,7 @@ export const FeeStatusSidebar = ({
                         </Button>
                     )}
 
-                    {permissions.can_cancel && !['paid', 'cancelled', 'waived'].includes(fee.status) && (
+                    {permissions.can_cancel && !['paid', 'cancelled', 'refunded'].includes(fee.status) && (
                         <Button 
                             variant="outline" 
                             className="w-full justify-start text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50"
@@ -242,7 +292,7 @@ export const FeeStatusSidebar = ({
 
                     <Separator className="dark:bg-gray-700" />
 
-                    <Button variant="ghost" className="w-full justify-start dark:text-gray-300 dark:hover:bg-gray-900">
+                    <Button variant="ghost" className="w-full justify-start dark:text-gray-300 dark:hover:bg-gray-800">
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Add Note
                     </Button>
@@ -256,6 +306,10 @@ export const FeeStatusSidebar = ({
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                     <div className="flex justify-between">
+                        <span className="text-gray-500 dark:text-gray-400">Fee Code</span>
+                        <span className="font-mono dark:text-gray-300">{fee.fee_code || fee.code || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
                         <span className="text-gray-500 dark:text-gray-400">Created</span>
                         <span className="dark:text-gray-300">{formatDate(fee.created_at)}</span>
                     </div>
@@ -263,16 +317,28 @@ export const FeeStatusSidebar = ({
                         <span className="text-gray-500 dark:text-gray-400">Last Updated</span>
                         <span className="dark:text-gray-300">{formatDate(fee.updated_at)}</span>
                     </div>
-                    {fee.payment_date && (
+                    {fee.paid_date && (
                         <div className="flex justify-between">
                             <span className="text-gray-500 dark:text-gray-400">Paid Date</span>
-                            <span className="dark:text-gray-300">{formatDate(fee.payment_date)}</span>
+                            <span className="dark:text-gray-300">{formatDate(fee.paid_date)}</span>
                         </div>
                     )}
                     {fee.cancelled_at && (
                         <div className="flex justify-between">
                             <span className="text-gray-500 dark:text-gray-400">Cancelled Date</span>
                             <span className="dark:text-gray-300">{formatDate(fee.cancelled_at)}</span>
+                        </div>
+                    )}
+                    {fee.certificate_number && (
+                        <div className="flex justify-between">
+                            <span className="text-gray-500 dark:text-gray-400">Certificate #</span>
+                            <span className="font-mono dark:text-gray-300">{fee.certificate_number}</span>
+                        </div>
+                    )}
+                    {fee.or_number && (
+                        <div className="flex justify-between">
+                            <span className="text-gray-500 dark:text-gray-400">OR #</span>
+                            <span className="font-mono dark:text-gray-300">{fee.or_number}</span>
                         </div>
                     )}
                 </CardContent>

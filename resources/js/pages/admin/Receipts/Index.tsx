@@ -1,4 +1,3 @@
-// resources/js/pages/admin/Receipts/Index.tsx
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -34,7 +33,6 @@ interface Receipt {
     is_voided: boolean;
     printed_count: number;
     fee_breakdown: Array<any>;
-    // ... other fields
 }
 
 interface ReceiptsPageProps {
@@ -54,6 +52,8 @@ interface ReceiptsPageProps {
         receipt_type?: string;
         date_from?: string;
         date_to?: string;
+        amount_range?: string;
+        printed_status?: string;
         per_page?: number;
     };
     stats: {
@@ -72,6 +72,14 @@ interface ReceiptsPageProps {
     };
 }
 
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
 export default function ReceiptsIndex({ 
     receipts, 
     filters: initialFilters, 
@@ -81,13 +89,24 @@ export default function ReceiptsIndex({
 }: ReceiptsPageProps) {
     const { flash } = usePage().props as any;
     
-    // State management
-    const [search, setSearch] = useState(initialFilters.search || '');
-    const [statusFilter, setStatusFilter] = useState(initialFilters.status || '');
-    const [methodFilter, setMethodFilter] = useState(initialFilters.payment_method || '');
-    const [typeFilter, setTypeFilter] = useState(initialFilters.receipt_type || '');
-    const [dateFrom, setDateFrom] = useState(initialFilters.date_from || '');
-    const [dateTo, setDateTo] = useState(initialFilters.date_to || '');
+    // Safe data extraction
+    const safeReceipts = receipts || { data: [], current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 };
+    const allReceipts = safeReceipts.data || [];
+    
+    // Filter states - client-side only (removed sort from filters)
+    const [search, setSearch] = useState<string>(getSafeString(initialFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(initialFilters.status));
+    const [methodFilter, setMethodFilter] = useState<string>(getSafeString(initialFilters.payment_method));
+    const [typeFilter, setTypeFilter] = useState<string>(getSafeString(initialFilters.receipt_type));
+    const [dateFrom, setDateFrom] = useState<string>(getSafeString(initialFilters.date_from));
+    const [dateTo, setDateTo] = useState<string>(getSafeString(initialFilters.date_to));
+    const [amountRange, setAmountRange] = useState<string>(getSafeString(initialFilters.amount_range));
+    const [printedStatusFilter, setPrintedStatusFilter] = useState<string>(getSafeString(initialFilters.printed_status));
+    
+    // Separate sort states for table header
+    const [sortBy, setSortBy] = useState<string>('issued_date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(initialFilters.per_page || 15);
@@ -142,8 +161,10 @@ export default function ReceiptsIndex({
         }
     }, [flash]);
 
-    // Get current page receipts
-    const currentPageReceipts = receipts.data;
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, statusFilter, methodFilter, typeFilter, dateFrom, dateTo, amountRange, printedStatusFilter]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -153,49 +174,184 @@ export default function ReceiptsIndex({
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedReceipts.length > 0) {
-                        setSelectedReceipts([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Ctrl/Cmd + F to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-        };
+    // Helper function to check amount range
+    const checkAmountRange = (amount: number, range: string): boolean => {
+        switch (range) {
+            case '0-100': return amount >= 0 && amount <= 100;
+            case '101-500': return amount >= 101 && amount <= 500;
+            case '501-1000': return amount >= 501 && amount <= 1000;
+            case '1001-5000': return amount >= 1001 && amount <= 5000;
+            case '5000+': return amount >= 5000;
+            default: return true;
+        }
+    };
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedReceipts, isMobile]);
+    // Helper to extract numeric amount from formatted string
+    const extractNumericAmount = (formattedAmount: string): number => {
+        if (!formattedAmount) return 0;
+        const match = formattedAmount.match(/[\d,]+\.?\d*/);
+        if (match) {
+            return parseFloat(match[0].replace(/,/g, ''));
+        }
+        return 0;
+    };
+
+    // Filter receipts client-side
+    const filteredReceipts = useMemo(() => {
+        if (!allReceipts || allReceipts.length === 0) {
+            return [];
+        }
+        
+        let filtered = [...allReceipts];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(receipt =>
+                receipt?.receipt_number?.toLowerCase().includes(searchLower) ||
+                receipt?.or_number?.toLowerCase().includes(searchLower) ||
+                receipt?.payer_name?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Status filter
+        if (statusFilter && statusFilter !== 'all') {
+            if (statusFilter === 'voided') {
+                filtered = filtered.filter(receipt => receipt?.is_voided === true);
+            } else {
+                filtered = filtered.filter(receipt => receipt?.status === statusFilter && !receipt?.is_voided);
+            }
+        }
+        
+        // Payment method filter
+        if (methodFilter && methodFilter !== 'all') {
+            filtered = filtered.filter(receipt => receipt?.payment_method === methodFilter);
+        }
+        
+        // Receipt type filter
+        if (typeFilter && typeFilter !== 'all') {
+            filtered = filtered.filter(receipt => receipt?.receipt_type === typeFilter);
+        }
+        
+        // Date range filter
+        if (dateFrom) {
+            filtered = filtered.filter(receipt => receipt?.formatted_issued_date >= dateFrom);
+        }
+        if (dateTo) {
+            filtered = filtered.filter(receipt => receipt?.formatted_issued_date <= dateTo);
+        }
+        
+        // Amount range filter
+        if (amountRange && amountRange !== 'all') {
+            filtered = filtered.filter(receipt => {
+                const amount = extractNumericAmount(receipt?.formatted_total || '0');
+                return checkAmountRange(amount, amountRange);
+            });
+        }
+        
+        // Printed status filter
+        if (printedStatusFilter && printedStatusFilter !== 'all') {
+            if (printedStatusFilter === 'printed') {
+                filtered = filtered.filter(receipt => (receipt?.printed_count || 0) > 0);
+            } else if (printedStatusFilter === 'unprinted') {
+                filtered = filtered.filter(receipt => (receipt?.printed_count || 0) === 0);
+            }
+        }
+        
+        // Apply sorting (for table header)
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'receipt_number':
+                        valueA = a?.receipt_number || '';
+                        valueB = b?.receipt_number || '';
+                        break;
+                    case 'or_number':
+                        valueA = a?.or_number || '';
+                        valueB = b?.or_number || '';
+                        break;
+                    case 'payer_name':
+                        valueA = a?.payer_name || '';
+                        valueB = b?.payer_name || '';
+                        break;
+                    case 'payment_method':
+                        valueA = a?.payment_method_label || '';
+                        valueB = b?.payment_method_label || '';
+                        break;
+                    case 'receipt_type':
+                        valueA = a?.receipt_type_label || '';
+                        valueB = b?.receipt_type_label || '';
+                        break;
+                    case 'total_amount':
+                        valueA = extractNumericAmount(a?.formatted_total || '0');
+                        valueB = extractNumericAmount(b?.formatted_total || '0');
+                        break;
+                    case 'status':
+                        valueA = a?.is_voided ? 'voided' : (a?.status || '');
+                        valueB = b?.is_voided ? 'voided' : (b?.status || '');
+                        break;
+                    case 'printed_status':
+                        valueA = (a?.printed_count || 0) > 0 ? 1 : 0;
+                        valueB = (b?.printed_count || 0) > 0 ? 1 : 0;
+                        break;
+                    case 'issued_date':
+                        valueA = a?.formatted_issued_date ? new Date(a.formatted_issued_date).getTime() : 0;
+                        valueB = b?.formatted_issued_date ? new Date(b.formatted_issued_date).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.formatted_issued_date ? new Date(a.formatted_issued_date).getTime() : 0;
+                        valueB = b?.formatted_issued_date ? new Date(b.formatted_issued_date).getTime() : 0;
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [allReceipts, search, statusFilter, methodFilter, typeFilter, dateFrom, dateTo, amountRange, printedStatusFilter, sortBy, sortOrder]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        if (!filteredReceipts || filteredReceipts.length === 0) {
+            return stats;
+        }
+        
+        const totalCount = filteredReceipts.length;
+        const totalAmount = filteredReceipts.reduce((sum, r) => sum + extractNumericAmount(r?.formatted_total || '0'), 0);
+        const voidedCount = filteredReceipts.filter(r => r?.is_voided).length;
+        const printedCount = filteredReceipts.filter(r => (r?.printed_count || 0) > 0).length;
+        
+        return {
+            total: { count: totalCount, amount: totalAmount, formatted_amount: `₱${totalAmount.toLocaleString()}` },
+            today: stats.today,
+            this_month: stats.this_month,
+            voided: voidedCount,
+            printed: printedCount,
+            by_method: stats.by_method,
+            by_type: stats.by_type
+        };
+    }, [filteredReceipts, stats]);
+
+    // Pagination
+    const totalItems = filteredReceipts.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedReceipts = filteredReceipts.slice(startIndex, endIndex);
 
     // Selection handlers
-    const handleSelectAllOnPage = () => {
-        const pageIds = currentPageReceipts.map(r => r.id);
+    const handleSelectAllOnPage = useCallback(() => {
+        const pageIds = paginatedReceipts.map(r => r.id);
         if (isSelectAll) {
             setSelectedReceipts(prev => prev.filter(id => !pageIds.includes(id)));
         } else {
@@ -204,10 +360,10 @@ export default function ReceiptsIndex({
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    };
+    }, [paginatedReceipts, isSelectAll, selectedReceipts]);
 
-    const handleSelectAllFiltered = () => {
-        const allIds = receipts.data.map(r => r.id);
+    const handleSelectAllFiltered = useCallback(() => {
+        const allIds = filteredReceipts.map(r => r.id);
         if (selectedReceipts.length === allIds.length && allIds.every(id => selectedReceipts.includes(id))) {
             setSelectedReceipts(prev => prev.filter(id => !allIds.includes(id)));
         } else {
@@ -215,17 +371,17 @@ export default function ReceiptsIndex({
             setSelectedReceipts(newSelected);
             setSelectionMode('filtered');
         }
-    };
+    }, [filteredReceipts, selectedReceipts]);
 
-    const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${receipts.total} receipts. This action may take a moment.`)) {
-            const allIds = receipts.data.map(r => r.id);
+    const handleSelectAll = useCallback(() => {
+        if (confirm(`This will select ALL ${totalItems} receipts. This action may take a moment.`)) {
+            const allIds = filteredReceipts.map(r => r.id);
             setSelectedReceipts(allIds);
             setSelectionMode('all');
         }
-    };
+    }, [filteredReceipts, totalItems]);
 
-    const handleItemSelect = (id: number) => {
+    const handleItemSelect = useCallback((id: number) => {
         setSelectedReceipts(prev => {
             if (prev.includes(id)) {
                 return prev.filter(itemId => itemId !== id);
@@ -233,25 +389,26 @@ export default function ReceiptsIndex({
                 return [...prev, id];
             }
         });
-    };
+    }, []);
 
     // Check if all items on current page are selected
     useEffect(() => {
-        const allPageIds = currentPageReceipts.map(r => r.id);
+        const allPageIds = paginatedReceipts.map(r => r.id);
         const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedReceipts.includes(id));
         setIsSelectAll(allSelected);
-    }, [selectedReceipts, currentPageReceipts]);
+    }, [selectedReceipts, paginatedReceipts]);
 
     // Get selected receipts data
     const selectedReceiptsData = useMemo(() => {
-        return receipts.data.filter(r => selectedReceipts.includes(r.id));
-    }, [selectedReceipts, receipts.data]);
+        return filteredReceipts.filter(r => selectedReceipts.includes(r.id));
+    }, [selectedReceipts, filteredReceipts]);
 
     // Calculate selection stats
     const selectionStats = useMemo(() => {
-        const totalAmount = selectedReceiptsData.reduce((sum, r) => sum + parseFloat(r.formatted_total.replace(/[^0-9.-]/g, '')), 0);
-        const paidAmount = selectedReceiptsData.reduce((sum, r) => sum + parseFloat(r.formatted_amount_paid.replace(/[^0-9.-]/g, '')), 0);
-        const voidedCount = selectedReceiptsData.filter(r => r.is_voided).length;
+        const totalAmount = selectedReceiptsData.reduce((sum, r) => sum + extractNumericAmount(r?.formatted_total || '0'), 0);
+        const paidAmount = selectedReceiptsData.reduce((sum, r) => sum + extractNumericAmount(r?.formatted_amount_paid || '0'), 0);
+        const voidedCount = selectedReceiptsData.filter(r => r?.is_voided).length;
+        const printedCount = selectedReceiptsData.filter(r => (r?.printed_count || 0) > 0).length;
         
         return {
             count: selectedReceiptsData.length,
@@ -260,33 +417,25 @@ export default function ReceiptsIndex({
             paidAmount,
             formattedPaidAmount: `₱${paidAmount.toLocaleString()}`,
             voidedCount,
+            printedCount,
             paymentMethods: selectedReceiptsData.reduce((acc, r) => {
-                acc[r.payment_method] = (acc[r.payment_method] || 0) + 1;
+                acc[r?.payment_method] = (acc[r?.payment_method] || 0) + 1;
                 return acc;
             }, {} as Record<string, number>)
         };
     }, [selectedReceiptsData]);
 
+    // Handle sort from table header
+    const handleSort = useCallback((column: string) => {
+        const newOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newOrder);
+    }, [sortBy, sortOrder]);
+
     // Apply filters
     const applyFilters = useCallback(() => {
-        router.get(route('receipts.index'), {
-            search: search || undefined,
-            status: statusFilter || undefined,
-            payment_method: methodFilter || undefined,
-            receipt_type: typeFilter || undefined,
-            date_from: dateFrom || undefined,
-            date_to: dateTo || undefined,
-        }, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    }, [search, statusFilter, methodFilter, typeFilter, dateFrom, dateTo]);
-
-    // Handle search submit
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        applyFilters();
-    };
+        setCurrentPage(1);
+    }, []);
 
     // Clear filters
     const clearFilters = useCallback(() => {
@@ -296,11 +445,11 @@ export default function ReceiptsIndex({
         setTypeFilter('');
         setDateFrom('');
         setDateTo('');
-        
-        router.get(route('receipts.index'), {}, {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        setAmountRange('');
+        setPrintedStatusFilter('');
+        setSortBy('issued_date');
+        setSortOrder('desc');
+        setCurrentPage(1);
     }, []);
 
     // View receipt
@@ -310,7 +459,6 @@ export default function ReceiptsIndex({
 
     // Print receipt
     const printReceipt = useCallback((receipt: Receipt) => {
-        // Handle print logic
         const printWindow = window.open('', '_blank');
         if (printWindow) {
             printWindow.document.write('<html><head><title>Print Receipt</title></head><body>');
@@ -358,14 +506,14 @@ export default function ReceiptsIndex({
         }
         
         const data = selectedReceiptsData.map(r => ({
-            'Receipt #': r.receipt_number,
-            'OR #': r.or_number || 'N/A',
-            'Payer': r.payer_name,
-            'Amount': r.formatted_total,
-            'Paid': r.formatted_amount_paid,
-            'Method': r.payment_method_label,
-            'Date': r.formatted_issued_date,
-            'Status': r.is_voided ? 'Voided' : r.status,
+            'Receipt #': r?.receipt_number || 'N/A',
+            'OR #': r?.or_number || 'N/A',
+            'Payer': r?.payer_name || 'N/A',
+            'Amount': r?.formatted_total || '₱0.00',
+            'Paid': r?.formatted_amount_paid || '₱0.00',
+            'Method': r?.payment_method_label || 'N/A',
+            'Date': r?.formatted_issued_date || 'N/A',
+            'Status': r?.is_voided ? 'Voided' : (r?.status || 'N/A'),
         }));
         
         const csvData = [
@@ -381,7 +529,7 @@ export default function ReceiptsIndex({
     }, [selectedReceiptsData]);
 
     // Bulk operations
-    const handleBulkOperation = async (operation: string) => {
+    const handleBulkOperation = useCallback(async (operation: string) => {
         if (selectedReceipts.length === 0) {
             toast.error('Please select at least one receipt');
             return;
@@ -394,15 +542,12 @@ export default function ReceiptsIndex({
                 case 'export':
                     setShowBulkExportDialog(true);
                     break;
-
                 case 'void':
                     setShowBulkVoidDialog(true);
                     break;
-
                 case 'copy_data':
                     handleCopySelectedData();
                     break;
-
                 default:
                     toast.info('Functionality to be implemented');
                     break;
@@ -413,9 +558,9 @@ export default function ReceiptsIndex({
         } finally {
             setIsPerformingBulkAction(false);
         }
-    };
+    }, [selectedReceipts.length, handleCopySelectedData]);
 
-    const handleBulkVoid = async () => {
+    const handleBulkVoid = useCallback(async () => {
         if (!bulkEditValue) {
             toast.error('Please provide a reason for voiding');
             return;
@@ -446,87 +591,140 @@ export default function ReceiptsIndex({
         } finally {
             setIsPerformingBulkAction(false);
         }
-    };
+    }, [bulkEditValue, selectedReceipts]);
 
-    const handleBulkExport = async () => {
+    const handleBulkExport = useCallback(async () => {
         setIsPerformingBulkAction(true);
 
         try {
-            const response = await fetch('/admin/receipts/export', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                },
-                body: JSON.stringify({
-                    receipt_ids: selectedReceipts,
-                    format: 'csv'
-                })
-            });
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `receipts-export-${new Date().toISOString().split('T')[0]}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                toast.success(`${selectedReceipts.length} receipts exported successfully`);
-                setSelectedReceipts([]);
-                setShowBulkExportDialog(false);
-            } else {
-                toast.error('Failed to export receipts');
-            }
+            const exportData = selectedReceiptsData.map(r => ({
+                'Receipt Number': r?.receipt_number || 'N/A',
+                'OR Number': r?.or_number || 'N/A',
+                'Payer Name': r?.payer_name || 'N/A',
+                'Total Amount': r?.formatted_total || '₱0.00',
+                'Amount Paid': r?.formatted_amount_paid || '₱0.00',
+                'Payment Method': r?.payment_method_label || 'N/A',
+                'Receipt Type': r?.receipt_type_label || 'N/A',
+                'Issue Date': r?.formatted_issued_date || 'N/A',
+                'Status': r?.is_voided ? 'Voided' : (r?.status || 'N/A'),
+                'Printed': (r?.printed_count || 0) > 0 ? 'Yes' : 'No',
+            }));
+            
+            const csv = [
+                Object.keys(exportData[0]).join(','),
+                ...exportData.map(row => Object.values(row).map(v => `"${v}"`).join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `receipts-export-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            toast.success(`${selectedReceipts.length} receipts exported successfully`);
+            setSelectedReceipts([]);
+            setShowBulkExportDialog(false);
         } catch (error) {
             console.error('Bulk export error:', error);
-            toast.error('An error occurred during the operation.');
+            toast.error('Failed to export receipts');
         } finally {
             setIsPerformingBulkAction(false);
         }
-    };
-
-    // Handle sort
-    const handleSort = (column: string) => {
-        // Implement sort logic
-        console.log('Sort by:', column);
-    };
+    }, [selectedReceiptsData, selectedReceipts.length]);
 
     // Handle page change
     const handlePageChange = useCallback((page: number) => {
-        router.get(route('receipts.index'), {
-            ...initialFilters,
-            page
-        }, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    }, [initialFilters]);
-
-    // Handle per page change
-    const handlePerPageChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        router.get(route('receipts.index'), {
-            ...initialFilters,
-            per_page: e.target.value,
-            page: 1
-        }, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    }, [initialFilters]);
+        setCurrentPage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
 
     const hasActiveFilters = useMemo(() => 
-        !!(search || statusFilter || methodFilter || typeFilter || dateFrom || dateTo),
-    [search, statusFilter, methodFilter, typeFilter, dateFrom, dateTo]);
+        !!(search || statusFilter || methodFilter || typeFilter || dateFrom || dateTo || amountRange || printedStatusFilter),
+    [search, statusFilter, methodFilter, typeFilter, dateFrom, dateTo, amountRange, printedStatusFilter]);
 
     // Get current page stats
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, receipts.total);
+    const startIndexDisplay = (currentPage - 1) * itemsPerPage + 1;
+    const endIndexDisplay = Math.min(startIndexDisplay + itemsPerPage - 1, totalItems);
+
+    // Create filtersStateForComponent (removed sort fields)
+    const filtersStateForComponent = {
+        search,
+        status: statusFilter,
+        payment_method: methodFilter,
+        receipt_type: typeFilter,
+        date_from: dateFrom,
+        date_to: dateTo,
+        amount_range: amountRange,
+        printed_status: printedStatusFilter
+    };
+
+    // Handle sort change from dropdown
+    const handleSortChange = useCallback((value: string) => {
+        const [col, order] = value.split('-');
+        setSortBy(col);
+        setSortOrder(order as 'asc' | 'desc');
+    }, []);
+
+    const getCurrentSortValue = useCallback(() => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
+
+    // Handle delete receipt
+    const handleDelete = useCallback((receipt: Receipt) => {
+        toast.info('Delete functionality to be implemented');
+    }, []);
+
+    // Handle create new receipt
+    const handleCreateNew = useCallback(() => {
+        router.get(route('receipts.create'));
+    }, []);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedReceipts.length > 0) {
+                        setSelectedReceipts([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedReceipts, isMobile, handleSelectAllFiltered, handleSelectAllOnPage]);
 
     return (
-        <AppLayout>
+        <AppLayout
+            title="Receipts Management"
+            breadcrumbs={[
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Receipts', href: '/admin/receipts' }
+            ]}
+        >
             <TooltipProvider>
                 <div className="space-y-6">
                     <ReceiptsHeader 
@@ -536,7 +734,7 @@ export default function ReceiptsIndex({
                     />
 
                     <ReceiptsStats 
-                        globalStats={stats}
+                        globalStats={filteredStats}
                         filteredStats={null}
                         isLoading={isPerformingBulkAction}
                     />
@@ -554,14 +752,18 @@ export default function ReceiptsIndex({
                         setDateFrom={setDateFrom}
                         dateTo={dateTo}
                         setDateTo={setDateTo}
+                        amountRange={amountRange}
+                        setAmountRange={setAmountRange}
+                        printedStatusFilter={printedStatusFilter}
+                        setPrintedStatusFilter={setPrintedStatusFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
                         handleClearFilters={clearFilters}
                         hasActiveFilters={hasActiveFilters}
                         isMobile={isMobile}
-                        totalItems={receipts.total}
-                        startIndex={startIndex}
-                        endIndex={endIndex}
+                        totalItems={totalItems}
+                        startIndex={startIndexDisplay}
+                        endIndex={endIndexDisplay}
                         searchInputRef={searchInputRef}
                         isLoading={isPerformingBulkAction}
                         filterOptions={filterOptions}
@@ -569,7 +771,7 @@ export default function ReceiptsIndex({
                     />
 
                     <ReceiptsContent
-                        receipts={currentPageReceipts}
+                        receipts={paginatedReceipts}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -579,8 +781,8 @@ export default function ReceiptsIndex({
                         isMobile={isMobile}
                         hasActiveFilters={hasActiveFilters}
                         currentPage={currentPage}
-                        totalPages={receipts.last_page}
-                        totalItems={receipts.total}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
                         itemsPerPage={itemsPerPage}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
@@ -589,7 +791,7 @@ export default function ReceiptsIndex({
                         onItemSelect={handleItemSelect}
                         onClearFilters={clearFilters}
                         onClearSelection={handleClearSelection}
-                        onDelete={() => {}} // Not applicable for receipts
+                        onDelete={handleDelete}
                         onSort={handleSort}
                         onBulkOperation={handleBulkOperation}
                         onCopySelectedData={handleCopySelectedData}
@@ -603,6 +805,11 @@ export default function ReceiptsIndex({
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
+                        onCreateNew={handleCreateNew}
                     />
 
                     {/* Keyboard Shortcuts Help */}

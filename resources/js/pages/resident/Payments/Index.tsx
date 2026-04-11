@@ -1,31 +1,18 @@
-// pages/portal/resident/my-payments.tsx
-import { useState, useEffect, useMemo, useRef } from 'react';
+// pages/portal/resident/my-payments.tsx (Updated with mobile list view)
+
+import { useState, useEffect, useMemo } from 'react';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Link, usePage, router, Head } from '@inertiajs/react';
+import { Link, usePage, Head } from '@inertiajs/react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { 
-    Plus, 
-    ChevronUp, 
-    ChevronDown, 
-    Filter, 
-    Square, 
-    Grid, 
-    List, 
-    ArrowUpDown,
     Calendar,
-    DollarSign,
-    Info,
-    Receipt,
-    AlertCircle,
-    User
+    AlertCircle
 } from 'lucide-react';
 
 // Import reusable components
-import { StatusBadge } from '@/components/residentui/StatusBadge';
-import { CustomTabs } from '@/components/residentui/CustomTabs';
+import { PaymentTabs, PAYMENT_TABS_CONFIG } from '@/components/portal/payments/index/payment-tabs';
 import { ModernSelect } from '@/components/residentui/modern-select';
 import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
 import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
@@ -42,33 +29,30 @@ import { DesktopHeader } from '@/components/residentui/modern/desktop-header';
 import { ErrorState } from '@/components/residentui/modern/error-state';
 import { ModernPaymentListView } from '@/components/portal/payments/index/modern-payment-list-view';
 import { ModernPaymentGridView } from '@/components/portal/payments/index/modern-payment-grid-view';
+import { ModernPaymentMobileListView } from '@/components/portal/payments/index/modern-payment-mobile-list-view'; // New import
 import { ModernPaymentFilters } from '@/components/residentui/payments/modern-payment-filters';
+import { SelectModeButton } from '@/components/residentui/modern/select-mode-button';
 
 // Import payment utilities and types
 import {
     Payment,
-    PaymentsPaginatedResponse,
     PaymentStats,
     PaymentMethodType,
-    PaymentFilters,
     ViewMode
 } from '@/types/portal/payments/payment.types';
 import {
     formatDate,
     formatCurrency,
-    getStatusCount,
     printPaymentsList,
     exportToCSV,
-    getPaymentMethodDisplay,
-    getPaymentStatusColor,
-    getPaymentStatusLabel
 } from '@/components/residentui/payments/payment-utils';
 import { getPaymentStatsCards } from '@/components/residentui/payments/constants';
-import { SelectModeButton } from '@/components/residentui/modern/select-mode-button';
 
 // Define PageProps with proper types
 interface PageProps extends Record<string, any> {
-    payments?: PaymentsPaginatedResponse;
+    payments?: {
+        data: Payment[];
+    };
     stats?: PaymentStats;
     availableYears?: number[];
     availablePaymentMethods?: PaymentMethodType[];
@@ -78,26 +62,15 @@ interface PageProps extends Record<string, any> {
         last_name: string;
     };
     hasProfile?: boolean;
-    filters?: PaymentFilters;
     error?: string;
 }
 
 export default function MyPayments() {
-    const page = usePage<PageProps>();
-    const pageProps = page.props;
+    const { props } = usePage<PageProps>();
     
-    const payments = pageProps.payments || {
-        data: [],
-        current_page: 1,
-        last_page: 1,
-        per_page: 15,
-        total: 0,
-        from: 0,
-        to: 0,
-        links: [],
-    };
-    
-    const stats = pageProps.stats || {
+    // Safe data access with fallbacks
+    const allPayments = props.payments?.data || [];
+    const stats = props.stats || {
         total_payments: 0,
         pending_payments: 0,
         total_paid: 0,
@@ -110,16 +83,18 @@ export default function MyPayments() {
         current_year_balance: 0,
     };
     
-    const availableYears = pageProps.availableYears || [];
-    const availablePaymentMethods = pageProps.availablePaymentMethods || [];
-    const currentResident = pageProps.currentResident || { id: 0, first_name: '', last_name: '' };
-    const hasProfile = pageProps.hasProfile || false;
-    const filters = pageProps.filters || {};
+    const availableYears = props.availableYears || [];
+    const availablePaymentMethods = props.availablePaymentMethods || [];
+    const currentResident = props.currentResident || { id: 0, first_name: '', last_name: '' };
+    const hasProfile = props.hasProfile || false;
     
-    const [search, setSearch] = useState('');
+    // Client-side filter state
+    const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
     const [yearFilter, setYearFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [showStats, setShowStats] = useState(true);
@@ -130,9 +105,6 @@ export default function MyPayments() {
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [sortBy, setSortBy] = useState<'date' | 'amount' | 'status'>('date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    
-    const hasInitialized = useRef(false);
-    const searchTimeout = useRef<NodeJS.Timeout | null>(null);
     
     // Check if mobile on mount and resize
     useEffect(() => {
@@ -149,143 +121,124 @@ export default function MyPayments() {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
     
-    // Initialize filters from props
-    useEffect(() => {
-        if (!hasInitialized.current) {
-            setSearch(filters.search || '');
-            setStatusFilter(filters.status || 'all');
-            setPaymentMethodFilter(filters.payment_method || 'all');
-            setYearFilter(filters.year || 'all');
-            hasInitialized.current = true;
-        }
-    }, [filters]);
-    
-    // Search debounce
-    useEffect(() => {
-        if (!hasInitialized.current) return;
-        if (search === '' && !filters.search) return;
-        if (search === filters.search) return;
-        
-        if (searchTimeout.current) {
-            clearTimeout(searchTimeout.current);
+    // Filter payments client-side with safety checks
+    const filteredPayments = useMemo(() => {
+        if (!allPayments || !Array.isArray(allPayments)) {
+            return [];
         }
         
-        searchTimeout.current = setTimeout(() => {
-            updateFilters({ 
-                search: search.trim(),
-                page: '1'
+        let filtered = [...allPayments];
+        
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(payment => payment?.status === statusFilter);
+        }
+        
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(payment => 
+                payment?.or_number?.toLowerCase().includes(query) ||
+                payment?.purpose?.toLowerCase().includes(query) ||
+                payment?.reference_number?.toLowerCase().includes(query) ||
+                payment?.total_amount?.toString().includes(query)
+            );
+        }
+        
+        if (paymentMethodFilter !== 'all') {
+            filtered = filtered.filter(payment => payment?.payment_method === paymentMethodFilter);
+        }
+        
+        if (yearFilter !== 'all') {
+            filtered = filtered.filter(payment => {
+                if (!payment?.payment_date) return false;
+                try {
+                    const paymentYear = new Date(payment.payment_date).getFullYear().toString();
+                    return paymentYear === yearFilter;
+                } catch {
+                    return false;
+                }
             });
-        }, 800);
+        }
         
-        return () => {
-            if (searchTimeout.current) {
-                clearTimeout(searchTimeout.current);
+        filtered.sort((a, b) => {
+            let comparison = 0;
+            
+            switch (sortBy) {
+                case 'date':
+                    const dateA = a?.payment_date ? new Date(a.payment_date).getTime() : 0;
+                    const dateB = b?.payment_date ? new Date(b.payment_date).getTime() : 0;
+                    comparison = dateA - dateB;
+                    break;
+                case 'amount':
+                    const amountA = a?.total_amount || 0;
+                    const amountB = b?.total_amount || 0;
+                    comparison = amountA - amountB;
+                    break;
+                case 'status':
+                    comparison = (a?.status || '').localeCompare(b?.status || '');
+                    break;
             }
-        };
-    }, [search]);
+            
+            return sortOrder === 'asc' ? comparison : -comparison;
+        });
+        
+        return filtered;
+    }, [allPayments, statusFilter, searchQuery, paymentMethodFilter, yearFilter, sortBy, sortOrder]);
     
-    const updateFilters = (newFilters: Record<string, string>) => {
-        setLoading(true);
+    // Pagination
+    const itemsPerPage = 15;
+    const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+    const paginatedPayments = useMemo(() => {
+        if (!filteredPayments || filteredPayments.length === 0) {
+            return [];
+        }
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        return filteredPayments.slice(start, end);
+    }, [filteredPayments, currentPage]);
+    
+    // Reset to first page when filters change
+    const handleFilterChange = (filterType: string, value: string) => {
+        setCurrentPage(1);
         
-        const updatedFilters = {
-            ...filters,
-            ...newFilters,
-        };
+        switch (filterType) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'search':
+                setSearchQuery(value);
+                break;
+            case 'paymentMethod':
+                setPaymentMethodFilter(value);
+                break;
+            case 'year':
+                setYearFilter(value);
+                break;
+        }
         
-        const cleanFilters: Record<string, string> = {};
+        setSelectedPayments([]);
+        setSelectMode(false);
+    };
+    
+    const hasActiveFilters = statusFilter !== 'all' || 
+                            searchQuery !== '' || 
+                            paymentMethodFilter !== 'all' || 
+                            yearFilter !== 'all';
+    
+    const clearFilters = () => {
+        setStatusFilter('all');
+        setSearchQuery('');
+        setPaymentMethodFilter('all');
+        setYearFilter('all');
+        setCurrentPage(1);
         
-        Object.entries(updatedFilters).forEach(([key, value]) => {
-            if (key === 'page' && value === '1') return;
-            if (value && value !== '' && value !== 'all' && value !== undefined) {
-                cleanFilters[key] = value;
-            }
-        });
-        
-        router.get('/portal/payments', cleanFilters, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
+        if (isMobile) setShowMobileFilters(false);
+        setSelectedPayments([]);
+        setSelectMode(false);
     };
     
     const handleTabChange = (tab: string) => {
-        setStatusFilter(tab);
-        
-        if (tab === 'all') {
-            updateFilters({ 
-                status: '',
-                page: '1'
-            });
-        } else {
-            updateFilters({ 
-                status: tab,
-                page: '1'
-            });
-        }
-        
+        handleFilterChange('status', tab);
         if (isMobile) setShowMobileFilters(false);
-        // Clear selection when changing tabs
-        setSelectedPayments([]);
-        setSelectMode(false);
-    };
-    
-    const handlePaymentMethodChange = (method: string) => {
-        setPaymentMethodFilter(method);
-        updateFilters({ 
-            payment_method: method === 'all' ? '' : method,
-            page: '1'
-        });
-        if (isMobile) setShowMobileFilters(false);
-        setSelectedPayments([]);
-        setSelectMode(false);
-    };
-    
-    const handleYearChange = (year: string) => {
-        setYearFilter(year);
-        updateFilters({ 
-            year: year === 'all' ? '' : year,
-            page: '1'
-        });
-        if (isMobile) setShowMobileFilters(false);
-        setSelectedPayments([]);
-        setSelectMode(false);
-    };
-    
-    const handleClearFilters = () => {
-        setSearch('');
-        setStatusFilter('all');
-        setPaymentMethodFilter('all');
-        setYearFilter('all');
-        
-        router.get('/portal/payments', {}, {
-            preserveState: true,
-            preserveScroll: true,
-            onFinish: () => setLoading(false),
-        });
-        
-        if (isMobile) setShowMobileFilters(false);
-        setSelectedPayments([]);
-        setSelectMode(false);
-    };
-    
-    const handleSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchTimeout.current) {
-            clearTimeout(searchTimeout.current);
-        }
-        updateFilters({ 
-            search: search.trim(),
-            page: '1'
-        });
-    };
-    
-    const handleSearchClear = () => {
-        setSearch('');
-        updateFilters({ 
-            search: '',
-            page: '1'
-        });
     };
     
     const toggleSelectPayment = (id: number) => {
@@ -297,11 +250,10 @@ export default function MyPayments() {
     };
     
     const selectAllPayments = () => {
-        const currentPayments = payments.data;
-        if (selectedPayments.length === currentPayments.length && currentPayments.length > 0) {
+        if (selectedPayments.length === paginatedPayments.length && paginatedPayments.length > 0) {
             setSelectedPayments([]);
         } else {
-            setSelectedPayments(currentPayments.map(p => p.id));
+            setSelectedPayments(paginatedPayments.map(p => p?.id).filter(id => id));
         }
     };
     
@@ -314,179 +266,105 @@ export default function MyPayments() {
         }
     };
     
-    const getCurrentTabPayments = () => {
-        return payments.data;
+    // Calculate status counts from filtered data with safety
+    const getStatusCountForTab = (status: string): number => {
+        if (!filteredPayments || !Array.isArray(filteredPayments)) return 0;
+        if (status === 'all') return filteredPayments.length;
+        return filteredPayments.filter(payment => payment?.status === status).length;
     };
     
-    const hasActiveFilters = useMemo(() => {
-        return Object.entries(filters).some(([key, value]) => 
-            key !== 'page' && value && value !== '' && value !== 'all'
+    const handlePrintPayments = () => {
+        if (filteredPayments.length === 0) {
+            toast.error('No payments to print');
+            return;
+        }
+        printPaymentsList(
+            filteredPayments, 
+            statusFilter, 
+            stats,             
+            formatDate, 
+            formatCurrency
         );
-    }, [filters]);
-    
-  const handlePrintPayments = () => {
-    const currentPayments = getCurrentTabPayments();
-    printPaymentsList(
-        currentPayments, 
-        statusFilter, 
-        stats,             
-        formatDate, 
-        formatCurrency
-    );
-};
+    };
     
     const handleExportCSV = () => {
-        const currentPayments = getCurrentTabPayments();
-        exportToCSV(currentPayments, statusFilter, formatDate, setIsExporting, toast);
+        if (filteredPayments.length === 0) {
+            toast.error('No payments to export');
+            return;
+        }
+        exportToCSV(filteredPayments, statusFilter, formatDate, setIsExporting, toast);
     };
     
     const handleCopyOrNumber = (orNumber: string) => {
+        if (!orNumber) return;
         navigator.clipboard.writeText(orNumber);
         toast.success(`Copied: ${orNumber}`);
     };
     
     const handleCopyReference = (ref: string) => {
+        if (!ref) return;
         navigator.clipboard.writeText(ref);
         toast.success(`Copied: ${ref}`);
     };
     
     const handleViewDetails = (id: number) => {
-        router.visit(`/portal/payments/${id}`);
-    };
-    
-    const handleMakePayment = (id: number) => {
-        router.visit(`/portal/payments/create?payment_id=${id}`);
-    };
-    
-    const handleDownloadReceipt = (payment: Payment) => {
-        toast.info('Receipt download would be implemented here');
-    };
-    
-    const handleGenerateReceipt = (payment: Payment) => {
-        const reportWindow = window.open('', '_blank');
-        if (reportWindow) {
-            reportWindow.document.write(`
-                <h1>Payment Receipt: ${payment.or_number}</h1>
-                <p><strong>Purpose:</strong> ${payment.purpose}</p>
-                <p><strong>Amount:</strong> ${formatCurrency(payment.total_amount)}</p>
-                <p><strong>Status:</strong> ${payment.status}</p>
-            `);
+        if (id) {
+            window.location.href = `/portal/payments/${id}`;
         }
     };
     
-    const renderTabContent = () => {
-        const currentPayments = getCurrentTabPayments();
-        const tabHasData = currentPayments.length > 0;
-        
-        return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
-                <CardContent className="p-4 md:p-6">
-                    {/* Selection Mode Banner */}
-                    {selectMode && tabHasData && (
-                        <ModernSelectionBanner
-                            selectedCount={selectedPayments.length}
-                            totalCount={currentPayments.length}
-                            onSelectAll={selectAllPayments}
-                            onDeselectAll={() => setSelectedPayments([])}
-                            onCancel={toggleSelectMode}
-                            onDelete={() => {
-                                toast.success(`Deleted ${selectedPayments.length} payments`);
-                                setSelectedPayments([]);
-                                setSelectMode(false);
-                            }}
-                            deleteLabel="Delete Selected"
-                        />
-                    )}
-                    
-                    {/* Header with Sort */}
-                    <ModernCardHeader
-                        title={`${statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Payments`}
-                        description={tabHasData 
-                            ? `Showing ${currentPayments.length} payment${currentPayments.length !== 1 ? 's' : ''}`
-                            : `No ${statusFilter === 'all' ? 'payments' : statusFilter.replace('_', ' ')} found`
-                        }
-                        action={
-                            <div className="flex items-center gap-2">
-                                <SortDropdown
-                                    sortBy={sortBy}
-                                    sortOrder={sortOrder}
-                                    onSort={(by, order) => {
-                                        setSortBy(by as 'date' | 'amount' | 'status');
-                                        setSortOrder(order);
-                                    }}
-                                />
-                                {!selectMode && tabHasData && (
-                                    <ViewToggle
-                                        viewMode={viewMode}
-                                        onViewChange={setViewMode}
-                                        disabled={isMobile}
-                                    />
-                                )}
-                                {tabHasData && (
-                                    <SelectModeButton
-                                        isActive={selectMode}
-                                        onToggle={toggleSelectMode}
-                                    />
-                                )}
-                            </div>
-                        }
-                    />
-                    
-                    {!tabHasData ? (
-                        <ModernEmptyState 
-                            status={statusFilter} 
-                            hasFilters={hasActiveFilters}
-                            onClearFilters={handleClearFilters}
-                        />
-                    ) : viewMode === 'grid' ? (
-                        <ModernPaymentGridView
-                            payments={currentPayments}
-                            selectMode={selectMode}
-                            selectedPayments={selectedPayments}
-                            onSelectPayment={toggleSelectPayment}
-                            formatDate={(date) => formatDate(date, isMobile)}
-                            formatCurrency={formatCurrency}
-                            onViewDetails={handleViewDetails}
-                            onMakePayment={handleMakePayment}
-                            onDownloadReceipt={handleDownloadReceipt}
-                            onCopyOrNumber={handleCopyOrNumber}
-                            onCopyReference={handleCopyReference}
-                            onGenerateReceipt={handleGenerateReceipt}
-                            isMobile={isMobile}
-                        />
-                    ) : (
-                        <ModernPaymentListView
-                            payments={currentPayments}
-                            selectMode={selectMode}
-                            selectedPayments={selectedPayments}
-                            onSelectPayment={toggleSelectPayment}
-                            onSelectAll={selectAllPayments}
-                            formatDate={(date) => formatDate(date, isMobile)}
-                            formatCurrency={formatCurrency}
-                            onViewDetails={handleViewDetails}
-                            onMakePayment={handleMakePayment}
-                            onDownloadReceipt={handleDownloadReceipt}
-                            onCopyOrNumber={handleCopyOrNumber}
-                            onCopyReference={handleCopyReference}
-                            onGenerateReceipt={handleGenerateReceipt}
-                        />
-                    )}
-                    
-                    {/* Pagination */}
-                    {payments.last_page > 1 && (
-                        <div className="mt-6">
-                            <ModernPagination
-                                currentPage={payments.current_page}
-                                lastPage={payments.last_page}
-                                onPageChange={(page) => updateFilters({ page: page.toString() })}
-                                loading={loading}
-                            />
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        );
+    const handleDownloadReceipt = (payment: Payment) => {
+        if (!payment) return;
+        toast.info(`Receipt download for ${payment.or_number} would be implemented here`);
     };
+    
+    const handleGenerateReceipt = (payment: Payment) => {
+        if (!payment) return;
+        const reportWindow = window.open('', '_blank');
+        if (reportWindow) {
+            reportWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Payment Receipt - ${payment.or_number}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 40px; }
+                        .receipt { max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .amount { font-size: 24px; font-weight: bold; color: #059669; }
+                        .status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
+                        .status-paid { background: #d1fae5; color: #065f46; }
+                        .status-pending { background: #fef3c7; color: #92400e; }
+                        .status-overdue { background: #fee2e2; color: #991b1b; }
+                    </style>
+                </head>
+                <body>
+                    <div class="receipt">
+                        <div class="header">
+                            <h1>Barangay Payment Receipt</h1>
+                            <p>Official Receipt #: ${payment.or_number}</p>
+                        </div>
+                        <div>
+                            <p><strong>Purpose:</strong> ${payment.purpose || 'N/A'}</p>
+                            <p><strong>Amount:</strong> <span class="amount">${formatCurrency(payment.total_amount)}</span></p>
+                            <p><strong>Status:</strong> <span class="status status-${payment.status}">${payment.status?.toUpperCase() || 'PENDING'}</span></p>
+                            <p><strong>Payment Date:</strong> ${formatDate(payment.payment_date)}</p>
+                            ${payment.reference_number ? `<p><strong>Reference #:</strong> ${payment.reference_number}</p>` : ''}
+                        </div>
+                        <hr />
+                        <p style="text-align: center; font-size: 12px; color: #666;">
+                            Generated from Barangay Management System
+                        </p>
+                    </div>
+                </body>
+                </html>
+            `);
+            reportWindow.document.close();
+            reportWindow.print();
+        }
+    };
+    
+    const tabHasData = paginatedPayments && paginatedPayments.length > 0;
     
     if (!hasProfile) {
         return (
@@ -519,7 +397,7 @@ export default function MyPayments() {
         );
     }
     
-    if (pageProps.error) {
+    if (props.error) {
         return (
             <ResidentLayout
                 breadcrumbs={[
@@ -531,7 +409,7 @@ export default function MyPayments() {
                 <div className="space-y-6">
                     <DesktopHeader title="My Payments" description="View and manage your barangay payments" />
                     <ErrorState 
-                        message={pageProps.error} 
+                        message={props.error} 
                         onGoHome={() => window.location.href = '/dashboard'} 
                     />
                 </div>
@@ -553,7 +431,7 @@ export default function MyPayments() {
                     {isMobile ? (
                         <MobileHeader
                             title="My Payments"
-                            subtitle={`${stats.total_payments} payment${stats.total_payments !== 1 ? 's' : ''} total`}
+                            subtitle={`${filteredPayments.length} payment${filteredPayments.length !== 1 ? 's' : ''} total`}
                             showStats={showStats}
                             onToggleStats={() => setShowStats(!showStats)}
                             onOpenFilters={() => setShowMobileFilters(true)}
@@ -573,23 +451,22 @@ export default function MyPayments() {
                         />
                     )}
                     
-                    {showStats && (
+                    {showStats && stats && (
                         <div className="animate-slide-down">
                             <ModernStatsCards cards={getPaymentStatsCards(stats, formatCurrency)} loading={loading} />
-
                         </div>
                     )}
                     
                     {!isMobile && (
                         <ModernPaymentFilters
-                            search={search}
-                            setSearch={setSearch}
-                            handleSearchSubmit={handleSearchSubmit}
-                            handleSearchClear={handleSearchClear}
+                            search={searchQuery}
+                            setSearch={(value) => handleFilterChange('search', value)}
+                            handleSearchSubmit={(e) => { e.preventDefault(); }}
+                            handleSearchClear={() => handleFilterChange('search', '')}
                             paymentMethodFilter={paymentMethodFilter}
-                            handlePaymentMethodChange={handlePaymentMethodChange}
+                            handlePaymentMethodChange={(method) => handleFilterChange('paymentMethod', method)}
                             yearFilter={yearFilter}
-                            handleYearChange={handleYearChange}
+                            handleYearChange={(year) => handleFilterChange('year', year)}
                             loading={loading}
                             availablePaymentMethods={availablePaymentMethods}
                             availableYears={availableYears}
@@ -597,10 +474,10 @@ export default function MyPayments() {
                             exportToCSV={handleExportCSV}
                             isExporting={isExporting}
                             hasActiveFilters={hasActiveFilters}
-                            handleClearFilters={handleClearFilters}
+                            handleClearFilters={clearFilters}
                             onCopySummary={() => {
                                 const summary = `Payments Summary:\n` +
-                                    `Total: ${stats.total_payments}\n` +
+                                    `Total: ${filteredPayments.length}\n` +
                                     `Paid: ${formatCurrency(stats.total_paid)}\n` +
                                     `Balance: ${formatCurrency(stats.balance_due)}`;
                                 navigator.clipboard.writeText(summary);
@@ -610,31 +487,154 @@ export default function MyPayments() {
                     )}
                     
                     <div className="mt-4">
-                        <CustomTabs 
+                        <PaymentTabs 
                             statusFilter={statusFilter}
                             handleTabChange={handleTabChange}
-                            getStatusCount={(status) => getStatusCount(stats, status, payments.data)}
+                            getStatusCount={getStatusCountForTab}
+                            tabsConfig={PAYMENT_TABS_CONFIG}
                         />
                         
-                        <div className="mt-4">
-                            {renderTabContent()}
-                        </div>
+                        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 mt-4">
+                            <CardContent className="p-4 md:p-6">
+                                {selectMode && tabHasData && (
+                                    <ModernSelectionBanner
+                                        selectedCount={selectedPayments.length}
+                                        totalCount={paginatedPayments.length}
+                                        onSelectAll={selectAllPayments}
+                                        onDeselectAll={() => setSelectedPayments([])}
+                                        onCancel={toggleSelectMode}
+                                        onDelete={() => {
+                                            toast.success(`Deleted ${selectedPayments.length} payments`);
+                                            setSelectedPayments([]);
+                                            setSelectMode(false);
+                                        }}
+                                        deleteLabel="Delete Selected"
+                                    />
+                                )}
+                                
+                                <ModernCardHeader
+                                    title={`${statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Payments`}
+                                    description={tabHasData 
+                                        ? `Showing ${paginatedPayments.length} of ${filteredPayments.length} payment${filteredPayments.length !== 1 ? 's' : ''}`
+                                        : `No ${statusFilter === 'all' ? 'payments' : statusFilter.replace('_', ' ')} found`
+                                    }
+                                    action={
+                                        <div className="flex items-center gap-2">
+                                            <SortDropdown
+                                                sortBy={sortBy}
+                                                sortOrder={sortOrder}
+                                                onSort={(by, order) => {
+                                                    setSortBy(by as 'date' | 'amount' | 'status');
+                                                    setSortOrder(order);
+                                                    setCurrentPage(1);
+                                                }}
+                                            />
+                                            {!selectMode && tabHasData && (
+                                                <ViewToggle
+                                                    viewMode={viewMode}
+                                                    onViewChange={setViewMode}
+                                                    disabled={false}
+                                                />
+                                            )}
+                                            {tabHasData && (
+                                                <SelectModeButton
+                                                    isActive={selectMode}
+                                                    onToggle={toggleSelectMode}
+                                                />
+                                            )}
+                                        </div>
+                                    }
+                                />
+                                
+                                {!tabHasData ? (
+                                    <ModernEmptyState 
+                                        status={statusFilter} 
+                                        hasFilters={hasActiveFilters}
+                                        onClearFilters={clearFilters}
+                                    />
+                                ) : (
+                                    // Mobile-specific rendering
+                                    isMobile ? (
+                                        viewMode === 'grid' ? (
+                                            <ModernPaymentGridView
+                                                payments={paginatedPayments}
+                                                selectMode={selectMode}
+                                                selectedPayments={selectedPayments}
+                                                onSelectPayment={toggleSelectPayment}
+                                                formatDate={(date) => formatDate(date, true)}
+                                                formatCurrency={formatCurrency}
+                                                onViewDetails={handleViewDetails}
+                                                onDownloadReceipt={handleDownloadReceipt}
+                                                onCopyOrNumber={handleCopyOrNumber}
+                                                onCopyReference={handleCopyReference}
+                                                onGenerateReceipt={handleGenerateReceipt}
+                                                isMobile={true}
+                                            />
+                                        ) : (
+                                            <ModernPaymentMobileListView
+                                                payments={paginatedPayments}
+                                                selectMode={selectMode}
+                                                selectedPayments={selectedPayments}
+                                                onSelectPayment={toggleSelectPayment}
+                                                formatDate={(date) => formatDate(date, true)}
+                                                formatCurrency={formatCurrency}
+                                                onViewDetails={handleViewDetails}
+                                                onDownloadReceipt={handleDownloadReceipt}
+                                                onCopyOrNumber={handleCopyOrNumber}
+                                                onCopyReference={handleCopyReference}
+                                                onGenerateReceipt={handleGenerateReceipt}
+                                            />
+                                        )
+                                    ) : (
+                                        // Desktop rendering
+                                        viewMode === 'grid' ? (
+                                            <ModernPaymentGridView
+                                                payments={paginatedPayments}
+                                                selectMode={selectMode}
+                                                selectedPayments={selectedPayments}
+                                                onSelectPayment={toggleSelectPayment}
+                                                formatDate={(date) => formatDate(date, false)}
+                                                formatCurrency={formatCurrency}
+                                                onViewDetails={handleViewDetails}
+                                                onDownloadReceipt={handleDownloadReceipt}
+                                                onCopyOrNumber={handleCopyOrNumber}
+                                                onCopyReference={handleCopyReference}
+                                                onGenerateReceipt={handleGenerateReceipt}
+                                                isMobile={false}
+                                            />
+                                        ) : (
+                                            <ModernPaymentListView
+                                                payments={paginatedPayments}
+                                                selectMode={selectMode}
+                                                selectedPayments={selectedPayments}
+                                                onSelectPayment={toggleSelectPayment}
+                                                onSelectAll={selectAllPayments}
+                                                formatDate={(date) => formatDate(date, false)}
+                                                formatCurrency={formatCurrency}
+                                                onViewDetails={handleViewDetails}
+                                                onDownloadReceipt={handleDownloadReceipt}
+                                                onCopyOrNumber={handleCopyOrNumber}
+                                                onCopyReference={handleCopyReference}
+                                                onGenerateReceipt={handleGenerateReceipt}
+                                            />
+                                        )
+                                    )
+                                )}
+                                
+                                {totalPages > 1 && (
+                                    <div className="mt-6">
+                                        <ModernPagination
+                                            currentPage={currentPage}
+                                            lastPage={totalPages}
+                                            onPageChange={(page: number) => setCurrentPage(page)}
+                                            loading={loading}
+                                        />
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
-                
-                {/* Mobile FAB */}
-                {isMobile && (
-                    <div className="fixed bottom-6 right-6 z-50 safe-bottom animate-scale-in">
-                        <Link href="/portal/payments/create">
-                            <Button 
-                                size="lg" 
-                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-                            >
-                                <Plus className="h-6 w-6" />
-                            </Button>
-                        </Link>
-                    </div>
-                )}
                 
                 {/* Mobile Filter Modal */}
                 <ModernFilterModal
@@ -642,45 +642,57 @@ export default function MyPayments() {
                     onClose={() => setShowMobileFilters(false)}
                     title="Filter Payments"
                     description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
-                    search={search}
-                    onSearchChange={setSearch}
-                    onSearchSubmit={handleSearchSubmit}
-                    onSearchClear={handleSearchClear}
+                    search={searchQuery}
+                    onSearchChange={(value) => setSearchQuery(value)}
+                    onSearchSubmit={(e) => { 
+                        e.preventDefault(); 
+                        handleFilterChange('search', searchQuery);
+                        setShowMobileFilters(false);
+                    }}
+                    onSearchClear={() => handleFilterChange('search', '')}
                     loading={loading}
                     hasActiveFilters={hasActiveFilters}
-                    onClearFilters={handleClearFilters}
+                    onClearFilters={clearFilters}
                 >
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Payment Method
-                        </label>
-                        <ModernSelect
-                            value={paymentMethodFilter}
-                            onValueChange={handlePaymentMethodChange}
-                            placeholder="All payment methods"
-                            options={availablePaymentMethods.map(method => ({
-                                value: method.type,
-                                label: method.display_name
-                            }))}
-                            disabled={loading}
-                        />
-                    </div>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Payment Method
+                            </label>
+                            <ModernSelect
+                                value={paymentMethodFilter}
+                                onValueChange={(value) => handleFilterChange('paymentMethod', value)}
+                                placeholder="All payment methods"
+                                options={[
+                                    { value: 'all', label: 'All payment methods' },
+                                    ...availablePaymentMethods.map(method => ({
+                                        value: method.type,
+                                        label: method.display_name
+                                    }))
+                                ]}
+                                disabled={loading}
+                            />
+                        </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Year
-                        </label>
-                        <ModernSelect
-                            value={yearFilter}
-                            onValueChange={handleYearChange}
-                            placeholder="All years"
-                            options={availableYears.map(year => ({
-                                value: year.toString(),
-                                label: year.toString()
-                            }))}
-                            disabled={loading}
-                            icon={Calendar}
-                        />
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Year
+                            </label>
+                            <ModernSelect
+                                value={yearFilter}
+                                onValueChange={(value) => handleFilterChange('year', value)}
+                                placeholder="All years"
+                                options={[
+                                    { value: 'all', label: 'All years' },
+                                    ...availableYears.map(year => ({
+                                        value: year.toString(),
+                                        label: year.toString()
+                                    }))
+                                ]}
+                                disabled={loading}
+                                icon={Calendar}
+                            />
+                        </div>
                     </div>
                 </ModernFilterModal>
                 

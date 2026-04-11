@@ -11,35 +11,143 @@ import LeftColumn from '@/components/admin/feesCreate/feesEdit/LeftColumn';
 import RightColumn from '@/components/admin/feesCreate/feesEdit/RightColumn';
 import CancelFeeModal from '@/components/admin/feesCreate/feesEdit/CancelFeeModal';
 import { 
-    FeeEditProps, 
     FeeType, 
     Resident, 
     Household,
     DiscountInfo,
-    FeeFormData
-} from '@/types/fees';
-import { 
-    formatCurrency, 
-    parseNumber, 
-    safeString, 
-    calculateTotalAmount,
-    validateFeeForm,
-    getDiscountsForFeeType,
-    getDiscountNote,
-    getPhilippineLegalBasis
-} from '@/admin-utils/fees/discount-display-utils';
+    DiscountRule,
+    DocumentCategory,
+    PrivilegeData
+} from '@/types/admin/fees/fees';
+
+// Format currency helper
+const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP',
+        minimumFractionDigits: 2
+    }).format(amount);
+};
+
+// Parse number helper
+const parseNumber = (value: any): number => {
+    if (value === null || value === undefined || value === '') return 0;
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+};
+
+// Safe string helper
+const safeString = (value: any): string => {
+    if (value === null || value === undefined) return '';
+    return String(value);
+};
+
+// Calculate total amount
+const calculateTotalAmount = (base: number, surcharge: number, penalty: number, discount: number): number => {
+    return base + surcharge + penalty - discount;
+};
+
+// Get discounts for fee type
+const getDiscountsForFeeType = (feeType: FeeType, discountRules: DiscountRule[]): DiscountRule[] => {
+    return discountRules.filter(rule => 
+        rule.applies_to_all_fee_types || 
+        rule.applies_to_fee_type_ids?.includes(feeType.id)
+    );
+};
+
+// Get discount note
+const getDiscountNote = (discountCodes: string[]): { type: 'warning' | 'info', note: string } => {
+    if (discountCodes.includes('senior') && discountCodes.includes('pwd')) {
+        return {
+            type: 'warning',
+            note: 'Note: Only the highest applicable discount will be applied (usually Senior or PWD takes precedence).'
+        };
+    }
+    return {
+        type: 'info',
+        note: 'Eligible discounts will be automatically applied based on resident privileges.'
+    };
+};
+
+// Get Philippine legal basis
+const getPhilippineLegalBasis = (discountType: string): string => {
+    const legalBasis: Record<string, string> = {
+        senior: 'RA 9994 - Expanded Senior Citizens Act of 2010',
+        pwd: 'RA 10754 - Persons with Disability Benefits Act',
+        solo_parent: 'RA 8972 - Solo Parents Welfare Act of 2000',
+        indigent: 'LGU Ordinance - Based on local government classification'
+    };
+    return legalBasis[discountType] || 'Local Government Ordinance';
+};
+
+// Validate fee form
+const validateFeeForm = (data: FeeFormData): string | null => {
+    if (!data.fee_type_id) return 'Please select a fee type';
+    if (!data.payer_type) return 'Please select a payer type';
+    if (data.payer_type === 'resident' && !data.resident_id) return 'Please select a resident';
+    if (data.payer_type === 'household' && !data.household_id) return 'Please select a household';
+    if (data.payer_type === 'business' && !data.business_name) return 'Please enter a business name';
+    if ((data.payer_type === 'visitor' || data.payer_type === 'other') && !data.payer_name) return 'Please enter a name';
+    if (data.base_amount <= 0) return 'Base amount must be greater than 0';
+    if (!data.due_date) return 'Please select a due date';
+    return null;
+};
+
+// Fee Form Data interface
+interface FeeFormData {
+    fee_type_id: string;
+    payer_type: string;
+    resident_id: string;
+    household_id: string;
+    business_name: string;
+    payer_name: string;
+    contact_number: string;
+    address: string;
+    purok: string;
+    zone: string;
+    billing_period: string;
+    period_start: string;
+    period_end: string;
+    issue_date: string;
+    due_date: string;
+    base_amount: number;
+    surcharge_amount: number;
+    penalty_amount: number;
+    discount_amount: number;
+    total_amount: number;
+    purpose: string;
+    property_description: string;
+    business_type: string;
+    area: number;
+    remarks: string;
+    requirements_submitted: string[];
+    ph_legal_compliance_notes: string;
+}
+
+// Extended Fee Edit Props
+interface FeeEditProps {
+    fee: any;
+    feeTypes: FeeType[];
+    residents: Resident[];
+    households: Household[];
+    discountRules?: DiscountRule[];
+    puroks?: string[];
+    documentCategories?: DocumentCategory[];
+    errors?: Record<string, string>;
+    allPrivileges?: PrivilegeData[];
+}
 
 // ========== DYNAMIC PRIVILEGE HELPER FUNCTIONS ==========
 
 /**
  * Get active privileges from resident
  */
-function getActivePrivileges(resident: Resident): any[] {
+function getActivePrivileges(resident: Resident): PrivilegeData[] {
     if (!resident.privileges || !Array.isArray(resident.privileges)) {
         return [];
     }
     
-    return resident.privileges.filter((p: any) => 
+    return resident.privileges.filter((p: PrivilegeData) => 
         p.status === 'active' || p.status === 'expiring_soon'
     );
 }
@@ -57,8 +165,8 @@ export default function FeeEdit({
     residents,
     households,
     discountRules = [],
-    puroks,
-    documentCategories,
+    puroks = [],
+    documentCategories = [],
     errors: serverErrors,
     allPrivileges = []
 }: FeeEditProps) {
@@ -187,7 +295,7 @@ export default function FeeEdit({
                 address: data.address
             } as any);
         }
-    }, []);
+    }, [data.fee_type_id, data.payer_type, data.resident_id, data.household_id, data.business_name, data.payer_name, data.contact_number, data.purok, data.address, feeTypes, residents, households]);
 
     const handleFeeTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const feeTypeId = e.target.value;
@@ -200,7 +308,10 @@ export default function FeeEdit({
             
             // Only update base amount if it's different from current
             if (selected.base_amount !== data.base_amount) {
-                setData('base_amount', selected.base_amount);
+                const baseAmount = typeof selected.base_amount === 'string' 
+                    ? parseFloat(selected.base_amount) 
+                    : selected.base_amount;
+                setData('base_amount', baseAmount);
             }
             
             setShowSurcharge(selected.has_surcharge);
@@ -224,7 +335,10 @@ export default function FeeEdit({
 
             // Recalculate surcharge if needed
             if (selected.has_surcharge && selected.surcharge_percentage && data.surcharge_amount === 0) {
-                const surcharge = (selected.base_amount * selected.surcharge_percentage) / 100;
+                const baseAmount = typeof selected.base_amount === 'string' 
+                    ? parseFloat(selected.base_amount) 
+                    : selected.base_amount;
+                const surcharge = (baseAmount * selected.surcharge_percentage) / 100;
                 setData('surcharge_amount', surcharge);
             }
             
@@ -256,8 +370,8 @@ export default function FeeEdit({
             setSelectedPayer(resident);
             setData('resident_id', residentId);
             setData('payer_type', 'resident');
-            setData('payer_name', resident.full_name);
-            setData('contact_number', resident.contact_number || '');
+            setData('payer_name', resident.full_name || '');
+            setData('contact_number', resident.contact_number || resident.phone || '');
             setData('purok', resident.purok || '');
             setData('address', resident.address || '');
         }
@@ -270,7 +384,7 @@ export default function FeeEdit({
             setData('household_id', householdId);
             setData('payer_type', 'household');
             setData('payer_name', household.name);
-            setData('contact_number', household.contact_number || '');
+            setData('contact_number', household.contact_number || household.phone || '');
             setData('purok', household.purok || '');
             setData('address', household.address || '');
         }
@@ -311,7 +425,7 @@ export default function FeeEdit({
 
     const getSelectedCategoryName = () => {
         if (selectedCategory === 'all') return 'All Categories';
-        const category = documentCategories?.find(
+        const category = documentCategories.find(
             (cat) => cat.id.toString() === selectedCategory
         );
         return category ? category.name : 'Select Category';
@@ -384,22 +498,22 @@ export default function FeeEdit({
         >
             <Head title={`Edit Fee: ${fee.fee_code}`} />
 
-          {/* Status Warning Banner */}
-{fee.status !== 'pending' && (
-    <Alert className="mb-6 border-l-4 border-l-yellow-500 dark:bg-gray-900 dark:border-yellow-800 flex flex-row"> {/* Added flex directly */}
-        <div className="flex items-center gap-3 w-full">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-            <div className="flex-1">
-                <div className="font-semibold text-yellow-700 dark:text-yellow-300">
-                    Editing {fee.status} Fee
-                </div>
-                <div className="text-sm text-yellow-600 dark:text-yellow-400">
-                    This fee has been {fee.status}. Changes made may affect payment records.
-                </div>
-            </div>
-        </div>
-    </Alert>
-)}
+            {/* Status Warning Banner */}
+            {fee.status !== 'pending' && (
+                <Alert className="mb-6 border-l-4 border-l-yellow-500 dark:bg-gray-900 dark:border-yellow-800">
+                    <div className="flex items-center gap-3 w-full">
+                        <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                        <div className="flex-1">
+                            <div className="font-semibold text-yellow-700 dark:text-yellow-300">
+                                Editing {fee.status} Fee
+                            </div>
+                            <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                                This fee has been {fee.status}. Changes made may affect payment records.
+                            </div>
+                        </div>
+                    </div>
+                </Alert>
+            )}
 
             <form onSubmit={submit}>
                 <div className="space-y-6">
@@ -411,9 +525,9 @@ export default function FeeEdit({
                         onCancel={() => setShowCancelModal(true)}
                     />
 
-                    {/* Horizontal Layout - Changed from grid to flex */}
+                    {/* Horizontal Layout */}
                     <div className="flex flex-col lg:flex-row gap-6">
-                        {/* Left Column - Fee Details - 50% width */}
+                        {/* Left Column - Fee Details */}
                         <div className="lg:w-1/2">
                             <LeftColumn
                                 data={data}
@@ -428,7 +542,7 @@ export default function FeeEdit({
                                 selectedCategory={selectedCategory}
                                 setSelectedCategory={setSelectedCategory}
                                 filteredFeeTypes={filteredFeeTypes}
-                                documentCategories={documentCategories || []}
+                                documentCategories={documentCategories}
                                 getSelectedCategoryName={getSelectedCategoryName}
                                 feeTypes={feeTypes}
                                 selectedPayer={selectedPayer}
@@ -441,7 +555,7 @@ export default function FeeEdit({
                             />
                         </div>
 
-                        {/* Right Column - Payer Information - 50% width */}
+                        {/* Right Column - Payer Information */}
                         <div className="lg:w-1/2">
                             <RightColumn
                                 data={data}
@@ -449,7 +563,7 @@ export default function FeeEdit({
                                 selectedPayer={selectedPayer}
                                 residents={residents}
                                 households={households}
-                                puroks={puroks || []}
+                                puroks={puroks}
                                 errors={errors}
                                 handlePayerTypeChange={handlePayerTypeChange}
                                 handleResidentSelect={handleResidentSelect}

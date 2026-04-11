@@ -1,5 +1,3 @@
-// pages/admin/households/index.tsx
-
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
@@ -13,7 +11,7 @@ import {
     HouseholdFilters,
     FlashMessage,
     SelectionStats,
-    FilterState  // Import FilterState from types
+    FilterState
 } from '@/types/admin/households/household.types';
 import { 
     filterHouseholds, 
@@ -39,8 +37,6 @@ interface HouseholdsPageProps {
     allHouseholds: Household[];
 }
 
-// Remove the local FilterState interface - use the imported one
-// Define the filtered stats type to match what HouseholdsStats expects
 interface FilteredStats {
     total: number;
     active: number;
@@ -65,19 +61,16 @@ export default function Households({ households, stats, filters, puroks, allHous
         purokCount: 0
     };
     
-    // Search and filter states - use the imported FilterState
+    // Search and filter states - client-side only
     const [search, setSearch] = useState(safeFilters.search || '');
-    const [filtersState, setFiltersState] = useState<FilterState>({
-        search: safeFilters.search || '',
-        status: safeFilters.status || 'all',
-        purok_id: String(safeFilters.purok_id || 'all'),
-        from_date: safeFilters.from_date || '',
-        to_date: safeFilters.to_date || '',
-        sort_by: safeFilters.sort_by || 'household_number',
-        sort_order: (safeFilters.sort_order as 'asc' | 'desc') || 'asc',
-        min_members: safeFilters.min_members?.toString() || '',
-        max_members: safeFilters.max_members?.toString() || ''
-    });
+    const [statusFilter, setStatusFilter] = useState<string>(safeFilters.status || 'all');
+    const [purokFilter, setPurokFilter] = useState<string>(String(safeFilters.purok_id || 'all'));
+    const [minMembers, setMinMembers] = useState<string>(safeFilters.min_members?.toString() || '');
+    const [maxMembers, setMaxMembers] = useState<string>(safeFilters.max_members?.toString() || '');
+    const [fromDate, setFromDate] = useState<string>(safeFilters.from_date || '');
+    const [toDate, setToDate] = useState<string>(safeFilters.to_date || '');
+    const [sortBy, setSortBy] = useState<string>(safeFilters.sort_by || 'household_number');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(safeFilters.sort_order as 'asc' | 'desc' || 'asc');
     
     // View and pagination states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -137,12 +130,24 @@ export default function Households({ households, stats, filters, puroks, allHous
         }
     }, []);
 
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, statusFilter, purokFilter, minMembers, maxMembers, fromDate, toDate, sortBy, sortOrder]);
+
+    // Reset selection when exiting bulk mode
+    useEffect(() => {
+        if (!isBulkMode) {
+            setSelectedHouseholds([]);
+            setIsSelectAll(false);
+        }
+    }, [isBulkMode]);
+
     // Keyboard shortcuts
     useEffect(() => {
         if (isMobile) return;
         
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -151,7 +156,6 @@ export default function Households({ households, stats, filters, puroks, allHous
                     handleSelectAllOnPage();
                 }
             }
-            // Escape key
             if (e.key === 'Escape') {
                 if (isBulkMode) {
                     if (selectedHouseholds.length > 0) {
@@ -161,17 +165,14 @@ export default function Households({ households, stats, filters, puroks, allHous
                     }
                 }
             }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 setIsBulkMode(!isBulkMode);
             }
-            // Ctrl/Cmd + F to focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            // Delete key for bulk delete
             if (e.key === 'Delete' && isBulkMode && selectedHouseholds.length > 0) {
                 e.preventDefault();
                 setShowBulkDeleteDialog(true);
@@ -182,49 +183,93 @@ export default function Households({ households, stats, filters, puroks, allHous
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isBulkMode, selectedHouseholds, isMobile]);
 
-    // Reset selection when exiting bulk mode
-    useEffect(() => {
-        if (!isBulkMode) {
-            setSelectedHouseholds([]);
-            setIsSelectAll(false);
-        }
-    }, [isBulkMode]);
-
-    // Immediate search handler
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setSearch(value);
-        
-        const params: Record<string, any> = {
-            ...filtersState,
-            search: value
-        };
-        
-        // Remove empty params
-        Object.keys(params).forEach(key => {
-            if (!params[key] || params[key] === 'all') {
-                delete params[key];
-            }
-        });
-        
-        router.get('/admin/households', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
     // Filter households client-side
     const filteredHouseholds = useMemo(() => {
-        return filterHouseholds(
-            allHouseholds,
-            search,
-            filtersState,
-            safePuroks
-        );
-    }, [allHouseholds, search, filtersState, safePuroks]);
+        let filtered = [...allHouseholds];
+        
+        // Apply search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(household =>
+                household.household_number?.toLowerCase().includes(searchLower) ||
+                household.address?.toLowerCase().includes(searchLower) ||
+                household.head_of_household?.first_name?.toLowerCase().includes(searchLower) ||
+                household.head_of_household?.last_name?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(household => household.status === statusFilter);
+        }
+        
+        // Apply purok filter
+        if (purokFilter !== 'all') {
+            filtered = filtered.filter(household => household.purok_id?.toString() === purokFilter);
+        }
+        
+        // Apply member count filter
+        if (minMembers) {
+            const min = parseInt(minMembers);
+            filtered = filtered.filter(household => (household.member_count || 0) >= min);
+        }
+        if (maxMembers) {
+            const max = parseInt(maxMembers);
+            filtered = filtered.filter(household => (household.member_count || 0) <= max);
+        }
+        
+        // Apply date filters
+        if (fromDate) {
+            filtered = filtered.filter(household => household.created_at >= fromDate);
+        }
+        if (toDate) {
+            filtered = filtered.filter(household => household.created_at <= toDate);
+        }
+        
+        // Apply sorting
+        filtered.sort((a, b) => {
+            let valueA: any;
+            let valueB: any;
+            
+            switch (sortBy) {
+                case 'household_number':
+                    valueA = a.household_number || '';
+                    valueB = b.household_number || '';
+                    break;
+                case 'head_name':
+                    valueA = `${a.head_of_household?.last_name || ''} ${a.head_of_household?.first_name || ''}`.trim();
+                    valueB = `${b.head_of_household?.last_name || ''} ${b.head_of_household?.first_name || ''}`.trim();
+                    break;
+                case 'member_count':
+                    valueA = a.member_count || 0;
+                    valueB = b.member_count || 0;
+                    break;
+                case 'purok':
+                    valueA = a.purok?.name || '';
+                    valueB = b.purok?.name || '';
+                    break;
+                case 'status':
+                    valueA = a.status || '';
+                    valueB = b.status || '';
+                    break;
+                case 'created_at':
+                    valueA = new Date(a.created_at).getTime();
+                    valueB = new Date(b.created_at).getTime();
+                    break;
+                default:
+                    valueA = a.household_number || '';
+                    valueB = b.household_number || '';
+            }
+            
+            if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+            if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        return filtered;
+    }, [allHouseholds, search, statusFilter, purokFilter, minMembers, maxMembers, fromDate, toDate, sortBy, sortOrder]);
 
-    // Calculate filtered stats for display - now properly typed as FilteredStats
+    // Calculate filtered stats
     const filteredStats = useMemo((): FilteredStats => {
         return {
             total: filteredHouseholds.length,
@@ -238,17 +283,12 @@ export default function Households({ households, stats, filters, puroks, allHous
         };
     }, [filteredHouseholds]);
 
-    // Calculate pagination
+    // Pagination
     const totalItems = filteredHouseholds.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
     const paginatedHouseholds = filteredHouseholds.slice(startIndex, endIndex);
-
-    // Reset to first page when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [search, filtersState]);
 
     // Selection handlers
     const handleSelectAllOnPage = () => {
@@ -309,6 +349,18 @@ export default function Households({ households, stats, filters, puroks, allHous
         return getSelectionStats(selectedHouseholdsData);
     }, [selectedHouseholdsData]);
 
+    // Handle sort change from dropdown
+    const handleSortChange = (value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    };
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = (): string => {
+        return `${sortBy}-${sortOrder}`;
+    };
+
     // Bulk operations
     const handleBulkOperation = async (operation: BulkAction) => {
         if (selectedHouseholds.length === 0) {
@@ -357,11 +409,37 @@ export default function Households({ households, stats, filters, puroks, allHous
                     break;
 
                 case 'export':
-                    toast.info('Export functionality to be implemented');
+                    const exportData = selectedHouseholdsData.map(household => ({
+                        'Household Number': household.household_number,
+                        'Head of Household': household.head_of_household?.full_name || 'N/A',
+                        'Purok': household.purok?.name || 'N/A',
+                        'Members': household.member_count || 0,
+                        'Status': household.status,
+                        'Address': household.address || 'N/A',
+                        'Created': new Date(household.created_at).toLocaleDateString()
+                    }));
+                    
+                    const csv = [
+                        Object.keys(exportData[0]).join(','),
+                        ...exportData.map(row => Object.values(row).map(v => `"${v}"`).join(','))
+                    ].join('\n');
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `households-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    toast.success(`${selectedHouseholds.length} households exported`);
                     break;
 
                 case 'print':
-                    toast.info('Print functionality to be implemented');
+                    selectedHouseholds.forEach(id => {
+                        window.open(`/admin/households/${id}/print`, '_blank');
+                    });
+                    toast.success(`${selectedHouseholds.length} household(s) opened for printing`);
                     break;
 
                 case 'change_status':
@@ -384,7 +462,6 @@ export default function Households({ households, stats, filters, puroks, allHous
         }
     };
 
-    // Bulk action handlers
     const handleBulkStatusUpdate = async (status: string) => {
         setIsPerformingBulkAction(true);
 
@@ -467,7 +544,6 @@ export default function Households({ households, stats, filters, puroks, allHous
         }
     };
 
-    // Copy selected data to clipboard
     const handleCopySelectedData = () => {
         if (selectedHouseholdsData.length === 0) {
             toast.error('No data to copy');
@@ -483,7 +559,6 @@ export default function Households({ households, stats, filters, puroks, allHous
         });
     };
 
-    // Individual household operations
     const handleDelete = (household: Household) => {
         if (confirm(`Are you sure you want to delete household "${household.household_number || 'Untitled'}"?`)) {
             router.delete(`/admin/households/${household.id}`, {
@@ -522,66 +597,17 @@ export default function Households({ households, stats, filters, puroks, allHous
         });
     };
 
-    const handleSort = (column: string) => {
-        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
-        
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column,
-            sort_order: newOrder
-        }));
-        
-        // Trigger server-side sort update
-        const params: Record<string, any> = {
-            ...filtersState,
-            sort_by: column,
-            sort_order: newOrder,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            if (!params[key] || params[key] === 'all') {
-                delete params[key];
-            }
-        });
-        
-        router.get('/admin/households', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
     const handleClearFilters = () => {
         setSearch('');
-        setFiltersState({
-            search: '',
-            status: 'all',
-            purok_id: 'all',
-            from_date: '',
-            to_date: '',
-            sort_by: 'household_number',
-            sort_order: 'asc',
-            min_members: '',
-            max_members: ''
-        });
-        
-        // Trigger search with cleared filters
-        router.get('/admin/households', {
-            search: '',
-            status: 'all',
-            purok_id: 'all',
-            from_date: '',
-            to_date: '',
-            sort_by: 'household_number',
-            sort_order: 'asc',
-            min_members: '',
-            max_members: ''
-        }, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
+        setStatusFilter('all');
+        setPurokFilter('all');
+        setMinMembers('');
+        setMaxMembers('');
+        setFromDate('');
+        setToDate('');
+        setSortBy('household_number');
+        setSortOrder('asc');
+        setCurrentPage(1);
     };
 
     const handleClearSelection = () => {
@@ -589,37 +615,51 @@ export default function Households({ households, stats, filters, puroks, allHous
         setIsSelectAll(false);
     };
 
-    const updateFilter = (key: keyof FilterState, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
-        
-        // Trigger server-side filter update
-        const params: Record<string, any> = {
-            ...filtersState,
-            [key]: value,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            if (!params[key] || params[key] === 'all') {
-                delete params[key];
-            }
-        });
-        
-        router.get('/admin/households', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
+    const hasActiveFilters = Boolean(
+        search || 
+        statusFilter !== 'all' || 
+        purokFilter !== 'all' ||
+        minMembers ||
+        maxMembers ||
+        fromDate ||
+        toDate
+    );
+
+    // Create a filters state object for the Filters component
+    const filtersStateForComponent = {
+        status: statusFilter,
+        purok_id: purokFilter,
+        from_date: fromDate,
+        to_date: toDate,
+        min_members: minMembers,
+        max_members: maxMembers,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        search: search
     };
 
-    const hasActiveFilters = 
-        search !== '' || 
-        filtersState.status !== 'all' || 
-        filtersState.purok_id !== 'all' ||
-        filtersState.from_date !== '' ||
-        filtersState.to_date !== '' ||
-        filtersState.min_members !== '' ||
-        filtersState.max_members !== '';
+    const updateFilter = (key: string, value: string) => {
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'purok_id':
+                setPurokFilter(value);
+                break;
+            case 'from_date':
+                setFromDate(value);
+                break;
+            case 'to_date':
+                setToDate(value);
+                break;
+            case 'min_members':
+                setMinMembers(value);
+                break;
+            case 'max_members':
+                setMaxMembers(value);
+                break;
+        }
+    };
 
     return (
         <AppLayout
@@ -637,7 +677,6 @@ export default function Households({ households, stats, filters, puroks, allHous
                         isMobile={isMobile}
                     />
 
-                    {/* Separate Stats Component */}
                     <HouseholdsStats 
                         globalStats={safeStats}
                         filteredStats={filteredStats}
@@ -649,8 +688,8 @@ export default function Households({ households, stats, filters, puroks, allHous
                         filteredStats={filteredStats}
                         search={search}
                         setSearch={setSearch}
-                        onSearchChange={handleSearchChange}
-                        filtersState={filtersState}
+                        onSearchChange={(e) => setSearch(e.target.value)}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
@@ -666,7 +705,7 @@ export default function Households({ households, stats, filters, puroks, allHous
                         isLoading={isPerformingBulkAction}
                     />
 
-                  <HouseholdsContent
+                    <HouseholdsContent
                         households={paginatedHouseholds}
                         stats={{
                             total: filteredStats.total,
@@ -695,10 +734,10 @@ export default function Households({ households, stats, filters, puroks, allHous
                         onDelete={handleDelete}
                         onToggleStatus={handleToggleStatus}
                         onCopyToClipboard={handleCopyToClipboard}
-                        onSort={handleSort}
+                        onSort={() => {}} // No longer needed for server-side
                         puroks={safePuroks}
-                        sortBy={filtersState.sort_by}
-                        sortOrder={filtersState.sort_order}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
                         selectionStats={selectionStats}
                         isPerformingBulkAction={isPerformingBulkAction}
                         onBulkOperation={handleBulkOperation}
@@ -710,6 +749,8 @@ export default function Households({ households, stats, filters, puroks, allHous
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
                         setShowBulkPurokDialog={setShowBulkPurokDialog}
                         selectionMode={selectionMode}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
                     
                     {/* Keyboard Shortcuts Help */}

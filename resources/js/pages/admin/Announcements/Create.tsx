@@ -14,7 +14,6 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import AudienceTarget from '@/components/admin/announcements/AudienceTarget';
 import { 
     ArrowLeft,
@@ -46,13 +45,8 @@ import {
     FileArchive,
     Loader2,
     Trash2,
-    Download,
     Maximize2,
-    Image as ImageIcon,
-    Link as LinkIcon,
     Info,
-    CheckCircle,
-    XCircle
 } from 'lucide-react';
 import { route } from 'ziggy-js';
 import {
@@ -61,7 +55,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog';
 import {
     Tooltip,
@@ -70,19 +63,33 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+// Import types from centralized types file
+import type {
+    AnnouncementType,
+    PriorityLevel,
+    AudienceType,
+    Role,
+    Purok,
+    Household,
+    Business,
+    User
+} from '@/types/admin/announcements/announcement.types';
+
+// Props interface using imported types
 interface CreateAnnouncementProps {
-    types: Record<string, string>;
-    priorities: Record<string, string>;
-    audience_types: Record<string, string>;
-    roles: Array<{ id: number; name: string }>;
-    puroks: Array<{ id: number; name: string }>;
-    households: Array<{ id: number; household_number: string; purok?: { name: string } }>;
-    businesses: Array<{ id: number; business_name: string; owner_name?: string }>;
-    users: Array<{ id: number; first_name: string; last_name: string; email: string; role?: { name: string } }>;
+    types: Record<AnnouncementType, string>;
+    priorities: Record<PriorityLevel, string>;
+    audience_types: Record<AudienceType, string>;
+    roles: Role[];
+    puroks: Purok[];
+    households: Household[];
+    businesses: Business[];
+    users: User[];
     maxFileSize?: number;
     allowedFileTypes?: string[];
 }
 
+// Attachment interface
 interface Attachment {
     id?: number;
     file: File;
@@ -94,6 +101,26 @@ interface Attachment {
     error?: string;
     isUploading?: boolean;
     isImage?: boolean;
+}
+
+// Form data interface
+interface AnnouncementFormData {
+    title: string;
+    content: string;
+    type: AnnouncementType;
+    priority: PriorityLevel;
+    is_active: boolean;
+    audience_type: AudienceType;
+    target_roles: number[];
+    target_puroks: number[];
+    target_households: number[];
+    target_businesses: number[];
+    target_users: number[];
+    start_date: string;
+    start_time: string;
+    end_date: string;
+    end_time: string;
+    attachments: File[];
 }
 
 // Helper function to format file size
@@ -131,22 +158,21 @@ export default function CreateAnnouncement({
     allowedFileTypes = ['image/*', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv']
 }: CreateAnnouncementProps) {
     const { flash } = usePage().props as any;
-    const [activeTab, setActiveTab] = useState('content');
-    const [showStartTime, setShowStartTime] = useState(false);
-    const [showEndTime, setShowEndTime] = useState(false);
+    const [activeTab, setActiveTab] = useState<string>('content');
+    const [showStartTime, setShowStartTime] = useState<boolean>(false);
+    const [showEndTime, setShowEndTime] = useState<boolean>(false);
     
-    // Attachment state - always initialized as empty array
+    // Attachment state
     const [attachments, setAttachments] = useState<Attachment[]>([]);
-    const [isDragging, setIsDragging] = useState(false);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
     const [previewImage, setPreviewImage] = useState<Attachment | null>(null);
-    const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
-    // Form state - attachments initialized as empty array
-    const { data, setData, post, processing, errors, reset } = useForm({
+    // Form state with proper typing
+    const { data, setData, post, processing, errors, reset } = useForm<AnnouncementFormData>({
         title: '',
         content: '',
         type: 'general',
-        priority: 0,
+        priority: 1,
         is_active: true,
         audience_type: 'all',
         target_roles: [],
@@ -158,7 +184,7 @@ export default function CreateAnnouncement({
         start_time: '',
         end_date: '',
         end_time: '',
-        attachments: [] as File[], // Initialize as empty array
+        attachments: [],
     });
 
     // Flash messages
@@ -181,13 +207,12 @@ export default function CreateAnnouncement({
             const formattedEndDate = endDate.toISOString().split('T')[0];
             setData('end_date', formattedEndDate);
         }
-    }, [data.start_date]);
+    }, [data.start_date, setData]);
 
-    // Clean up preview URLs on unmount - with safe check
+    // Clean up preview URLs on unmount
     useEffect(() => {
         return () => {
-            // Safe check for attachments array
-            if (Array.isArray(attachments) && attachments.length > 0) {
+            if (attachments.length > 0) {
                 attachments.forEach(att => {
                     if (att?.preview) {
                         URL.revokeObjectURL(att.preview);
@@ -199,8 +224,9 @@ export default function CreateAnnouncement({
 
     // Validate file before adding
     const validateFile = (file: File): string | null => {
-        // Check file size
-        if (file.size > maxFileSize * 1024 * 1024) {
+        // Check file size (convert MB to bytes)
+        const maxSizeBytes = maxFileSize * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
             return `File size exceeds ${maxFileSize}MB limit`;
         }
 
@@ -231,8 +257,8 @@ export default function CreateAnnouncement({
         const newFiles: File[] = [];
 
         Array.from(files).forEach(file => {
-            // Safe check for duplicates
-            if (Array.isArray(attachments) && attachments.some(att => att.name === file.name && att.size === file.size)) {
+            // Check for duplicates
+            if (attachments.some(att => att.name === file.name && att.size === file.size)) {
                 toast.error(`${file.name} is already added`);
                 return;
             }
@@ -259,13 +285,8 @@ export default function CreateAnnouncement({
             newAttachments.push(attachment);
         });
 
-        // Safe update with existing attachments
-        const currentAttachments = Array.isArray(attachments) ? attachments : [];
-        setAttachments([...currentAttachments, ...newAttachments]);
-        
-        // Safe update for form data
-        const currentFormAttachments = Array.isArray(data.attachments) ? data.attachments : [];
-        setData('attachments', [...currentFormAttachments, ...newFiles]);
+        setAttachments([...attachments, ...newAttachments]);
+        setData('attachments', [...data.attachments, ...newFiles]);
     };
 
     // Handle file drop
@@ -288,40 +309,33 @@ export default function CreateAnnouncement({
 
     // Remove attachment
     const removeAttachment = (index: number) => {
-        // Safe update for attachments state
-        setAttachments(prev => {
-            const current = Array.isArray(prev) ? prev : [];
-            const newAttachments = [...current];
-            if (newAttachments[index]?.preview) {
-                URL.revokeObjectURL(newAttachments[index].preview!);
-            }
-            newAttachments.splice(index, 1);
-            return newAttachments;
-        });
-
-        // Safe update for form data
-        setData('attachments', prev => {
-            const current = Array.isArray(prev) ? prev : [];
-            return current.filter((_, i) => i !== index);
-        });
+        // Clean up preview URL if exists
+        if (attachments[index]?.preview) {
+            URL.revokeObjectURL(attachments[index].preview!);
+        }
+        
+        // Update attachments state
+        setAttachments(prev => prev.filter((_, i) => i !== index));
+        
+        // Update form data - use direct assignment instead of updater function
+        const updatedAttachments = data.attachments.filter((_, i) => i !== index);
+        setData('attachments', updatedAttachments);
     };
 
     // Clear all attachments
     const clearAttachments = () => {
-        // Clean up preview URLs
-        if (Array.isArray(attachments) && attachments.length > 0) {
-            attachments.forEach(att => {
-                if (att?.preview) {
-                    URL.revokeObjectURL(att.preview);
-                }
-            });
-        }
+        // Clean up all preview URLs
+        attachments.forEach(att => {
+            if (att?.preview) {
+                URL.revokeObjectURL(att.preview);
+            }
+        });
         setAttachments([]);
         setData('attachments', []);
     };
 
     // Validate form before submit
-    const validateForm = () => {
+    const validateForm = (): boolean => {
         if (!data.title.trim()) {
             toast.error('Title is required');
             setActiveTab('content');
@@ -333,27 +347,25 @@ export default function CreateAnnouncement({
             return false;
         }
         
-        // Check for attachment errors - safe check
-        if (Array.isArray(attachments) && attachments.length > 0) {
-            const hasErrors = attachments.some(att => att.error);
-            if (hasErrors) {
-                toast.error('Please fix attachment errors before publishing');
-                setActiveTab('attachments');
-                return false;
-            }
+        // Check for attachment errors
+        const hasErrors = attachments.some(att => att.error);
+        if (hasErrors) {
+            toast.error('Please fix attachment errors before publishing');
+            setActiveTab('attachments');
+            return false;
         }
 
         // Validate audience selections
         switch (data.audience_type) {
             case 'roles':
-                if (!Array.isArray(data.target_roles) || data.target_roles.length === 0) {
+                if (data.target_roles.length === 0) {
                     toast.error('Please select at least one role');
                     setActiveTab('audience');
                     return false;
                 }
                 break;
             case 'puroks':
-                if (!Array.isArray(data.target_puroks) || data.target_puroks.length === 0) {
+                if (data.target_puroks.length === 0) {
                     toast.error('Please select at least one purok');
                     setActiveTab('audience');
                     return false;
@@ -361,21 +373,21 @@ export default function CreateAnnouncement({
                 break;
             case 'households':
             case 'household_members':
-                if (!Array.isArray(data.target_households) || data.target_households.length === 0) {
+                if (data.target_households.length === 0) {
                     toast.error('Please select at least one household');
                     setActiveTab('audience');
                     return false;
                 }
                 break;
             case 'businesses':
-                if (!Array.isArray(data.target_businesses) || data.target_businesses.length === 0) {
+                if (data.target_businesses.length === 0) {
                     toast.error('Please select at least one business');
                     setActiveTab('audience');
                     return false;
                 }
                 break;
             case 'specific_users':
-                if (!Array.isArray(data.target_users) || data.target_users.length === 0) {
+                if (data.target_users.length === 0) {
                     toast.error('Please select at least one user');
                     setActiveTab('audience');
                     return false;
@@ -400,24 +412,24 @@ export default function CreateAnnouncement({
         formData.append('is_active', data.is_active.toString());
         formData.append('audience_type', data.audience_type);
         
-        // Add array fields - with safe checks
-        if (Array.isArray(data.target_roles) && data.target_roles.length > 0) {
+        // Add array fields
+        if (data.target_roles.length > 0) {
             data.target_roles.forEach(id => formData.append('target_roles[]', id.toString()));
         }
         
-        if (Array.isArray(data.target_puroks) && data.target_puroks.length > 0) {
+        if (data.target_puroks.length > 0) {
             data.target_puroks.forEach(id => formData.append('target_puroks[]', id.toString()));
         }
         
-        if (Array.isArray(data.target_households) && data.target_households.length > 0) {
+        if (data.target_households.length > 0) {
             data.target_households.forEach(id => formData.append('target_households[]', id.toString()));
         }
         
-        if (Array.isArray(data.target_businesses) && data.target_businesses.length > 0) {
+        if (data.target_businesses.length > 0) {
             data.target_businesses.forEach(id => formData.append('target_businesses[]', id.toString()));
         }
         
-        if (Array.isArray(data.target_users) && data.target_users.length > 0) {
+        if (data.target_users.length > 0) {
             data.target_users.forEach(id => formData.append('target_users[]', id.toString()));
         }
         
@@ -427,12 +439,10 @@ export default function CreateAnnouncement({
         if (data.end_date) formData.append('end_date', data.end_date);
         if (showEndTime && data.end_time) formData.append('end_time', data.end_time);
         
-        // Add attachments - with safe check
-        if (Array.isArray(data.attachments) && data.attachments.length > 0) {
-            data.attachments.forEach((file, index) => {
-                formData.append(`attachments[${index}]`, file);
-            });
-        }
+        // Add attachments
+        data.attachments.forEach((file, index) => {
+            formData.append(`attachments[${index}]`, file);
+        });
 
         // Submit using FormData
         post(route('admin.announcements.store'), {
@@ -500,7 +510,7 @@ export default function CreateAnnouncement({
     };
 
     // Format date and time for preview
-    const formatDateTimePreview = (date: string, time: string, showTime: boolean) => {
+    const formatDateTimePreview = (date: string, time: string, showTime: boolean): string => {
         if (!date) return 'Not set';
         
         const dateObj = new Date(date);
@@ -523,7 +533,7 @@ export default function CreateAnnouncement({
     };
 
     // Get priority color
-    const getPriorityColor = (priority: number) => {
+    const getPriorityColor = (priority: PriorityLevel): string => {
         switch (priority) {
             case 4: return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
             case 3: return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
@@ -534,7 +544,7 @@ export default function CreateAnnouncement({
     };
 
     // Get type color
-    const getTypeColor = (type: string) => {
+    const getTypeColor = (type: AnnouncementType): string => {
         switch (type) {
             case 'important': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
             case 'event': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
@@ -545,7 +555,7 @@ export default function CreateAnnouncement({
     };
 
     // Get type icon
-    const getTypeIcon = (type: string) => {
+    const getTypeIcon = (type: AnnouncementType) => {
         switch (type) {
             case 'important': return AlertCircle;
             case 'event': return Calendar;
@@ -556,7 +566,7 @@ export default function CreateAnnouncement({
     };
 
     // Get audience icon
-    const getAudienceIcon = (type: string) => {
+    const getAudienceIcon = (type: AudienceType) => {
         switch (type) {
             case 'roles': return Users;
             case 'puroks': return MapPin;
@@ -568,14 +578,18 @@ export default function CreateAnnouncement({
         }
     };
 
-    const typeOptions = Object.entries(types).map(([value, label]) => ({ value, label }));
+    const typeOptions = Object.entries(types).map(([value, label]) => ({ 
+        value: value as AnnouncementType, 
+        label 
+    }));
+    
     const priorityOptions = Object.entries(priorities).map(([value, label]) => ({ 
-        value: parseInt(value), 
+        value: parseInt(value) as PriorityLevel, 
         label 
     }));
 
     // Safe check for attachments count
-    const attachmentsCount = Array.isArray(attachments) ? attachments.length : 0;
+    const attachmentsCount = attachments.length;
 
     return (
         <AppLayout
@@ -651,11 +665,11 @@ export default function CreateAnnouncement({
 
                 {/* Main Content Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                    <TabsList className="grid grid-cols-4 w-full max-w-2xl ">
-                        <TabsTrigger value="content" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white ">
+                    <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+                        <TabsTrigger value="content" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white">
                             Content
                         </TabsTrigger>
-                        <TabsTrigger value="attachments" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white ">
+                        <TabsTrigger value="attachments" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white">
                             Attachments
                             {attachmentsCount > 0 && (
                                 <Badge variant="secondary" className="ml-2 dark:bg-gray-700 dark:text-gray-300">
@@ -782,8 +796,8 @@ export default function CreateAnnouncement({
                                     </div>
                                 </div>
 
-                                {/* File List - with safe check */}
-                                {Array.isArray(attachments) && attachments.length > 0 && (
+                                {/* File List */}
+                                {attachments.length > 0 && (
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
                                             <h3 className="font-semibold dark:text-gray-100">
@@ -956,7 +970,7 @@ export default function CreateAnnouncement({
                                         <Label htmlFor="type" className="dark:text-gray-300">Type *</Label>
                                         <Select 
                                             value={data.type}
-                                            onValueChange={(value: any) => setData('type', value)}
+                                            onValueChange={(value: AnnouncementType) => setData('type', value)}
                                         >
                                             <SelectTrigger id="type" className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                 <SelectValue placeholder="Select type" />
@@ -984,7 +998,7 @@ export default function CreateAnnouncement({
                                         <Label htmlFor="priority" className="dark:text-gray-300">Priority Level *</Label>
                                         <Select 
                                             value={data.priority.toString()}
-                                            onValueChange={(value) => setData('priority', parseInt(value))}
+                                            onValueChange={(value) => setData('priority', parseInt(value) as PriorityLevel)}
                                         >
                                             <SelectTrigger id="priority" className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                                                 <SelectValue placeholder="Select priority" />
@@ -1153,11 +1167,11 @@ export default function CreateAnnouncement({
                         <AudienceTarget
                             value={{
                                 audience_type: data.audience_type,
-                                target_roles: data.target_roles || [],
-                                target_puroks: data.target_puroks || [],
-                                target_households: data.target_households || [],
-                                target_businesses: data.target_businesses || [],
-                                target_users: data.target_users || [],
+                                target_roles: data.target_roles,
+                                target_puroks: data.target_puroks,
+                                target_households: data.target_households,
+                                target_businesses: data.target_businesses,
+                                target_users: data.target_users,
                             }}
                             onChange={(field, value) => setData(field as any, value)}
                             roles={roles}
@@ -1191,19 +1205,19 @@ export default function CreateAnnouncement({
                                             return <IconComponent className="h-5 w-5" />;
                                         })()}
                                     </div>
-                                    <div>
-                                        <h3 className="font-bold text-lg dark:text-gray-100">
-                                            {data.title || "Announcement Title"}
-                                        </h3>
-                                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                            <Calendar className="h-3 w-3" />
-                                            <span>Posted: {new Date().toLocaleDateString()}</span>
-                                            <span>•</span>
-                                            <span className={`font-medium px-2 py-1 rounded-full text-xs ${getPriorityColor(data.priority)}`}>
-                                                {priorities[data.priority.toString()] || 'Normal'} Priority
-                                            </span>
-                                        </div>
+                                <div>
+                                    <h3 className="font-bold text-lg dark:text-gray-100">
+                                        {data.title || "Announcement Title"}
+                                    </h3>
+                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                        <Calendar className="h-3 w-3" />
+                                        <span>Posted: {new Date().toLocaleDateString()}</span>
+                                        <span>•</span>
+                                        <span className={`font-medium px-2 py-1 rounded-full text-xs ${getPriorityColor(data.priority)}`}>
+                                            {priorities[data.priority] || 'Normal'} Priority
+                                        </span>
                                     </div>
+                                </div>
                                 </div>
                                 {data.is_active && (
                                     <div className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full text-xs font-medium">
@@ -1223,12 +1237,12 @@ export default function CreateAnnouncement({
                                 </Badge>
                                 {data.audience_type !== 'all' && (
                                     <Badge variant="secondary" className="text-xs dark:bg-gray-700 dark:text-gray-300">
-                                        {data.audience_type === 'roles' && (data.target_roles?.length || 0)} roles selected
-                                        {data.audience_type === 'puroks' && (data.target_puroks?.length || 0)} puroks selected
-                                        {data.audience_type === 'households' && (data.target_households?.length || 0)} households selected
-                                        {data.audience_type === 'household_members' && (data.target_households?.length || 0)} households selected
-                                        {data.audience_type === 'businesses' && (data.target_businesses?.length || 0)} businesses selected
-                                        {data.audience_type === 'specific_users' && (data.target_users?.length || 0)} users selected
+                                        {data.audience_type === 'roles' && data.target_roles.length} roles selected
+                                        {data.audience_type === 'puroks' && data.target_puroks.length} puroks selected
+                                        {data.audience_type === 'households' && data.target_households.length} households selected
+                                        {data.audience_type === 'household_members' && data.target_households.length} households selected
+                                        {data.audience_type === 'businesses' && data.target_businesses.length} businesses selected
+                                        {data.audience_type === 'specific_users' && data.target_users.length} users selected
                                     </Badge>
                                 )}
                             </div>
@@ -1239,8 +1253,8 @@ export default function CreateAnnouncement({
                                 </p>
                             </div>
 
-                            {/* Attachments Preview - with safe check */}
-                            {Array.isArray(attachments) && attachments.length > 0 && (
+                            {/* Attachments Preview */}
+                            {attachments.length > 0 && (
                                 <div className="mt-4 pt-4 border-t dark:border-gray-700">
                                     <div className="flex items-center gap-2 mb-3">
                                         <Paperclip className="h-4 w-4 text-gray-400 dark:text-gray-500" />

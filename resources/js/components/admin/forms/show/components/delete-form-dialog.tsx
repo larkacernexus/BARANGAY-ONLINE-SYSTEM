@@ -11,7 +11,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
-import { Form } from '../types';
+import { Form } from '@/types/admin/forms/forms.types';
 
 interface Props {
     open: boolean;

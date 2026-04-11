@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { UserPlus, X, CheckCircle } from 'lucide-react';
 import { SearchableResidentDropdown } from './SearchableResidentDropdown';
-import { Resident } from '@/components/admin/community-reports/create//types/community-report';
+import { Resident } from '@/types/admin/reports/community-report';
 
 interface ComplainantInfoCardProps {
     residents: Resident[];

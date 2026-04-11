@@ -150,80 +150,94 @@ class ResidentPaymentController extends Controller
     /**
      * Display the specified payment with all details
      */
-    public function show(Payment $payment)
-    {
-        $user = auth()->user();
-        $household = $user->household_id ? Household::find($user->household_id) : null;
-        
-        if (!$household) {
-            abort(403, 'You are not authorized to view this payment.');
-        }
-        
-        // Check if payment belongs to this household or its residents
-        $authorized = $this->checkPaymentAuthorization($payment, $household);
-        
-        if (!$authorized) {
-            abort(403, 'You are not authorized to view this payment.');
-        }
-        
-        // Load only existing relationships
-        $payment->load([
-            'items', 
-            'resident', 
-            'household'
-        ]);
-        
-        // Get related payments (same payer)
-        $relatedPayments = Payment::where(function($query) use ($payment) {
-                $query->where('payer_type', $payment->payer_type)
-                      ->where('payer_id', $payment->payer_id);
-            })
-            ->where('id', '!=', $payment->id)
-            ->latest('payment_date')
-            ->limit(5)
-            ->get();
-            
-        $payment->setRelation('related_payments', $relatedPayments);
-        
-        // Format payment for frontend
-        $formattedPayment = $this->formatPaymentForFrontend($payment);
-        
-        // Determine permissions
-        $canEdit = $payment->status === 'pending';
-        $canDelete = $payment->status === 'pending';
-        $canPrint = in_array($payment->status, ['completed', 'paid']);
-        $canDownload = in_array($payment->status, ['completed', 'paid']);
-        $canVerify = false; // Residents cannot verify payments
-        $canRefund = false; // Residents cannot refund payments
-        $canAddNote = false; // Disabled since notes relationship doesn't exist
-        $canUploadAttachment = false; // Disabled
-        
-        // Determine if payment can be paid online
-        $canPayOnline = in_array($payment->payment_method, ['gcash', 'maya', 'online', 'bank']) 
-            && $payment->status === 'pending';
-        
-        return Inertia::render('resident/Payments/Show', [
-            'payment' => $formattedPayment,
-            'canEdit' => $canEdit,
-            'canDelete' => $canDelete,
-            'canPrint' => $canPrint,
-            'canDownload' => $canDownload,
-            'canVerify' => $canVerify,
-            'canRefund' => $canRefund,
-            'canAddNote' => $canAddNote,
-            'canUploadAttachment' => $canUploadAttachment,
-            'canPayOnline' => $canPayOnline,
-            'paymentMethods' => [
-                'cash' => 'Cash',
-                'gcash' => 'GCash',
-                'maya' => 'Maya',
-                'bank' => 'Bank Transfer',
-                'check' => 'Check',
-                'online' => 'Online Payment',
-            ],
-        ]);
+   public function show(Payment $payment)
+{
+    $user = auth()->user();
+    $household = $user->household_id ? Household::find($user->household_id) : null;
+    
+    if (!$household) {
+        abort(403, 'You are not authorized to view this payment.');
     }
     
+    // Check if payment belongs to this household or its residents
+    $authorized = $this->checkPaymentAuthorization($payment, $household);
+    
+    if (!$authorized) {
+        abort(403, 'You are not authorized to view this payment.');
+    }
+    
+    // Load relationships - FIXED: Remove 'audit_log' and load 'activities' instead
+    $payment->load([
+        'items', 
+        'resident', 
+        'household',
+        'discounts.rule',
+        'discounts.verifier',
+        'recorder'
+    ]);
+    
+    // Load activities for audit log using Spatie Activitylog
+    // The activities are stored in the 'activity_log' table with 'log_name' = 'payments'
+    $activities = \Spatie\Activitylog\Models\Activity::where('subject_type', Payment::class)
+        ->where('subject_id', $payment->id)
+        ->orWhere(function($query) use ($payment) {
+            $query->where('log_name', 'payments')
+                  ->where('subject_id', $payment->id);
+        })
+        ->orderBy('created_at', 'desc')
+        ->get();
+    
+    // Get related payments (same payer)
+    $relatedPayments = Payment::where(function($query) use ($payment) {
+            $query->where('payer_type', $payment->payer_type)
+                  ->where('payer_id', $payment->payer_id);
+        })
+        ->where('id', '!=', $payment->id)
+        ->latest('payment_date')
+        ->limit(5)
+        ->get();
+        
+    $payment->setRelation('related_payments', $relatedPayments);
+    
+    // Format payment for frontend
+    $formattedPayment = $this->formatPaymentForFrontend($payment, $activities);
+    
+    // Determine permissions
+    $canEdit = $payment->status === 'pending';
+    $canDelete = $payment->status === 'pending';
+    $canPrint = in_array($payment->status, ['completed', 'paid']);
+    $canDownload = in_array($payment->status, ['completed', 'paid']);
+    $canVerify = false; // Residents cannot verify payments
+    $canRefund = false; // Residents cannot refund payments
+    $canAddNote = false; // Disabled since notes relationship doesn't exist
+    $canUploadAttachment = false; // Disabled
+    
+    // Determine if payment can be paid online
+    $canPayOnline = in_array($payment->payment_method, ['gcash', 'maya', 'online', 'bank']) 
+        && $payment->status === 'pending';
+    
+    return Inertia::render('resident/Payments/Show', [
+        'payment' => $formattedPayment,
+        'canEdit' => $canEdit,
+        'canDelete' => $canDelete,
+        'canPrint' => $canPrint,
+        'canDownload' => $canDownload,
+        'canVerify' => $canVerify,
+        'canRefund' => $canRefund,
+        'canAddNote' => $canAddNote,
+        'canUploadAttachment' => $canUploadAttachment,
+        'canPayOnline' => $canPayOnline,
+        'paymentMethods' => [
+            'cash' => 'Cash',
+            'gcash' => 'GCash',
+            'maya' => 'Maya',
+            'bank' => 'Bank Transfer',
+            'check' => 'Check',
+            'online' => 'Online Payment',
+        ],
+    ]);
+}
+
     /**
      * Generate and download PDF receipt
      */
@@ -861,137 +875,249 @@ class ResidentPaymentController extends Controller
     /**
      * Format payment for frontend
      */
-    private function formatPaymentForFrontend(Payment $payment)
-    {
-        // Get payer details based on payer_type
-        $payerDetails = [];
-        
-        if ($payment->payer_type === 'resident' && $payment->resident) {
-            $payerDetails = [
-                'id' => $payment->resident->id,
-                'name' => $payment->resident->full_name ?? $payment->resident->name ?? 'N/A',
-                'first_name' => $payment->resident->first_name,
-                'last_name' => $payment->resident->last_name,
-                'middle_name' => $payment->resident->middle_name,
-                'suffix' => $payment->resident->suffix,
-                'contact_number' => $payment->resident->contact_number,
-                'email' => $payment->resident->email,
-                'address' => $payment->resident->address,
-                'household_number' => $payment->resident->household_number,
-                'purok' => $payment->resident->purok,
-                'profile_photo' => $payment->resident->profile_photo,
-            ];
-        } elseif ($payment->payer_type === 'household' && $payment->household) {
-            $payerDetails = [
-                'id' => $payment->household->id,
-                'name' => $payment->household->head_of_family ?? $payment->household->name ?? 'N/A',
-                'contact_number' => $payment->household->contact_number,
-                'address' => $payment->household->address,
-                'household_number' => $payment->household->household_number,
-                'purok' => $payment->household->purok,
-            ];
+   private function formatPaymentForFrontend(Payment $payment, $activities = null)
+{
+    // Get payer details based on payer_type
+    $payerDetails = [];
+    
+    if ($payment->payer_type === 'resident' && $payment->resident) {
+        // Get active privileges
+        $activePrivileges = $payment->resident->residentPrivileges
+            ?->filter(function ($rp) {
+                return $rp->isActive();
+            })
+            ->map(function ($rp) {
+                $privilege = $rp->privilege;
+                $discountType = $privilege?->discountType;
+                return [
+                    'code' => $privilege?->code,
+                    'name' => $privilege?->name,
+                    'id_number' => $rp->id_number,
+                    'discount_percentage' => $discountType?->percentage ?? 0,
+                ];
+            })
+            ->values()
+            ->toArray() ?? [];
+
+        // DYNAMIC privilege flags
+        $privilegeFlags = [];
+        foreach ($activePrivileges as $priv) {
+            $code = strtolower($priv['code']);
+            $privilegeFlags["is_{$code}"] = true;
         }
-        
-        // Get certificate type display name
-        $certificateTypeDisplay = null;
-        if ($payment->certificate_type) {
-            $certificateTypes = [
-                'residency' => 'Certificate of Residency',
-                'indigency' => 'Certificate of Indigency',
-                'clearance' => 'Barangay Clearance',
-                'cedula' => 'Cedula',
-                'business' => 'Business Permit',
-            ];
-            $certificateTypeDisplay = $certificateTypes[$payment->certificate_type] ?? ucfirst($payment->certificate_type);
-        }
-        
-        // Get payment method display name
-        $paymentMethodDisplay = $this->getPaymentMethodLabel($payment->payment_method);
-        
-        // Get collection type display name
-        $collectionTypeDisplay = $this->getReceiptTypeLabel($payment->collection_type);
-        
-        // Format amounts
-        $formatAmount = function($amount) {
-            return '₱' . number_format($amount, 2);
-        };
-        
-        // Format items
-        $items = $payment->items->map(function ($item) use ($formatAmount) {
-            return [
-                'id' => $item->id,
-                'item_name' => $item->item_name ?? $item->fee_name ?? 'N/A',
-                'description' => $item->description,
-                'quantity' => (int) ($item->quantity ?? 1),
-                'unit_price' => (float) ($item->unit_price ?? $item->base_amount ?? 0),
-                'total' => (float) ($item->total ?? $item->total_amount ?? 0),
-                'formatted_unit_price' => $formatAmount($item->unit_price ?? $item->base_amount ?? 0),
-                'formatted_total' => $formatAmount($item->total ?? $item->total_amount ?? 0),
-                'fee_code' => $item->fee_code,
-                'fee_name' => $item->fee_name,
-                'category' => $item->category,
-                'period_covered' => $item->period_covered,
-            ];
-        })->toArray();
-        
-        // Format related payments
-        $relatedPayments = $payment->related_payments ? $payment->related_payments->map(function ($related) use ($formatAmount) {
-            return [
-                'id' => $related->id,
-                'or_number' => $related->or_number,
-                'purpose' => $related->purpose,
-                'total_amount' => (float) $related->total_amount,
-                'formatted_total' => $formatAmount($related->total_amount),
-                'payment_date' => $related->payment_date ? $related->payment_date->toISOString() : null,
-                'formatted_date' => $related->payment_date ? $related->payment_date->format('M d, Y') : 'N/A',
-                'status' => $related->status,
-                'payment_method' => $related->payment_method,
-            ];
-        })->toArray() : [];
-        
-        return [
-            'id' => $payment->id,
-            'or_number' => $payment->or_number,
-            'reference_number' => $payment->reference_number,
-            'purpose' => $payment->purpose,
-            'subtotal' => (float) $payment->subtotal,
-            'surcharge' => (float) $payment->surcharge,
-            'penalty' => (float) $payment->penalty,
-            'discount' => (float) $payment->discount,
-            'total_amount' => (float) $payment->total_amount,
-            'payment_date' => $payment->payment_date ? $payment->payment_date->toISOString() : null,
-            'due_date' => $payment->due_date ? $payment->due_date->toISOString() : null,
-            'status' => $payment->status,
-            'payment_method' => $payment->payment_method,
-            'payment_method_display' => $paymentMethodDisplay,
-            'is_cleared' => (bool) $payment->is_cleared,
-            'certificate_type' => $payment->certificate_type,
-            'certificate_type_display' => $certificateTypeDisplay,
-            'collection_type' => $payment->collection_type,
-            'collection_type_display' => $collectionTypeDisplay,
-            'remarks' => $payment->remarks,
-            'payer_type' => $payment->payer_type,
-            'payer_id' => $payment->payer_id,
-            'formatted_total' => $formatAmount($payment->total_amount),
-            'formatted_date' => $payment->payment_date ? $payment->payment_date->format('M d, Y') : 'N/A',
-            'formatted_subtotal' => $formatAmount($payment->subtotal),
-            'formatted_surcharge' => $formatAmount($payment->surcharge),
-            'formatted_penalty' => $formatAmount($payment->penalty),
-            'formatted_discount' => $formatAmount($payment->discount),
-            'payer_details' => $payerDetails,
-            'items' => $items,
-            'related_payments' => $relatedPayments,
-            'metadata' => $payment->method_details,
-            'tags' => $payment->tags ? explode(',', $payment->tags) : [],
-            'created_at' => $payment->created_at ? $payment->created_at->toISOString() : null,
-            'updated_at' => $payment->updated_at ? $payment->updated_at->toISOString() : null,
-            'created_by' => $payment->recorded_by ? [
-                'id' => $payment->recorded_by,
-                'name' => $payment->recorded_by_name ?? 'System',
-                'role' => 'system',
-            ] : null,
+
+        $payerDetails = array_merge([
+            'id' => $payment->resident->id,
+            'name' => $payment->resident->full_name ?? $payment->resident->name ?? 'Unknown',
+            'first_name' => $payment->resident->first_name,
+            'last_name' => $payment->resident->last_name,
+            'middle_name' => $payment->resident->middle_name,
+            'suffix' => $payment->resident->suffix,
+            'contact_number' => $payment->resident->contact_number,
+            'email' => $payment->resident->email,
+            'address' => $payment->resident->address,
+            'household_number' => $payment->resident->household_number,
+            'purok' => $payment->resident->purok,
+            'profile_photo' => $payment->resident->profile_photo,
+            'privileges' => $activePrivileges,
+            'privileges_count' => count($activePrivileges),
+            'has_privileges' => count($activePrivileges) > 0,
+        ], $privilegeFlags);
+    } elseif ($payment->payer_type === 'household' && $payment->household) {
+        $payerDetails = [
+            'id' => $payment->household->id,
+            'name' => $payment->household->head_of_family ?? $payment->household->name ?? 'N/A',
+            'contact_number' => $payment->household->contact_number,
+            'address' => $payment->household->address,
+            'household_number' => $payment->household->household_number,
+            'purok' => $payment->household->purok,
         ];
     }
+    
+    // Get certificate type display name
+    $certificateTypeDisplay = null;
+    if ($payment->certificate_type) {
+        $certificateTypes = [
+            'residency' => 'Certificate of Residency',
+            'indigency' => 'Certificate of Indigency',
+            'clearance' => 'Barangay Clearance',
+            'cedula' => 'Cedula',
+            'business' => 'Business Permit',
+        ];
+        $certificateTypeDisplay = $certificateTypes[$payment->certificate_type] ?? ucfirst($payment->certificate_type);
+    }
+    
+    // Get payment method display name
+    $paymentMethodDisplay = $this->getPaymentMethodLabel($payment->payment_method);
+    
+    // Get collection type display name
+    $collectionTypeDisplay = $this->getReceiptTypeLabel($payment->collection_type);
+    
+    // Format amounts
+    $formatAmount = function($amount) {
+        return '₱' . number_format($amount, 2);
+    };
+    
+    // Format audit log from activities
+    $auditLog = [];
+    if ($activities && $activities->count() > 0) {
+        $auditLog = $activities->map(function ($log) {
+            return [
+                'id' => $log->id,
+                'action' => $log->event ?? 'updated',
+                'description' => $log->description,
+                'created_at' => $log->created_at?->toISOString(),
+                'formatted_date' => $log->created_at ? $log->created_at->format('M d, Y h:i A') : 'N/A',
+                'created_by' => $log->causer ? [
+                    'id' => $log->causer->id,
+                    'name' => $log->causer->name ?? 'System',
+                    'role' => $log->causer->role?->name ?? 'System',
+                ] : null,
+                'metadata' => $log->properties?->toArray() ?? [],
+            ];
+        })->toArray();
+    } else {
+        // Create a basic audit log entry if no activities exist
+        $auditLog = [
+            [
+                'id' => 1,
+                'action' => 'created',
+                'description' => 'Payment was created',
+                'created_at' => $payment->created_at?->toISOString(),
+                'formatted_date' => $payment->created_at ? $payment->created_at->format('M d, Y h:i A') : 'N/A',
+                'created_by' => $payment->recorder ? [
+                    'id' => $payment->recorder->id,
+                    'name' => $payment->recorder->name ?? 'System',
+                    'role' => $payment->recorder->role?->name ?? 'Admin',
+                ] : null,
+                'metadata' => [],
+            ]
+        ];
+        
+        // Add completed status change if payment is completed
+        if ($payment->status === 'completed') {
+            $auditLog[] = [
+                'id' => 2,
+                'action' => 'status_changed',
+                'description' => 'Payment status changed to completed',
+                'created_at' => $payment->updated_at?->toISOString(),
+                'formatted_date' => $payment->updated_at ? $payment->updated_at->format('M d, Y h:i A') : 'N/A',
+                'created_by' => $payment->recorder ? [
+                    'id' => $payment->recorder->id,
+                    'name' => $payment->recorder->name ?? 'System',
+                    'role' => $payment->recorder->role?->name ?? 'Admin',
+                ] : null,
+                'metadata' => [],
+            ];
+        }
+    }
+    
+    // Format notes (if any - using remarks as notes for now)
+    $notes = [];
+    if ($payment->remarks) {
+        $notes[] = [
+            'id' => 1,
+            'content' => $payment->remarks,
+            'is_public' => true,
+            'user_name' => $payment->recorder?->name ?? 'System',
+            'created_at' => $payment->created_at?->toISOString(),
+            'formatted_date' => $payment->created_at ? $payment->created_at->format('M d, Y h:i A') : 'N/A',
+        ];
+    }
+    
+    // Format attachments (if any)
+    $attachments = [];
+    
+    // Format items
+    $items = $payment->items->map(function ($item) use ($formatAmount) {
+        return [
+            'id' => $item->id,
+            'item_name' => $item->item_name ?? $item->fee_name ?? 'N/A',
+            'description' => $item->description,
+            'quantity' => (int) ($item->quantity ?? 1),
+            'unit_price' => (float) ($item->unit_price ?? $item->base_amount ?? 0),
+            'total' => (float) ($item->total ?? $item->total_amount ?? 0),
+            'formatted_unit_price' => $formatAmount($item->unit_price ?? $item->base_amount ?? 0),
+            'formatted_total' => $formatAmount($item->total ?? $item->total_amount ?? 0),
+            'fee_code' => $item->fee_code,
+            'fee_name' => $item->fee_name,
+            'category' => $item->category,
+            'period_covered' => $item->period_covered,
+        ];
+    })->toArray();
+    
+    // Format related payments
+    $relatedPayments = $payment->related_payments ? $payment->related_payments->map(function ($related) use ($formatAmount) {
+        return [
+            'id' => $related->id,
+            'or_number' => $related->or_number,
+            'purpose' => $related->purpose,
+            'total_amount' => (float) $related->total_amount,
+            'formatted_total' => $formatAmount($related->total_amount),
+            'payment_date' => $related->payment_date ? $related->payment_date->toISOString() : null,
+            'formatted_date' => $related->payment_date ? $related->payment_date->format('M d, Y') : 'N/A',
+            'status' => $related->status,
+            'payment_method' => $related->payment_method,
+        ];
+    })->toArray() : [];
+    
+    return [
+        'id' => $payment->id,
+        'or_number' => $payment->or_number,
+        'reference_number' => $payment->reference_number,
+        'purpose' => $payment->purpose,
+        'subtotal' => (float) $payment->subtotal,
+        'surcharge' => (float) $payment->surcharge,
+        'penalty' => (float) $payment->penalty,
+        'discount' => (float) $payment->discount,
+        'total_amount' => (float) $payment->total_amount,
+        'payment_date' => $payment->payment_date ? $payment->payment_date->toISOString() : null,
+        'due_date' => $payment->due_date ? $payment->due_date->toISOString() : null,
+        'status' => $payment->status,
+        'payment_method' => $payment->payment_method,
+        'payment_method_display' => $paymentMethodDisplay,
+        'is_cleared' => (bool) $payment->is_cleared,
+        'certificate_type' => $payment->certificate_type,
+        'certificate_type_display' => $certificateTypeDisplay,
+        'collection_type' => $payment->collection_type,
+        'collection_type_display' => $collectionTypeDisplay,
+        'remarks' => $payment->remarks,
+        'payer_type' => $payment->payer_type,
+        'payer_id' => $payment->payer_id,
+        'formatted_total' => $formatAmount($payment->total_amount),
+        'formatted_date' => $payment->payment_date ? $payment->payment_date->format('M d, Y') : 'N/A',
+        'formatted_subtotal' => $formatAmount($payment->subtotal),
+        'formatted_surcharge' => $formatAmount($payment->surcharge),
+        'formatted_penalty' => $formatAmount($payment->penalty),
+        'formatted_discount' => $formatAmount($payment->discount),
+        'payer_details' => $payerDetails,
+        'items' => $items,
+        'related_payments' => $relatedPayments,
+        'metadata' => $payment->method_details,
+        'tags' => $payment->tags ? explode(',', $payment->tags) : [],
+        'created_at' => $payment->created_at ? $payment->created_at->toISOString() : null,
+        'updated_at' => $payment->updated_at ? $payment->updated_at->toISOString() : null,
+        'created_by' => $payment->recorded_by ? [
+            'id' => $payment->recorded_by,
+            'name' => $payment->recorder?->name ?? 'System',
+            'role' => 'system',
+        ] : null,
+        // Add these for the tabs
+        'audit_log' => $auditLog,
+        'notes' => $notes,
+        'attachments' => $attachments,
+        'discounts' => $payment->discounts,
+        'discounts_summary' => $payment->discounts_summary,
+        'amount_due' => $payment->amount_due,
+        'formatted_amount_due' => $formatAmount($payment->amount_due),
+        'balance' => $payment->balance,
+        'formatted_balance' => $formatAmount($payment->balance),
+        'change_due' => $payment->change_due,
+        'formatted_change_due' => $formatAmount($payment->change_due),
+        'payment_status' => $payment->payment_status,
+        'is_fully_paid' => $payment->is_fully_paid,
+    ];
+}
     
     private function emptyPagination()
     {

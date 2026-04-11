@@ -8,7 +8,7 @@ import {
     Edit,
 } from 'lucide-react';
 import { route } from 'ziggy-js';
-import { FeeType } from '../types';
+import { FeeType } from '@/types/admin/fee-types/fee.types';
 
 interface Props {
     feeType: FeeType;

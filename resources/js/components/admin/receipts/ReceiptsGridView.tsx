@@ -26,21 +26,44 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { 
-    Receipt, 
     getReceiptStatusConfig, 
-    getPaymentMethodConfig 
+    getPaymentMethodConfig,
+    ReceiptStatus 
 } from '@/components/admin/receipts/receipt';
 
+// Define ReceiptData interface that matches actual data
+interface ReceiptData {
+    id: number;
+    receipt_number: string;
+    or_number: string | null;
+    receipt_type: string;
+    receipt_type_label: string;
+    payer_name: string;
+    payer_address: string | null;
+    formatted_total: string;
+    formatted_amount_paid: string;
+    payment_method: string;
+    payment_method_label: string;
+    formatted_issued_date: string;
+    status: string;
+    is_voided: boolean;
+    printed_count: number;
+    fee_breakdown: Array<any>;
+    reference_number?: string | null;
+    issued_by?: string | null;
+    void_reason?: string | null;
+}
+
 interface ReceiptsGridViewProps {
-    receipts: Receipt[];
+    receipts: ReceiptData[];
     isBulkMode: boolean;
     selectedReceipts: number[];
     isMobile: boolean;
     onItemSelect: (id: number) => void;
     onView: (id: number) => void;
-    onPrint: (receipt: Receipt) => void;
+    onPrint: (receipt: ReceiptData) => void;
     onVoid: (id: number, receiptNumber: string) => void;
-    onDelete: (receipt: Receipt) => void;
+    onDelete: (receipt: ReceiptData) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     selectionStats: any;
@@ -64,6 +87,12 @@ const truncateText = (text: string, maxLength: number = 25): string => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+};
+
+// Helper to safely cast status to ReceiptStatus
+const castToReceiptStatus = (status: string): ReceiptStatus => {
+    const validStatuses: ReceiptStatus[] = ['completed', 'pending', 'failed', 'cancelled', 'refunded'];
+    return validStatuses.includes(status as ReceiptStatus) ? (status as ReceiptStatus) : 'pending';
 };
 
 export default function ReceiptsGridView({
@@ -121,7 +150,8 @@ export default function ReceiptsGridView({
             padding="p-4"
         >
             {receipts.map((receipt) => {
-                const statusConfig = getReceiptStatusConfig(receipt.status, receipt.is_voided);
+                // ✅ Cast status to ReceiptStatus
+                const statusConfig = getReceiptStatusConfig(castToReceiptStatus(receipt.status), receipt.is_voided);
                 const paymentMethodConfig = getPaymentMethodConfig(receipt.payment_method);
                 const isSelected = selectedReceipts.includes(receipt.id);
                 const isExpanded = expandedReceipts.includes(receipt.id);
@@ -217,7 +247,7 @@ export default function ReceiptsGridView({
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem 
                                                         onClick={() => onVoid(receipt.id, receipt.receipt_number)}
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20"
                                                     >
                                                         <Ban className="mr-2 h-4 w-4" />
                                                         <span>Void Receipt</span>
@@ -298,9 +328,11 @@ export default function ReceiptsGridView({
                                 )}
 
                                 {/* Issued By */}
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    Issued by: {receipt.issued_by || 'System'}
-                                </div>
+                                {receipt.issued_by && (
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        Issued by: {receipt.issued_by}
+                                    </div>
+                                )}
 
                                 {/* Fee Breakdown - Expandable */}
                                 {receipt.fee_breakdown && receipt.fee_breakdown.length > 0 && (
@@ -315,7 +347,7 @@ export default function ReceiptsGridView({
                                         
                                         {isExpanded && (
                                             <div className="mt-2 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
-                                                {receipt.fee_breakdown.map((fee, index) => (
+                                                {receipt.fee_breakdown.map((fee: any, index: number) => (
                                                     <div key={index} className="flex items-center justify-between text-xs">
                                                         <span className="text-gray-600 dark:text-gray-400">
                                                             {fee.fee_name}
@@ -350,6 +382,7 @@ export default function ReceiptsGridView({
                                         e.stopPropagation();
                                         onView(receipt.id);
                                     }}
+                                    title="View Details"
                                 >
                                     <Eye className="h-3.5 w-3.5" />
                                 </Button>
@@ -362,6 +395,7 @@ export default function ReceiptsGridView({
                                         e.stopPropagation();
                                         onPrint(receipt);
                                     }}
+                                    title="Print Receipt"
                                 >
                                     <Printer className="h-3.5 w-3.5" />
                                 </Button>
@@ -375,6 +409,7 @@ export default function ReceiptsGridView({
                                             e.stopPropagation();
                                             handleCopyToClipboard(receipt.payer_address!, 'Address', e);
                                         }}
+                                        title="Copy Address"
                                     >
                                         <Copy className="h-3.5 w-3.5" />
                                     </Button>

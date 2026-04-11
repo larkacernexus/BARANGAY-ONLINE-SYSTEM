@@ -1,5 +1,5 @@
 // app/utils/payment-utils.ts
-import type { OutstandingFee, PaymentFormData, PaymentItem } from '@/types/payment-types';
+import type { OutstandingFee, PaymentFormData, PaymentItem } from '@/types/admin/payments/payments';
 import { getOutstandingFeeBalance, parseAmount, getAmountPaid, getTotalOriginalAmount, getDiscountPercentageForFeeType, calculateMonthsLate } from './payment-helpers';
 
 /**
@@ -55,9 +55,10 @@ export function validateFormData(data: PaymentFormData): { isValid: boolean; err
     errors.push('Purpose of payment is required');
   }
 
-  if (data.clearance_type_id && !data.clearance_type) {
-    errors.push('Clearance type is required for clearance payments');
-  }
+  // ❌ REMOVED: Clearance type validation - not required
+  // if (data.clearance_type_id && !data.clearance_type) {
+  //     errors.push('Clearance type is required for clearance payments');
+  // }
 
   return {
     isValid: errors.length === 0,
@@ -152,7 +153,7 @@ export function createPaymentItemFromOutstandingFee(
 
   const item: PaymentItem = {
     id: Date.now(),
-    fee_id: outstandingFee.id,
+    fee_id: String(outstandingFee.id), // ✅ FIXED: Convert to string
     fee_name: outstandingFee.fee_type_name || outstandingFee.fee_type?.name || 'Fee',
     fee_code: outstandingFee.fee_code,
     description: outstandingFee.purpose || `Payment for ${outstandingFee.fee_type_name || 'Fee'}`,

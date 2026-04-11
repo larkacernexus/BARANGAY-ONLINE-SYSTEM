@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, X, User, ExternalLink } from 'lucide-react';
+import { Bell, CheckCircle2, User, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -181,24 +181,19 @@ export function NotificationCenter({
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-full sm:max-w-md p-0">
         <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <SheetTitle className="text-xl font-semibold flex items-center gap-2">
-                <Bell className="h-5 w-5 text-blue-500" />
-                Notifications
-                {unreadCount > 0 && (
-                  <Badge variant="destructive" className="ml-2">
-                    {unreadCount} new
-                  </Badge>
-                )}
-              </SheetTitle>
-              <SheetDescription>
-                Stay updated with your household
-              </SheetDescription>
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+          <div>
+            <SheetTitle className="text-xl font-semibold flex items-center gap-2">
+              <Bell className="h-5 w-5 text-blue-500" />
+              Notifications
+              {unreadCount > 0 && (
+                <Badge variant="destructive" className="ml-2">
+                  {unreadCount} new
+                </Badge>
+              )}
+            </SheetTitle>
+            <SheetDescription>
+              Stay updated with your household
+            </SheetDescription>
           </div>
 
           {/* Filter Tabs */}

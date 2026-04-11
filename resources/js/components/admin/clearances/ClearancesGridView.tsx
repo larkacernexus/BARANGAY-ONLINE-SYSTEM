@@ -1,6 +1,7 @@
 // components/admin/clearances/ClearancesGridView.tsx
 
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import React, { useCallback, useMemo, memo, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -11,17 +12,33 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { GridLayout } from '@/components/adminui/grid-layout';
+import { EmptyState } from '@/components/adminui/empty-state';
+import { Link } from '@inertiajs/react';
+import { toast } from 'sonner';
 import { 
     FileText, User, Clock, DollarSign, RefreshCw, 
     CheckCircle, XCircle, AlertCircle, Zap, AlertTriangle,
     Eye, Edit, Printer, Trash2, Copy, MoreVertical,
-    CreditCard, Home, Building, Calendar
+    CreditCard, Home, Building, Calendar, Receipt,
+    ChevronDown, ChevronUp, Hash, FileCheck
 } from 'lucide-react';
-import { Link } from '@inertiajs/react';
-import { toast } from 'sonner';
-import { ClearanceRequest, ClearanceType, Resident } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance';
 import { JSX } from 'react';
+
+// Define a simplified Resident type that matches the actual data structure
+interface SimpleResident {
+    id: number;
+    first_name: string;
+    last_name: string;
+    middle_name?: string;
+    suffix?: string;
+    full_name: string;
+    contact_number?: string;
+    email?: string;
+    address?: any;
+    purok?: any;
+}
 
 interface ClearancesGridViewProps {
     clearances: ClearanceRequest[];
@@ -110,7 +127,7 @@ const getPayerIcon = (payerType?: string) => {
     }
 };
 
-const getResidentName = (resident?: Resident): string => {
+const getResidentName = (resident?: SimpleResident): string => {
     if (!resident) return 'N/A';
     if (resident.full_name && typeof resident.full_name === 'string') return resident.full_name;
     if (resident.first_name || resident.last_name) {
@@ -129,7 +146,7 @@ const getPayerName = (clearance: ClearanceRequest): string => {
     }
     
     if (anyClearance.payer_type === 'resident') {
-        return getResidentName(clearance.resident);
+        return getResidentName(clearance.resident as SimpleResident);
     }
     
     if (anyClearance.payer_type === 'household') {
@@ -141,7 +158,7 @@ const getPayerName = (clearance: ClearanceRequest): string => {
         if (anyClearance.business?.business_name) return anyClearance.business.business_name;
     }
     
-    return getResidentName(clearance.resident) || 'N/A';
+    return getResidentName(clearance.resident as SimpleResident) || 'N/A';
 };
 
 const formatDate = (dateString?: string): string => {
@@ -157,6 +174,367 @@ const formatDate = (dateString?: string): string => {
     }
 };
 
+const truncateText = (text: string, maxLength: number = 30): string => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+};
+
+// Shared Clearance Card Component
+const ClearanceCard = memo(({ 
+    clearance, 
+    isBulkMode, 
+    isSelected, 
+    isExpanded,
+    onItemSelect,
+    onDelete,
+    onViewPhoto,
+    handleRecordPayment,
+    onToggleExpand,
+    onViewDetails,
+    isMobile = false
+}: {
+    clearance: ClearanceRequest;
+    isBulkMode: boolean;
+    isSelected: boolean;
+    isExpanded: boolean;
+    onItemSelect: (id: number) => void;
+    onDelete: (clearance: ClearanceRequest) => void;
+    onViewPhoto: (clearance: ClearanceRequest) => void;
+    handleRecordPayment: (clearance: ClearanceRequest) => void;
+    onToggleExpand: (id: number, e: React.MouseEvent) => void;
+    onViewDetails: (id: number, e: React.MouseEvent) => void;
+    isMobile?: boolean;
+}) => {
+    const anyClearance = clearance as any;
+    const isPriority = clearance.urgency === 'express' || clearance.urgency === 'rush';
+    const payerName = getPayerName(clearance);
+    
+    // Memoized handlers
+    const handleCardClick = useCallback((e: React.MouseEvent) => {
+        if (isBulkMode) return;
+        onToggleExpand(clearance.id, e);
+    }, [isBulkMode, clearance.id, onToggleExpand]);
+
+    const handlePaymentClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        handleRecordPayment(clearance);
+    }, [handleRecordPayment, clearance]);
+
+    const handleCopyReference = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(clearance.reference_number);
+        toast.success('Reference number copied to clipboard');
+    }, [clearance.reference_number]);
+
+    const handleDelete = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onDelete(clearance);
+    }, [onDelete, clearance]);
+
+    return (
+        <Card 
+            className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
+                isSelected 
+                    ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
+            } ${isExpanded ? 'shadow-lg' : ''} ${isPriority ? 'border-l-4 border-l-amber-500' : ''} cursor-pointer group`}
+            onClick={handleCardClick}
+        >
+            <CardContent className="p-4">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {isBulkMode && (
+                            <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => onItemSelect(clearance.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 flex-shrink-0"
+                            />
+                        )}
+                        <Badge 
+                            variant={getStatusVariant(clearance.status)}
+                            className="flex items-center gap-1 flex-shrink-0"
+                        >
+                            {getStatusIcon(clearance.status)}
+                            <span>{getStatusDisplay(clearance.status)}</span>
+                        </Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 ml-2">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={(e) => onViewDetails(clearance.id, e)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                </DropdownMenuItem>
+                                
+                                {['pending', 'processing', 'approved'].includes(clearance.status) && (
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/admin/clearances/${clearance.id}/edit`} className="flex items-center cursor-pointer">
+                                            <Edit className="h-4 w-4 mr-2" />
+                                            Edit Request
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
+                                
+                                {clearance.status === 'pending_payment' && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                            onClick={handlePaymentClick}
+                                            className="flex items-center cursor-pointer"
+                                        >
+                                            <CreditCard className="h-4 w-4 mr-2 text-green-600" />
+                                            <span className="text-green-600 font-medium">Record Payment</span>
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                                
+                                <DropdownMenuSeparator />
+                                
+                                <DropdownMenuItem onClick={handleCopyReference}>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copy Reference
+                                </DropdownMenuItem>
+                                
+                                {clearance.status === 'issued' && (
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/admin/clearances/${clearance.id}/print`} className="flex items-center cursor-pointer">
+                                            <Printer className="h-4 w-4 mr-2" />
+                                            Print Clearance
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
+                                
+                                {['pending', 'pending_payment', 'processing'].includes(clearance.status) && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem 
+                                            className="text-red-600 dark:text-red-400 focus:text-red-700 focus:bg-red-50"
+                                            onClick={handleDelete}
+                                        >
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Cancel Request
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+
+                {/* Reference Number */}
+                <div className="mb-3">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                        <Hash className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="font-mono font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {clearance.reference_number}
+                        </span>
+                    </div>
+                    {clearance.clearance_number && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate ml-5">
+                            #{clearance.clearance_number}
+                        </div>
+                    )}
+                </div>
+
+                {/* Payer Info */}
+                <div className="flex items-start gap-2 mb-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                        {getPayerIcon(anyClearance.payer_type)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {truncateText(payerName, 25)}
+                        </div>
+                        {anyClearance.payer_type && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {anyClearance.payer_type.charAt(0).toUpperCase() + anyClearance.payer_type.slice(1)}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Purpose & Type */}
+                <div className="mb-3">
+                    <div className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-1.5">
+                        {clearance.purpose}
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                        <FileCheck className="h-3 w-3 mr-1" />
+                        {clearance.clearance_type?.name || 'N/A'}
+                    </Badge>
+                </div>
+
+                {/* Fee & Urgency */}
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1.5">
+                        <Receipt className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
+                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                            ₱{Number(clearance.fee_amount || 0).toLocaleString('en-PH', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                            })}
+                        </span>
+                    </div>
+                    <Badge 
+                        variant={getUrgencyVariant(clearance.urgency)}
+                        className={`flex items-center gap-1 ${isPriority ? 'font-semibold' : ''}`}
+                    >
+                        {getUrgencyIcon(clearance.urgency)}
+                        {getUrgencyDisplay(clearance.urgency)}
+                    </Badge>
+                </div>
+
+                {/* Date Info */}
+                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Created: {formatDate(clearance.created_at)}</span>
+                </div>
+
+                {/* Priority Badge */}
+                {isPriority && (
+                    <div className="mb-2">
+                        <Badge 
+                            variant={clearance.urgency === 'express' ? "destructive" : "secondary"} 
+                            className="text-xs w-full justify-center"
+                        >
+                            {clearance.urgency === 'express' ? (
+                                <>
+                                    <Zap className="h-3 w-3 mr-1" />
+                                    Express Priority
+                                </>
+                            ) : (
+                                <>
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    Rush Priority
+                                </>
+                            )}
+                        </Badge>
+                    </div>
+                )}
+
+                {/* Expand/Collapse indicator */}
+                {!isBulkMode && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {isExpanded ? 'Hide details' : 'Click to view details'}
+                        </div>
+                        <button
+                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            onClick={(e) => onToggleExpand(clearance.id, e)}
+                        >
+                            {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            ) : (
+                                <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            )}
+                        </button>
+                    </div>
+                )}
+
+                {/* Expanded Details */}
+                {isExpanded && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50 duration-200">
+                        {/* Additional Info */}
+                        {anyClearance.valid_until && (
+                            <div className="flex items-center gap-2 text-sm">
+                                <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                <span className="text-gray-700 dark:text-gray-300">
+                                    Valid until: {formatDate(anyClearance.valid_until)}
+                                </span>
+                            </div>
+                        )}
+
+                        {anyClearance.processed_by && (
+                            <div className="flex items-center gap-2 text-sm">
+                                <User className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                <span className="text-gray-700 dark:text-gray-300">
+                                    Processed by: {anyClearance.processed_by}
+                                </span>
+                            </div>
+                        )}
+
+                        {anyClearance.remarks && (
+                            <div className="text-sm">
+                                <p className="text-gray-500 dark:text-gray-400 mb-1">Remarks:</p>
+                                <p className="text-gray-700 dark:text-gray-300 line-clamp-2 italic">
+                                    "{truncateText(anyClearance.remarks, 100)}"
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2 pt-2">
+                            {clearance.status === 'pending_payment' && (
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    className="flex-1 text-xs bg-green-600 hover:bg-green-700"
+                                    onClick={handlePaymentClick}
+                                >
+                                    <CreditCard className="h-3 w-3 mr-1" />
+                                    Record Payment
+                                </Button>
+                            )}
+                            
+                            {clearance.status === 'issued' && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 text-xs"
+                                    asChild
+                                >
+                                    <Link href={`/admin/clearances/${clearance.id}/print`}>
+                                        <Printer className="h-3 w-3 mr-1" />
+                                        Print
+                                    </Link>
+                                </Button>
+                            )}
+                            
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 text-xs"
+                                onClick={(e) => onViewDetails(clearance.id, e)}
+                            >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View Full Details
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+});
+
+ClearanceCard.displayName = 'ClearanceCard';
+
+// Empty State Component
+const EmptyStateComponent = ({ hasActiveFilters, onClearFilters }: { hasActiveFilters: boolean; onClearFilters: () => void }) => (
+    <EmptyState
+        title="No clearances found"
+        description={hasActiveFilters 
+            ? 'Try changing your filters or search criteria.'
+            : 'Get started by creating a clearance request.'}
+        icon={<FileText className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
+        hasFilters={hasActiveFilters}
+        onClearFilters={onClearFilters}
+    />
+);
+
+// Main Grid View Component
 export default function ClearancesGridView({
     clearances,
     isBulkMode,
@@ -168,282 +546,53 @@ export default function ClearancesGridView({
     onViewPhoto,
     handleRecordPayment
 }: ClearancesGridViewProps) {
-
-    const handlePaymentClick = (clearance: ClearanceRequest, e: React.MouseEvent) => {
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    
+    // Memoized handlers
+    const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
-        handleRecordPayment(clearance);
-    };
+        setExpandedId(prev => prev === id ? null : id);
+    }, []);
 
-    const handleCopyReference = (reference: string, e: React.MouseEvent) => {
+    const handleViewDetails = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(reference);
-        toast.success('Reference number copied to clipboard');
+        window.location.href = `/admin/clearances/${id}`;
+    }, []);
+
+    // Memoize selected set for quick lookup
+    const selectedSet = useMemo(() => new Set(selectedClearances), [selectedClearances]);
+
+    // Early return for empty state
+    if (clearances.length === 0) {
+        return <EmptyStateComponent hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />;
+    }
+
+    // Grid layout configuration
+    const gridLayoutProps = {
+        isEmpty: false,
+        emptyState: null,
+        gridCols: { base: 1, sm: 2, lg: 3, xl: 4 } as const,
+        gap: { base: '3', sm: '4' } as const,
+        padding: "p-4" as const
     };
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-            {clearances.map((clearance: ClearanceRequest) => {
-                const anyClearance = clearance as any;
-                const isSelected = selectedClearances.includes(clearance.id);
-                const isPriority = clearance.urgency === 'express' || clearance.urgency === 'rush';
-                
-                return (
-                    <Card 
-                        key={clearance.id}
-                        className={`overflow-hidden hover:shadow-md transition-all duration-200 border bg-white dark:bg-gray-900 cursor-pointer ${
-                            isSelected 
-                                ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900/30 bg-blue-50/50 dark:bg-blue-900/20' 
-                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        } ${isPriority ? 'border-l-4 border-l-amber-500' : ''}`}
-                        onClick={(e) => {
-                            if (isBulkMode && e.target instanceof HTMLElement && 
-                                !e.target.closest('a') && 
-                                !e.target.closest('button') &&
-                                !e.target.closest('.dropdown-menu-content') &&
-                                !e.target.closest('input[type="checkbox"]')) {
-                                onItemSelect(clearance.id);
-                            }
-                        }}
-                    >
-                        <CardContent className="p-4">
-                            {/* Header with checkbox and menu */}
-                            <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    {isBulkMode && (
-                                        <Checkbox
-                                            checked={isSelected}
-                                            onCheckedChange={() => onItemSelect(clearance.id)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                                        />
-                                    )}
-                                    <Badge 
-                                        variant={getStatusVariant(clearance.status)}
-                                        className="flex items-center gap-1"
-                                    >
-                                        {getStatusIcon(clearance.status)}
-                                        <span>{getStatusDisplay(clearance.status)}</span>
-                                    </Badge>
-                                </div>
-                                
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button 
-                                            variant="ghost" 
-                                            className="h-8 w-8 p-0"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
-                                        <DropdownMenuItem asChild>
-                                            <Link href={`/admin/clearances/${clearance.id}`} className="flex items-center cursor-pointer">
-                                                <Eye className="mr-2 h-4 w-4" />
-                                                <span>View Details</span>
-                                            </Link>
-                                        </DropdownMenuItem>
-                                        
-                                        {['pending', 'processing', 'approved'].includes(clearance.status) && (
-                                            <DropdownMenuItem asChild>
-                                                <Link href={`/admin/clearances/${clearance.id}/edit`} className="flex items-center cursor-pointer">
-                                                    <Edit className="mr-2 h-4 w-4" />
-                                                    <span>Edit Request</span>
-                                                </Link>
-                                            </DropdownMenuItem>
-                                        )}
-                                        
-                                        {clearance.status === 'pending_payment' && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem 
-                                                    onClick={(e) => handlePaymentClick(clearance, e)}
-                                                    className="flex items-center cursor-pointer"
-                                                >
-                                                    <CreditCard className="mr-2 h-4 w-4 text-green-600" />
-                                                    <span className="text-green-600 font-medium">Record Payment</span>
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
-                                        
-                                        <DropdownMenuSeparator />
-                                        
-                                        <DropdownMenuItem 
-                                            onClick={(e) => handleCopyReference(clearance.reference_number, e)}
-                                            className="flex items-center cursor-pointer"
-                                        >
-                                            <Copy className="mr-2 h-4 w-4" />
-                                            <span>Copy Reference</span>
-                                        </DropdownMenuItem>
-                                        
-                                        {clearance.status === 'issued' && (
-                                            <DropdownMenuItem asChild>
-                                                <Link href={`/admin/clearances/${clearance.id}/print`} className="flex items-center cursor-pointer">
-                                                    <Printer className="mr-2 h-4 w-4" />
-                                                    <span>Print Clearance</span>
-                                                </Link>
-                                            </DropdownMenuItem>
-                                        )}
-                                        
-                                        {['pending', 'pending_payment', 'processing'].includes(clearance.status) && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem 
-                                                    className="text-red-600 focus:text-red-700 focus:bg-red-50"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onDelete(clearance);
-                                                    }}
-                                                >
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    <span>Cancel Request</span>
-                                                </DropdownMenuItem>
-                                            </>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-
-                            {/* Reference Number */}
-                            <div className="mb-2">
-                                <div className="font-mono text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                    {clearance.reference_number}
-                                </div>
-                                {clearance.clearance_number && (
-                                    <div className="text-xs text-gray-500 truncate">
-                                        #{clearance.clearance_number}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Payer Info */}
-                            <div className="flex items-center gap-2 mb-3">
-                                {getPayerIcon(anyClearance.payer_type)}
-                                <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                        {getPayerName(clearance)}
-                                    </div>
-                                    {anyClearance.payer_type && (
-                                        <div className="text-xs text-gray-500 truncate">
-                                            {anyClearance.payer_type.charAt(0).toUpperCase() + anyClearance.payer_type.slice(1)}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Purpose & Type */}
-                            <div className="mb-3">
-                                <div className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-1">
-                                    {clearance.purpose}
-                                </div>
-                                <Badge variant="outline" className="text-xs">
-                                    {clearance.clearance_type?.name || 'N/A'}
-                                </Badge>
-                            </div>
-
-                            {/* Fee & Urgency */}
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="font-semibold text-gray-900 dark:text-gray-100">
-                                    ₱{Number(clearance.fee_amount || 0).toLocaleString('en-PH', {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2
-                                    })}
-                                </div>
-                                <Badge 
-                                    variant={getUrgencyVariant(clearance.urgency)}
-                                    className={`flex items-center gap-1 ${isPriority ? 'font-semibold' : ''}`}
-                                >
-                                    {getUrgencyIcon(clearance.urgency)}
-                                    {getUrgencyDisplay(clearance.urgency)}
-                                </Badge>
-                            </div>
-
-                            {/* Date Info */}
-                            <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                                <Calendar className="h-3 w-3" />
-                                <span>Created: {formatDate(clearance.created_at)}</span>
-                            </div>
-
-                            {/* Priority Badge */}
-                            {isPriority && (
-                                <div className="mb-2">
-                                    <Badge 
-                                        variant={clearance.urgency === 'express' ? "destructive" : "secondary"} 
-                                        className="text-xs w-full justify-center"
-                                    >
-                                        {clearance.urgency === 'express' ? (
-                                            <>
-                                                <Zap className="h-3 w-3 mr-1" />
-                                                Express Priority
-                                            </>
-                                        ) : (
-                                            <>
-                                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                                Rush Priority
-                                            </>
-                                        )}
-                                    </Badge>
-                                </div>
-                            )}
-                        </CardContent>
-
-                        {/* Footer Actions */}
-                        <CardFooter className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                            <div className="flex items-center justify-between w-full gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex-1 text-xs"
-                                    asChild
-                                >
-                                    <Link href={`/admin/clearances/${clearance.id}`}>
-                                        <Eye className="h-3 w-3 mr-1" />
-                                        View
-                                    </Link>
-                                </Button>
-                                
-                                {clearance.status === 'pending_payment' && (
-                                    <Button
-                                        variant="default"
-                                        size="sm"
-                                        className="flex-1 text-xs bg-green-600 hover:bg-green-700"
-                                        onClick={(e) => handlePaymentClick(clearance, e)}
-                                    >
-                                        <CreditCard className="h-3 w-3 mr-1" />
-                                        Pay
-                                    </Button>
-                                )}
-                                
-                                {clearance.status === 'issued' && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="flex-1 text-xs"
-                                        asChild
-                                    >
-                                        <Link href={`/admin/clearances/${clearance.id}/print`}>
-                                            <Printer className="h-3 w-3 mr-1" />
-                                            Print
-                                        </Link>
-                                    </Button>
-                                )}
-                                
-                                {clearance.status === 'processing' && (
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        className="flex-1 text-xs"
-                                        disabled
-                                    >
-                                        <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                                        Processing
-                                    </Button>
-                                )}
-                            </div>
-                        </CardFooter>
-                    </Card>
-                );
-            })}
-        </div>
+        <GridLayout {...gridLayoutProps}>
+            {clearances.map((clearance) => (
+                <ClearanceCard
+                    key={clearance.id}
+                    clearance={clearance}
+                    isBulkMode={isBulkMode}
+                    isSelected={selectedSet.has(clearance.id)}
+                    isExpanded={expandedId === clearance.id}
+                    onItemSelect={onItemSelect}
+                    onDelete={onDelete}
+                    onViewPhoto={onViewPhoto}
+                    handleRecordPayment={handleRecordPayment}
+                    onToggleExpand={handleToggleExpand}
+                    onViewDetails={handleViewDetails}
+                />
+            ))}
+        </GridLayout>
     );
 }

@@ -1,5 +1,8 @@
 // types/admin/fee-types/fee-types.ts
 
+import { Briefcase, FileText, Shield, DollarSign, Heart, Tag } from 'lucide-react';
+import React from 'react';
+
 export interface FeeType {
     id: number;
     code: string;
@@ -101,6 +104,8 @@ export interface SelectionStats {
     mandatory: number;
     autoGenerate: number;
     totalAmount: number;
+    fixedAmount: number;
+    variableAmount: number;
     byCategory: Record<string, number>;
     byStatus: Record<string, number>;
     byAmountType: Record<string, number>;
@@ -168,6 +173,23 @@ export interface CreateFeeTypeProps extends Record<string, any> {
         category_id: number;
     }>;
 }
+
+    export interface Stats {
+        total: number;
+        total_amount: number;
+        collected: number;
+        pending: number;
+        issued_count: number;
+        overdue_count: number;
+        partially_paid_count: number;
+        waived_count: number;
+        // Optional additional fields that might be useful
+        this_month_count?: number;
+        this_month_amount?: number;
+        this_month_collected?: number;
+        status_counts?: Record<string, number>;
+        category_totals?: Record<string, number>;
+    }
 
 // Fee Type edit specific types
 export interface EditFeeTypeProps extends Record<string, any> {
@@ -261,15 +283,71 @@ export const PHILIPPINE_STANDARD_DISCOUNTS = {
     }
 } as const;
 
-// Helper functions types
+// Updated CategoryDetails interface with React.ReactNode for icon
 export interface CategoryDetails {
     name: string;
-    icon: string;
+    icon: React.ReactNode;
     color: string;
     bgColor: string;
     textColor: string;
     borderColor: string;
 }
+
+// Updated helper function returning React components using React.createElement
+export const getCategoryDetails = (categorySlug?: string): CategoryDetails => {
+    const categories: Record<string, CategoryDetails> = {
+        tax: {
+            name: 'Taxes',
+            icon: React.createElement(Briefcase, { className: "h-4 w-4" }),
+            color: 'blue',
+            bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+            textColor: 'text-blue-700 dark:text-blue-400',
+            borderColor: 'border-blue-200 dark:border-blue-800'
+        },
+        clearance: {
+            name: 'Clearances',
+            icon: React.createElement(FileText, { className: "h-4 w-4" }),
+            color: 'green',
+            bgColor: 'bg-green-100 dark:bg-green-900/30',
+            textColor: 'text-green-700 dark:text-green-400',
+            borderColor: 'border-green-200 dark:border-green-800'
+        },
+        permit: {
+            name: 'Permits',
+            icon: React.createElement(Shield, { className: "h-4 w-4" }),
+            color: 'purple',
+            bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+            textColor: 'text-purple-700 dark:text-purple-400',
+            borderColor: 'border-purple-200 dark:border-purple-800'
+        },
+        fee: {
+            name: 'Fees',
+            icon: React.createElement(DollarSign, { className: "h-4 w-4" }),
+            color: 'yellow',
+            bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+            textColor: 'text-yellow-700 dark:text-yellow-400',
+            borderColor: 'border-yellow-200 dark:border-yellow-800'
+        },
+        donation: {
+            name: 'Donations',
+            icon: React.createElement(Heart, { className: "h-4 w-4" }),
+            color: 'red',
+            bgColor: 'bg-red-100 dark:bg-red-900/30',
+            textColor: 'text-red-700 dark:text-red-400',
+            borderColor: 'border-red-200 dark:border-red-800'
+        },
+        default: {
+            name: 'Other',
+            icon: React.createElement(Tag, { className: "h-4 w-4" }),
+            color: 'gray',
+            bgColor: 'bg-gray-100 dark:bg-gray-800',
+            textColor: 'text-gray-700 dark:text-gray-400',
+            borderColor: 'border-gray-200 dark:border-gray-700'
+        }
+    };
+    
+    return categories[categorySlug || 'default'] || categories.default;
+};
 
 export interface DiscountDetails {
     summary: string;
@@ -277,6 +355,14 @@ export interface DiscountDetails {
     totalDiscountPercentage?: number;
     highestDiscount: number;
     applicableGroups: string[];
+}
+
+export interface Statistic {
+    label: string;
+    value: string | number;
+    icon: string;
+    description: string;
+    color: string;
 }
 
 // Form data interfaces
@@ -476,60 +562,4 @@ export const getPenaltySummary = (feeType: FeeType): string => {
     }
     
     return penalties.length > 0 ? penalties.join(' + ') : 'No penalties';
-};
-
-// Category helper functions
-export const getCategoryDetails = (categorySlug?: string): CategoryDetails => {
-    const categories: Record<string, CategoryDetails> = {
-        tax: {
-            name: 'Taxes',
-            icon: 'Briefcase',
-            color: 'blue',
-            bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-            textColor: 'text-blue-700 dark:text-blue-400',
-            borderColor: 'border-blue-200 dark:border-blue-800'
-        },
-        clearance: {
-            name: 'Clearances',
-            icon: 'FileText',
-            color: 'green',
-            bgColor: 'bg-green-100 dark:bg-green-900/30',
-            textColor: 'text-green-700 dark:text-green-400',
-            borderColor: 'border-green-200 dark:border-green-800'
-        },
-        permit: {
-            name: 'Permits',
-            icon: 'Shield',
-            color: 'purple',
-            bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-            textColor: 'text-purple-700 dark:text-purple-400',
-            borderColor: 'border-purple-200 dark:border-purple-800'
-        },
-        fee: {
-            name: 'Fees',
-            icon: 'DollarSign',
-            color: 'yellow',
-            bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
-            textColor: 'text-yellow-700 dark:text-yellow-400',
-            borderColor: 'border-yellow-200 dark:border-yellow-800'
-        },
-        donation: {
-            name: 'Donations',
-            icon: 'Heart',
-            color: 'red',
-            bgColor: 'bg-red-100 dark:bg-red-900/30',
-            textColor: 'text-red-700 dark:text-red-400',
-            borderColor: 'border-red-200 dark:border-red-800'
-        },
-        default: {
-            name: 'Other',
-            icon: 'Tag',
-            color: 'gray',
-            bgColor: 'bg-gray-100 dark:bg-gray-800',
-            textColor: 'text-gray-700 dark:text-gray-400',
-            borderColor: 'border-gray-200 dark:border-gray-700'
-        }
-    };
-    
-    return categories[categorySlug || 'default'] || categories.default;
 };

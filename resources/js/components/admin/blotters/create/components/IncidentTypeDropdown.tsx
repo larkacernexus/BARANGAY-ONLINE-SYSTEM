@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Search, X } from 'lucide-react';
-import { IncidentType } from './BlotterTypes';
+import { IncidentType } from '@/types/admin/blotters/blotter';
 import { getPriorityLevelColor, getPriorityLevelLabel } from '@/data/blotterIncidentTypes';
 
 interface IncidentTypeDropdownProps {

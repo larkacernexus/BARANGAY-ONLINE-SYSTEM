@@ -11,7 +11,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { SelectionStats } from '@/types/payments.types';
+import { SelectionStats } from '@/types/admin/payments/payments';
+
+// Define the bulk operation type to match the hook
+type BulkOperationType = 'export' | 'print' | 'delete' | 'update_status' | 'send_receipt' | 'mark_cleared' | 'export_csv';
 
 interface PaymentsDialogsProps {
     showBulkDeleteDialog: boolean;
@@ -20,7 +23,7 @@ interface PaymentsDialogsProps {
     setShowBulkStatusDialog: (show: boolean) => void;
     isPerformingBulkAction: boolean;
     selectedPayments: number[];
-    handleBulkOperation: (operation: string, data?: any) => Promise<void>;
+    handleBulkOperation: (operation: BulkOperationType, data?: any) => Promise<void>;  // Fixed: Use specific type
     selectionStats: SelectionStats;
     bulkEditValue: string;
     setBulkEditValue: (value: string) => void;
@@ -48,6 +51,18 @@ export default function PaymentsDialogs({
         }).format(amount);
     };
 
+    // Handler for delete operation
+    const handleDelete = () => {
+        handleBulkOperation('delete');
+    };
+
+    // Handler for status update operation
+    const handleStatusUpdate = () => {
+        if (bulkEditValue) {
+            handleBulkOperation('update_status', { status: bulkEditValue });
+        }
+    };
+
     return (
         <>
             {/* Bulk Delete Confirmation Dialog */}
@@ -63,7 +78,7 @@ export default function PaymentsDialogs({
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isPerformingBulkAction}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => handleBulkOperation('delete')}
+                            onClick={handleDelete}
                             className="bg-red-600 hover:bg-red-700 text-white"
                             disabled={isPerformingBulkAction}
                         >
@@ -93,7 +108,7 @@ export default function PaymentsDialogs({
                         <div>
                             <Label>New Status</Label>
                             <select 
-                                className="w-full border rounded px-3 py-2 mt-1"
+                                className="w-full border rounded px-3 py-2 mt-1 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700"
                                 value={bulkEditValue}
                                 onChange={(e) => setBulkEditValue(e.target.value)}
                             >
@@ -103,7 +118,7 @@ export default function PaymentsDialogs({
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
-                        <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded">
+                        <div className="text-sm text-gray-500 p-3 bg-gray-50 dark:bg-gray-800 rounded">
                             <div className="font-medium mb-1">Current selection stats:</div>
                             <ul className="list-disc list-inside space-y-1">
                                 <li>{selectionStats.total} total payments</li>
@@ -119,7 +134,7 @@ export default function PaymentsDialogs({
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isPerformingBulkAction}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => handleBulkOperation('update_status')}
+                            onClick={handleStatusUpdate}
                             disabled={isPerformingBulkAction || !bulkEditValue}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >

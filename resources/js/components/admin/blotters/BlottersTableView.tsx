@@ -473,13 +473,13 @@ export default function BlottersTableView({
                                                     </DropdownMenuItem>
                                                     
                                                     {blotter.respondent_name && (
-                                                        <DropdownMenuItem 
-                                                            onClick={() => handleCopyToClipboard(blotter.respondent_name, 'Respondent Name')}
-                                                            className="flex items-center cursor-pointer"
-                                                        >
-                                                            <Copy className="mr-2 h-4 w-4" />
-                                                            <span>Copy Respondent</span>
-                                                        </DropdownMenuItem>
+                                                   <DropdownMenuItem 
+                                                        onClick={() => handleCopyToClipboard(blotter.respondent_name ?? '', 'Respondent Name')}
+                                                        className="flex items-center cursor-pointer"
+                                                    >
+                                                        <Copy className="mr-2 h-4 w-4" />
+                                                        <span>Copy Respondent</span>
+                                                    </DropdownMenuItem>
                                                     )}
                                                     
                                                     {blotter.attachments && blotter.attachments.length > 0 && (

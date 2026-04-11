@@ -1,7 +1,7 @@
 // resources/js/Pages/Admin/DocumentTypes/components/statistics-cards.tsx
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Statistic } from '../types';
+import { Statistic } from '@/types/admin/document-types/document-types';
 
 interface Props {
     statistics: Statistic[];

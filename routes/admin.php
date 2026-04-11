@@ -100,7 +100,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 Route::get('/instructions', function () {
     return Inertia::render('admin/Instructions/Instructions', [
         'section' => request('section', 'overview'), // optional section parameter
-        'userRole' => auth()->user()->role ?? 'staff'
+        // 'userRole' => auth()->user()->role ?? 'staff'
     ]);
 })->name('instructions');
 
@@ -453,6 +453,9 @@ Route::middleware('permission:manage-payments')->prefix('payments')->name('payme
     Route::get('/create-for-clearance/{clearanceRequest}', [PaymentCreateController::class, 'createForClearance'])->name('create-for-clearance');
     Route::post('/', [PaymentStoreController::class, 'store'])->name('store');
     
+
+    Route::post('/verify-discount-id', [PaymentCreateController::class, 'verifyDiscountId'])
+    ->name('verify-discount-id');
     // Edit/Update routes
     Route::get('/{payment}/edit', [PaymentEditController::class, 'edit'])->name('edit');
     Route::put('/{payment}', [PaymentEditController::class, 'update'])->name('update');

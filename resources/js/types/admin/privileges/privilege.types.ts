@@ -43,6 +43,7 @@ export interface ResidentPrivilege {
 }
 
 export interface Privilege {
+    discountType: any;
     id: number;
     name: string;
     code: string;

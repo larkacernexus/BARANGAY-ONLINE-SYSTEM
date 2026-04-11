@@ -1,4 +1,4 @@
-// types/portal/community-report.ts
+// /types/portal/community-report.ts
 import { 
     AlertCircle, 
     CheckCircle, 
@@ -65,7 +65,6 @@ export interface UploadedFile {
 }
 
 export interface ReportEvidence {
-    file_type(file_type: any, is_image: boolean): unknown;
     id: number;
     report_id: number;
     file_path: string;
@@ -75,6 +74,7 @@ export interface ReportEvidence {
     formatted_size: string;
     mime_type: string;
     is_image: boolean;
+    file_type: string;
     description?: string;
     notes?: string | null;
     uploaded_by: number;
@@ -187,6 +187,14 @@ export interface CommunityReport {
 }
 
 // ============================================================================
+// Print/Export Types
+// ============================================================================
+
+export interface ReportForPrint extends Omit<CommunityReport, 'incident_time'> {
+    incident_time?: string;
+}
+
+// ============================================================================
 // Draft Types
 // ============================================================================
 
@@ -253,7 +261,7 @@ export interface ReportDraft {
 // ============================================================================
 
 export interface ReportFormData {
-    report_type_id: string;
+    report_type_id: number | null;
     title: string;
     description: string;
     detailed_description?: string;
@@ -273,7 +281,6 @@ export interface ReportFormData {
     environmental_impact?: boolean;
     recurring_issue?: boolean;
     files: File[];
-    [key: string]: any;
 }
 
 export interface ReportFormErrors {
@@ -381,6 +388,22 @@ export interface ConfirmModalState {
 // Page Props Types
 // ============================================================================
 
+// Main PageProps for use with usePage<PageProps>()
+export interface PageProps {
+    reportTypes?: ReportType[];
+    reports?: PaginatedReports;
+    stats?: ReportStats;
+    filterOptions?: FilterOptions;
+    currentResident?: ReportUser;
+    filters?: ReportFilters;
+    error?: string;
+    auth?: {
+        user?: ReportUser;
+    };
+    [key: string]: unknown;
+}
+
+// Specific page props (can be used as needed)
 export interface CommunityReportPageProps {
     reports?: PaginatedReports;
     stats?: ReportStats;
@@ -388,6 +411,9 @@ export interface CommunityReportPageProps {
     currentResident?: ReportUser;
     filters?: ReportFilters;
     error?: string;
+    auth?: {
+        user?: ReportUser;
+    };
 }
 
 export interface ReportShowPageProps {
@@ -403,6 +429,9 @@ export interface ReportCreatePageProps {
     reportTypes: ReportType[];
     draft?: ReportDraft | null;
     error?: string;
+    auth?: {
+        user?: ReportUser;
+    };
 }
 
 // ============================================================================

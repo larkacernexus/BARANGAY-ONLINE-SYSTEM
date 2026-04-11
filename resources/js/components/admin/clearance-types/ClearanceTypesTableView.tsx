@@ -1,4 +1,5 @@
 // components/admin/clearance-types/ClearanceTypesTableView.tsx
+
 import {
     Table,
     TableBody,
@@ -18,11 +19,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
     ArrowUpDown,
     CheckCircle,
     Clock,
@@ -40,36 +36,21 @@ import {
     Printer,
     Trash2,
     Square,
-    CheckSquare
+    CheckSquare,
+    Lock,
+    Unlock,
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
-interface ClearanceType {
-    id: number;
-    name: string;
-    code: string;
-    description: string;
-    fee: number;
-    formatted_fee: string;
-    processing_days: number;
-    validity_days: number;
-    is_active: boolean;
-    requires_payment: boolean;
-    requires_approval: boolean;
-    is_online_only: boolean;
-    clearances_count?: number;
-    purpose_options?: string;
-    document_types_count?: number;
-}
-
-interface FilterState {
-    search: string;
-    status: string;
-    requires_payment: string;
-    sort: string;
-    direction: string;
-}
+// Import types and utilities
+import { 
+    ClearanceType, 
+    FilterState, 
+    getStatusBadgeVariant, 
+    getDiscountableBadgeVariant,
+    truncateText
+} from '@/types/admin/clearance-types/clearance-types';
 
 interface ClearanceTypesTableViewProps {
     clearanceTypes: ClearanceType[];
@@ -82,13 +63,12 @@ interface ClearanceTypesTableViewProps {
     onClearFilters: () => void;
     onDelete: (type: ClearanceType) => void;
     onToggleStatus?: (type: ClearanceType) => void;
+    onToggleDiscountable?: (type: ClearanceType) => void;
     onDuplicate?: (type: ClearanceType) => void;
     onViewPhoto: (type: ClearanceType) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
-    truncateText: (text: string, maxLength?: number) => string;
-    getStatusBadgeVariant: (isActive: boolean) => "default" | "secondary" | "destructive" | "outline";
     getPurposeOptionsCount: (type: ClearanceType) => number;
     getTruncationLength: (type: 'name' | 'description' | 'code') => number;
 }
@@ -104,14 +84,13 @@ export default function ClearanceTypesTableView({
     onClearFilters,
     onDelete,
     onToggleStatus,
+    onToggleDiscountable,
     onDuplicate,
     onViewPhoto,
     onCopyToClipboard,
     onSelectAllOnPage,
     isSelectAll,
-    truncateText,
-    getStatusBadgeVariant,
-    getPurposeOptionsCount,
+    getPurposeOptionsCount: getPurposeCount,
     getTruncationLength
 }: ClearanceTypesTableViewProps) {
     
@@ -119,6 +98,12 @@ export default function ClearanceTypesTableView({
         return isActive ? 
             <CheckCircle className="h-4 w-4 text-green-500" /> : 
             <XCircle className="h-4 w-4 text-gray-500" />;
+    };
+
+    const getDiscountableIcon = (isDiscountable: boolean) => {
+        return isDiscountable ? 
+            <Unlock className="h-3 w-3 text-green-500" /> : 
+            <Lock className="h-3 w-3 text-gray-500" />;
     };
 
     return (
@@ -151,7 +136,7 @@ export default function ClearanceTypesTableView({
                                         </button>
                                     </div>
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                                     <div className="flex items-center gap-1">
                                         Fee
                                         <button
@@ -163,13 +148,25 @@ export default function ClearanceTypesTableView({
                                         </button>
                                     </div>
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                                    <div className="flex items-center gap-1">
+                                        Discountable
+                                        <button
+                                            onClick={() => onSort('is_discountable')}
+                                            className="ml-1 hover:text-gray-900 dark:hover:text-gray-300"
+                                            title="Sort by discountable"
+                                        >
+                                            <ArrowUpDown className="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                </TableHead>
+                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                                     Processing
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                                     Validity
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                                     <div className="flex items-center gap-1">
                                         Issued
                                         <button
@@ -235,7 +232,7 @@ export default function ClearanceTypesTableView({
                                                 }}
                                                 title={`Double-click to select all\nName: ${type.name}\nCode: ${type.code}\nDescription: ${type.description}`}
                                             >
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
                                                     <div 
                                                         className="font-medium text-gray-900 dark:text-white truncate"
                                                         data-full-text={type.name}
@@ -249,8 +246,15 @@ export default function ClearanceTypesTableView({
                                                         {getStatusIcon(type.is_active)}
                                                         {type.is_active ? 'Active' : 'Inactive'}
                                                     </Badge>
+                                                    <Badge 
+                                                        variant={getDiscountableBadgeVariant(type.is_discountable)}
+                                                        className="flex items-center gap-1"
+                                                    >
+                                                        {getDiscountableIcon(type.is_discountable)}
+                                                        {type.is_discountable ? 'Discountable' : 'Non-Discountable'}
+                                                    </Badge>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap mt-1">
                                                     <code 
                                                         className="text-xs font-mono bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-gray-600 dark:text-gray-400 truncate"
                                                         data-full-text={type.code}
@@ -289,15 +293,20 @@ export default function ClearanceTypesTableView({
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <Copy className="h-3 w-3" />
-                                                        <span>{getPurposeOptionsCount(type)} purposes</span>
+                                                        <span>{getPurposeCount(type)} purposes</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <div className="font-medium text-gray-900 dark:text-white truncate" title={type.formatted_fee}>
+                                            <div className="font-medium text-gray-900 dark:text-white" title={type.formatted_fee}>
                                                 {type.formatted_fee}
                                             </div>
+                                        </TableCell>
+                                        <TableCell className="px-4 py-3">
+                                            <Badge variant="outline" className="text-xs">
+                                                {type.is_discountable ? 'Yes' : 'No'}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <div className="flex items-center gap-2">
@@ -439,6 +448,28 @@ export default function ClearanceTypesTableView({
                                                                 <>
                                                                     <CheckCircle className="mr-2 h-4 w-4" />
                                                                     <span>Activate</span>
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    
+                                                    {onToggleDiscountable && (
+                                                        <DropdownMenuItem 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onToggleDiscountable(type);
+                                                            }}
+                                                            className="flex items-center cursor-pointer"
+                                                        >
+                                                            {type.is_discountable ? (
+                                                                <>
+                                                                    <Lock className="mr-2 h-4 w-4" />
+                                                                    <span>Mark Non-Discountable</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Unlock className="mr-2 h-4 w-4" />
+                                                                    <span>Mark Discountable</span>
                                                                 </>
                                                             )}
                                                         </DropdownMenuItem>

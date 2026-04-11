@@ -17,7 +17,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Link } from '@inertiajs/react';
 import { 
     Receipt as ReceiptIcon,
     MoreVertical,
@@ -25,20 +24,34 @@ import {
     Printer,
     Copy,
     Ban,
-    CheckCircle,
-    XCircle,
-    Clock,
-    AlertCircle,
-    CreditCard,
-    User,
-    Calendar,
-    FileText
 } from 'lucide-react';
-import { Receipt } from '@/components/admin/receipts/receipt';
-import { getReceiptStatusConfig, getPaymentMethodConfig } from '@/components/admin/receipts/receipt';
+import { getReceiptStatusConfig, getPaymentMethodConfig, ReceiptStatus } from '@/components/admin/receipts/receipt';
+
+// Define ReceiptData interface that matches actual data
+interface ReceiptData {
+    id: number;
+    receipt_number: string;
+    or_number: string | null;
+    receipt_type: string;
+    receipt_type_label: string;
+    payer_name: string;
+    payer_address: string | null;
+    formatted_total: string;
+    formatted_amount_paid: string;
+    payment_method: string;
+    payment_method_label: string;
+    formatted_issued_date: string;
+    status: string; // Keep as string for flexibility
+    is_voided: boolean;
+    printed_count: number;
+    fee_breakdown: Array<any>;
+    reference_number?: string | null;
+    issued_by?: string | null;
+    void_reason?: string | null;
+}
 
 interface ReceiptsTableViewProps {
-    receipts: Receipt[];
+    receipts: ReceiptData[];
     isBulkMode: boolean;
     selectedReceipts: number[];
     isMobile: boolean;
@@ -47,9 +60,9 @@ interface ReceiptsTableViewProps {
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     onView: (id: number) => void;
-    onPrint: (receipt: Receipt) => void;
+    onPrint: (receipt: ReceiptData) => void;
     onVoid: (id: number, receiptNumber: string) => void;
-    onDelete: (receipt: Receipt) => void;
+    onDelete: (receipt: ReceiptData) => void;
     selectionStats: any;
     getSortIcon: (column: string) => string | null;
 }
@@ -72,6 +85,12 @@ const truncateText = (text: string, maxLength: number = 30): string => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+};
+
+// Helper to safely cast status to ReceiptStatus
+const castToReceiptStatus = (status: string): ReceiptStatus => {
+    const validStatuses: ReceiptStatus[] = ['completed', 'pending', 'failed', 'cancelled', 'refunded'];
+    return validStatuses.includes(status as ReceiptStatus) ? (status as ReceiptStatus) : 'pending';
 };
 
 export default function ReceiptsTableView({
@@ -128,7 +147,7 @@ export default function ReceiptsTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('receipt_number')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -137,7 +156,7 @@ export default function ReceiptsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('status')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -146,7 +165,7 @@ export default function ReceiptsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('payer_name')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -155,7 +174,7 @@ export default function ReceiptsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('total_amount')}
                                 >
                                     <div className="flex items-center gap-1 justify-end">
@@ -164,7 +183,7 @@ export default function ReceiptsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('payment_method')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -173,7 +192,7 @@ export default function ReceiptsTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('issued_date')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -188,7 +207,8 @@ export default function ReceiptsTableView({
                         </TableHeader>
                         <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
                             {receipts.map((receipt) => {
-                                const statusConfig = getReceiptStatusConfig(receipt.status, receipt.is_voided);
+                                // ✅ Cast status to ReceiptStatus
+                                const statusConfig = getReceiptStatusConfig(castToReceiptStatus(receipt.status), receipt.is_voided);
                                 const paymentMethodConfig = getPaymentMethodConfig(receipt.payment_method);
                                 const isSelected = selectedReceipts.includes(receipt.id);
                                 
@@ -276,7 +296,6 @@ export default function ReceiptsTableView({
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
                                             <div className="flex items-center gap-1">
-                                                {paymentMethodConfig.icon && <span className="text-sm">{paymentMethodConfig.label}</span>}
                                                 <span className="text-sm text-gray-700 dark:text-gray-300">
                                                     {receipt.payment_method_label}
                                                 </span>
@@ -295,7 +314,7 @@ export default function ReceiptsTableView({
                                                 <DropdownMenuTrigger asChild>
                                                     <Button 
                                                         variant="ghost" 
-                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
+                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <span className="sr-only">Open menu</span>
@@ -332,7 +351,7 @@ export default function ReceiptsTableView({
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem 
                                                                 onClick={() => onVoid(receipt.id, receipt.receipt_number)}
-                                                                className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                                className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20"
                                                             >
                                                                 <Ban className="mr-2 h-4 w-4" />
                                                                 <span>Void Receipt</span>

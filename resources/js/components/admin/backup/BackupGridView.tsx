@@ -1,4 +1,5 @@
 // resources/js/components/admin/backup/BackupGridView.tsx
+
 import React, { JSX } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,14 +31,16 @@ import {
     ChevronRight,
 } from 'lucide-react';
 
+import type { BackupFile } from '@/types/admin/backup/backup';
+
 interface BackupGridViewProps {
-    backups: any[];
+    backups: BackupFile[];
     isBulkMode: boolean;
-    selectedBackups: number[];
-    onItemSelect: (id: number) => void;
-    onDelete: (backup: any) => void;
-    onDownload: (backup: any) => void;
-    onToggleProtection: (backup: any) => void;
+    selectedBackups: string[]; // Changed from number[] to string[]
+    onItemSelect: (id: string) => void; // Changed from number to string
+    onDelete: (backup: BackupFile) => void;
+    onDownload: (backup: BackupFile) => void;
+    onToggleProtection: (backup: BackupFile) => void;
     onSelectAllFiltered: () => void;
     onClearSelection: () => void;
     isSelectAll: boolean;
@@ -89,6 +92,9 @@ export default function BackupGridView({
     startIndex,
     endIndex
 }: BackupGridViewProps) {
+    // Convert backup.id to string for comparison
+    const getBackupId = (backup: BackupFile): string => backup.id.toString();
+
     return (
         <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-950">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -96,7 +102,7 @@ export default function BackupGridView({
                     <Card 
                         key={backup.id}
                         className={`relative overflow-hidden transition-all border bg-white dark:bg-gray-900 ${
-                            selectedBackups.includes(backup.id) 
+                            selectedBackups.includes(getBackupId(backup)) 
                                 ? 'ring-2 ring-blue-500 dark:ring-blue-400 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
                                 : 'hover:shadow-md dark:hover:shadow-gray-800 border-gray-200 dark:border-gray-700'
                         }`}
@@ -104,8 +110,8 @@ export default function BackupGridView({
                         {isBulkMode && (
                             <div className="absolute top-3 left-3 z-10">
                                 <Checkbox
-                                    checked={selectedBackups.includes(backup.id)}
-                                    onCheckedChange={() => onItemSelect(backup.id)}
+                                    checked={selectedBackups.includes(getBackupId(backup))}
+                                    onCheckedChange={() => onItemSelect(getBackupId(backup))}
                                     disabled={isPerformingBulkAction}
                                     className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
                                 />

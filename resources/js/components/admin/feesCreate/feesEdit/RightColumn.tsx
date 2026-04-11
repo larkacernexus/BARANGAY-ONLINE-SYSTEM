@@ -1,4 +1,4 @@
-// components/admin/feesEdit/RightColumn.tsx
+// components/admin/feesCreate/feesEdit/RightColumn.tsx
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -7,9 +7,40 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { User, Building, Home, Phone, MapPin, FileText, Info, Search, Award, Calendar } from 'lucide-react';
-import { FeeFormData, Resident, Household, Privilege } from '@/types/fees';
+import { FeeType, Resident, Household, PrivilegeData } from '@/types/admin/fees/fees';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+// Fee Form Data interface
+interface FeeFormData {
+    fee_type_id: string;
+    payer_type: string;
+    resident_id: string;
+    household_id: string;
+    business_name: string;
+    payer_name: string;
+    contact_number: string;
+    address: string;
+    purok: string;
+    zone: string;
+    billing_period: string;
+    period_start: string;
+    period_end: string;
+    issue_date: string;
+    due_date: string;
+    base_amount: number;
+    surcharge_amount: number;
+    penalty_amount: number;
+    discount_amount: number;
+    total_amount: number;
+    purpose: string;
+    property_description: string;
+    business_type: string;
+    area: number;
+    remarks: string;
+    requirements_submitted: string[];
+    ph_legal_compliance_notes: string;
+}
 
 interface RightColumnProps {
     data: FeeFormData;
@@ -18,7 +49,7 @@ interface RightColumnProps {
     residents: Resident[];
     households: Household[];
     puroks: string[];
-    allPrivileges?: Privilege[];
+    allPrivileges?: PrivilegeData[];
     errors?: Record<string, string>;
     handlePayerTypeChange: (payerType: string) => void;
     handleResidentSelect: (residentId: string) => void;
@@ -74,7 +105,7 @@ export default function RightColumn({
         
         const searchLower = residentSearch.toLowerCase();
         return residents.filter(resident => 
-            resident.full_name.toLowerCase().includes(searchLower) ||
+            (resident.full_name && resident.full_name.toLowerCase().includes(searchLower)) ||
             (resident.purok && resident.purok.toLowerCase().includes(searchLower)) ||
             (resident.address && resident.address.toLowerCase().includes(searchLower))
         );
@@ -86,7 +117,7 @@ export default function RightColumn({
         
         const searchLower = householdSearch.toLowerCase();
         return households.filter(household => 
-            household.name.toLowerCase().includes(searchLower) ||
+            (household.name && household.name.toLowerCase().includes(searchLower)) ||
             (household.purok && household.purok.toLowerCase().includes(searchLower)) ||
             (household.address && household.address.toLowerCase().includes(searchLower))
         );
@@ -113,16 +144,16 @@ export default function RightColumn({
 
     // Get resident privileges badges
     const getResidentBadges = (resident: Resident) => {
-        const badges = [];
+        const badges: Array<{ code: string; label: string; icon: string; color: string; id_number?: string; status?: string }> = [];
         
         if (resident.privileges && resident.privileges.length > 0) {
-            resident.privileges.forEach((rp: any) => {
+            resident.privileges.forEach((rp: PrivilegeData) => {
                 badges.push({
                     code: rp.code,
                     label: rp.name,
                     icon: getPrivilegeIcon(rp.code),
                     color: getPrivilegeColor(rp.code),
-                    id_number: rp.id_number,
+                    id_number: (rp as any).id_number,
                     status: rp.status
                 });
             });
@@ -134,10 +165,14 @@ export default function RightColumn({
     // Helper to get privilege icon
     const getPrivilegeIcon = (code: string): string => {
         const icons: Record<string, string> = {
+            'senior': '👴',
             'SC': '👴',
             'OSP': '👴',
+            'pwd': '♿',
             'PWD': '♿',
+            'solo_parent': '👨‍👧',
             'SP': '👨‍👧',
+            'indigent': '🏠',
             'IND': '🏠',
             '4PS': '📦',
             'IP': '🌿',
@@ -153,10 +188,14 @@ export default function RightColumn({
     // Helper to get privilege color
     const getPrivilegeColor = (code: string): string => {
         const colors: Record<string, string> = {
+            'senior': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
             'SC': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
             'OSP': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+            'pwd': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
             'PWD': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+            'solo_parent': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
             'SP': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+            'indigent': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
             'IND': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
             '4PS': 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
             'IP': 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800',
@@ -164,21 +203,19 @@ export default function RightColumn({
             'FSH': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800',
             'OFW': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
             'SCH': 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
-            'UNE': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700',
+            'UNE': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
         };
-        return colors[code] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+        return colors[code] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     };
 
     // Handle resident selection
     const handleResidentSelectWithSearch = (residentId: string) => {
-        console.log('Selected resident ID:', residentId);
-        
-        const selected = residents.find(r => r.id === residentId);
+        const selected = residents.find(r => String(r.id) === residentId);
         if (selected) {
-            setResidentSearch(selected.full_name);
+            setResidentSearch(selected.full_name || '');
             setData('resident_id', residentId);
-            setData('payer_name', selected.full_name);
-            setData('contact_number', selected.contact_number || '');
+            setData('payer_name', selected.full_name || '');
+            setData('contact_number', selected.contact_number || selected.phone || '');
             setData('purok', selected.purok || '');
             setData('address', selected.address || '');
             setData('payer_type', 'resident');
@@ -198,14 +235,12 @@ export default function RightColumn({
 
     // Handle household selection
     const handleHouseholdSelectWithSearch = (householdId: string) => {
-        console.log('Selected household ID:', householdId);
-        
-        const selected = households.find(h => h.id === householdId);
+        const selected = households.find(h => String(h.id) === householdId);
         if (selected) {
             setHouseholdSearch(selected.name);
             setData('household_id', householdId);
             setData('payer_name', selected.name);
-            setData('contact_number', selected.contact_number || '');
+            setData('contact_number', selected.contact_number || selected.phone || '');
             setData('purok', selected.purok || '');
             setData('address', selected.address || '');
             setData('payer_type', 'household');
@@ -250,7 +285,7 @@ export default function RightColumn({
     // Update search input when selectedPayer changes
     useEffect(() => {
         if (data.payer_type === 'resident' && selectedPayer && 'full_name' in selectedPayer) {
-            setResidentSearch(selectedPayer.full_name);
+            setResidentSearch(selectedPayer.full_name || '');
         } else if (data.payer_type === 'resident' && !selectedPayer) {
             setResidentSearch('');
         }
@@ -361,65 +396,64 @@ export default function RightColumn({
                                     </div>
 
                                     {/* Search results dropdown */}
-                                    {showResidentDropdown && (
+                                    {showResidentDropdown && filteredResidents.length > 0 && (
                                         <div 
                                             ref={residentDropdownRef}
-                                            className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
-                                            style={{ width: 'calc(100% - 2rem)' }}
+                                            className="absolute z-50 mt-1 max-h-60 w-[calc(100%-2rem)] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
                                         >
-                                            {filteredResidents.length > 0 ? (
-                                                filteredResidents.map((resident) => {
-                                                    const badges = getResidentBadges(resident);
-                                                    return (
-                                                        <button
-                                                            key={resident.id}
-                                                            type="button"
-                                                            onClick={() => handleResidentSelectWithSearch(resident.id)}
-                                                            className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none border-b dark:border-gray-700 last:border-b-0"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <div>
-                                                                    <span className="font-medium dark:text-gray-200">{resident.full_name}</span>
-                                                                    {resident.purok && (
-                                                                        <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                                                                            (Purok {resident.purok})
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex gap-1">
-                                                                    {badges.slice(0, 3).map((badge, idx) => (
-                                                                        <TooltipProvider key={idx}>
-                                                                            <Tooltip>
-                                                                                <TooltipTrigger asChild>
-                                                                                    <span className="text-sm cursor-help" title={badge.label}>
-                                                                                        {badge.icon}
-                                                                                    </span>
-                                                                                </TooltipTrigger>
-                                                                                <TooltipContent>
-                                                                                    <p>{badge.label}</p>
-                                                                                    {badge.id_number && <p className="text-xs">ID: {badge.id_number}</p>}
-                                                                                    {badge.status === 'expiring_soon' && (
-                                                                                        <p className="text-xs text-yellow-500">Expiring soon</p>
-                                                                                    )}
-                                                                                </TooltipContent>
-                                                                            </Tooltip>
-                                                                        </TooltipProvider>
-                                                                    ))}
-                                                                </div>
+                                            {filteredResidents.map((resident) => {
+                                                const badges = getResidentBadges(resident);
+                                                return (
+                                                    <button
+                                                        key={resident.id}
+                                                        type="button"
+                                                        onClick={() => handleResidentSelectWithSearch(String(resident.id))}
+                                                        className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none border-b dark:border-gray-700 last:border-b-0"
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <span className="font-medium dark:text-gray-200">{resident.full_name}</span>
+                                                                {resident.purok && (
+                                                                    <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                                                                        (Purok {resident.purok})
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                            {resident.address && (
-                                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                                    {resident.address}
-                                                                </div>
-                                                            )}
-                                                        </button>
-                                                    );
-                                                })
-                                            ) : (
-                                                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                                                    No residents found matching "{residentSearch}"
-                                                </div>
-                                            )}
+                                                            <div className="flex gap-1">
+                                                                {badges.slice(0, 3).map((badge, idx) => (
+                                                                    <TooltipProvider key={idx}>
+                                                                        <Tooltip>
+                                                                            <TooltipTrigger asChild>
+                                                                                <span className="text-sm cursor-help" title={badge.label}>
+                                                                                    {badge.icon}
+                                                                                </span>
+                                                                            </TooltipTrigger>
+                                                                            <TooltipContent>
+                                                                                <p>{badge.label}</p>
+                                                                                {badge.id_number && <p className="text-xs">ID: {badge.id_number}</p>}
+                                                                                {badge.status === 'expiring_soon' && (
+                                                                                    <p className="text-xs text-yellow-500">Expiring soon</p>
+                                                                                )}
+                                                                            </TooltipContent>
+                                                                        </Tooltip>
+                                                                    </TooltipProvider>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                        {resident.address && (
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                {resident.address}
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {showResidentDropdown && filteredResidents.length === 0 && residentSearch && (
+                                        <div className="absolute z-50 mt-1 w-[calc(100%-2rem)] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                            No residents found matching "{residentSearch}"
                                         </div>
                                     )}
 
@@ -495,57 +529,56 @@ export default function RightColumn({
                                     </div>
 
                                     {/* Search results dropdown */}
-                                    {showHouseholdDropdown && (
+                                    {showHouseholdDropdown && filteredHouseholds.length > 0 && (
                                         <div 
                                             ref={householdDropdownRef}
-                                            className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
-                                            style={{ width: 'calc(100% - 2rem)' }}
+                                            className="absolute z-50 mt-1 max-h-60 w-[calc(100%-2rem)] overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
                                         >
-                                            {filteredHouseholds.length > 0 ? (
-                                                filteredHouseholds.map((household) => (
-                                                    <button
-                                                        key={household.id}
-                                                        type="button"
-                                                        onClick={() => handleHouseholdSelectWithSearch(household.id)}
-                                                        className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none border-b dark:border-gray-700 last:border-b-0"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <div>
-                                                                <span className="font-medium dark:text-gray-200">{household.name}</span>
-                                                                {household.purok && (
-                                                                    <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                                                                        (Purok {household.purok})
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {household.member_count && (
-                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                    {household.member_count} members
+                                            {filteredHouseholds.map((household) => (
+                                                <button
+                                                    key={household.id}
+                                                    type="button"
+                                                    onClick={() => handleHouseholdSelectWithSearch(String(household.id))}
+                                                    className="w-full px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 focus:bg-gray-50 dark:focus:bg-gray-700 focus:outline-none border-b dark:border-gray-700 last:border-b-0"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <span className="font-medium dark:text-gray-200">{household.name}</span>
+                                                            {household.purok && (
+                                                                <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                                                                    (Purok {household.purok})
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        {household.address && (
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                                {household.address}
-                                                            </div>
+                                                        {(household as any).member_count && (
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                {(household as any).member_count} members
+                                                            </span>
                                                         )}
-                                                        {/* Show head's privileges if any */}
-                                                        {household.head_privileges && household.head_privileges.length > 0 && (
-                                                            <div className="mt-1 flex gap-1">
-                                                                {household.head_privileges.slice(0, 2).map((p: any, idx: number) => (
-                                                                    <Badge key={idx} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
-                                                                        {p.name}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </button>
-                                                ))
-                                            ) : (
-                                                <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                                                    No households found matching "{householdSearch}"
-                                                </div>
-                                            )}
+                                                    </div>
+                                                    {household.address && (
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                            {household.address}
+                                                        </div>
+                                                    )}
+                                                    {/* Show head's privileges if any */}
+                                                    {household.head_privileges && household.head_privileges.length > 0 && (
+                                                        <div className="mt-1 flex gap-1">
+                                                            {household.head_privileges.slice(0, 2).map((p: PrivilegeData, idx: number) => (
+                                                                <Badge key={idx} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
+                                                                    {p.name}
+                                                                </Badge>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {showHouseholdDropdown && filteredHouseholds.length === 0 && householdSearch && (
+                                        <div className="absolute z-50 mt-1 w-[calc(100%-2rem)] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                            No households found matching "{householdSearch}"
                                         </div>
                                     )}
 
@@ -579,11 +612,11 @@ export default function RightColumn({
                                             <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                                                 {selectedPayer.purok && `Purok ${selectedPayer.purok}`}
                                                 {selectedPayer.address && ` • ${selectedPayer.address}`}
-                                                {selectedPayer.member_count && ` • ${selectedPayer.member_count} members`}
+                                                {(selectedPayer as any).member_count && ` • ${(selectedPayer as any).member_count} members`}
                                             </div>
                                             {selectedPayer.head_privileges && selectedPayer.head_privileges.length > 0 && (
                                                 <div className="mt-2 flex gap-1">
-                                                    {selectedPayer.head_privileges.map((p: any, idx: number) => (
+                                                    {selectedPayer.head_privileges.map((p: PrivilegeData, idx: number) => (
                                                         <Badge key={idx} variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800">
                                                             {p.name}
                                                         </Badge>

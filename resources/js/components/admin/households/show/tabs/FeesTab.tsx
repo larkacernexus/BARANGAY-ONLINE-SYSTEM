@@ -21,6 +21,21 @@ import { useState, useMemo } from 'react';
 import { Fee, FeeStatus } from '@/types/admin/households/household.types';
 import { formatDate, formatDateTime } from '@/types/admin/households/household.types';
 
+// Helper to safely get fee type display name
+const getFeeTypeDisplay = (feeType: any): string => {
+    if (!feeType) return 'Fee Assessment';
+    if (typeof feeType === 'string') return feeType;
+    if (typeof feeType === 'object') {
+        // If it's an object with name property
+        if (feeType.name) return feeType.name;
+        // If it's an object with code property
+        if (feeType.code) return feeType.code;
+        // If it has an id but no name/code
+        if (feeType.id) return `Fee #${feeType.id}`;
+    }
+    return 'Fee Assessment';
+};
+
 interface FeesTabProps {
     householdId: number;
     fees: Fee[];
@@ -121,6 +136,96 @@ export const FeesTab = ({
         };
     }, [fees]);
 
+    // Render individual fee item
+    const renderFeeItem = (fee: Fee) => {
+        const totalAmountValue = toNumber(fee.total_amount);
+        const amountPaid = toNumber(fee.amount_paid);
+        const balance = totalAmountValue - amountPaid;
+        const isPaid = fee.status === 'paid';
+        const feeTypeDisplay = getFeeTypeDisplay(fee.fee_type);
+
+        return (
+            <div key={fee.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <div className="flex items-center gap-2">
+                                {getStatusIcon(fee.status)}
+                                <h3 className="font-semibold dark:text-gray-100">
+                                    {feeTypeDisplay}
+                                </h3>
+                            </div>
+                            {getStatusBadge(fee.status)}
+                            {fee.reference_number && (
+                                <Badge variant="outline" className="text-xs dark:border-gray-600">
+                                    Ref: {fee.reference_number}
+                                </Badge>
+                            )}
+                        </div>
+                        
+                        {fee.notes && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                {fee.notes}
+                            </p>
+                        )}
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <p className="text-gray-500 dark:text-gray-400">Amount</p>
+                                <p className="font-medium dark:text-gray-200">{formatAmount(totalAmountValue)}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 dark:text-gray-400">Paid</p>
+                                <p className="font-medium text-green-600 dark:text-green-400">{formatAmount(amountPaid)}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 dark:text-gray-400">Balance</p>
+                                <p className={`font-medium ${balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                    {formatAmount(balance)}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500 dark:text-gray-400">Due Date</p>
+                                <p className="font-medium dark:text-gray-200">
+                                    {formatDateSafe(fee.due_date)}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {isPaid && fee.paid_date && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                                Paid on: {formatDateSafe(fee.paid_date)}
+                                {fee.payment_method && ` via ${fee.payment_method.toUpperCase()}`}
+                            </p>
+                        )}
+                        
+                        {fee.receipt_number && (
+                            <p className="text-xs text-gray-400 mt-1">Receipt #: {fee.receipt_number}</p>
+                        )}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <Link href={route('admin.fees.show', fee.id)}>
+                            <Button variant="ghost" size="sm" title="View Details">
+                                <Eye className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                        {!isPaid && (
+                            <Link href={route('admin.payments.create', { fee_id: fee.id, household_id: householdId })}>
+                                <Button variant="outline" size="sm" className="dark:border-gray-600">
+                                    Pay
+                                </Button>
+                            </Link>
+                        )}
+                        <Button variant="ghost" size="sm" title="Download Receipt">
+                            <Download className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6">
             {/* Summary Cards */}
@@ -191,7 +296,7 @@ export const FeesTab = ({
             {/* Fees List */}
             <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
                         <CardTitle className="dark:text-gray-100">Fee Assessments</CardTitle>
                         <Link href={route('admin.fees.create', { household_id: householdId })}>
                             <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
@@ -217,7 +322,9 @@ export const FeesTab = ({
                                         <AlertCircle className="h-4 w-4" />
                                         Overdue Fees ({feesByStatus.overdue.length})
                                     </h4>
-                                    {renderFeeList(feesByStatus.overdue)}
+                                    <div className="space-y-3">
+                                        {feesByStatus.overdue.map(renderFeeItem)}
+                                    </div>
                                 </div>
                             )}
 
@@ -228,7 +335,9 @@ export const FeesTab = ({
                                         <Clock className="h-4 w-4" />
                                         Pending Fees ({feesByStatus.pending.length})
                                     </h4>
-                                    {renderFeeList(feesByStatus.pending)}
+                                    <div className="space-y-3">
+                                        {feesByStatus.pending.map(renderFeeItem)}
+                                    </div>
                                 </div>
                             )}
 
@@ -239,7 +348,9 @@ export const FeesTab = ({
                                         <CheckCircle className="h-4 w-4" />
                                         Paid Fees ({feesByStatus.paid.length})
                                     </h4>
-                                    {renderFeeList(feesByStatus.paid)}
+                                    <div className="space-y-3">
+                                        {feesByStatus.paid.map(renderFeeItem)}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -248,98 +359,4 @@ export const FeesTab = ({
             </Card>
         </div>
     );
-
-    function renderFeeList(feesList: Fee[]) {
-        return (
-            <div className="space-y-3">
-                {feesList.map((fee) => {
-                    const totalAmount = toNumber(fee.total_amount);
-                    const amountPaid = toNumber(fee.amount_paid);
-                    const balance = totalAmount - amountPaid;
-                    const isPaid = fee.status === 'paid';
-                    
-                    return (
-                        <div key={fee.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                                        <div className="flex items-center gap-2">
-                                            {getStatusIcon(fee.status)}
-                                            <h3 className="font-semibold dark:text-gray-100">
-                                                {fee.fee_type || 'Fee Assessment'}
-                                            </h3>
-                                        </div>
-                                        {getStatusBadge(fee.status)}
-                                        {fee.reference_number && (
-                                            <Badge variant="outline" className="text-xs dark:border-gray-600">
-                                                Ref: {fee.reference_number}
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    
-                                    {fee.notes && (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                                            {fee.notes}
-                                        </p>
-                                    )}
-                                    
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                        <div>
-                                            <p className="text-gray-500 dark:text-gray-400">Amount</p>
-                                            <p className="font-medium dark:text-gray-200">{formatAmount(totalAmount)}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-500 dark:text-gray-400">Paid</p>
-                                            <p className="font-medium text-green-600 dark:text-green-400">{formatAmount(amountPaid)}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-500 dark:text-gray-400">Balance</p>
-                                            <p className={`font-medium ${balance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                                {formatAmount(balance)}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-500 dark:text-gray-400">Due Date</p>
-                                            <p className="font-medium dark:text-gray-200">
-                                                {formatDateSafe(fee.due_date)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    
-                                    {isPaid && fee.paid_date && (
-                                        <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                                            Paid on: {formatDateSafe(fee.paid_date)}
-                                            {fee.payment_method && ` via ${fee.payment_method.toUpperCase()}`}
-                                        </p>
-                                    )}
-                                    
-                                    {fee.receipt_number && (
-                                        <p className="text-xs text-gray-400 mt-1">Receipt #: {fee.receipt_number}</p>
-                                    )}
-                                </div>
-                                
-                                <div className="flex items-center gap-2">
-                                    <Link href={route('admin.fees.show', fee.id)}>
-                                        <Button variant="ghost" size="sm" title="View Details">
-                                            <Eye className="h-4 w-4" />
-                                        </Button>
-                                    </Link>
-                                    {!isPaid && (
-                                        <Link href={route('admin.payments.create', { fee_id: fee.id, household_id: householdId })}>
-                                            <Button variant="outline" size="sm" className="dark:border-gray-600">
-                                                Pay
-                                            </Button>
-                                        </Link>
-                                    )}
-                                    <Button variant="ghost" size="sm" title="Download Receipt">
-                                        <Download className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }
 };

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { BackupFile, Filters } from '@/types/backup';
+import { BackupFile, Filters } from '@/types/admin/backup/backup';
 import { filterBackups } from '@/admin-utils/backupUtils';
 
 export const useBackupFilters = (initialBackups: BackupFile[], initialFilters?: Filters) => {

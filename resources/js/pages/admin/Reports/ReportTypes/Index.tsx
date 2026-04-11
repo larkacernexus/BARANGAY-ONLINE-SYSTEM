@@ -1,8 +1,6 @@
-// app/pages/admin/report-types/index.tsx
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -21,19 +19,24 @@ import {
     formatDate,
     getPriorityDetails,
     getPriorityLabel,
-    getPriorityColor,
-    getPriorityIcon,
-    getStatusBadgeVariant,
     getSelectionStats,
-    filterReportTypes,
-    formatForClipboard,
-    safeNumber
 } from '@/admin-utils/reportTypesUtils';
 
-// Import types
-import { ReportType, BulkOperation, BulkEditField, SelectionMode, FilterState, SelectionStats } from '@/types/report-types';
+// Import types (no PageProps from here - we define it locally)
+import { 
+    ReportType, 
+    BulkOperation, 
+    BulkEditField, 
+    SelectionMode, 
+    SelectionStats 
+} from '@/types/report-types';
 
-interface PageProps {
+// ============================================
+// LOCAL PAGE PROPS INTERFACE
+// ============================================
+// Defined locally to avoid conflicts with any global PageProps definitions
+interface ReportTypesPageProps {
+    [key: string]: unknown; // Add index signature to satisfy PageProps constraint
     reportTypes: ReportType[] | null;
     filters: {
         search?: string;
@@ -54,31 +57,23 @@ interface PageProps {
     } | null;
 }
 
-declare module '@inertiajs/react' {
-    interface PageProps {
-        reportTypes: ReportType[] | null;
-        filters: {
-            search?: string;
-            status?: string;
-            priority?: string;
-            requires_action?: string;
-        } | null;
-        stats: {
-            total: number;
-            active: number;
-            requires_immediate_action: number;
-            allows_anonymous: number;
-            requires_evidence: number;
-            critical: number;
-            high: number;
-            medium: number;
-            low: number;
-        } | null;
-    }
-}
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
 export default function ReportTypesIndex() {
-    const { props } = usePage<PageProps>();
+    const { props } = usePage<ReportTypesPageProps>();
     const { reportTypes = [], filters = {}, stats = null } = props;
     
     // Safe defaults for optional props
@@ -96,17 +91,23 @@ export default function ReportTypesIndex() {
         low: 0
     };
     
-    // State management
-    const [search, setSearch] = useState(safeFilters.search || '');
-    const [filtersState, setFiltersState] = useState<FilterState>({
-        search: safeFilters.search || '',
-        status: safeFilters.status || 'all',
-        priority: safeFilters.priority || 'all',
-        requires_action: safeFilters.requires_action || 'all'
-    });
+    // ============================================
+    // STATE
+    // ============================================
+    
+    // Filter states - client-side only
+    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
+    const [priorityFilter, setPriorityFilter] = useState<string>(getSafeString(safeFilters.priority, 'all'));
+    const [requiresActionFilter, setRequiresActionFilter] = useState<string>(getSafeString(safeFilters.requires_action, 'all'));
+    const [sortBy, setSortBy] = useState<string>('name');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [itemsPerPage] = useState<number>(15);
     
     // Bulk selection states
     const [selectedReportTypes, setSelectedReportTypes] = useState<number[]>([]);
@@ -125,7 +126,10 @@ export default function ReportTypesIndex() {
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    
+    // ============================================
+    // EFFECTS
+    // ============================================
+
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -144,6 +148,11 @@ export default function ReportTypesIndex() {
         return () => window.removeEventListener('resize', handleResize);
     }, [viewMode]);
 
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, statusFilter, priorityFilter, requiresActionFilter, sortBy, sortOrder]);
+
     // Reset selection when exiting bulk mode
     useEffect(() => {
         if (!isBulkMode) {
@@ -152,131 +161,102 @@ export default function ReportTypesIndex() {
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedReportTypes.length > 0) {
-                        setSelectedReportTypes([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Ctrl/Cmd + F to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            // Delete key for bulk delete
-            if (e.key === 'Delete' && isBulkMode && selectedReportTypes.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
+    // ============================================
+    // COMPUTED VALUES
+    // ============================================
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedReportTypes, isMobile]);
-
-    // Filter report types client-side for selection
+    // Filter report types client-side
     const filteredReportTypes = useMemo(() => {
-        return filterReportTypes(
-            safeReportTypes,
-            search,
-            filtersState,
-            'name',
-            'asc'
-        );
-    }, [safeReportTypes, search, filtersState]);
-
-    // Calculate pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
-    const totalItems = filteredReportTypes.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedReportTypes = filteredReportTypes.slice(startIndex, endIndex);
-
-    // Selection handlers
-    const handleSelectAllOnPage = () => {
-        const pageIds = paginatedReportTypes.map(type => type.id);
-        if (isSelectAll) {
-            setSelectedReportTypes(prev => prev.filter(id => !pageIds.includes(id)));
-        } else {
-            const newSelected = [...new Set([...selectedReportTypes, ...pageIds])];
-            setSelectedReportTypes(newSelected);
+        if (!safeReportTypes || safeReportTypes.length === 0) {
+            return [];
         }
-        setIsSelectAll(!isSelectAll);
-        setSelectionMode('page');
-    };
-
-    const handleSelectAllFiltered = () => {
-        const allIds = filteredReportTypes.map(type => type.id);
-        if (selectedReportTypes.length === allIds.length && allIds.every(id => selectedReportTypes.includes(id))) {
-            setSelectedReportTypes(prev => prev.filter(id => !allIds.includes(id)));
-        } else {
-            const newSelected = [...new Set([...selectedReportTypes, ...allIds])];
-            setSelectedReportTypes(newSelected);
-            setSelectionMode('filtered');
+        
+        let filtered = [...safeReportTypes];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(type =>
+                type?.name?.toLowerCase().includes(searchLower) ||
+                type?.code?.toLowerCase().includes(searchLower) ||
+                type?.description?.toLowerCase().includes(searchLower)
+            );
         }
-    };
-
-    const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${safeReportTypes.length} report types. This action may take a moment.`)) {
-            const pageIds = paginatedReportTypes.map(type => type.id);
-            setSelectedReportTypes(pageIds);
-            setSelectionMode('all');
+        
+        // Status filter
+        if (statusFilter && statusFilter !== 'all') {
+            filtered = filtered.filter(type => type?.is_active === (statusFilter === 'active'));
         }
-    };
-
-    const handleItemSelect = (id: number) => {
-        setSelectedReportTypes(prev => {
-            if (prev.includes(id)) {
-                return prev.filter(itemId => itemId !== id);
-            } else {
-                return [...prev, id];
+        
+        // Priority filter
+        if (priorityFilter && priorityFilter !== 'all') {
+            const priorityMap: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+            const targetLevel = priorityMap[priorityFilter];
+            if (targetLevel) {
+                filtered = filtered.filter(type => type?.priority_level === targetLevel);
             }
-        });
-    };
+        }
+        
+        // Requires action filter
+        if (requiresActionFilter && requiresActionFilter !== 'all') {
+            filtered = filtered.filter(type => type?.requires_immediate_action === (requiresActionFilter === 'yes'));
+        }
+        
+        // Apply sorting
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'name':
+                        valueA = a?.name || '';
+                        valueB = b?.name || '';
+                        break;
+                    case 'code':
+                        valueA = a?.code || '';
+                        valueB = b?.code || '';
+                        break;
+                    case 'priority':
+                        valueA = a?.priority_level || 0;
+                        valueB = b?.priority_level || 0;
+                        break;
+                    case 'resolution_days':
+                        valueA = a?.resolution_days || 0;
+                        valueB = b?.resolution_days || 0;
+                        break;
+                    case 'status':
+                        valueA = a?.is_active ? 1 : 0;
+                        valueB = b?.is_active ? 1 : 0;
+                        break;
+                    case 'requires_immediate_action':
+                        valueA = a?.requires_immediate_action ? 1 : 0;
+                        valueB = b?.requires_immediate_action ? 1 : 0;
+                        break;
+                    case 'created_at':
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.name || '';
+                        valueB = b?.name || '';
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [safeReportTypes, search, statusFilter, priorityFilter, requiresActionFilter, sortBy, sortOrder]);
 
-    // Check if all items on current page are selected
-    useEffect(() => {
-        const allPageIds = paginatedReportTypes.map(type => type.id);
-        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedReportTypes.includes(id));
-        setIsSelectAll(allSelected);
-    }, [selectedReportTypes, paginatedReportTypes]);
-
-    // Get selected report types data
-    const selectedReportTypesData = useMemo(() => {
-        return filteredReportTypes.filter(type => selectedReportTypes.includes(type.id));
-    }, [selectedReportTypes, filteredReportTypes]);
-
-    // Calculate selection stats
-    const selectionStats = useMemo(() => {
-        return getSelectionStats(selectedReportTypesData);
-    }, [selectedReportTypesData]);
-
-    // Priority counts
+    // Priority counts for filtered items
     const priorityCounts = useMemo(() => {
         const counts = { critical: 0, high: 0, medium: 0, low: 0 };
         filteredReportTypes.forEach(type => {
@@ -288,6 +268,127 @@ export default function ReportTypesIndex() {
         });
         return counts;
     }, [filteredReportTypes]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        if (!filteredReportTypes || filteredReportTypes.length === 0) {
+            return safeStats;
+        }
+        
+        const active = filteredReportTypes.filter(t => t?.is_active).length;
+        const requires_immediate_action = filteredReportTypes.filter(t => t?.requires_immediate_action).length;
+        const allows_anonymous = filteredReportTypes.filter(t => t?.allows_anonymous).length;
+        const requires_evidence = filteredReportTypes.filter(t => t?.requires_evidence).length;
+        
+        return {
+            total: filteredReportTypes.length,
+            active,
+            requires_immediate_action,
+            allows_anonymous,
+            requires_evidence,
+            critical: priorityCounts.critical,
+            high: priorityCounts.high,
+            medium: priorityCounts.medium,
+            low: priorityCounts.low
+        };
+    }, [filteredReportTypes, safeStats, priorityCounts]);
+
+    // Pagination
+    const totalItems = filteredReportTypes.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedReportTypes = filteredReportTypes.slice(startIndex, endIndex);
+
+    // Get selected report types data
+    const selectedReportTypesData = useMemo(() => {
+        return filteredReportTypes.filter(type => selectedReportTypes.includes(type.id));
+    }, [selectedReportTypes, filteredReportTypes]);
+
+    // Calculate selection stats
+    const selectionStats = useMemo(() => {
+        return getSelectionStats(selectedReportTypesData);
+    }, [selectedReportTypesData]);
+
+    const hasActiveFilters = Boolean(
+        search || 
+        (statusFilter && statusFilter !== 'all') || 
+        (priorityFilter && priorityFilter !== 'all') ||
+        (requiresActionFilter && requiresActionFilter !== 'all')
+    );
+
+    // Create filters object for the Filters component
+    const filtersStateForComponent = {
+        search: search,
+        status: statusFilter,
+        priority: priorityFilter,
+        requires_action: requiresActionFilter
+    };
+
+    // ============================================
+    // HANDLERS
+    // ============================================
+
+    // Selection handlers
+    const handleSelectAllOnPage = useCallback(() => {
+        const pageIds = paginatedReportTypes.map(type => type.id);
+        if (isSelectAll) {
+            setSelectedReportTypes(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedReportTypes, ...pageIds])];
+            setSelectedReportTypes(newSelected);
+        }
+        setIsSelectAll(!isSelectAll);
+        setSelectionMode('page');
+    }, [paginatedReportTypes, isSelectAll, selectedReportTypes]);
+
+    const handleSelectAllFiltered = useCallback(() => {
+        const allIds = filteredReportTypes.map(type => type.id);
+        if (selectedReportTypes.length === allIds.length && allIds.every(id => selectedReportTypes.includes(id))) {
+            setSelectedReportTypes(prev => prev.filter(id => !allIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedReportTypes, ...allIds])];
+            setSelectedReportTypes(newSelected);
+            setSelectionMode('filtered');
+        }
+    }, [filteredReportTypes, selectedReportTypes]);
+
+    const handleSelectAll = useCallback(() => {
+        if (confirm(`This will select ALL ${totalItems} report types. This action may take a moment.`)) {
+            const allIds = filteredReportTypes.map(type => type.id);
+            setSelectedReportTypes(allIds);
+            setSelectionMode('all');
+        }
+    }, [filteredReportTypes, totalItems]);
+
+    const handleItemSelect = useCallback((id: number) => {
+        setSelectedReportTypes(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(itemId => itemId !== id);
+            } else {
+                return [...prev, id];
+            }
+        });
+    }, []);
+
+    // Check if all items on current page are selected
+    useEffect(() => {
+        const allPageIds = paginatedReportTypes.map(type => type.id);
+        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedReportTypes.includes(id));
+        setIsSelectAll(allSelected);
+    }, [selectedReportTypes, paginatedReportTypes]);
+
+    // Handle sort change from dropdown
+    const handleSortChange = useCallback((value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    }, []);
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = useCallback((): string => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
 
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation) => {
@@ -315,18 +416,14 @@ export default function ReportTypesIndex() {
                 case 'export':
                 case 'export_csv':
                     const exportData = selectedReportTypesData.map(type => ({
-                        'ID': type.id,
-                        'Code': type.code,
                         'Name': type.name,
-                        'Description': type.description || '',
+                        'Code': type.code,
                         'Priority': getPriorityLabel(type.priority_level),
                         'Resolution Days': type.resolution_days,
                         'Status': type.is_active ? 'Active' : 'Inactive',
                         'Requires Immediate Action': type.requires_immediate_action ? 'Yes' : 'No',
                         'Requires Evidence': type.requires_evidence ? 'Yes' : 'No',
-                        'Allows Anonymous': type.allows_anonymous ? 'Yes' : 'No',
-                        'Created At': formatDate(type.created_at),
-                        'Updated At': formatDate(type.updated_at),
+                        'Allows Anonymous': type.allows_anonymous ? 'Yes' : 'No'
                     }));
                     
                     const headers = Object.keys(exportData[0]);
@@ -347,9 +444,7 @@ export default function ReportTypesIndex() {
                     const a = document.createElement('a');
                     a.href = url;
                     a.download = `report-types-export-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                     
                     toast.success('Export completed successfully');
@@ -365,9 +460,8 @@ export default function ReportTypesIndex() {
                                 toast.success(`${selectedReportTypes.length} report type(s) duplicated successfully`);
                                 setSelectedReportTypes([]);
                             },
-                            onError: (errors) => {
+                            onError: () => {
                                 toast.error('Failed to duplicate report types');
-                                console.error('Duplicate errors:', errors);
                             }
                         });
                     }
@@ -389,23 +483,34 @@ export default function ReportTypesIndex() {
     };
 
     // Copy selected data to clipboard
-    const handleCopySelectedData = () => {
+    const handleCopySelectedData = useCallback(() => {
         if (selectedReportTypesData.length === 0) {
             toast.error('No data to copy');
             return;
         }
         
-        const csv = formatForClipboard(selectedReportTypesData);
+        const data = selectedReportTypesData.map(type => ({
+            'Name': type.name,
+            'Code': type.code,
+            'Priority': getPriorityLabel(type.priority_level),
+            'Resolution Days': type.resolution_days,
+            'Status': type.is_active ? 'Active' : 'Inactive'
+        }));
+        
+        const csv = [
+            Object.keys(data[0]).join('\t'),
+            ...data.map(row => Object.values(row).join('\t'))
+        ].join('\n');
         
         navigator.clipboard.writeText(csv).then(() => {
-            toast.success('Selected data copied to clipboard as CSV');
+            toast.success(`${selectedReportTypesData.length} records copied to clipboard`);
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
-    };
+    }, [selectedReportTypesData]);
 
     // Individual report type operations
-    const handleToggleStatus = (type: ReportType) => {
+    const handleToggleStatus = useCallback((type: ReportType) => {
         if (confirm(`Are you sure you want to ${type.is_active ? 'deactivate' : 'activate'} "${type.name}"?`)) {
             router.post(route('report-types.toggle-status', type.id), {}, {
                 preserveScroll: true,
@@ -417,9 +522,9 @@ export default function ReportTypesIndex() {
                 },
             });
         }
-    };
+    }, []);
 
-    const handleDuplicate = (type: ReportType) => {
+    const handleDuplicate = useCallback((type: ReportType) => {
         if (confirm(`Duplicate "${type.name}" report type?`)) {
             router.post(route('report-types.duplicate', type.id), {}, {
                 preserveScroll: true,
@@ -431,83 +536,113 @@ export default function ReportTypesIndex() {
                 },
             });
         }
-    };
+    }, []);
 
-    const handleDelete = (type: ReportType) => {
+    const handleDelete = useCallback((type: ReportType) => {
         if (confirm(`Are you sure you want to delete "${type.name}"? This action cannot be undone.`)) {
             router.delete(route('report-types.destroy', type.id));
         }
-    };
+    }, []);
 
-    const handleCopyToClipboard = (text: string, label: string) => {
+    const handleCopyToClipboard = useCallback((text: string, label: string) => {
         navigator.clipboard.writeText(text).then(() => {
             toast.success(`${label} copied to clipboard`);
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
-    };
+    }, []);
 
-    const handleSort = (column: string) => {
-        // For client-side sorting, we could implement it here
-        // For server-side sorting, we would update filters
-        toast.info(`Sort by ${column} - to be implemented`);
-    };
+    const handleSort = useCallback((column: string) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    }, [sortBy, sortOrder]);
 
-    const updateFilter = (key: keyof FilterState, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
-        
-        const params = { ...filtersState, [key]: value };
-        Object.keys(params).forEach(k => {
-            const key = k as keyof typeof params;
-            if (!params[key] || params[key] === 'all') {
-                delete params[key];
-            }
-        });
-        
-        router.get(route('admin.report-types.index'), params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleClearFilters = () => {
+    const handleClearFilters = useCallback(() => {
         setSearch('');
-        setFiltersState({
-            search: '',
-            status: 'all',
-            priority: 'all',
-            requires_action: 'all'
-        });
-        
-        router.get(route('admin.report-types.index'), {}, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
+        setStatusFilter('all');
+        setPriorityFilter('all');
+        setRequiresActionFilter('all');
+        setSortBy('name');
+        setSortOrder('asc');
+        setCurrentPage(1);
+    }, []);
 
-    const handleClearSelection = () => {
+    const handleClearSelection = useCallback(() => {
         setSelectedReportTypes([]);
         setIsSelectAll(false);
-    };
+    }, []);
 
-    const handlePageChange = (page: number) => {
+    const handlePageChange = useCallback((page: number) => {
         setCurrentPage(page);
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
+    }, []);
 
-    const handleViewPhoto = (type: ReportType) => {
-        // Implement if needed
+    const handleViewPhoto = useCallback(() => {
         toast.info('Feature to be implemented');
-    };
+    }, []);
 
-    const hasActiveFilters = 
-        search || 
-        filtersState.status !== 'all' || 
-        filtersState.priority !== 'all' ||
-        filtersState.requires_action !== 'all';
+    const updateFilter = useCallback((key: string, value: string) => {
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'priority':
+                setPriorityFilter(value);
+                break;
+            case 'requires_action':
+                setRequiresActionFilter(value);
+                break;
+        }
+    }, []);
 
-    // Add error boundary fallback
+    // ============================================
+    // KEYBOARD SHORTCUTS
+    // ============================================
+
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedReportTypes.length > 0) {
+                        setSelectedReportTypes([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedReportTypes.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedReportTypes, isMobile, handleSelectAllFiltered, handleSelectAllOnPage]);
+
+    // ============================================
+    // ERROR BOUNDARY FALLBACK
+    // ============================================
+
     if (!Array.isArray(safeReportTypes)) {
         return (
             <AppLayout
@@ -534,6 +669,10 @@ export default function ReportTypesIndex() {
         );
     }
 
+    // ============================================
+    // RENDER
+    // ============================================
+
     return (
         <AppLayout
             title="Report Types"
@@ -551,14 +690,14 @@ export default function ReportTypesIndex() {
                     />
 
                     <ReportTypesStats 
-                        stats={safeStats}
+                        stats={filteredStats}
                         priorityCounts={priorityCounts}
                     />
 
                     <ReportTypesFilters
                         search={search}
                         setSearch={setSearch}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
@@ -600,12 +739,16 @@ export default function ReportTypesIndex() {
                         onBulkOperation={handleBulkOperation}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkPriorityDialog={setShowBulkPriorityDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
                         getPriorityDetails={getPriorityDetails}
                         formatDate={formatDate}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Keyboard Shortcuts Help */}

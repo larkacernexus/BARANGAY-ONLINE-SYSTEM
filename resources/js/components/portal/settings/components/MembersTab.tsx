@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import { 
   Info, ChevronDown, ChevronUp, User, Calendar, Phone, Mail, 
   Heart, Briefcase, MapPin, Award, Hash, Users, Shield, 
-  CreditCard, BookOpen, Globe, Home, AlertCircle, Star,
-  IdCard, HeartHandshake, Building, Languages, Church,
-  Coffee, Baby, Users2, Sparkles
+  BookOpen, Home, AlertCircle, IdCard, Church, Sparkles
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -55,16 +53,22 @@ interface MemberDetails {
     code: string;
     name: string;
     id_number?: string;
-    status?: string;
     discount_percentage?: number;
+    status?: string;
     expires_at?: string;
     verified_at?: string;
+    discount_type?: {
+      id: number;
+      code: string;
+      name: string;
+      percentage: number;
+    };
   }>;
   privileges_count?: number;
   has_privileges?: boolean;
   
   // For backward compatibility
-  discount_eligibilities?: any;
+  discount_eligibilities?: any[];
   
   relationship_to_head: string;
   is_head: boolean;
@@ -89,9 +93,36 @@ interface MemberDetails {
  * Get privilege icon based on code
  */
 function getPrivilegeIcon(code: string): string {
-  const firstChar = (code?.[0] || 'A').toUpperCase();
+  const codeUpper = (code || '').toUpperCase();
   
   const iconMap: Record<string, string> = {
+    'SC': '👴',
+    'SENIOR': '👴',
+    'OSP': '👴',
+    'PWD': '♿',
+    'SP': '👨‍👧',
+    'SOLO_PARENT': '👨‍👧',
+    'IND': '🏠',
+    'INDIGENT': '🏠',
+    '4PS': '📦',
+    'IP': '🌿',
+    'FRM': '🌾',
+    'FSH': '🎣',
+    'OFW': '✈️',
+    'SCH': '📚',
+    'STUDENT': '📚',
+    'UNE': '💼',
+    'VETERAN': '🎖️',
+  };
+  
+  // Check for exact match first
+  if (iconMap[codeUpper]) {
+    return iconMap[codeUpper];
+  }
+  
+  // Check first character as fallback
+  const firstChar = codeUpper[0] || 'A';
+  const fallbackMap: Record<string, string> = {
     'S': '👴',
     'P': '♿',
     'I': '🏠',
@@ -99,35 +130,38 @@ function getPrivilegeIcon(code: string): string {
     'O': '✈️',
     '4': '📦',
     'U': '💼',
-    'A': '🎫',
-    'B': '🎫',
-    'C': '🎫',
-    'D': '🎫',
-    'E': '🎫',
+    'V': '🎖️',
   };
   
-  return iconMap[firstChar] || '🎫';
+  return fallbackMap[firstChar] || '🎫';
 }
 
 /**
- * Get privilege color based on code hash
+ * Get privilege color based on code
  */
 function getPrivilegeColor(code: string): string {
-  const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
-  const colorIndex = firstChar % 8;
+  const codeUpper = (code || '').toUpperCase();
   
-  const colors = [
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-    'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300',
-  ];
+  const colorMap: Record<string, string> = {
+    'SC': 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300',
+    'SENIOR': 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300',
+    'OSP': 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300',
+    'PWD': 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300',
+    'SP': 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300',
+    'SOLO_PARENT': 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300',
+    'IND': 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300',
+    'INDIGENT': 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300',
+    '4PS': 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300',
+    'IP': 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300',
+    'VETERAN': 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300',
+  };
   
-  return colors[colorIndex] || 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300';
+  if (colorMap[codeUpper]) {
+    return colorMap[codeUpper];
+  }
+  
+  // Default color
+  return 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300';
 }
 
 /**
@@ -138,9 +172,19 @@ function getActivePrivileges(member: MemberDetails): any[] {
     return [];
   }
   
-  return member.privileges.filter((p: any) => 
-    p.status === 'active' || p.status === 'expiring_soon'
-  );
+  return member.privileges.filter((p: any) => {
+    // If status is explicitly set, use it
+    if (p.status) {
+      return p.status === 'active' || p.status === 'expiring_soon';
+    }
+    
+    // Otherwise, infer status from verified_at and expires_at
+    const isVerified = p.verified_at;
+    const isExpired = p.expires_at && new Date(p.expires_at) <= new Date();
+    const isExpiringSoon = p.expires_at && new Date(p.expires_at) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    
+    return isVerified && !isExpired;
+  });
 }
 
 /**
@@ -154,19 +198,26 @@ function getPrivilegeBadges(member: MemberDetails): Array<{
   id_number?: string;
   discount_percentage?: number;
   expires_at?: string;
+  status?: string;
 }> {
   const activePrivileges = getActivePrivileges(member);
   
   return activePrivileges.map((p: any) => {
+    // Handle both nested and flat privilege data structures
     const privilege = p.privilege || p;
+    const code = privilege.code || p.code;
+    const discountPercentage = p.discount_percentage ?? privilege.discount_percentage ?? 0;
+    const name = privilege.name || p.name || code;
+    
     return {
-      code: privilege.code || p.code,
-      name: privilege.name || p.name || privilege.code || p.code,
-      icon: getPrivilegeIcon(privilege.code || p.code),
-      color: getPrivilegeColor(privilege.code || p.code),
+      code: code,
+      name: name,
+      icon: getPrivilegeIcon(code),
+      color: getPrivilegeColor(code),
       id_number: p.id_number,
-      discount_percentage: p.discount_percentage,
-      expires_at: p.expires_at
+      discount_percentage: typeof discountPercentage === 'number' ? discountPercentage : parseFloat(discountPercentage) || 0,
+      expires_at: p.expires_at,
+      status: p.status
     };
   });
 }
@@ -176,6 +227,58 @@ function getPrivilegeBadges(member: MemberDetails): Array<{
  */
 function hasAnyPrivilege(member: MemberDetails): boolean {
   return getActivePrivileges(member).length > 0;
+}
+
+/**
+ * Format date helper
+ */
+function formatDate(dateString?: string): string | null {
+  if (!dateString) return null;
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+/**
+ * Get initials from name
+ */
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+/**
+ * Get status badge
+ */
+function getStatusBadge(status?: string) {
+  if (!status) return null;
+  
+  const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string, className?: string }> = {
+    active: { variant: "default", label: "Active", className: "bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800" },
+    inactive: { variant: "secondary", label: "Inactive", className: "bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700" },
+    pending: { variant: "outline", label: "Pending", className: "border-yellow-500 text-yellow-600 dark:text-yellow-400 dark:border-yellow-400" },
+    archived: { variant: "destructive", label: "Archived" },
+    expired: { variant: "destructive", label: "Expired" },
+    expiring_soon: { variant: "outline", label: "Expiring Soon", className: "border-orange-500 text-orange-600 dark:text-orange-400 dark:border-orange-400" }
+  };
+  
+  const config = variants[status.toLowerCase()] || { variant: "outline", label: status };
+  
+  return (
+    <Badge variant={config.variant} className={cn("text-xs", config.className)}>
+      {config.label}
+    </Badge>
+  );
 }
 
 export const MembersTab = ({ household, residentId }: MembersTabProps) => {
@@ -194,43 +297,6 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
 
   const toggleMember = (memberId: number) => {
     setOpenMemberId(openMemberId === memberId ? null : memberId);
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return null;
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getStatusBadge = (status?: string) => {
-    if (!status) return null;
-    
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string, className?: string }> = {
-      active: { variant: "default", label: "Active", className: "bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800" },
-      inactive: { variant: "secondary", label: "Inactive", className: "bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700" },
-      pending: { variant: "outline", label: "Pending", className: "border-yellow-500 text-yellow-600 dark:text-yellow-400 dark:border-yellow-400" },
-      archived: { variant: "destructive", label: "Archived" }
-    };
-    
-    const config = variants[status.toLowerCase()] || { variant: "outline", label: status };
-    
-    return (
-      <Badge variant={config.variant} className={cn("text-xs", config.className)}>
-        {config.label}
-      </Badge>
-    );
   };
 
   return (
@@ -335,22 +401,22 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                             </Badge>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>{badge.name}</p>
-                            {badge.discount_percentage && (
-                              <p className="text-xs">{badge.discount_percentage}% discount</p>
+                            <p className="font-medium">{badge.name}</p>
+                            {badge.discount_percentage !== undefined && badge.discount_percentage > 0 && (
+                              <p className="text-xs text-green-600 dark:text-green-400">{badge.discount_percentage}% discount</p>
                             )}
                             {badge.id_number && (
-                              <p className="text-xs">ID: {badge.id_number}</p>
+                              <p className="text-xs text-gray-500">ID: {badge.id_number}</p>
                             )}
                             {badge.expires_at && (
-                              <p className="text-xs">Expires: {formatDate(badge.expires_at)}</p>
+                              <p className="text-xs text-orange-500">Expires: {formatDate(badge.expires_at)}</p>
                             )}
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     ))}
                     
-                    {/* Voter badge (kept separately) */}
+                    {/* Voter badge */}
                     {member.is_voter && (
                       <TooltipProvider>
                         <Tooltip>
@@ -567,10 +633,12 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                                 )}
                               >
                                 <span className="text-lg mt-0.5">{privilege.icon}</span>
-                                <div>
+                                <div className="flex-1">
                                   <p className="text-xs font-medium text-gray-900 dark:text-white">{privilege.name}</p>
-                                  {privilege.discount_percentage && (
-                                    <p className="text-xs text-gray-600 dark:text-gray-400">{privilege.discount_percentage}% Discount</p>
+                                  {privilege.discount_percentage !== undefined && privilege.discount_percentage > 0 && (
+                                    <p className="text-xs font-semibold text-green-600 dark:text-green-400">
+                                      {privilege.discount_percentage}% Discount
+                                    </p>
                                   )}
                                   {privilege.id_number && (
                                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
@@ -578,9 +646,12 @@ export const MembersTab = ({ household, residentId }: MembersTabProps) => {
                                     </p>
                                   )}
                                   {privilege.expires_at && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
                                       Expires: {formatDate(privilege.expires_at)}
                                     </p>
+                                  )}
+                                  {privilege.status === 'expiring_soon' && (
+                                    <p className="text-xs text-orange-500 mt-1">⚠️ Expiring soon</p>
                                   )}
                                 </div>
                               </div>

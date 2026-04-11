@@ -1,6 +1,6 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
+import { type BreadcrumbItem as BreadcrumbItemType } from '@/types/breadcrumbs';
 import { 
   Bell, 
   HelpCircle, 
@@ -550,7 +550,7 @@ export function AppSidebarHeader({
               </div>
             )}
             
-            <div className="hidden md:flex items-center gap-2 mt-1 animate-fade-in" style={{ animationDelay: '300ms' }}>
+            {/* <div className="hidden md:flex items-center gap-2 mt-1 animate-fade-in" style={{ animationDelay: '300ms' }}>
               {user?.role && (
                 <Badge variant="secondary" className="gap-1 text-xs">
                   {user?.is_admin ? (
@@ -567,7 +567,7 @@ export function AppSidebarHeader({
                   <span className="truncate">{user.department}</span>
                 </Badge>
               )}
-            </div>
+            </div> */}
           </div>
         </div>
 

@@ -1,9 +1,15 @@
-// components/admin/users/UsersContent.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import UsersTable from './UsersTable';
 import UsersGridView from './UsersGridView';
 import UsersBulkActions from './UsersBulkActions';
@@ -14,7 +20,8 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import { 
   UserIcon,
   List,
-  Grid3X3
+  Grid3X3,
+  ArrowUpDown
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from '@inertiajs/react';
@@ -41,8 +48,8 @@ export default function UsersContent({
   setShowBulkStatusDialog,
   setShowBulkRoleDialog,
   roles,
-  sortBy,
-  sortOrder,
+  sortBy: sortByProp = 'name',
+  sortOrder: sortOrderProp = 'asc',
   onSort,
   onClearSelection,
   onBulkOperation,
@@ -54,8 +61,26 @@ export default function UsersContent({
   onUserEdit,
   onUserDelete,
   onUserStatusChange,
-  onUserImpersonate
-}: UsersContentProps) {
+  onUserImpersonate,
+  sortBy: externalSortBy,
+  sortOrder: externalSortOrder,
+  onSortChange,
+  getCurrentSortValue
+}: UsersContentProps & {
+  sortByProp?: string;
+  sortOrderProp?: 'asc' | 'desc';
+  onSortChange?: (value: string) => void;
+  getCurrentSortValue?: () => string;
+}) {
+  // Use props or fallbacks
+  const sortBy = externalSortBy || sortByProp;
+  const sortOrder = externalSortOrder || sortOrderProp;
+  const handleSortChange = onSortChange || ((value: string) => {
+    const [newSortBy, newSortOrder] = value.split('-');
+    onSort(newSortBy);
+  });
+  const getCurrentValue = getCurrentSortValue || (() => `${sortBy}-${sortOrder}`);
+
   // Toggle handler for bulk mode
   const handleBulkModeToggle = () => {
     setIsBulkMode(!isBulkMode);
@@ -246,6 +271,35 @@ export default function UsersContent({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Sort By Dropdown */}
+            {!isMobile && (
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <Select
+                  value={getCurrentValue()}
+                  onValueChange={handleSortChange}
+                >
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectValue placeholder="Sort by..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                    <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                    <SelectItem value="email-asc">Email (A to Z)</SelectItem>
+                    <SelectItem value="email-desc">Email (Z to A)</SelectItem>
+                    <SelectItem value="role-asc">Role (A to Z)</SelectItem>
+                    <SelectItem value="role-desc">Role (Z to A)</SelectItem>
+                    <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                    <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                    <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                    <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                    <SelectItem value="last_login_at-asc">Last Login (Oldest first)</SelectItem>
+                    <SelectItem value="last_login_at-desc">Last Login (Newest first)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Grid view select all checkbox */}
             {viewMode === 'grid' && isBulkMode && users.data.length > 0 && (
               <div className="flex items-center gap-2">

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Auth;
 
 class Fee extends Model
 {
@@ -38,19 +39,19 @@ class Fee extends Model
         'valid_until',
         
         // Amounts
-        'base_amount',        // Original amount before discounts
-        'discount_amount',    // Sum of all discounts applied
-        'surcharge_amount',   // Calculated surcharge
-        'penalty_amount',     // Calculated penalty
-        'total_amount',       // base_amount - discount_amount + surcharge + penalty
+        'base_amount',
+        'discount_amount',
+        'surcharge_amount',
+        'penalty_amount',
+        'total_amount',
         'amount_paid',
         'balance',
         
         // Status
-        'status', // draft, issued, pending_payment, partially_paid, paid, cancelled, waived
+        'status',
         
-        // Fee-specific data (store as JSON for flexibility)
-        'metadata', // JSON: business_type, area, property_description, etc.
+        // Fee-specific data
+        'metadata',
         
         // Audit
         'issued_by',
@@ -63,7 +64,7 @@ class Fee extends Model
         // Metadata
         'remarks',
         'batch_reference',
-        'requirements_submitted', // JSON array
+        'requirements_submitted',
     ];
 
     protected $casts = [
@@ -87,87 +88,66 @@ class Fee extends Model
 
     // ==================== RELATIONSHIPS ====================
 
-    /**
-     * Polymorphic relationship to payer
-     */
     public function payer(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Relationship to FeeType
-     */
     public function feeType(): BelongsTo
     {
         return $this->belongsTo(FeeType::class);
     }
 
-    /**
-     * Relationship to applied discounts
-     */
     public function feeDiscounts(): HasMany
     {
         return $this->hasMany(FeeDiscount::class);
     }
 
-    /**
-     * Relationship to special discount applications
-     */
     public function specialDiscountApplications(): HasMany
     {
         return $this->hasMany(SpecialDiscountApplication::class);
     }
 
-    /**
-     * Relationship to payments through payment items
-     */
     public function paymentItems(): HasMany
     {
         return $this->hasMany(PaymentItem::class);
     }
 
-    /**
-     * Relationship to users who issued this fee
-     */
     public function issuedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');
     }
 
-    /**
-     * Relationship to users who collected payment
-     */
     public function collectedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'collected_by');
     }
 
-    /**
-     * Relationship to users who created this fee
-     */
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /**
-     * Relationship to users who updated this fee
-     */
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    /**
-     * Relationship to users who cancelled this fee
-     */
     public function cancelledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by');
     }
 
-    // ==================== PAYER & PAYMENT CHECK METHODS ====================
+    // ==================== HELPER METHODS ====================
+    
+    /**
+     * Get the current authenticated user ID safely
+     */
+    private function getCurrentUserId(): ?int
+    {
+        $user = Auth::user();
+        return $user?->id;
+    }
 
     /**
      * Check if fee belongs to a specific payer
@@ -195,7 +175,9 @@ class Fee extends Model
      */
     public function getPaymentsByPayer(string $payerType, int $payerId)
     {
-        return $this->where('payer_type', $this->normalizePayerType($payerType))
+        $normalizedType = $this->normalizePayerType($payerType);
+        
+        return $this->where('payer_type', $normalizedType)
             ->where('payer_id', $payerId)
             ->with(['paymentItems.payment'])
             ->get()
@@ -224,7 +206,9 @@ class Fee extends Model
      */
     public function hasOutstandingFees(string $payerType, int $payerId): bool
     {
-        return $this->where('payer_type', $this->normalizePayerType($payerType))
+        $normalizedType = $this->normalizePayerType($payerType);
+        
+        return $this->where('payer_type', $normalizedType)
             ->where('payer_id', $payerId)
             ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
             ->where('balance', '>', 0)
@@ -236,7 +220,9 @@ class Fee extends Model
      */
     public function getTotalPaidByPayer(string $payerType, int $payerId): float
     {
-        return (float) $this->where('payer_type', $this->normalizePayerType($payerType))
+        $normalizedType = $this->normalizePayerType($payerType);
+        
+        return (float) $this->where('payer_type', $normalizedType)
             ->where('payer_id', $payerId)
             ->where('status', 'paid')
             ->sum('amount_paid');
@@ -247,7 +233,9 @@ class Fee extends Model
      */
     public function getTotalOutstandingByPayer(string $payerType, int $payerId): float
     {
-        return (float) $this->where('payer_type', $this->normalizePayerType($payerType))
+        $normalizedType = $this->normalizePayerType($payerType);
+        
+        return (float) $this->where('payer_type', $normalizedType)
             ->where('payer_id', $payerId)
             ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
             ->sum('balance');
@@ -258,11 +246,11 @@ class Fee extends Model
      */
     public function getPayerFeeHistory(string $payerType, int $payerId, array $options = [])
     {
-        $query = $this->where('payer_type', $this->normalizePayerType($payerType))
+        $normalizedType = $this->normalizePayerType($payerType);
+        $query = $this->where('payer_type', $normalizedType)
             ->where('payer_id', $payerId)
             ->with(['feeType', 'paymentItems.payment']);
         
-        // Filter by date range
         if (isset($options['from_date'])) {
             $query->whereDate('created_at', '>=', $options['from_date']);
         }
@@ -271,17 +259,14 @@ class Fee extends Model
             $query->whereDate('created_at', '<=', $options['to_date']);
         }
         
-        // Filter by status
         if (isset($options['status'])) {
             $query->where('status', $options['status']);
         }
         
-        // Filter by fee type
         if (isset($options['fee_type_id'])) {
             $query->where('fee_type_id', $options['fee_type_id']);
         }
         
-        // Filter by payment method
         if (isset($options['payment_method'])) {
             $query->whereHas('paymentItems.payment', function ($q) use ($options) {
                 $q->where('payment_method', $options['payment_method']);
@@ -296,7 +281,8 @@ class Fee extends Model
      */
     public function getPayerPaymentSummary(string $payerType, int $payerId): array
     {
-        $fees = $this->where('payer_type', $this->normalizePayerType($payerType))
+        $normalizedType = $this->normalizePayerType($payerType);
+        $fees = $this->where('payer_type', $normalizedType)
             ->where('payer_id', $payerId)
             ->get();
         
@@ -394,7 +380,6 @@ class Fee extends Model
             'other' => 'App\Models\Other',
         ];
         
-        // If it's already a full class name, return it
         if (class_exists($payerType)) {
             return $payerType;
         }
@@ -450,20 +435,18 @@ class Fee extends Model
             ->whereNotIn('status', ['paid', 'cancelled', 'waived']);
     }
 
-    /**
-     * Scope to filter by payer
-     */
     public function scopeByPayer($query, string $payerType, int $payerId)
     {
-        return $query->where('payer_type', $this->normalizePayerType($payerType))
+        $normalizedType = $this->normalizePayerType($payerType);
+        
+        return $query->where('payer_type', $normalizedType)
             ->where('payer_id', $payerId);
     }
 
-    /**
-     * Scope to get fees with payment status for payer
-     */
     public function scopeWithPayerPaymentStatus($query, string $payerType, int $payerId)
     {
+        $normalizedType = $this->normalizePayerType($payerType);
+        
         return $query->byPayer($payerType, $payerId)
             ->select('fees.*')
             ->selectRaw('CASE 
@@ -477,9 +460,6 @@ class Fee extends Model
             }]);
     }
 
-    /**
-     * Scope to filter by payment method
-     */
     public function scopeByPaymentMethod($query, string $paymentMethod)
     {
         return $query->whereHas('paymentItems.payment', function ($q) use ($paymentMethod) {
@@ -499,20 +479,14 @@ class Fee extends Model
 
     // ==================== METHODS ====================
 
-    /**
-     * Calculate total discounts from all applied discounts
-     */
     public function calculateTotalDiscounts(): float
     {
         return (float) $this->feeDiscounts()->sum('discount_amount');
     }
 
-    /**
-     * Calculate surcharge based on fee type rules
-     */
     public function calculateSurcharge(): float
     {
-        if (!$this->feeType->has_surcharge) {
+        if (!$this->feeType?->has_surcharge) {
             return 0.00;
         }
 
@@ -527,21 +501,16 @@ class Fee extends Model
         return 0.00;
     }
 
-    /**
-     * Calculate penalty based on fee type rules and payment date
-     */
     public function calculatePenalty($paymentDate = null): float
     {
-        if (!$this->feeType->has_penalty) {
+        if (!$this->feeType?->has_penalty) {
             return 0.00;
         }
 
-        // Use provided payment date or current date
         $checkDate = $paymentDate ?: now();
         
-        // Only apply penalty if payment is being made AFTER the due date
         if ($this->due_date && $checkDate->startOfDay()->lte($this->due_date)) {
-            return 0.00; // No penalty if paid on or before due date
+            return 0.00;
         }
 
         if ($this->feeType->penalty_fixed > 0) {
@@ -555,9 +524,6 @@ class Fee extends Model
         return 0.00;
     }
 
-    /**
-     * Recalculate all amounts
-     */
     public function recalculate($paymentDate = null): self
     {
         $this->discount_amount = $this->calculateTotalDiscounts();
@@ -576,46 +542,28 @@ class Fee extends Model
         return $this;
     }
 
-    /**
-     * Update status based on current state
-     */
     public function updateStatus(): self
     {
-        $oldStatus = $this->status;
-        
         if ($this->balance <= 0 && $this->base_amount > 0) {
             $this->status = 'paid';
         } elseif ($this->amount_paid > 0 && $this->balance > 0) {
             $this->status = 'partially_paid';
         } elseif ($this->isOverdue()) {
             $this->status = 'overdue';
-        } elseif (in_array($this->status, ['draft', 'issued', 'pending_payment'])) {
-            // Keep current status if not paid/overdue
-        }
-        
-        if ($this->status !== $oldStatus) {
-            $this->save();
         }
         
         return $this;
     }
 
-    /**
-     * Check if fee is overdue
-     */
     public function isOverdue(): bool
     {
         if (in_array($this->status, ['paid', 'cancelled', 'waived'])) {
             return false;
         }
         
-        // A fee is overdue if current date is AFTER the due date AND it's not paid
         return $this->due_date && now()->startOfDay()->gt($this->due_date);
     }
 
-    /**
-     * Get days overdue
-     */
     public function getDaysOverdueAttribute(): int
     {
         if (!$this->isOverdue()) {
@@ -625,15 +573,11 @@ class Fee extends Model
         return now()->diffInDays($this->due_date);
     }
 
-    /**
-     * Apply payment to fee
-     */
     public function applyPayment(float $amount, ?int $paymentId = null, array $paymentData = []): self
     {
         $this->amount_paid += $amount;
         $this->balance = max(0, $this->total_amount - $this->amount_paid);
         
-        // Update payment metadata
         if (!empty($paymentData)) {
             if (isset($paymentData['or_number'])) {
                 $this->or_number = $paymentData['or_number'];
@@ -642,7 +586,6 @@ class Fee extends Model
                 $this->collected_by = $paymentData['collected_by'];
             }
             if (isset($paymentData['payment_date'])) {
-                // Recalculate penalty based on actual payment date
                 $this->penalty_amount = $this->calculatePenalty($paymentData['payment_date']);
                 $this->total_amount = $this->base_amount - $this->discount_amount + $this->surcharge_amount + $this->penalty_amount;
                 $this->balance = max(0, $this->total_amount - $this->amount_paid);
@@ -655,18 +598,11 @@ class Fee extends Model
         return $this;
     }
 
-    /**
-     * Apply a discount to this fee
-     */
     public function applyDiscount(DiscountType $discountType, ?SpecialDiscount $specialDiscount = null, ?float $percentage = null): FeeDiscount
     {
-        // Determine discount percentage
         $discountPercentage = $percentage ?? $this->getDiscountPercentage($discountType, $specialDiscount);
-        
-        // Calculate discount amount
         $discountAmount = $this->base_amount * ($discountPercentage / 100);
         
-        // Create fee discount record
         $feeDiscount = FeeDiscount::create([
             'fee_id' => $this->id,
             'discount_type_id' => $discountType->id,
@@ -674,27 +610,21 @@ class Fee extends Model
             'discount_amount' => $discountAmount,
             'discount_percentage' => $discountPercentage,
             'base_amount' => $this->base_amount,
-            'applied_by' => auth()->id(),
+            'applied_by' => $this->getCurrentUserId(),
             'applied_at' => now(),
         ]);
         
-        // Recalculate fee totals
         $this->recalculate()->save();
         
         return $feeDiscount;
     }
 
-    /**
-     * Get discount percentage for a discount type
-     */
     private function getDiscountPercentage(DiscountType $discountType, ?SpecialDiscount $specialDiscount = null): float
     {
-        // Priority: Special discount > FeeType-specific discount > Default discount
         if ($specialDiscount) {
             return $specialDiscount->percentage ?? $specialDiscount->default_percentage;
         }
         
-        // Check if this fee type has specific percentage for this discount
         $discountFeeType = DiscountFeeType::where('fee_type_id', $this->fee_type_id)
             ->where('discount_type_id', $discountType->id)
             ->first();
@@ -706,39 +636,33 @@ class Fee extends Model
         return $discountType->default_percentage;
     }
 
-    /**
-     * Check if fee can be waived
-     */
     public function canBeWaived(): bool
     {
-        return $this->status !== 'paid' && $this->status !== 'cancelled';
+        return !in_array($this->status, ['paid', 'cancelled']);
     }
 
-    /**
-     * Waive this fee (apply 100% discount with reason)
-     */
     public function waive(string $reason, ?int $approvedBy = null): self
     {
         if (!$this->canBeWaived()) {
             throw new \Exception('Fee cannot be waived');
         }
         
-        // Create a special discount application for waiver
         $application = SpecialDiscountApplication::create([
             'fee_id' => $this->id,
-            'requested_by' => auth()->id(),
+            'requested_by' => $this->getCurrentUserId(),
             'reason' => $reason,
             'status' => 'approved',
-            'approved_by' => $approvedBy ?? auth()->id(),
+            'approved_by' => $approvedBy ?? $this->getCurrentUserId(),
             'approved_at' => now(),
         ]);
         
-        // Apply 100% discount
-        $waiverDiscount = DiscountType::firstOrCreate([
-            'code' => 'WAIVER',
-            'name' => 'Fee Waiver',
-            'default_percentage' => 100,
-        ]);
+        $waiverDiscount = DiscountType::firstOrCreate(
+            ['code' => 'WAIVER'],
+            [
+                'name' => 'Fee Waiver',
+                'default_percentage' => 100,
+            ]
+        );
         
         $this->applyDiscount($waiverDiscount, null, 100);
         $this->status = 'waived';
@@ -747,9 +671,6 @@ class Fee extends Model
         return $this;
     }
 
-    /**
-     * Cancel this fee
-     */
     public function cancel(?string $reason = null, ?int $cancelledBy = null): self
     {
         if ($this->hasPayments()) {
@@ -757,7 +678,7 @@ class Fee extends Model
         }
         
         $this->status = 'cancelled';
-        $this->cancelled_by = $cancelledBy ?? auth()->id();
+        $this->cancelled_by = $cancelledBy ?? $this->getCurrentUserId();
         $this->cancelled_at = now();
         $this->remarks = $reason ? ($this->remarks . "\nCancelled: " . $reason) : $this->remarks;
         $this->save();
@@ -765,17 +686,11 @@ class Fee extends Model
         return $this;
     }
 
-    /**
-     * Check if fee has any payments
-     */
     public function hasPayments(): bool
     {
         return $this->paymentItems()->exists();
     }
 
-    /**
-     * Get latest payment
-     */
     public function getLatestPaymentAttribute()
     {
         return $this->paymentItems()
@@ -785,9 +700,6 @@ class Fee extends Model
             ?->payment;
     }
 
-    /**
-     * Get payment summary
-     */
     public function getPaymentSummaryAttribute(): array
     {
         $payments = $this->paymentItems()->with('payment')->get();
@@ -802,9 +714,6 @@ class Fee extends Model
         ];
     }
 
-    /**
-     * Generate certificate number
-     */
     public function generateCertificateNumber(): string
     {
         if (!empty($this->certificate_number)) {
@@ -812,7 +721,7 @@ class Fee extends Model
         }
         
         $year = date('Y');
-        $prefix = strtoupper(substr($this->feeType->code ?? 'FEE', 0, 3));
+        $prefix = strtoupper(substr($this->feeType?->code ?? 'FEE', 0, 3));
         $sequence = Fee::whereYear('created_at', $year)
             ->whereNotNull('certificate_number')
             ->count() + 1;
@@ -823,17 +732,11 @@ class Fee extends Model
         return $this->certificate_number;
     }
 
-    /**
-     * Get metadata value
-     */
     public function getMetadata(string $key, $default = null)
     {
         return $this->metadata[$key] ?? $default;
     }
 
-    /**
-     * Set metadata value
-     */
     public function setMetadata(string $key, $value): self
     {
         $metadata = $this->metadata ?? [];
@@ -843,12 +746,9 @@ class Fee extends Model
         return $this;
     }
 
-    /**
-     * Check if all requirements are submitted
-     */
     public function hasAllRequirements(): bool
     {
-        if (empty($this->feeType->requirements)) {
+        if (empty($this->feeType?->requirements)) {
             return true;
         }
         
@@ -862,9 +762,6 @@ class Fee extends Model
         return count(array_intersect($required, $submitted)) === count($required);
     }
 
-    /**
-     * Add submitted requirement
-     */
     public function addRequirement(string $requirement): self
     {
         $submitted = $this->requirements_submitted ?? [];
@@ -878,12 +775,8 @@ class Fee extends Model
         return $this;
     }
 
-    /**
-     * Get payer type attribute accessor
-     */
     public function getPayerTypeAttribute($value)
     {
-        // Convert legacy values to full class names
         $morphMap = [
             'resident' => 'App\Models\Resident',
             'household' => 'App\Models\Household',
@@ -894,12 +787,8 @@ class Fee extends Model
         return $morphMap[$value] ?? $value;
     }
 
-    /**
-     * Set payer type attribute mutator
-     */
     public function setPayerTypeAttribute($value)
     {
-        // Ensure we store full class names
         $morphMap = [
             'resident' => 'App\Models\Resident',
             'household' => 'App\Models\Household',

@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Forms/components/form-preview-card.tsx
+
 import React, { RefObject } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import {
     AlertTriangle,
     FileText,
 } from 'lucide-react';
-import { Form } from '../types';
+import { Form } from '@/types/admin/forms/forms.types';
 
 interface Props {
     form: Form;
@@ -45,6 +46,34 @@ interface Props {
     formatFileSize: (bytes: number) => string;
 }
 
+// Helper to safely get file size
+const getFileSize = (value: any): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return parseInt(value) || 0;
+    return 0;
+};
+
+// Helper to safely get mime type string
+const getMimeType = (mimeType: any, fileType: string): string => {
+    if (typeof mimeType === 'string') return mimeType;
+    if (typeof mimeType === 'function') {
+        try {
+            const result = mimeType('dummy');
+            if (typeof result === 'string') return result;
+        } catch {
+            return fileType || 'unknown';
+        }
+    }
+    return fileType || 'unknown';
+};
+
+// Helper to safely get pages
+const getPages = (pages: any): string => {
+    if (typeof pages === 'number') return pages.toString();
+    if (typeof pages === 'string') return pages;
+    return 'N/A';
+};
+
 export const FormPreviewCard = ({
     form,
     previewUrl,
@@ -70,10 +99,16 @@ export const FormPreviewCard = ({
     onImageError,
     formatFileSize,
 }: Props) => {
+    // Safely extract values
+    const fileSize = getFileSize(form.file_size);
+    const mimeType = getMimeType(form.mime_type, form.file_type || 'unknown');
+    const pages = getPages(form.pages);
+    const title = form.title || 'Form';
+
     return (
         <Card className="dark:bg-gray-900">
             <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
                         <CardTitle className="flex items-center gap-2 dark:text-gray-100">
                             <Eye className="h-5 w-5" />
@@ -105,6 +140,7 @@ export const FormPreviewCard = ({
                             href={previewUrl}
                             target="_blank"
                             rel="noopener noreferrer"
+                            className="inline-block"
                         >
                             <Button variant="outline" size="sm" className="h-8 dark:border-gray-600 dark:text-gray-300">
                                 <ExternalLink className="h-3 w-3" />
@@ -145,7 +181,7 @@ export const FormPreviewCard = ({
                         <iframe
                             ref={iframeRef}
                             src={`${previewUrl}#view=fit&toolbar=0&navpanes=0`}
-                            title={form.title}
+                            title={title}
                             className="w-full h-full border-0"
                             style={{
                                 transform: `scale(${zoomLevel / 100})`,
@@ -160,7 +196,7 @@ export const FormPreviewCard = ({
                         <div className="w-full h-full flex items-center justify-center p-4 bg-gray-900 dark:bg-gray-950">
                             <img
                                 src={previewUrl}
-                                alt={form.title}
+                                alt={title}
                                 className="max-w-full max-h-full object-contain"
                                 style={{
                                     transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
@@ -176,7 +212,7 @@ export const FormPreviewCard = ({
                             <iframe
                                 ref={iframeRef}
                                 src={`https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + previewUrl)}&embedded=true`}
-                                title={form.title}
+                                title={title}
                                 className="w-full h-full border-0"
                                 onLoad={onIframeLoad}
                                 onError={onIframeError}
@@ -198,7 +234,7 @@ export const FormPreviewCard = ({
 
                     {/* Preview controls for images */}
                     {isImage && !isLoadingPreview && !previewError && (
-                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 dark:bg-gray-900/90 text-white rounded-lg px-3 py-2 flex items-center gap-2 z-10">
+                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 dark:bg-gray-900/90 text-white rounded-lg px-3 py-2 flex items-center gap-2 z-10 shadow-lg">
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -207,7 +243,7 @@ export const FormPreviewCard = ({
                             >
                                 <ZoomOut className="h-4 w-4" />
                             </Button>
-                            <span className="text-sm">{zoomLevel}%</span>
+                            <span className="text-sm font-medium">{zoomLevel}%</span>
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -243,7 +279,7 @@ export const FormPreviewCard = ({
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">File Type</p>
                             <p className="text-sm font-semibold dark:text-gray-300">
-                                {isPdf && 'PDF'}
+                                {isPdf && 'PDF Document'}
                                 {isImage && 'Image'}
                                 {isOfficeDoc && 'Office Document'}
                                 {!isPdf && !isImage && !isOfficeDoc && 'File'}
@@ -251,15 +287,17 @@ export const FormPreviewCard = ({
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">File Size</p>
-                            <p className="text-sm dark:text-gray-300">{formatFileSize(form.file_size)}</p>
+                            <p className="text-sm dark:text-gray-300">{formatFileSize(fileSize)}</p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">MIME Type</p>
-                            <p className="text-sm font-mono text-xs dark:text-gray-300">{form.mime_type || form.file_type}</p>
+                            <p className="text-sm font-mono text-xs dark:text-gray-300 truncate" title={mimeType}>
+                                {mimeType}
+                            </p>
                         </div>
                         <div className="space-y-1">
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Pages</p>
-                            <p className="text-sm dark:text-gray-300">{form.pages || 'N/A'}</p>
+                            <p className="text-sm dark:text-gray-300">{pages}</p>
                         </div>
                     </div>
 
@@ -273,7 +311,7 @@ export const FormPreviewCard = ({
                             Download Original
                         </Button>
                         {isPdf && (
-                            <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+                            <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="inline-block">
                                 <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
                                     <ExternalLink className="h-3 w-3 mr-2" />
                                     Open in New Tab

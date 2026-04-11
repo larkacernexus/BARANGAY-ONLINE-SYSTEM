@@ -1,15 +1,16 @@
 <?php
 
-
 // app/Http/Controllers/Admin/PositionController.php
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Position;
 use App\Models\Committee;
+use App\Models\Official;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 
 class PositionController extends Controller
 {
@@ -18,220 +19,190 @@ class PositionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Position::with(['committee', 'role']);
+        $query = Position::with(['committee', 'role'])
+            ->withCount('officials'); // Add officials_count for member_count sorting
         
         // Search
-        if ($request->has('search') && $request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('code', 'like', "%{$request->search}%")
-                  ->orWhere('description', 'like', "%{$request->search}%");
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
             });
         }
         
         // Filter by active status
-        if ($request->has('status') && $request->status !== 'all') {
+        if ($request->filled('status') && $request->status !== 'all') {
             $query->where('is_active', $request->status === 'active');
         }
         
         // Filter by requires account
-        if ($request->has('requires_account') && $request->requires_account !== 'all') {
-            $query->where('requires_account', $request->requires_account === 'yes');
+        if ($request->filled('requires_account') && $request->requires_account !== 'all') {
+            $query->where('requires_account', $request->requires_account === 'required');
         }
         
-        // Sorting
+        // Sorting - support all frontend sort options
         $sortBy = $request->get('sort_by', 'order');
         $sortOrder = $request->get('sort_order', 'asc');
-        $query->orderBy($sortBy, $sortOrder);
         
-        $positions = $query->paginate($request->get('per_page', 15));
+        // Handle special sort columns
+        switch ($sortBy) {
+            case 'member_count':
+                $query->orderBy('officials_count', $sortOrder);
+                break;
+            case 'committee':
+                $query->leftJoin('committees', 'positions.committee_id', '=', 'committees.id')
+                    ->orderBy('committees.name', $sortOrder)
+                    ->select('positions.*');
+                break;
+            case 'status':
+                $query->orderBy('is_active', $sortOrder);
+                break;
+            case 'requires_account':
+                $query->orderBy('requires_account', $sortOrder);
+                break;
+            case 'created_at':
+                $query->orderBy('created_at', $sortOrder);
+                break;
+            default:
+                $query->orderBy($sortBy, $sortOrder);
+                break;
+        }
+        
+        $positions = $query->paginate(15);
+        
+        // Get comprehensive stats
+        $stats = [
+            'total' => Position::count(),
+            'active' => Position::where('is_active', true)->count(),
+            'inactive' => Position::where('is_active', false)->count(),
+            'requires_account' => Position::where('requires_account', true)->count(),
+            'kagawad_count' => Position::where('code', 'like', 'KAG%')->orWhere('name', 'like', '%Kagawad%')->count(),
+            'assigned' => Position::has('officials')->count(),
+            'unassigned' => Position::doesntHave('officials')->count(),
+        ];
         
         return Inertia::render('admin/Positions/Index', [
             'positions' => $positions,
             'filters' => $request->only(['search', 'status', 'requires_account', 'sort_by', 'sort_order']),
-            'stats' => [
-                'total' => Position::count(),
-                'active' => Position::where('is_active', true)->count(),
-                'requires_account' => Position::where('requires_account', true)->count(),
-                'kagawad_count' => Position::where('code', 'like', '%kagawad%')->count(),
-            ],
+            'stats' => $stats,
         ]);
     }
 
     /**
-     * Show form to create new position
+     * Show position details with complete data
      */
-    public function create()
+    public function show(Position $position)
     {
-        // Get active committees for dropdown
-        $committees = Committee::where('is_active', true)
-            ->orderBy('order')
-            ->orderBy('name')
-            ->get()
-            ->map(function ($committee) {
-                return $committee->toSelectOption();
-            });
+        $position->load(['committee', 'role'])
+            ->loadCount('officials');
         
-        // Get roles for system accounts
-        $roles = Role::where('is_system_role', true)
-            ->orWhere('name', 'like', '%official%')
-            ->orWhere('name', 'like', '%admin%')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
+        // Get officials using position code
+        $officialsCount = Official::where('position', $position->code)->count();
         
-        return Inertia::render('admin/Positions/Create', [
-            'committees' => $committees,
-            'roles' => $roles,
-            'nextOrder' => Position::max('order') + 1,
+        // Get additional committees if the field exists
+        $additionalCommittees = [];
+        if ($position->additional_committees) {
+            $additionalCommittees = Committee::whereIn('id', (array) json_decode($position->additional_committees, true))
+                ->get();
+        }
+        
+        return Inertia::render('admin/Positions/Show', [
+            'position' => [
+                'id' => $position->id,
+                'code' => $position->code,
+                'name' => $position->name,
+                'description' => $position->description,
+                'order' => $position->order,
+                'is_active' => $position->is_active,
+                'requires_account' => $position->requires_account,
+                'created_at' => $position->created_at?->format('Y-m-d H:i:s'),
+                'updated_at' => $position->updated_at?->format('Y-m-d H:i:s'),
+                'officials_count' => $officialsCount,
+                'committee' => $position->committee ? [
+                    'id' => $position->committee->id,
+                    'name' => $position->committee->name,
+                ] : null,
+                'role' => $position->role ? [
+                    'id' => $position->role->id,
+                    'name' => $position->role->name,
+                ] : null,
+                'additional_committees' => $additionalCommittees,
+            ],
         ]);
     }
 
     /**
      * Store new position
      */
-   // In PositionController.php
-
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'code' => 'required|string|max:50|unique:positions,code',
-        'name' => 'required|string|max:255',
-        'committee_id' => 'nullable|exists:committees,id',
-        'additional_committees' => 'nullable|array',
-        'additional_committees.*' => 'exists:committees,id',
-        'description' => 'nullable|string|max:1000',
-        'order' => 'required|integer|min:0',
-        'role_id' => 'nullable|exists:roles,id',
-        'requires_account' => 'boolean',
-        'is_active' => 'boolean',
-    ]);
-    
-    // Generate code from name if not provided
-    if (empty($validated['code'])) {
-        $validated['code'] = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $validated['name']));
-    }
-    
-    // Convert additional_committees to JSON
-    // Let the model mutator handle this
-    // if (isset($validated['additional_committees'])) {
-    //     $validated['additional_committees'] = json_encode($validated['additional_committees']);
-    // }
-    
-    $position = Position::create($validated);
-    
-    return redirect()->route('positions.index')
-        ->with('success', 'Position created successfully.');
-}
-
-
-    /**
-     * Show position details
-     */
-   public function show(Position $position)
-{
-    $position->load(['committee', 'role']);
-    
-    // Get officials count - use 'position' column, not 'position_code'
-    $officialsCount = \App\Models\Official::where('position', $position->code)->count();
-    
-    // Get additional committees using the model method
-    $additionalCommittees = $position->additionalCommittees();
-    
-    return Inertia::render('admin/Positions/Show', [
-        'position' => [
-            'id' => $position->id,
-            'code' => $position->code,
-            'name' => $position->name,
-            'committee' => $position->committee,
-            'additional_committees' => $position->additional_committees ?? [],
-            'all_committees' => $additionalCommittees,
-            'description' => $position->description,
-            'order' => $position->order,
-            'role' => $position->role,
-            'requires_account' => $position->requires_account,
-            'is_active' => $position->is_active,
-            'created_at' => $position->created_at->format('Y-m-d H:i:s'),
-            'updated_at' => $position->updated_at->format('Y-m-d H:i:s'),
-            'officials_count' => $officialsCount,
-            'is_kagawad' => $position->isKagawad(),
-        ],
-    ]);
-}
-    /**
-     * Show form to edit position
-     */
-    public function edit(Position $position)
+    public function store(Request $request)
     {
-        $committees = Committee::where('is_active', true)
-            ->orderBy('order')
-            ->orderBy('name')
-            ->get()
-            ->map(function ($committee) {
-                return $committee->toSelectOption();
-            });
-        
-        $roles = Role::where('is_system_role', true)
-            ->orWhere('name', 'like', '%official%')
-            ->orWhere('name', 'like', '%admin%')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
-        
-        return Inertia::render('admin/Positions/Edit', [
-            'position' => [
-                'id' => $position->id,
-                'code' => $position->code,
-                'name' => $position->name,
-                'committee_id' => $position->committee_id,
-                'additional_committees' => $position->additional_committees ?? [],
-                'description' => $position->description,
-                'order' => $position->order,
-                'role_id' => $position->role_id,
-                'requires_account' => $position->requires_account,
-                'is_active' => $position->is_active,
-            ],
-            'committees' => $committees,
-            'roles' => $roles,
+        $validated = $request->validate([
+            'code' => 'nullable|string|max:50|unique:positions,code',
+            'name' => 'required|string|max:255',
+            'committee_id' => 'nullable|exists:committees,id',
+            'additional_committees' => 'nullable|array',
+            'additional_committees.*' => 'exists:committees,id',
+            'description' => 'nullable|string|max:1000',
+            'order' => 'required|integer|min:0',
+            'role_id' => 'nullable|exists:roles,id',
+            'requires_account' => 'boolean',
+            'is_active' => 'boolean',
         ]);
+        
+        // Generate code from name if not provided
+        if (empty($validated['code'])) {
+            $validated['code'] = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '_', $validated['name']));
+        }
+        
+        // Handle additional committees JSON
+        if (isset($validated['additional_committees'])) {
+            $validated['additional_committees'] = json_encode($validated['additional_committees']);
+        }
+        
+        $position = Position::create($validated);
+        
+        return redirect()->route('positions.index')
+            ->with('success', 'Position created successfully.');
     }
 
     /**
      * Update position
      */
-  
-public function update(Request $request, Position $position)
-{
-    $validated = $request->validate([
-        'code' => 'required|string|max:50|unique:positions,code,' . $position->id,
-        'name' => 'required|string|max:255',
-        'committee_id' => 'nullable|exists:committees,id',
-        'additional_committees' => 'nullable|array',
-        'additional_committees.*' => 'exists:committees,id',
-        'description' => 'nullable|string|max:1000',
-        'order' => 'required|integer|min:0',
-        'role_id' => 'nullable|exists:roles,id',
-        'requires_account' => 'boolean',
-        'is_active' => 'boolean',
-    ]);
-    
-    // Let the model mutator handle the JSON encoding
-    // if (isset($validated['additional_committees'])) {
-    //     $validated['additional_committees'] = json_encode($validated['additional_committees']);
-    // }
-    
-    $position->update($validated);
-    
-    return redirect()->route('positions.show', $position)
-        ->with('success', 'Position updated successfully.');
-}
+    public function update(Request $request, Position $position)
+    {
+        $validated = $request->validate([
+            'code' => 'required|string|max:50|unique:positions,code,' . $position->id,
+            'name' => 'required|string|max:255',
+            'committee_id' => 'nullable|exists:committees,id',
+            'additional_committees' => 'nullable|array',
+            'additional_committees.*' => 'exists:committees,id',
+            'description' => 'nullable|string|max:1000',
+            'order' => 'required|integer|min:0',
+            'role_id' => 'nullable|exists:roles,id',
+            'requires_account' => 'boolean',
+            'is_active' => 'boolean',
+        ]);
+        
+        // Handle additional committees JSON
+        if (isset($validated['additional_committees'])) {
+            $validated['additional_committees'] = json_encode($validated['additional_committees']);
+        }
+        
+        $position->update($validated);
+        
+        return redirect()->route('positions.show', $position)
+            ->with('success', 'Position updated successfully.');
+    }
+
     /**
      * Delete position
      */
     public function destroy(Position $position)
     {
         // Check if position is being used by officials
-        $officialsCount = \App\Models\Official::where('position', $position->code)->count();
+        $officialsCount = Official::where('position', $position->code)->count();
         
         if ($officialsCount > 0) {
             return redirect()->back()
@@ -245,107 +216,185 @@ public function update(Request $request, Position $position)
     }
 
     /**
-     * Get positions for dropdown (used in Official creation)
+     * Bulk action handler
+     */
+    public function bulkAction(Request $request)
+    {
+        $request->validate([
+            'action' => 'required|in:activate,deactivate,toggle_account,delete',
+            'position_ids' => 'required|array',
+            'position_ids.*' => 'exists:positions,id',
+            'requires_account' => 'required_if:action,toggle_account|boolean',
+        ]);
+
+        $positionIds = $request->position_ids;
+        $action = $request->action;
+
+        try {
+            DB::beginTransaction();
+
+            switch ($action) {
+                case 'activate':
+                    Position::whereIn('id', $positionIds)->update(['is_active' => true]);
+                    $message = count($positionIds) . ' positions activated successfully.';
+                    break;
+
+                case 'deactivate':
+                    Position::whereIn('id', $positionIds)->update(['is_active' => false]);
+                    $message = count($positionIds) . ' positions deactivated successfully.';
+                    break;
+
+                case 'toggle_account':
+                    Position::whereIn('id', $positionIds)->update(['requires_account' => $request->requires_account]);
+                    $status = $request->requires_account ? 'enabled' : 'disabled';
+                    $message = count($positionIds) . ' positions account requirement ' . $status . ' successfully.';
+                    break;
+
+                case 'delete':
+                    // Check if any positions have officials
+                    $positions = Position::whereIn('id', $positionIds)->get();
+                    $usedPositions = [];
+                    
+                    foreach ($positions as $position) {
+                        $officialsCount = Official::where('position', $position->code)->count();
+                        if ($officialsCount > 0) {
+                            $usedPositions[] = $position->name;
+                        }
+                    }
+                    
+                    if (!empty($usedPositions)) {
+                        throw new \Exception('Cannot delete positions: ' . implode(', ', $usedPositions) . ' - they have assigned officials.');
+                    }
+                    
+                    Position::whereIn('id', $positionIds)->delete();
+                    $message = count($positionIds) . ' positions deleted successfully.';
+                    break;
+            }
+
+            DB::commit();
+            
+            return redirect()->back()->with('success', $message);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Export positions to CSV
+     */
+    public function export(Request $request)
+    {
+        $query = Position::with(['committee', 'role'])->withCount('officials');
+        
+        // Apply same filters as index
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+        
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('is_active', $request->status === 'active');
+        }
+        
+        if ($request->filled('requires_account') && $request->requires_account !== 'all') {
+            $query->where('requires_account', $request->requires_account === 'required');
+        }
+        
+        $positions = $query->orderBy('order')->get();
+        
+        $csv = fopen('php://temp', 'r+');
+        
+        // Headers
+        fputcsv($csv, [
+            'ID', 'Code', 'Name', 'Description', 'Committee', 'Display Order', 
+            'Officials Count', 'Requires Account', 'Status', 'Created At'
+        ]);
+        
+        // Data rows
+        foreach ($positions as $position) {
+            fputcsv($csv, [
+                $position->id,
+                $position->code,
+                $position->name,
+                $position->description ?? '',
+                $position->committee?->name ?? '',
+                $position->order,
+                $position->officials_count ?? 0,
+                $position->requires_account ? 'Yes' : 'No',
+                $position->is_active ? 'Active' : 'Inactive',
+                $position->created_at?->format('Y-m-d H:i:s'),
+            ]);
+        }
+        
+        rewind($csv);
+        $csvContent = stream_get_contents($csv);
+        fclose($csv);
+        
+        $filename = 'positions-export-' . date('Y-m-d-His') . '.csv';
+        
+        return response($csvContent)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    }
+
+    /**
+     * Get positions for dropdown
      */
     public function getForDropdown()
     {
         $positions = Position::where('is_active', true)
             ->orderBy('order')
-            ->get()
-            ->map(function ($position) {
-                return $position->toSelectOption();
-            });
+            ->get(['id', 'name', 'code', 'requires_account']);
             
         return response()->json($positions);
     }
 
-    public function bulkActivate(Request $request)
-{
-    $request->validate([
-        'ids' => 'required|array',
-        'ids.*' => 'exists:positions,id',
-    ]);
-
-    Position::whereIn('id', $request->ids)->update(['is_active' => true]);
-
-    return redirect()->back()->with('success', 'Selected positions activated successfully.');
-}
-
-public function bulkDeactivate(Request $request)
-{
-    $request->validate([
-        'ids' => 'required|array',
-        'ids.*' => 'exists:positions,id',
-    ]);
-
-    Position::whereIn('id', $request->ids)->update(['is_active' => false]);
-
-    return redirect()->back()->with('success', 'Selected positions deactivated successfully.');
-}
-
-public function bulkDelete(Request $request)
-{
-    $request->validate([
-        'ids' => 'required|array',
-        'ids.*' => 'exists:positions,id',
-    ]);
-
-    $positions = Position::whereIn('id', $request->ids)->get();
-    
-    foreach ($positions as $position) {
-        // Check if position is being used
-        $officialsCount = \App\Models\Official::where('position', $position->code)->count();
-        
-        if ($officialsCount > 0) {
-            return redirect()->back()
-                ->with('error', 'Cannot delete position "'.$position->name.'". It is being used by ' . $officialsCount . ' official(s).');
+    /**
+     * Apply all filters to query
+     */
+    protected function applyFilters($query, Request $request)
+    {
+        // Search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
         }
-        $position->delete();
+        
+        // Status filter
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('is_active', $request->status === 'active');
+        }
+        
+        // Requires account filter
+        if ($request->filled('requires_account') && $request->requires_account !== 'all') {
+            $query->where('requires_account', $request->requires_account === 'required');
+        }
     }
 
-    return redirect()->back()->with('success', 'Selected positions deleted successfully.');
-}
-
-public function export(Request $request)
-{
-    $query = Position::with(['committee', 'role']);
-    
-    if ($request->has('search') && $request->search) {
-        $query->where('name', 'like', "%{$request->search}%")
-              ->orWhere('code', 'like', "%{$request->search}%");
+    /**
+     * Get position statistics
+     */
+    protected function getStats(): array
+    {
+        return [
+            'total' => Position::count(),
+            'active' => Position::where('is_active', true)->count(),
+            'inactive' => Position::where('is_active', false)->count(),
+            'requires_account' => Position::where('requires_account', true)->count(),
+            'kagawad_count' => Position::where('code', 'like', 'KAG%')
+                ->orWhere('name', 'like', '%Kagawad%')
+                ->count(),
+            'assigned' => Position::has('officials')->count(),
+            'unassigned' => Position::doesntHave('officials')->count(),
+        ];
     }
-    
-    if ($request->has('status') && $request->status !== 'all') {
-        $query->where('is_active', $request->status === 'active');
-    }
-    
-    if ($request->has('requires_account') && $request->requires_account !== 'all') {
-        $query->where('requires_account', $request->requires_account === 'yes');
-    }
-    
-    $positions = $query->orderBy('order')->get();
-    
-    $csv = "ID,Code,Name,Committee,Role,Requires Account,Order,Status,Officials Count,Created\n";
-    
-    foreach ($positions as $position) {
-        $csv .= implode(',', [
-            $position->id,
-            $position->code,
-            '"' . $position->name . '"',
-            $position->committee?->name ?? 'None',
-            $position->role?->name ?? 'None',
-            $position->requires_account ? 'Yes' : 'No',
-            $position->order,
-            $position->is_active ? 'Active' : 'Inactive',
-            $position->officials_count ?? 0,
-            $position->created_at->format('Y-m-d')
-        ]) . "\n";
-    }
-    
-    $filename = 'positions-export-' . date('Y-m-d') . '.csv';
-    
-    return response($csv)
-        ->header('Content-Type', 'text/csv')
-        ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
-}
 }

@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { BulkOperation, BulkEditField, SelectionStats, FeeType } from '@/types/fee-types';
+import { BulkOperation, BulkEditField, SelectionStats, FeeType } from '@/types/admin/fee-types/fee.types';
 
 interface FeeTypesDialogsProps {
     showBulkDeleteDialog: boolean;
@@ -56,7 +56,12 @@ export default function FeeTypesDialogs({
         autoGenerate: 0,
         totalAmount: 0,
         fixedAmount: 0,
-        variableAmount: 0
+        variableAmount: 0,
+        byCategory: {},
+        byStatus: {},
+        byAmountType: {},
+        byFrequency: {},
+        byDiscountType: {}
     },
     categories,
     selectedFeeTypesData,
@@ -107,7 +112,7 @@ export default function FeeTypesDialogs({
                         <div>
                             <Label>Action</Label>
                             <select 
-                                className="w-full border rounded px-3 py-2 mt-1"
+                                className="w-full border rounded px-3 py-2 mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100"
                                 value={bulkEditValue}
                                 onChange={(e) => {
                                     setBulkEditValue(e.target.value);
@@ -119,8 +124,8 @@ export default function FeeTypesDialogs({
                                 <option value="deactivate">Deactivate Selected</option>
                             </select>
                         </div>
-                        <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded">
-                            <div className="font-medium mb-1">Current selection stats:</div>
+                        <div className="text-sm text-gray-500 p-3 bg-gray-50 dark:bg-gray-800 rounded dark:text-gray-300">
+                            <div className="font-medium mb-1 dark:text-gray-200">Current selection stats:</div>
                             <ul className="list-disc list-inside space-y-1">
                                 <li>{selectionStats.total} total fee types</li>
                                 <li>{selectionStats.active} active • {selectionStats.inactive} inactive</li>
@@ -169,7 +174,7 @@ export default function FeeTypesDialogs({
                         <div>
                             <Label>New Category</Label>
                             <select 
-                                className="w-full border rounded px-3 py-2 mt-1"
+                                className="w-full border rounded px-3 py-2 mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100"
                                 value={bulkEditValue}
                                 onChange={(e) => {
                                     setBulkEditValue(e.target.value);
@@ -177,7 +182,7 @@ export default function FeeTypesDialogs({
                                 }}
                             >
                                 <option value="">Select Category</option>
-                                <option value="">Uncategorized</option>
+                                <option value="none">Uncategorized</option>
                                 {Object.entries(categories).map(([id, name]) => (
                                     <option key={id} value={id}>
                                         {name}
@@ -185,8 +190,8 @@ export default function FeeTypesDialogs({
                                 ))}
                             </select>
                         </div>
-                        <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded">
-                            <div className="font-medium mb-1">Current category distribution:</div>
+                        <div className="text-sm text-gray-500 p-3 bg-gray-50 dark:bg-gray-800 rounded dark:text-gray-300">
+                            <div className="font-medium mb-1 dark:text-gray-200">Current category distribution:</div>
                             <ul className="list-disc list-inside space-y-1">
                                 {(() => {
                                     const categoryCounts: Record<string, number> = {};
@@ -206,7 +211,7 @@ export default function FeeTypesDialogs({
                         <AlertDialogCancel disabled={isPerformingBulkAction}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => handleBulkOperation('update_category')}
-                            disabled={isPerformingBulkAction || bulkEditValue === undefined}
+                            disabled={isPerformingBulkAction || !bulkEditValue}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
                             {isPerformingBulkAction ? (

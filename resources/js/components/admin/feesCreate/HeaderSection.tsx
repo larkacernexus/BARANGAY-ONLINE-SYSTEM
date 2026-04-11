@@ -4,13 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Link } from '@inertiajs/react';
 import { ArrowLeft, Copy, Save, Shield } from 'lucide-react';
+import { FeeType } from '@/types/admin/fees/fees';
 
 interface HeaderSectionProps {
-    duplicateFrom?: {
-        id: number;
-        fee_code: string;
-        fee_type_name: string;
-    };
+    duplicateFrom?: FeeType | null;
     processing: boolean;
     handleResetForm: () => void;
 }
@@ -27,9 +24,9 @@ export default function HeaderSection({ duplicateFrom, processing, handleResetFo
                             <span className="dark:text-blue-400">
                                 Duplicating from Fee{' '}
                                 <strong className="dark:text-blue-300">
-                                    #{duplicateFrom.fee_code}
+                                    #{duplicateFrom.code || duplicateFrom.fee_code}
                                 </strong>{' '}
-                                ({duplicateFrom.fee_type_name})
+                                ({duplicateFrom.name})
                             </span>
                             <Link
                                 href={`/admin/fees/${duplicateFrom.id}`}

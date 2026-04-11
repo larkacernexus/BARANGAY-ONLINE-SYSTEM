@@ -34,20 +34,33 @@ class ResidentHandleInertiaRequests extends Middleware
 
     /**
      * Get all active privileges - DYNAMIC FROM DATABASE
+     * FIXED: Removed non-existent default_discount_percentage column
      */
     private function getAllPrivileges(): array
     {
         return Cache::remember('all_active_privileges', 3600, function () {
-            return Privilege::where('is_active', true)
+            return Privilege::with('discountType') // Eager load discount type
+                ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'code', 'description', 'default_discount_percentage'])
+                ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
                 ->map(function ($privilege) {
                     return [
                         'id' => $privilege->id,
                         'name' => $privilege->name,
                         'code' => $privilege->code,
                         'description' => $privilege->description,
-                        'default_discount_percentage' => $privilege->default_discount_percentage,
+                        'discount_type_id' => $privilege->discount_type_id,
+                        'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
+                        'discount_type' => $privilege->discountType ? [
+                            'id' => $privilege->discountType->id,
+                            'code' => $privilege->discountType->code,
+                            'name' => $privilege->discountType->name,
+                            'percentage' => (float) $privilege->discountType->percentage,
+                            'requires_id_number' => (bool) $privilege->discountType->requires_id_number,
+                            'requires_verification' => (bool) $privilege->discountType->requires_verification,
+                            'verification_document' => $privilege->discountType->verification_document,
+                            'validity_days' => $privilege->discountType->validity_days,
+                        ] : null,
                     ];
                 })
                 ->toArray();
@@ -56,11 +69,12 @@ class ResidentHandleInertiaRequests extends Middleware
 
     /**
      * Get resident's active privileges
+     * FIXED: Uses discountType relationship for percentage
      */
     private function getResidentPrivileges(Resident $resident): array
     {
         if (!$resident->relationLoaded('residentPrivileges')) {
-            $resident->load('residentPrivileges.privilege');
+            $resident->load('residentPrivileges.privilege.discountType');
         }
 
         return $resident->residentPrivileges
@@ -69,19 +83,55 @@ class ResidentHandleInertiaRequests extends Middleware
             })
             ->map(function ($rp) {
                 $privilege = $rp->privilege;
+                // Get discount percentage from pivot, privilege's discount type, or default 0
+                $discountPercentage = $rp->discount_percentage 
+                    ?? $privilege->discountType?->percentage 
+                    ?? 0;
+                
                 return [
                     'id' => $rp->id,
                     'privilege_id' => $privilege->id,
                     'code' => $privilege->code,
                     'name' => $privilege->name,
                     'id_number' => $rp->id_number,
-                    'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                    'discount_percentage' => (float) $discountPercentage,
                     'verified_at' => $rp->verified_at?->toISOString(),
                     'expires_at' => $rp->expires_at?->toISOString(),
+                    'status' => $this->getPrivilegeStatus($rp),
+                    'discount_type' => $privilege->discountType ? [
+                        'id' => $privilege->discountType->id,
+                        'code' => $privilege->discountType->code,
+                        'name' => $privilege->discountType->name,
+                        'percentage' => (float) $privilege->discountType->percentage,
+                    ] : null,
                 ];
             })
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Get privilege status based on expiry
+     */
+    private function getPrivilegeStatus($residentPrivilege): string
+    {
+        if (!$residentPrivilege->verified_at) {
+            return 'pending';
+        }
+        
+        if ($residentPrivilege->expires_at) {
+            $daysUntilExpiry = now()->diffInDays($residentPrivilege->expires_at, false);
+            
+            if ($daysUntilExpiry <= 0) {
+                return 'expired';
+            }
+            
+            if ($daysUntilExpiry <= 30) {
+                return 'expiring_soon';
+            }
+        }
+        
+        return 'active';
     }
 
     /**
@@ -94,14 +144,18 @@ class ResidentHandleInertiaRequests extends Middleware
             'OSP' => '👴',
             'PWD' => '♿',
             'SP' => '👨‍👧',
+            'SOLO_PARENT' => '👨‍👧',
             'IND' => '🏠',
+            'INDIGENT' => '🏠',
             '4PS' => '📦',
             'IP' => '🌿',
             'FRM' => '🌾',
             'FSH' => '🎣',
             'OFW' => '✈️',
             'SCH' => '📚',
+            'STUDENT' => '📚',
             'UNE' => '💼',
+            'VETERAN' => '🎖️',
         ];
         
         return $icons[$code] ?? '🎫';
@@ -149,7 +203,7 @@ class ResidentHandleInertiaRequests extends Middleware
             $resident = Resident::with([
                 'household', 
                 'purok',
-                'residentPrivileges.privilege' // ADDED: Load privileges
+                'residentPrivileges.privilege.discountType' // Load with discount type
             ])->where('id', $user->resident_id)->first();
             
             if ($resident) {
@@ -170,6 +224,7 @@ class ResidentHandleInertiaRequests extends Middleware
                         'code' => $priv['code'],
                         'icon' => $this->getPrivilegeIcon($priv['code']),
                         'name' => $priv['name'],
+                        'discount_percentage' => $priv['discount_percentage'],
                     ];
                 }
                 
@@ -208,7 +263,7 @@ class ResidentHandleInertiaRequests extends Middleware
                     if ($household) {
                         $unitNumber = $household->unit_number ?? $household->household_number;
                         
-                        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege'])
+                        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege.discountType'])
                             ->where('household_id', $user->household_id)
                             ->get()
                             ->map(function ($member) use ($allPrivileges) {
@@ -223,10 +278,17 @@ class ResidentHandleInertiaRequests extends Middleware
                                         return $rp->isActive();
                                     })
                                     ->map(function ($rp) {
+                                        $privilege = $rp->privilege;
+                                        $discountPercentage = $rp->discount_percentage 
+                                            ?? $privilege->discountType?->percentage 
+                                            ?? 0;
+                                        
                                         return [
-                                            'code' => $rp->privilege->code,
-                                            'name' => $rp->privilege->name,
-                                            'icon' => $this->getPrivilegeIcon($rp->privilege->code),
+                                            'code' => $privilege->code,
+                                            'name' => $privilege->name,
+                                            'icon' => $this->getPrivilegeIcon($privilege->code),
+                                            'discount_percentage' => (float) $discountPercentage,
+                                            'id_number' => $rp->id_number,
                                         ];
                                     })
                                     ->values()
@@ -430,7 +492,7 @@ class ResidentHandleInertiaRequests extends Middleware
             'quickResults' => $quickResults,
             'recentSearches' => $recentSearches,
             'currentQuery' => $query,
-            // ADDED: Send all privileges to frontend
+            // Send all privileges to frontend
             'allPrivileges' => $allPrivileges,
         ]);
     }
@@ -493,7 +555,7 @@ class ResidentHandleInertiaRequests extends Middleware
 
     public function searchSelfResident($searchTerm, $residentId, array $allPrivileges)
     {
-        $resident = Resident::with(['purok', 'household', 'residentPrivileges.privilege'])
+        $resident = Resident::with(['purok', 'household', 'residentPrivileges.privilege.discountType'])
             ->where('id', $residentId)
             ->where(function($query) use ($searchTerm) {
                 $query->where('first_name', 'like', $searchTerm)
@@ -515,10 +577,12 @@ class ResidentHandleInertiaRequests extends Middleware
                     return $rp->isActive();
                 })
                 ->map(function ($rp) {
+                    $privilege = $rp->privilege;
                     return [
-                        'code' => $rp->privilege->code,
-                        'name' => $rp->privilege->name,
-                        'icon' => $this->getPrivilegeIcon($rp->privilege->code),
+                        'code' => $privilege->code,
+                        'name' => $privilege->name,
+                        'icon' => $this->getPrivilegeIcon($privilege->code),
+                        'discount_percentage' => (float) ($rp->discount_percentage ?? $privilege->discountType?->percentage ?? 0),
                     ];
                 })
                 ->values()
@@ -556,7 +620,7 @@ class ResidentHandleInertiaRequests extends Middleware
             return [];
         }
 
-        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege'])
+        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege.discountType'])
             ->where('household_id', $resident->household_id)
             ->whereHas('resident', function($q) use ($searchTerm, $residentId) {
                 $q->where('id', '!=', $residentId)
@@ -582,10 +646,12 @@ class ResidentHandleInertiaRequests extends Middleware
                     return $rp->isActive();
                 })
                 ->map(function ($rp) {
+                    $privilege = $rp->privilege;
                     return [
-                        'code' => $rp->privilege->code,
-                        'name' => $rp->privilege->name,
-                        'icon' => $this->getPrivilegeIcon($rp->privilege->code),
+                        'code' => $privilege->code,
+                        'name' => $privilege->name,
+                        'icon' => $this->getPrivilegeIcon($privilege->code),
+                        'discount_percentage' => (float) ($rp->discount_percentage ?? $privilege->discountType?->percentage ?? 0),
                     ];
                 })
                 ->values()

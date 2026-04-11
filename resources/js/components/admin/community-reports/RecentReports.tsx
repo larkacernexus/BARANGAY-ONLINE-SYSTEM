@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CommunityReport } from '@/types/communityReportTypes';
+import { CommunityReport } from '@/types/admin/reports/communityReportTypes';
 import { truncateText, getTimeAgo } from '@/admin-utils/communityReportHelpers';
 import { Clock } from 'lucide-react';
 

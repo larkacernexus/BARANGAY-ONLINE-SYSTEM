@@ -2,6 +2,11 @@
 
 // Base Fee interface
 export interface Fee {
+    name: any;
+    description: any;
+    surcharge_amount: number;
+    discount_amount: number;
+    cancelled_at: any;
     id: number;
     fee_type_id: number;
     resident_id: number;
@@ -46,6 +51,7 @@ export interface Fee {
 
 // Fee Type interface
 export interface FeeType {
+    fee_code: string;
     id: number;
     code: string;
     name: string;
@@ -58,6 +64,10 @@ export interface FeeType {
     is_mandatory: boolean;
     auto_generate: boolean;
     category?: string;
+    document_category_id?: number | null;
+    is_discountable?: boolean;
+    surcharge_description?: string;
+    penalty_description?: string;
     
     // Discount fields
     has_senior_discount: boolean;
@@ -87,6 +97,7 @@ export interface Resident {
     suffix?: string;
     email?: string;
     phone?: string;
+    contact_number?: string;
     purok?: string;
     address?: string;
     is_senior?: boolean;
@@ -94,6 +105,77 @@ export interface Resident {
     is_solo_parent?: boolean;
     is_indigent?: boolean;
     full_name?: string;
+    privileges?: PrivilegeData[];
+}
+
+// Household interface - ONLY DECLARE ONCE
+export interface Household {
+    id: number;
+    name: string;
+    contact_number?: string;
+    phone?: string;
+    purok?: string;
+    address?: string;
+    head_id?: number;
+    head_name?: string;
+    member_count?: number;
+    head_privileges?: PrivilegeData[];
+    privileges?: PrivilegeData[];
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Privilege Data interface
+export interface PrivilegeData {
+    id: number;
+    name: string;
+    code: string;
+    status: 'active' | 'expiring_soon' | 'expired' | 'inactive';
+    discount_percentage?: number;
+    valid_until?: string;
+    description?: string;
+    type?: 'senior' | 'pwd' | 'solo_parent' | 'indigent' | 'other';
+}
+
+// Document Category interface
+export interface DocumentCategory {
+    id: number;
+    name: string;
+    slug: string;
+    description?: string;
+    is_active?: boolean;
+    sort_order?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Discount Rule interface
+export interface DiscountRule {
+    id: number;
+    discount_type: string;
+    name: string;
+    value_type: 'percentage' | 'fixed';
+    discount_value: number;
+    description?: string;
+    verification_document?: string;
+    applies_to_fee_type_ids?: number[];
+    applies_to_all_fee_types?: boolean;
+    is_active?: boolean;
+    sort_order?: number;
+}
+
+// Discount Info interface
+export interface DiscountInfo {
+    eligibleDiscounts: Array<{
+        code: string;
+        name: string;
+        percentage: number;
+        legalBasis: string;
+        description: string;
+        requirements?: string[];
+    }>;
+    legalNotes: string[];
+    warnings: string[];
 }
 
 // Payment interface
@@ -136,12 +218,15 @@ export interface Filters {
     to_date?: string;
     date_from?: string;
     date_to?: string;
+    min_amount?: string;  
+    max_amount?: string;  
     amount_min?: number;
     amount_max?: number;
     has_discount?: boolean;
     is_overdue?: boolean;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
+   due_date_range?: string;  
 }
 
 export interface FilterState {
@@ -171,6 +256,9 @@ export interface Stats {
     this_month_collected: number;
     status_counts: Record<string, number>;
     category_totals: Record<string, number>;
+    issued_count?: number;
+    partially_paid_count?: number;
+    waived_count?: number;
     // Legacy fields for compatibility
     total_fees?: number;
     paid_amount?: number;
@@ -216,13 +304,17 @@ export interface SelectionStats {
 // Bulk operation types
 export type BulkOperation = 
     | 'delete' 
+    | 'activate'        
+    | 'deactivate'      
     | 'mark_paid' 
     | 'mark_pending' 
     | 'send_reminders' 
     | 'export' 
     | 'export_csv' 
     | 'apply_penalties' 
-    | 'waive_penalties';
+    | 'waive_penalties'
+    | 'print'          
+    | 'copy_data';
 
 export type BulkEditField = 
     | 'status' 
@@ -238,6 +330,18 @@ export interface FlashMessages {
     error?: string;
     info?: string;
     warning?: string;
+}
+
+// Permissions interface
+export interface Permissions {
+    can_edit: boolean;
+    can_delete: boolean;
+    can_record_payment: boolean;
+    can_cancel: boolean;
+    can_waive: boolean;
+    can_view_audit?: boolean;
+    can_approve?: boolean;
+    can_collect?: boolean;
 }
 
 // Props for the Fees Index page
@@ -267,12 +371,64 @@ export interface FeesShowProps {
 
 // Props for the Fees Create page
 export interface FeesCreateProps {
-    fee_types: FeeType[];
+    fee_types: FeeType[];  // Note: plural with underscore
     residents: Resident[];
+    households?: Household[];
     puroks: string[];
     default_resident_id?: number;
     default_fee_type_id?: number;
+    default_household_id?: number;
     errors?: Record<string, string>;
+    discountRules?: DiscountRule[];
+    documentCategories?: DocumentCategory[];
+    initialData?: Partial<BulkFeeFormData>;
+    duplicateFrom?: FeeType | null;
+    allPrivileges?: PrivilegeData[];
+    preselectedResident?: Resident | null;
+    preselectedHousehold?: Household | null;
+}
+
+// Bulk Fee Form Data interface
+export interface BulkFeeFormData extends FeeFormData {
+    payer_type: string;
+    household_id: string;
+    business_name: string;
+    address: string;
+    zone: string;
+    billing_period: string;
+    period_start: string;
+    period_end: string;
+    issue_date: string;
+    base_amount: number;
+    surcharge_amount: number;
+    penalty_amount: number;
+    discount_amount: number;
+    total_amount: number;
+    purpose: string;
+    property_description: string;
+    business_type: string;
+    area: number;
+    remarks: string;
+    requirements_submitted: string[];
+    ph_legal_compliance_notes: string;
+    bulk_type: 'none' | 'residents' | 'households' | 'custom';
+    selected_resident_ids: string[];
+    selected_household_ids: string[];
+    custom_payers: Array<{
+        id: string;
+        name: string;
+        contact_number: string;
+        purok: string;
+        address: string;
+        type: 'custom';
+    }>;
+    apply_to_all_residents: boolean;
+    apply_to_all_households: boolean;
+    filter_purok: string;
+    filter_discount_eligible: boolean;
+    payer_name: string;
+    contact_number: string;
+    purok: string;
 }
 
 // Props for the Fees Edit page
@@ -315,7 +471,8 @@ export const calculateDaysOverdue = (dueDate: string): number => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
-export const formatCurrency = (amount: number | string): string => {
+export const formatCurrency = (amount: number | string | undefined): string => {
+    if (amount === undefined || amount === null) return '₱0.00';
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return '₱0.00';
     return new Intl.NumberFormat('en-PH', {
@@ -373,4 +530,17 @@ export const getCategoryLabel = (category: string): string => {
         donation: 'Donation'
     };
     return labels[category] || category;
+};
+
+// Helper function to parse number safely
+export const parseNumber = (value: any): number => {
+    if (value === undefined || value === null) return 0;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return isNaN(num) ? 0 : num;
+};
+
+// Helper function to safely convert to string
+export const safeString = (value: any): string => {
+    if (value === undefined || value === null) return '';
+    return String(value);
 };

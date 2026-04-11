@@ -1,6 +1,6 @@
 // components/admin/dashboard/QuickActions.tsx
 import { Link } from '@inertiajs/react';
-import { QuickAction } from '@/components/admin/dashboard/types/dashboard';
+import { QuickAction } from '@/types/admin/dashboard/dashboard';
 
 interface QuickActionsProps {
     actions: QuickAction[];

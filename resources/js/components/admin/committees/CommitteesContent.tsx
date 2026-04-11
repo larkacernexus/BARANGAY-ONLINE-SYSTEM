@@ -1,10 +1,15 @@
-// resources/js/components/admin/committees/CommitteesContent.tsx
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CommitteesTable } from './CommitteesTable';
 import { CommitteesGridView } from './CommitteesGridView';
@@ -13,7 +18,7 @@ import { EmptyState } from '@/components/adminui/empty-state';
 import { Pagination } from '@/components/adminui/pagination';
 import { SelectAllFloat } from '@/components/adminui/select-all-float';
 import { GridSelectionSummary } from '@/components/adminui/grid-selection-summary';
-import { Grid3X3, List, Users } from 'lucide-react';
+import { Grid3X3, List, Users, ArrowUpDown } from 'lucide-react';
 import { Committee } from '@/types/admin/committees/committees';
 
 interface CommitteesContentProps {
@@ -37,7 +42,11 @@ interface CommitteesContentProps {
     onToggleStatus: (committee: Committee) => void;
     onToggleBulkMode: () => void;
     onClearSelection?: () => void;
-    onCreateCommittee?: () => void; // Add this prop for create action
+    onCreateCommittee?: () => void;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export function CommitteesContent({
@@ -61,8 +70,20 @@ export function CommitteesContent({
     onToggleStatus,
     onToggleBulkMode,
     onClearSelection = () => {},
-    onCreateCommittee = () => {} // Default empty function
+    onCreateCommittee = () => {},
+    sortBy = 'order',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'order-asc'
 }: CommitteesContentProps) {
+    
+    const handleBulkModeToggle = () => {
+        onToggleBulkMode();
+        if (isBulkMode) {
+            onClearSelection();
+        }
+    };
+
     return (
         <>
             {/* Floating Select All for Grid View */}
@@ -82,7 +103,6 @@ export function CommitteesContent({
                     selectedCount={selectedIds.length}
                     isPerformingBulkAction={false}
                     onClearSelection={() => {
-                        // Clear selection logic
                         selectedIds.forEach(id => onItemSelect(id));
                     }}
                     onSelectAllOnPage={onSelectAllOnPage}
@@ -142,6 +162,35 @@ export function CommitteesContent({
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="order-asc">Order (Low to High)</SelectItem>
+                                        <SelectItem value="order-desc">Order (High to Low)</SelectItem>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="description-asc">Description (A to Z)</SelectItem>
+                                        <SelectItem value="description-desc">Description (Z to A)</SelectItem>
+                                        <SelectItem value="position_count-asc">Positions (Low to High)</SelectItem>
+                                        <SelectItem value="position_count-desc">Positions (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && committees.length > 0 && (
                             <div className="flex items-center gap-2">
@@ -166,7 +215,7 @@ export function CommitteesContent({
                                     <div className="flex items-center gap-2">
                                         <Switch
                                             checked={isBulkMode}
-                                            onCheckedChange={onToggleBulkMode}
+                                            onCheckedChange={handleBulkModeToggle}
                                             className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                         />
                                         <Label 
@@ -212,21 +261,26 @@ export function CommitteesContent({
                             onSelectAllOnPage={onSelectAllOnPage}
                             onDelete={onDelete}
                             onToggleStatus={onToggleStatus}
+                            // sortBy={sortBy}
+                            // sortOrder={sortOrder}
+                            // onSort={onSortChange}
                         />
                     ) : (
                         <>
                             <CommitteesGridView
-                                        committees={committees}
-                                        selectedIds={selectedIds}
-                                        isBulkMode={isBulkMode}
-                                        onItemSelect={onItemSelect}
-                                        onDelete={onDelete}
-                                        onToggleStatus={onToggleStatus}
-                                        isMobile={isMobile} hasActiveFilters={false} onClearFilters={function (): void {
-                                            throw new Error('Function not implemented.');
-                                        } } onCopyToClipboard={function (text: string, label: string): void {
-                                            throw new Error('Function not implemented.');
-                                        } }                            />
+                                committees={committees}
+                                selectedIds={selectedIds}
+                                isBulkMode={isBulkMode}
+                                onItemSelect={onItemSelect}
+                                onDelete={onDelete}
+                                onToggleStatus={onToggleStatus}
+                                isMobile={isMobile}
+                                hasActiveFilters={hasActiveFilters}
+                                onClearFilters={onClearFilters}
+                                onCopyToClipboard={(text, label) => {
+                                    navigator.clipboard.writeText(text);
+                                }}
+                            />
                             
                             {/* Grid Selection Summary */}
                             {viewMode === 'grid' && isBulkMode && selectedIds.length > 0 && (

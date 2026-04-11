@@ -11,7 +11,12 @@ import {
     PaginationData,
     BulkOperation,
     SelectionMode,
-    SelectionStats
+    SelectionStats,
+    PRIORITY_DISPLAY,
+    PRIORITY_LABELS,
+    PRIORITY_ORDER,
+    STATUS_ORDER,
+    PriorityLevel
 } from '@/types/admin/announcements/announcement.types';
 import { announcementUtils } from '@/admin-utils/announcement-utils';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -29,6 +34,7 @@ interface AnnouncementsPageProps {
     announcements: PaginationData;
     filters: AnnouncementFilters;
     types: Record<string, string>;
+    audience_types: Record<string, string>;
     priorities: Record<string, string>;
     stats: AnnouncementStats;
 }
@@ -48,23 +54,39 @@ export default function AnnouncementsIndex({
     filters, 
     types, 
     priorities, 
+    audience_types,
     stats = defaultStats
 }: AnnouncementsPageProps) {
     const { flash } = usePage().props as any;
     
     // State management
     const [search, setSearch] = useState(filters.search || '');
+    
+    // Filter states
     const [filtersState, setFiltersState] = useState<AnnouncementFilters>({
         type: filters.type || 'all',
         status: filters.status || 'all',
         from_date: filters.from_date || '',
         to_date: filters.to_date || '',
-        sort_by: filters.sort_by || 'created_at',
-        sort_order: filters.sort_order || 'desc'
+        audience_type: filters.audience_type || 'all',
     });
+    
+    // Priority filter - using string values that map to numeric priorities
+    const [priorityFilter, setPriorityFilter] = useState<string>(filters.priority || 'all');
+    
+    // Audience type filter
+    const [audienceTypeFilter, setAudienceTypeFilter] = useState<string>(filters.audience_type || 'all');
+    
+    // Date range preset
+    const [dateRangePreset, setDateRangePreset] = useState<string>('');
+    
+    // Sorting states for table header
+    const [sortByState, setSortByState] = useState<string>(filters.sort_by || 'created_at');
+    const [sortOrderState, setSortOrderState] = useState<'asc' | 'desc'>(filters.sort_order || 'desc');
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(15);
+    const [currentPage, setCurrentPage] = useState(announcements.current_page || 1);
+    const [itemsPerPage] = useState(announcements.per_page || 15);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     
@@ -115,60 +137,119 @@ export default function AnnouncementsIndex({
         }
     }, [flash]);
 
-    // Handle search change - immediate navigation without debounce
-    const handleSearchChange = (value: string) => {
-        setSearch(value);
-        
-        const params = {
-            ...filtersState,
-            search: value
-        };
-        
-        // Clean up empty values
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/announcements', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
     // Filter announcements
     const filteredAnnouncements = useMemo(() => {
-        return announcementUtils.filterAnnouncements({
-            announcements: announcements.data,
-            search,
-            filters: filtersState
-        });
-    }, [announcements.data, search, filtersState]);
+        let filtered = [...(announcements.data || [])];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(a =>
+                a?.title?.toLowerCase().includes(searchLower) ||
+                a?.content?.toLowerCase().includes(searchLower) ||
+                a?.type?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Type filter
+        if (filtersState.type && filtersState.type !== 'all') {
+            filtered = filtered.filter(a => a?.type === filtersState.type);
+        }
+        
+        // Status filter
+        if (filtersState.status && filtersState.status !== 'all') {
+            filtered = filtered.filter(a => a?.status === filtersState.status);
+        }
+        
+        // Priority filter
+        if (priorityFilter && priorityFilter !== 'all') {
+            const numericPriority = parseInt(priorityFilter) as PriorityLevel;
+            filtered = filtered.filter(a => a?.priority === numericPriority);
+        }
+        
+        // Audience type filter
+        if (audienceTypeFilter && audienceTypeFilter !== 'all') {
+            filtered = filtered.filter(a => a?.audience_type === audienceTypeFilter);
+        }
+        
+        // Date range filter (using created_at) - FIXED: Added null checks
+        if (filtersState.from_date && filtersState.from_date !== '') {
+            filtered = filtered.filter(a => a.created_at && a.created_at >= filtersState.from_date!);
+        }
+        if (filtersState.to_date && filtersState.to_date !== '') {
+            filtered = filtered.filter(a => a.created_at && a.created_at <= filtersState.to_date!);
+        }
+        
+        // Apply sorting
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortByState) {
+                    case 'title':
+                        valueA = a?.title || '';
+                        valueB = b?.title || '';
+                        break;
+                    case 'type':
+                        valueA = a?.type || '';
+                        valueB = b?.type || '';
+                        break;
+                    case 'priority':
+                        valueA = a?.priority ?? 0;
+                        valueB = b?.priority ?? 0;
+                        break;
+                    case 'audience_type':
+                        valueA = a?.audience_type || '';
+                        valueB = b?.audience_type || '';
+                        break;
+                    case 'status':
+                        valueA = STATUS_ORDER[a?.status || 'archived'] || 99;
+                        valueB = STATUS_ORDER[b?.status || 'archived'] || 99;
+                        break;
+                    case 'start_date':
+                        valueA = a?.start_date ? new Date(a.start_date).getTime() : 0;
+                        valueB = b?.start_date ? new Date(b.start_date).getTime() : 0;
+                        break;
+                    case 'end_date':
+                        valueA = a?.end_date ? new Date(a.end_date).getTime() : 0;
+                        valueB = b?.end_date ? new Date(b.end_date).getTime() : 0;
+                        break;
+                    case 'created_at':
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrderState === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrderState === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [announcements.data, search, filtersState, priorityFilter, audienceTypeFilter, sortByState, sortOrderState]);
 
     // Calculate filtered stats
- const filteredStats = useMemo(() => {
-    return {
-        total: filteredAnnouncements.length,
-        active: filteredAnnouncements.filter(a => {
-            // Check if dates exist before creating Date objects
-            if (!a.start_date || !a.end_date) return false;
-            return a.is_active && new Date(a.start_date) <= new Date() && new Date(a.end_date) >= new Date();
-        }).length,
-        expired: filteredAnnouncements.filter(a => {
-            // Check if end_date exists
-            if (!a.end_date) return false;
-            return new Date(a.end_date) < new Date();
-        }).length,
-        upcoming: filteredAnnouncements.filter(a => {
-            // Check if start_date exists
-            if (!a.start_date) return false;
-            return new Date(a.start_date) > new Date();
-        }).length
-    };
-}, [filteredAnnouncements]);
+    const filteredStats = useMemo(() => {
+        return {
+            total: filteredAnnouncements.length,
+            active: filteredAnnouncements.filter(a => a?.status === 'active').length,
+            expired: filteredAnnouncements.filter(a => a?.status === 'expired').length,
+            upcoming: filteredAnnouncements.filter(a => a?.status === 'upcoming').length,
+            unread: stats.unread || 0,
+            personalized: stats.personalized || 0,
+            with_attachments: filteredAnnouncements.filter(a => a?.has_attachments).length,
+        };
+    }, [filteredAnnouncements, stats]);
 
     // Pagination
     const totalItems = filteredAnnouncements.length;
@@ -180,7 +261,7 @@ export default function AnnouncementsIndex({
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, filtersState, priorityFilter, audienceTypeFilter]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -190,50 +271,157 @@ export default function AnnouncementsIndex({
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
+    // Handle sort from table header
+    const handleSort = useCallback((column: string) => {
+        const newOrder = sortByState === column && sortOrderState === 'asc' ? 'desc' : 'asc';
+        setSortByState(column);
+        setSortOrderState(newOrder);
         
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedAnnouncements.length > 0) {
-                        setSelectedAnnouncements([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Ctrl/Cmd + F to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            // Delete key for bulk delete
-            if (e.key === 'Delete' && isBulkMode && selectedAnnouncements.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
+        // Optionally persist sort to server
+        router.get('/admin/announcements', {
+            ...filtersState,
+            search,
+            priority: priorityFilter,
+            audience_type: audienceTypeFilter,
+            sort_by: column,
+            sort_order: newOrder,
+            page: currentPage
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true
+        });
+    }, [sortByState, sortOrderState, filtersState, search, priorityFilter, audienceTypeFilter, currentPage]);
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedAnnouncements, isMobile]);
+    // Handle search change with debounce
+    const handleSearchChange = useCallback((value: string) => {
+        setSearch(value);
+        
+        // Debounced server search
+        const timeoutId = setTimeout(() => {
+            router.get('/admin/announcements', {
+                ...filtersState,
+                search: value,
+                priority: priorityFilter,
+                audience_type: audienceTypeFilter,
+                sort_by: sortByState,
+                sort_order: sortOrderState,
+                page: 1
+            }, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                only: ['announcements', 'filters']
+            });
+        }, 500);
+        
+        return () => clearTimeout(timeoutId);
+    }, [filtersState, priorityFilter, audienceTypeFilter, sortByState, sortOrderState]);
+
+    // Handle filter updates with server sync
+    const updateFilter = useCallback((key: keyof AnnouncementFilters, value: string) => {
+        const newFilters = { ...filtersState, [key]: value };
+        setFiltersState(newFilters);
+        setCurrentPage(1);
+        
+        router.get('/admin/announcements', {
+            ...newFilters,
+            search,
+            priority: priorityFilter,
+            audience_type: audienceTypeFilter,
+            sort_by: sortByState,
+            sort_order: sortOrderState,
+            page: 1
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            only: ['announcements', 'filters']
+        });
+    }, [filtersState, search, priorityFilter, audienceTypeFilter, sortByState, sortOrderState]);
+
+    // Handle priority filter change
+    const handlePriorityFilterChange = useCallback((value: string) => {
+        setPriorityFilter(value);
+        
+        router.get('/admin/announcements', {
+            ...filtersState,
+            search,
+            priority: value,
+            audience_type: audienceTypeFilter,
+            sort_by: sortByState,
+            sort_order: sortOrderState,
+            page: 1
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            only: ['announcements', 'filters']
+        });
+    }, [filtersState, search, audienceTypeFilter, sortByState, sortOrderState]);
+
+    // Handle audience type filter change
+    const handleAudienceTypeChange = useCallback((value: string) => {
+        setAudienceTypeFilter(value);
+        
+        router.get('/admin/announcements', {
+            ...filtersState,
+            search,
+            priority: priorityFilter,
+            audience_type: value,
+            sort_by: sortByState,
+            sort_order: sortOrderState,
+            page: 1
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            only: ['announcements', 'filters']
+        });
+    }, [filtersState, search, priorityFilter, sortByState, sortOrderState]);
+
+    // Handle clear filters
+    const handleClearFilters = useCallback(() => {
+        setSearch('');
+        setFiltersState({
+            type: 'all',
+            status: 'all',
+            from_date: '',
+            to_date: '',
+            audience_type: 'all',
+        });
+        setPriorityFilter('all');
+        setAudienceTypeFilter('all');
+        setDateRangePreset('');
+        setSortByState('created_at');
+        setSortOrderState('desc');
+        setCurrentPage(1);
+        
+        router.get('/admin/announcements', {
+            type: 'all',
+            status: 'all',
+            audience_type: 'all',
+            sort_by: 'created_at',
+            sort_order: 'desc',
+            page: 1
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            only: ['announcements', 'filters']
+        });
+    }, []);
+
+    // Check if any filters are active - FIXED: Added null checks for date fields
+    const hasActiveFilters = useMemo(() => {
+        return !!(search || 
+            filtersState.type !== 'all' || 
+            filtersState.status !== 'all' ||
+            (filtersState.from_date && filtersState.from_date !== '') ||
+            (filtersState.to_date && filtersState.to_date !== '') ||
+            filtersState.audience_type !== 'all' ||
+            priorityFilter !== 'all');
+    }, [search, filtersState, priorityFilter]);
 
     // Selection handlers
     const handleSelectAllOnPage = () => {
@@ -260,8 +448,8 @@ export default function AnnouncementsIndex({
     };
 
     const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${announcements.total || 0} announcements. This action may take a moment.`)) {
-            const allIds = announcements.data.map(a => a.id);
+        if (confirm(`This will select ALL ${filteredAnnouncements.length} announcements. This action may take a moment.`)) {
+            const allIds = filteredAnnouncements.map(a => a.id);
             setSelectedAnnouncements(allIds);
             setSelectionMode('all');
         }
@@ -318,6 +506,7 @@ export default function AnnouncementsIndex({
                         onSuccess: () => {
                             setSelectedAnnouncements([]);
                             toast.success(`${selectedAnnouncements.length} announcements activated successfully`);
+                            router.reload({ only: ['announcements'] });
                         },
                         onError: () => {
                             toast.error('Failed to activate announcements');
@@ -334,6 +523,7 @@ export default function AnnouncementsIndex({
                         onSuccess: () => {
                             setSelectedAnnouncements([]);
                             toast.success(`${selectedAnnouncements.length} announcements deactivated successfully`);
+                            router.reload({ only: ['announcements'] });
                         },
                         onError: () => {
                             toast.error('Failed to deactivate announcements');
@@ -341,32 +531,55 @@ export default function AnnouncementsIndex({
                     });
                     break;
 
-                case 'publish':
-                    toast.info('Publish functionality to be implemented');
-                    break;
-
-                case 'archive':
-                    toast.info('Archive functionality to be implemented');
-                    break;
-
                 case 'export':
-                    toast.info('Export functionality to be implemented');
+                    const exportData = selectedAnnouncementsData.map(announcement => ({
+                        'Title': announcement.title || 'N/A',
+                        'Type': announcement.type || 'N/A',
+                        'Priority': PRIORITY_DISPLAY[announcement.priority as PriorityLevel] || 'Normal',
+                        'Audience': announcement.audience_type || 'N/A',
+                        'Status': announcement.status || 'N/A',
+                        'Start Date': announcement.start_date || '',
+                        'End Date': announcement.end_date || '',
+                        'Created': announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : '',
+                    }));
+                    
+                    const headers = Object.keys(exportData[0]);
+                    const csv = [
+                        headers.join(','),
+                        ...exportData.map(row => 
+                            headers.map(header => {
+                                const value = row[header as keyof typeof row];
+                                return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+                            }).join(',')
+                        )
+                    ].join('\n');
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `announcements-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    toast.success(`${selectedAnnouncements.length} announcements exported`);
+                    setSelectedAnnouncements([]);
                     break;
 
                 case 'print':
-                    toast.info('Print functionality to be implemented');
-                    break;
-
-                case 'change_status':
-                    toast.info('Change status functionality to be implemented');
-                    break;
-
-                case 'change_type':
-                    toast.info('Change type functionality to be implemented');
+                    selectedAnnouncements.forEach(id => {
+                        window.open(`/admin/announcements/${id}/print`, '_blank');
+                    });
+                    toast.success(`${selectedAnnouncements.length} announcement(s) opened for printing`);
+                    setSelectedAnnouncements([]);
                     break;
 
                 case 'copy_data':
                     handleCopySelectedData();
+                    break;
+
+                default:
+                    toast.info('Functionality to be implemented');
                     break;
             }
         } catch (error) {
@@ -390,6 +603,7 @@ export default function AnnouncementsIndex({
                     setSelectedAnnouncements([]);
                     setShowBulkDeleteDialog(false);
                     toast.success(`${selectedAnnouncements.length} announcements deleted successfully`);
+                    router.reload({ only: ['announcements'] });
                 },
                 onError: () => {
                     toast.error('Failed to delete announcements');
@@ -411,6 +625,7 @@ export default function AnnouncementsIndex({
                 onSuccess: () => {
                     setSelectedAnnouncements(selectedAnnouncements.filter(id => id !== announcement.id));
                     toast.success('Announcement deleted successfully');
+                    router.reload({ only: ['announcements'] });
                 },
                 onError: () => {
                     toast.error('Failed to delete announcement');
@@ -424,68 +639,11 @@ export default function AnnouncementsIndex({
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Announcement status updated');
+                router.reload({ only: ['announcements'] });
             },
             onError: () => {
                 toast.error('Failed to update announcement status');
             }
-        });
-    };
-
-    const handleSort = (column: string) => {
-        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
-        
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column,
-            sort_order: newOrder
-        }));
-        
-        // Trigger server-side sort update
-        const params = {
-            ...filtersState,
-            sort_by: column,
-            sort_order: newOrder,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/announcements', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleClearFilters = () => {
-        setSearch('');
-        setFiltersState({
-            type: 'all',
-            status: 'all',
-            from_date: '',
-            to_date: '',
-            sort_by: 'created_at',
-            sort_order: 'desc'
-        });
-        
-        // Trigger server-side filter clear
-        router.get('/admin/announcements', {
-            search: '',
-            type: 'all',
-            status: 'all',
-            from_date: '',
-            to_date: '',
-            sort_by: 'created_at',
-            sort_order: 'desc'
-        }, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
         });
     };
 
@@ -503,8 +661,9 @@ export default function AnnouncementsIndex({
         const data = selectedAnnouncementsData.map(announcement => ({
             'Title': announcement.title || 'N/A',
             'Type': announcement.type || 'N/A',
-            'Priority': announcement.priority || 'N/A',
-            'Status': announcement.is_active ? 'Active' : 'Inactive',
+            'Priority': PRIORITY_DISPLAY[announcement.priority as PriorityLevel] || 'Normal',
+            'Audience': announcement.audience_type || 'N/A',
+            'Status': announcement.status || 'N/A',
             'Start Date': announcement.start_date,
             'End Date': announcement.end_date,
             'Created': announcementUtils.formatDate(announcement.created_at),
@@ -522,37 +681,65 @@ export default function AnnouncementsIndex({
         });
     };
 
-    const updateFilter = (key: keyof AnnouncementFilters, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
+    // Handle page change
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
         
-        // Trigger server-side filter update
-        const params = {
+        router.get('/admin/announcements', {
             ...filtersState,
-            [key]: value,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/announcements', params, {
+            search,
+            priority: priorityFilter,
+            audience_type: audienceTypeFilter,
+            sort_by: sortByState,
+            sort_order: sortOrderState,
+            page: page
+        }, {
             preserveState: true,
-            replace: true,
             preserveScroll: true,
+            replace: true,
+            only: ['announcements']
         });
     };
 
-    const hasActiveFilters: boolean = !!(
-        search || 
-        filtersState.type !== 'all' || 
-        filtersState.status !== 'all' ||
-        filtersState.from_date ||
-        filtersState.to_date
-    );
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedAnnouncements.length > 0) {
+                        setSelectedAnnouncements([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedAnnouncements.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedAnnouncements, isMobile]);
 
     return (
         <AppLayout
@@ -570,7 +757,6 @@ export default function AnnouncementsIndex({
                         isMobile={isMobile}
                     />
 
-                    {/* Separate Stats Component */}
                     <AnnouncementsStats 
                         globalStats={stats}
                         filteredStats={filteredStats}
@@ -587,12 +773,21 @@ export default function AnnouncementsIndex({
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
                         types={types}
+                        priorities={priorities}
+                        audienceTypes={audience_types}  
                         isMobile={isMobile}
                         totalItems={totalItems}
                         startIndex={startIndex}
                         endIndex={endIndex}
                         searchInputRef={searchInputRef}
                         isLoading={isPerformingBulkAction}
+                        handleExport={() => handleBulkOperation('export')}
+                        priorityFilter={priorityFilter}
+                        setPriorityFilter={handlePriorityFilterChange}
+                        audienceTypeFilter={audienceTypeFilter}
+                        setAudienceTypeFilter={handleAudienceTypeChange}
+                        dateRangePreset={dateRangePreset}
+                        setDateRangePreset={setDateRangePreset}
                     />
 
                     <AnnouncementsContent
@@ -609,7 +804,7 @@ export default function AnnouncementsIndex({
                         totalPages={totalPages}
                         totalItems={totalItems}
                         itemsPerPage={itemsPerPage}
-                        onPageChange={setCurrentPage}
+                        onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onSelectAllFiltered={handleSelectAllFiltered}
                         onSelectAll={handleSelectAll}
@@ -628,6 +823,8 @@ export default function AnnouncementsIndex({
                         selectionStats={selectionStats}
                         types={types}
                         priorities={priorities}
+                        // sortBy={sortByState}
+                        // sortOrder={sortOrderState}
                     />
 
                     {/* Keyboard Shortcuts Help */}

@@ -139,6 +139,7 @@ export interface Resident {
     barangay_id?: number;
     purok_id?: number;
     created_at: string;
+    civil_status: any;
     updated_at: string;
 }
 
@@ -158,6 +159,8 @@ export interface Household {
 
 // ========== CLEARANCE REQUEST ==========
 export interface ClearanceRequest {
+    business_id: null;
+    applicant_type: string;
     contact_purok: boolean;
     business: boolean;
     household: boolean;
@@ -304,6 +307,8 @@ export interface StatusOption {
 }
 
 export interface Filters {
+    from_date(from_date: any): string | (() => string);
+    to_date(to_date: any): string | (() => string);
     search?: string;
     status?: string;
     type?: string;

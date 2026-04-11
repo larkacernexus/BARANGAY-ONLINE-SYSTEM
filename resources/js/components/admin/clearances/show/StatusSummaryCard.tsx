@@ -19,7 +19,7 @@ import {
     FileCheck,
     MessageSquare
 } from 'lucide-react';
-import { ClearanceRequest } from '@/types/admin/clearances/clearance-types'; // Fix import
+import { ClearanceRequest } from '@/types/admin/clearances/clearance'; // Fix import
 import { JSX } from 'react';
 
 interface StatusSummaryCardProps {

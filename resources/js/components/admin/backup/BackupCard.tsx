@@ -20,14 +20,14 @@ import {
 } from 'lucide-react';
 import { formatDate, formatBytes, truncateText, getSizeColor } from '@/admin-utils/formatters';
 import { getTypeIcon, getTypeColor, getTypeLabel, getProtectionBadge } from '@/admin-utils/backupUtils';
-import type { BackupFile } from '@/types/backup';
+import type { BackupFile } from '@/types/admin/backup/backup';
 
 interface BackupCardProps {
   backup: BackupFile;
   isSelected: boolean;
   isBulkMode: boolean;
   isMobile: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (id: number) => void;
   onDelete: (backup: BackupFile) => void;
   onDownload: (filename: string) => void;
   onToggleProtection: (filename: string) => void;

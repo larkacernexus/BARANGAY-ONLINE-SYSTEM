@@ -28,7 +28,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ClearanceDocument } from '@/types/admin/clearances/clearance-types'; // Fix import
+import { ClearanceDocument } from '@/types/admin/clearances/clearance'; // Fix import
 import { JSX } from 'react';
 
 interface DocumentStats {

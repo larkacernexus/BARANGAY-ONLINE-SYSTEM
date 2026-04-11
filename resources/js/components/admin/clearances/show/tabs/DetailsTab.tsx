@@ -18,7 +18,7 @@ import {
     CheckCircle,
     XCircle
 } from 'lucide-react';
-import { ClearanceRequest, ClearanceType, Resident } from '@/types/admin/clearances/clearance-types'; // Fix import
+import { ClearanceRequest, ClearanceType, Resident } from '@/types/admin/clearances/clearance'; // Fix import
 
 interface DetailsTabProps {
     clearance: ClearanceRequest;

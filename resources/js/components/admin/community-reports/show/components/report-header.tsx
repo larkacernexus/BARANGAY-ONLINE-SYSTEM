@@ -14,7 +14,7 @@ import {
     FileText,
 } from 'lucide-react';
 import { route } from 'ziggy-js';
-import { CommunityReport } from './types';
+import { CommunityReport } from '@/types/admin/reports/community-report';
 
 interface ReportHeaderProps {
     report: CommunityReport;

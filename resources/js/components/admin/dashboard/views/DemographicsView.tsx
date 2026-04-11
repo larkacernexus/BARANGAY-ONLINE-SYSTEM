@@ -1,7 +1,7 @@
 import { BarChart3, PieChart, Heart, Briefcase, GraduationCap } from 'lucide-react';
 import { AgeDistributionChart } from '../charts/AgeDistributionChart';
 import { GenderDistributionChart } from '../charts/GenderDistributionChart';
-import type { PageProps } from '@/components/admin/dashboard/types/dashboard';
+import type { PageProps } from '@/types/admin/dashboard/dashboard';
 
 interface DemographicsViewProps {
     demographicStats: PageProps['demographicStats'];

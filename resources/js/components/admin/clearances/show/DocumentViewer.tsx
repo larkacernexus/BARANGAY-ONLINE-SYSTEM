@@ -18,7 +18,7 @@ import {
     File,
     AlertCircle
 } from 'lucide-react';
-import { ClearanceDocument } from '@/types/admin/clearances/clearance-types'; // Fix import
+import { ClearanceDocument } from '@/types/admin/clearances/clearance'; // Fix import
 
 interface DocumentViewerProps {
     document: ClearanceDocument | null; // Change from Document to ClearanceDocument

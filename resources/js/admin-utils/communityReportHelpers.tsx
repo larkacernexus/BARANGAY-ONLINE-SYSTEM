@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { CommunityReport } from '../types/communityReportTypes';
+import { CommunityReport } from '../types/admin/reports/communityReportTypes';
 import {
     AlertTriangle,
     AlertCircle,

@@ -7,7 +7,7 @@ import {
   BackupProgress, 
   BulkOperation,
   SelectionStats 
-} from '@/types/backup';
+} from '@/types/admin/backup/backup';
 import { 
   simulateBackupProgress,
   calculateSelectionStats
@@ -48,71 +48,87 @@ export const useBackupOperations = () => {
     setProgressInterval(simulationInterval);
     
     // Make actual API call
-    router.post(route('backup.create'), {
-      type: backupType,
-      description: backupDescription,
-    }, {
-      onSuccess: () => {
-        // When backend succeeds, complete the progress
-        if (simulationInterval) {
-          clearInterval(simulationInterval);
-        }
-        
-        setBackupProgress({
-          percentage: 100,
-          status: 'completed',
-          message: 'Backup created successfully!',
-          currentStep: 'Complete'
-        });
-        
-        // Short delay to show completion
-        setTimeout(() => {
-          setBackupProgress(null);
-          setBackupDescription('');
-          setShowCreateDialog(false);
-          setCreatingBackup(false);
+    router.post(
+      route('backup.create'),
+      {
+        type: backupType,
+        description: backupDescription,
+      },
+      {
+        onSuccess: () => {
+          // When backend succeeds, complete the progress
+          if (simulationInterval) {
+            clearInterval(simulationInterval);
+          }
           
-          // Reload data
-          router.reload({ only: ['backups', 'diskSpace', 'lastBackup', 'stats', 'flash'] });
-        }, 1500);
-      },
-      onError: (errors) => {
-        // When backend fails
-        if (simulationInterval) {
-          clearInterval(simulationInterval);
-        }
-        
-        setBackupProgress({
-          percentage: 100,
-          status: 'failed',
-          message: errors?.message || 'Failed to create backup. Please check the logs.'
-        });
-        
-        setCreatingBackup(false);
-      },
-    });
+          setBackupProgress({
+            percentage: 100,
+            status: 'completed',
+            message: 'Backup created successfully!',
+            currentStep: 'Complete'
+          });
+          
+          // Short delay to show completion
+          setTimeout(() => {
+            setBackupProgress(null);
+            setBackupDescription('');
+            setShowCreateDialog(false);
+            setCreatingBackup(false);
+            
+            // Reload data
+            router.reload({ only: ['backups', 'diskSpace', 'lastBackup', 'stats', 'flash'] });
+          }, 1500);
+        },
+        onError: (errors) => {
+          // When backend fails
+          if (simulationInterval) {
+            clearInterval(simulationInterval);
+          }
+          
+          setBackupProgress({
+            percentage: 100,
+            status: 'failed',
+            message: errors?.message || 'Failed to create backup. Please check the logs.'
+          });
+          
+          setCreatingBackup(false);
+        },
+      }
+    );
   }, [backupType, backupDescription, progressInterval]);
 
-  const handleDownloadBackup = useCallback((filename: string) => {
-    const link = document.createElement('a');
-    link.href = route('backup.download', { filename });
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadBackup = useCallback((backup: BackupFile) => {
+      const filename = backup.filename || backup.name;
+      
+      if (!filename) {
+          toast.error('Cannot download backup: filename is missing');
+          return;
+      }
+      
+      const link = document.createElement('a');
+      link.href = route('backup.download', { filename });
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   }, []);
 
+  // Already accepts BackupFile - good
   const handleDeleteBackup = useCallback((backup: BackupFile) => {
-    if (confirm(`Are you sure you want to delete backup "${backup.filename}"? This action cannot be undone.`)) {
-      router.delete(route('backup.destroy', { filename: backup.filename }), {
-        preserveScroll: true,
-        onSuccess: () => {
-          toast.success('Backup deleted successfully');
-        },
-        onError: (errors: any) => {
-          toast.error('Failed to delete backup: ' + (errors.message || 'Unknown error'));
-        },
-      });
+    const filename = backup.filename || backup.name;
+    if (confirm(`Are you sure you want to delete backup "${filename}"? This action cannot be undone.`)) {
+      router.delete(
+        route('backup.destroy', { filename }),
+        {
+          preserveScroll: true,
+          onSuccess: () => {
+            toast.success('Backup deleted successfully');
+          },
+          onError: (errors: any) => {
+            toast.error('Failed to delete backup: ' + (errors.message || 'Unknown error'));
+          },
+        }
+      );
     }
   }, []);
 
@@ -134,7 +150,10 @@ export const useBackupOperations = () => {
           if (confirm(`Are you sure you want to delete ${selectedIds.length} selected backup(s)? This action cannot be undone.`)) {
             await Promise.all(
               selectedBackupsData.map(backup => 
-                router.delete(route('backup.destroy', { filename: backup.filename }))
+                router.delete(
+                  route('backup.destroy', { filename: backup.filename }),
+                  { preserveScroll: true }
+                )
               )
             );
             setShowBulkDeleteDialog(false);
@@ -147,7 +166,7 @@ export const useBackupOperations = () => {
           // Download backups one by one
           selectedBackupsData.forEach((backup, index) => {
             setTimeout(() => {
-              handleDownloadBackup(backup.filename);
+              handleDownloadBackup(backup); // Now passing BackupFile directly
             }, index * 500);
           });
           toast.success(`Downloading ${selectedIds.length} backup(s)`);
@@ -198,7 +217,11 @@ export const useBackupOperations = () => {
         case 'protect':
           await Promise.all(
             selectedBackupsData.map(backup => 
-              router.post(route('backup.protect', { filename: backup.filename }))
+              router.post(
+                route('backup.protect', { filename: backup.filename }),
+                {},
+                { preserveScroll: true }
+              )
             )
           );
           toast.success(`${selectedIds.length} backup(s) protected`);
@@ -208,7 +231,11 @@ export const useBackupOperations = () => {
         case 'unprotect':
           await Promise.all(
             selectedBackupsData.map(backup => 
-              router.post(route('backup.unprotect', { filename: backup.filename }))
+              router.post(
+                route('backup.unprotect', { filename: backup.filename }),
+                {},
+                { preserveScroll: true }
+              )
             )
           );
           toast.success(`${selectedIds.length} backup(s) unprotected`);
@@ -254,16 +281,22 @@ export const useBackupOperations = () => {
     });
   }, []);
 
-  const toggleProtection = useCallback((filename: string) => {
-    router.post(route('backup.toggle-protection', { filename }), {
-      onSuccess: () => {
-        toast.success('Protection status updated');
-        router.reload({ only: ['backups'] });
-      },
-      onError: () => {
-        toast.error('Failed to update protection status');
+  // Updated to accept BackupFile
+  const toggleProtection = useCallback((backup: BackupFile) => {
+    const filename = backup.filename || backup.name;
+    router.post(
+      route('backup.toggle-protection', { filename }),
+      {},
+      {
+        onSuccess: () => {
+          toast.success('Protection status updated');
+          router.reload({ only: ['backups'] });
+        },
+        onError: () => {
+          toast.error('Failed to update protection status');
+        }
       }
-    });
+    );
   }, []);
 
   // Cleanup progress interval
@@ -297,13 +330,13 @@ export const useBackupOperations = () => {
     setBackupDescription,
     setCopied,
     
-    // Operations
+    // Operations - all accept BackupFile
     handleCreateBackup,
-    handleDownloadBackup,
-    handleDeleteBackup,
+    handleDownloadBackup,  // Now accepts BackupFile
+    handleDeleteBackup,     // Accepts BackupFile
     handleBulkOperation,
     handleCopySelectedData,
-    toggleProtection,
+    toggleProtection,       // Now accepts BackupFile
     cleanupProgress,
     
     // Progress management

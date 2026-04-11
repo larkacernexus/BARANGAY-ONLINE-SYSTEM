@@ -1,8 +1,14 @@
-// resources/js/components/admin/receipts/ReceiptsContent.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ViewToggle } from '@/components/adminui/view-toggle';
 import { Pagination } from '@/components/adminui/pagination';
@@ -12,11 +18,41 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import ReceiptsTableView from '@/components/admin/receipts/ReceiptsTableView';
 import ReceiptsGridView from '@/components/admin/receipts/ReceiptsGridView';
 import ReceiptsBulkActions from '@/components/admin/receipts/ReceiptsBulkActions';
-import { Receipt } from '@/components/admin/receipts/receipt';
-import { FileSpreadsheet, Printer, BarChart3, Copy, Ban, FileText, Receipt as ReceiptIcon } from 'lucide-react';
+import { FileSpreadsheet, Printer, BarChart3, Copy, Ban, FileText, Receipt as ReceiptIcon, ArrowUpDown } from 'lucide-react';
+
+// ✅ Define the ReceiptData type that matches actual backend data
+interface ReceiptData {
+    id: number;
+    receipt_number: string;
+    or_number: string | null;
+    receipt_type: string;
+    receipt_type_label: string;
+    payer_name: string;
+    payer_address: string | null;
+    formatted_total: string;
+    formatted_amount_paid: string;
+    payment_method: string;
+    payment_method_label: string;
+    formatted_issued_date: string;
+    status: string;
+    is_voided: boolean;
+    printed_count: number;
+    fee_breakdown: Array<any>;
+}
+
+interface SelectionStats {
+    count: number;
+    totalAmount: number;
+    formattedTotalAmount: string;
+    paidAmount: number;
+    formattedPaidAmount: string;
+    voidedCount: number;
+    printedCount: number;
+    paymentMethods: Record<string, number>;
+}
 
 interface ReceiptsContentProps {
-    receipts: Receipt[];
+    receipts: ReceiptData[];
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -36,12 +72,12 @@ interface ReceiptsContentProps {
     onItemSelect: (id: number) => void;
     onClearFilters: () => void;
     onClearSelection: () => void;
-    onDelete: (receipt: Receipt) => void;
+    onDelete: (receipt: ReceiptData) => void;
     onSort: (column: string) => void;
     onBulkOperation: (operation: string) => void;
     onCopySelectedData: () => void;
     onView: (id: number) => void;
-    onPrint: (receipt: Receipt) => void;
+    onPrint: (receipt: ReceiptData) => void;
     onVoid: (id: number, receiptNumber: string) => void;
     onGenerateFromClearance: (clearanceId: number) => void;
     setShowBulkVoidDialog?: (show: boolean) => void;
@@ -49,7 +85,12 @@ interface ReceiptsContentProps {
     pendingClearances?: any[];
     isPerformingBulkAction: boolean;
     selectionMode: 'page' | 'filtered' | 'all';
-    selectionStats?: any;
+    selectionStats?: SelectionStats;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
+    onCreateNew?: () => void;
 }
 
 export default function ReceiptsContent({
@@ -86,7 +127,21 @@ export default function ReceiptsContent({
     pendingClearances = [],
     isPerformingBulkAction,
     selectionMode,
-    selectionStats = {}
+    selectionStats = {
+        count: 0,
+        totalAmount: 0,
+        formattedTotalAmount: '₱0.00',
+        paidAmount: 0,
+        formattedPaidAmount: '₱0.00',
+        voidedCount: 0,
+        printedCount: 0,
+        paymentMethods: {}
+    },
+    sortBy = 'issued_date',
+    sortOrder = 'desc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'issued_date-desc',
+    onCreateNew = () => window.location.href = '/admin/receipts/create'
 }: ReceiptsContentProps) {
     
     // Bulk action items configuration
@@ -139,8 +194,8 @@ export default function ReceiptsContent({
     };
 
     const getSortIcon = (column: string) => {
-        // Implement sort icon logic
-        return null;
+        if (sortBy !== column) return null;
+        return sortOrder === 'asc' ? '↑' : '↓';
     };
 
     return (
@@ -199,6 +254,37 @@ export default function ReceiptsContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="receipt_number-asc">Receipt # (A to Z)</SelectItem>
+                                        <SelectItem value="receipt_number-desc">Receipt # (Z to A)</SelectItem>
+                                        <SelectItem value="or_number-asc">OR # (A to Z)</SelectItem>
+                                        <SelectItem value="or_number-desc">OR # (Z to A)</SelectItem>
+                                        <SelectItem value="payer_name-asc">Payer Name (A to Z)</SelectItem>
+                                        <SelectItem value="payer_name-desc">Payer Name (Z to A)</SelectItem>
+                                        <SelectItem value="payment_method-asc">Payment Method (A to Z)</SelectItem>
+                                        <SelectItem value="payment_method-desc">Payment Method (Z to A)</SelectItem>
+                                        <SelectItem value="total_amount-asc">Amount (Low to High)</SelectItem>
+                                        <SelectItem value="total_amount-desc">Amount (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (A to Z)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Z to A)</SelectItem>
+                                        <SelectItem value="issued_date-asc">Issue Date (Oldest first)</SelectItem>
+                                        <SelectItem value="issued_date-desc">Issue Date (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && receipts.length > 0 && (
                             <div className="flex items-center gap-2">
@@ -255,7 +341,7 @@ export default function ReceiptsContent({
                                 : "No receipts have been generated yet."}
                             hasFilters={hasActiveFilters}
                             onClearFilters={onClearFilters}
-                            onCreateNew={() => window.location.href = '/admin/receipts/create'}
+                            onCreateNew={onCreateNew}
                             createLabel="Generate Receipt"
                         />
                     ) : (

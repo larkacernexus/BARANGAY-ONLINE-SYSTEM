@@ -50,9 +50,57 @@ class FeeEditController extends Controller
             $payerPrivileges = [];
             
             if ($fee->payer_type === 'App\\Models\\Resident' && $fee->payer_id) {
-                $payer = Resident::find($fee->payer_id);
+                $payer = Resident::with('residentPrivileges.privilege')->find($fee->payer_id);
+                
+                // Get active privileges for the resident
+                if ($payer && $payer->residentPrivileges) {
+                    $payerPrivileges = $payer->residentPrivileges
+                        ->filter(function ($rp) {
+                            return $rp->isActive();
+                        })
+                        ->map(function ($rp) {
+                            return [
+                                'id' => $rp->id,
+                                'privilege_id' => $rp->privilege_id,
+                                'code' => $rp->privilege->code,
+                                'name' => $rp->privilege->name,
+                                'id_number' => $rp->id_number,
+                                'discount_percentage' => $rp->discount_percentage ?? $rp->privilege->discountType?->percentage ?? 0,
+                                'expires_at' => $rp->expires_at?->format('Y-m-d'),
+                                'verified_at' => $rp->verified_at?->format('Y-m-d'),
+                                'status' => $this->getPrivilegeStatus($rp),
+                            ];
+                        })
+                        ->values()
+                        ->toArray();
+                }
             } elseif ($fee->payer_type === 'App\\Models\\Household' && $fee->payer_id) {
                 $payer = Household::find($fee->payer_id);
+                // Household privileges would be based on head resident
+                if ($payer) {
+                    $headMember = $payer->householdMembers()->where('is_head', true)->first();
+                    if ($headMember && $headMember->resident) {
+                        $headResident = Resident::with('residentPrivileges.privilege')->find($headMember->resident_id);
+                        if ($headResident && $headResident->residentPrivileges) {
+                            $payerPrivileges = $headResident->residentPrivileges
+                                ->filter(function ($rp) {
+                                    return $rp->isActive();
+                                })
+                                ->map(function ($rp) {
+                                    return [
+                                        'id' => $rp->id,
+                                        'privilege_id' => $rp->privilege_id,
+                                        'code' => $rp->privilege->code,
+                                        'name' => $rp->privilege->name,
+                                        'id_number' => $rp->id_number,
+                                        'discount_percentage' => $rp->discount_percentage ?? $rp->privilege->discountType?->percentage ?? 0,
+                                    ];
+                                })
+                                ->values()
+                                ->toArray();
+                        }
+                    }
+                }
             }
 
             // Get all fee types with their relationships
@@ -64,7 +112,9 @@ class FeeEditController extends Controller
                         'id' => $type->id,
                         'code' => $type->code,
                         'name' => $type->name,
+                        'short_name' => $type->short_name,
                         'base_amount' => (float) $type->base_amount,
+                        'amount_type' => $type->amount_type,
                         'is_discountable' => (bool) $type->is_discountable,
                         'has_surcharge' => (bool) $type->has_surcharge,
                         'surcharge_percentage' => (float) $type->surcharge_percentage,
@@ -76,78 +126,82 @@ class FeeEditController extends Controller
                         'penalty_description' => $type->penalty_description,
                         'description' => $type->description,
                         'validity_days' => $type->validity_days,
+                        'frequency' => $type->frequency,
                         'document_category_id' => $type->document_category_id,
                         'document_category' => $type->document_category ? [
                             'id' => $type->document_category->id,
                             'name' => $type->document_category->name,
-                            // Remove 'code' if it doesn't exist
+                            'slug' => $type->document_category->slug ?? null,
                         ] : null,
-                        'requirements' => $type->requirements,
+                        'requirements' => $type->requirements ?? [],
                     ];
                 });
 
             // Get all residents
-            $residents = Resident::select(['id', 'first_name', 'last_name', 'middle_name', 'address', 'contact_number'])
+            $residents = Resident::select(['id', 'first_name', 'last_name', 'middle_name', 'suffix', 'address', 'contact_number', 'purok_id'])
+                ->with(['purok'])
                 ->orderBy('last_name')
                 ->get()
                 ->map(function ($resident) {
                     // Build full name
-                    $fullName = trim("{$resident->first_name} {$resident->middle_name} {$resident->last_name}");
+                    $fullName = trim("{$resident->first_name} " . ($resident->middle_name ? $resident->middle_name[0] . '.' : '') . " {$resident->last_name}" . ($resident->suffix ? " {$resident->suffix}" : ''));
                     
                     return [
                         'id' => (string) $resident->id,
                         'full_name' => $fullName,
+                        'first_name' => $resident->first_name,
+                        'last_name' => $resident->last_name,
                         'address' => $resident->address,
+                        'phone' => $resident->contact_number,
                         'contact_number' => $resident->contact_number,
+                        'purok' => $resident->purok?->name,
                         'privileges' => [],
                     ];
                 });
 
             // Get all households
-            $households = Household::select(['id', 'household_number', 'head_of_family', 'address', 'contact_number', 'member_count'])
+            $households = Household::select(['id', 'household_number', 'address', 'contact_number'])
+                ->with(['purok', 'householdMembers' => function($query) {
+                    $query->where('is_head', true)->with('resident');
+                }])
                 ->orderBy('household_number')
                 ->get()
                 ->map(function ($household) {
+                    $headMember = $household->householdMembers->first();
+                    $headName = $headMember && $headMember->resident 
+                        ? $headMember->resident->full_name 
+                        : 'Household #' . $household->household_number;
+                    
                     return [
                         'id' => (string) $household->id,
-                        'name' => $household->head_of_family ?? $household->household_number,
-                        'head_of_family' => $household->head_of_family,
+                        'name' => $headName,
                         'household_number' => $household->household_number,
                         'address' => $household->address,
                         'contact_number' => $household->contact_number,
-                        'member_count' => $household->member_count,
+                        'purok' => $household->purok?->name,
+                        'member_count' => $household->householdMembers->count(),
                         'head_privileges' => [],
                     ];
                 });
 
-            // Get puroks
+            // Get puroks - FIXED: Removed is_active filter
             $puroks = [];
             try {
-                // Check if Purok model exists and has the right columns
-                $puroks = Purok::orderBy('name')->pluck('name')->toArray();
+                $puroks = Purok::orderBy('name')->pluck('name')->filter()->values()->toArray();
             } catch (\Exception $e) {
                 Log::warning('Could not load puroks', ['error' => $e->getMessage()]);
-                // Provide default puroks
-                $puroks = ['1', '2', '3', '4', '5', '6', '7'];
+                $puroks = [];
             }
 
-            // Get document categories - WITHOUT the 'code' column
+            // Get document categories - FIXED: Removed 'code' column
             $documentCategories = [];
             try {
-                // Try to get just id and name first
-                $documentCategories = DocumentCategory::select(['id', 'name'])
+                $documentCategories = DocumentCategory::select(['id', 'name', 'slug', 'description'])
                     ->orderBy('name')
                     ->get();
             } catch (\Exception $e) {
                 Log::warning('Could not load document categories', ['error' => $e->getMessage()]);
-                
-                // If that fails, try without selecting specific columns
-                try {
-                    $documentCategories = DocumentCategory::orderBy('name')->get();
-                } catch (\Exception $e2) {
-                    Log::error('Failed to load document categories', ['error' => $e2->getMessage()]);
-                    $documentCategories = [];
-                }
+                $documentCategories = [];
             }
 
             // Get discount rules
@@ -159,11 +213,11 @@ class FeeEditController extends Controller
                         return [
                             'id' => $rule->id,
                             'name' => $rule->name,
-                            'discount_type' => $rule->discount_type,
+                            'discount_type' => $rule->discount_type ?? $rule->code,
                             'discount_value' => (float) $rule->discount_value,
                             'value_type' => $rule->value_type,
-                            'applicable_fee_types' => $rule->applicable_fee_types,
-                            'verification_document' => $rule->verification_document,
+                            'applicable_fee_types' => $rule->applicable_fee_types ?? [],
+                            'verification_document' => $rule->verification_document ?? null,
                             'description' => $rule->description,
                         ];
                     });
@@ -175,8 +229,18 @@ class FeeEditController extends Controller
             $allPrivileges = [];
             try {
                 $allPrivileges = Privilege::select(['id', 'code', 'name', 'description'])
+                    ->where('is_active', true)
                     ->orderBy('name')
-                    ->get();
+                    ->get()
+                    ->map(function ($privilege) {
+                        return [
+                            'id' => $privilege->id,
+                            'code' => $privilege->code,
+                            'name' => $privilege->name,
+                            'description' => $privilege->description,
+                            'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
+                        ];
+                    });
             } catch (\Exception $e) {
                 Log::warning('Could not load privileges', ['error' => $e->getMessage()]);
             }
@@ -197,9 +261,12 @@ class FeeEditController extends Controller
             // Build full name for display
             $payerFullName = $fee->payer_name;
             if ($payer && $fee->payer_type === 'App\\Models\\Resident') {
-                $payerFullName = trim("{$payer->first_name} {$payer->middle_name} {$payer->last_name}");
+                $payerFullName = trim("{$payer->first_name} " . ($payer->middle_name ? $payer->middle_name[0] . '.' : '') . " {$payer->last_name}" . ($payer->suffix ? " {$payer->suffix}" : ''));
             } elseif ($payer && $fee->payer_type === 'App\\Models\\Household') {
-                $payerFullName = $payer->head_of_family ?? $payer->household_number;
+                $headMember = $payer->householdMembers()->where('is_head', true)->first();
+                $payerFullName = $headMember && $headMember->resident 
+                    ? $headMember->resident->full_name 
+                    : ($payer->head_of_family ?? 'Household #' . $payer->household_number);
             }
 
             $feeData = [
@@ -236,7 +303,9 @@ class FeeEditController extends Controller
                 'business_type' => $metadata['business_type'] ?? '',
                 'area' => (float) ($metadata['area'] ?? 0),
                 'remarks' => $fee->remarks ?? '',
-                'requirements_submitted' => $fee->requirements_submitted ?? [],
+                'requirements_submitted' => is_array($fee->requirements_submitted) 
+                    ? $fee->requirements_submitted 
+                    : ($fee->requirements_submitted ? json_decode($fee->requirements_submitted, true) : []),
                 'ph_legal_compliance_notes' => $metadata['ph_legal_compliance_notes'] ?? '',
                 'status' => $fee->status,
                 'created_at' => $fee->created_at ? $fee->created_at->format('Y-m-d H:i:s') : null,
@@ -253,7 +322,7 @@ class FeeEditController extends Controller
                     'contact_number' => $payer->contact_number,
                     'privileges' => $payerPrivileges
                 ] : null,
-                'feeTypes' => $feeTypes,
+                'fee_types' => $feeTypes, // Changed from 'feeTypes' to 'fee_types' for consistency
                 'residents' => $residents,
                 'households' => $households,
                 'discountRules' => $discountRules,
@@ -274,6 +343,30 @@ class FeeEditController extends Controller
             return redirect()->route('admin.fees.index')
                 ->with('error', 'Failed to load fee edit form. Please try again.');
         }
+    }
+
+    /**
+     * Get privilege status based on expiry
+     */
+    private function getPrivilegeStatus($residentPrivilege): string
+    {
+        if (!$residentPrivilege->verified_at) {
+            return 'pending';
+        }
+        
+        if ($residentPrivilege->expires_at) {
+            $daysUntilExpiry = now()->diffInDays($residentPrivilege->expires_at, false);
+            
+            if ($daysUntilExpiry <= 0) {
+                return 'expired';
+            }
+            
+            if ($daysUntilExpiry <= 30) {
+                return 'expiring_soon';
+            }
+        }
+        
+        return 'active';
     }
 
     // Update fee
@@ -420,7 +513,6 @@ class FeeEditController extends Controller
             Log::info('Fee updated successfully', [
                 'fee_id' => $fee->id,
                 'fee_code' => $fee->fee_code,
-                'changes' => $changes ?? [],
                 'new_status' => $fee->status
             ]);
 

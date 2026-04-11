@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// /Pages/resident/Fees/Index.tsx
+import { useState, useMemo } from 'react';
 import { Head, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
@@ -12,6 +13,7 @@ import { MobileHeader } from '@/components/residentui/modern/mobile-header';
 import { DesktopHeader } from '@/components/residentui/modern/desktop-header';
 import { ErrorState } from '@/components/residentui/modern/error-state';
 import { ModernFeeListView } from '@/components/residentui/fees/modern-fee-list-view';
+import { ModernFeeMobileListView } from '@/components/residentui/fees/modern-fee-mobile-list-view'; // New import
 import { ModernFeeGridView } from '@/components/residentui/fees/modern-fee-grid-view';
 import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
 import { ModernFeeFilters } from '@/components/residentui/fees/modern-fee-filters';
@@ -24,17 +26,14 @@ import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
 import { ModernSelect } from '@/components/residentui/modern-select';
 import { getFeeStatsCards } from '@/components/residentui/fees/constants';
 import { formatDate, formatCurrency, getCategoryDisplay, getStatusCount, printFeesList, exportToCSV } from '@/components/residentui/fees/fee-utils';
-import { useFilters } from '@/components/residentui/hooks/use-filters';
 import { useMobile } from '@/components/residentui/hooks/use-mobile';
-import { useSelection } from '@/components/residentui/hooks/use-selection';
 import { Receipt, User, Calendar } from 'lucide-react';
 import { 
     Fee, 
     FeesPaginatedResponse, 
     FeeStats, 
     FeeType, 
-    Resident, 
-    FeeFilters,
+    Resident,
     getFeeStatusLabel,
     getFeeStatusColor,
     formatFeeAmount
@@ -49,7 +48,6 @@ interface PageProps extends Record<string, any> {
     householdResidents?: Resident[];
     currentResident?: Resident;
     hasProfile?: boolean;
-    filters?: FeeFilters;
     error?: string;
 }
 
@@ -79,16 +77,138 @@ export default function MyFees() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>(isMobile ? 'grid' : 'grid');
     const [sortBy, setSortBy] = useState<'date' | 'amount' | 'status'>('date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
+    // Client-side filters
     const [statusFilter, setStatusFilter] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [feeTypeFilter, setFeeTypeFilter] = useState('all');
+    const [residentFilter, setResidentFilter] = useState('all');
+    const [yearFilter, setYearFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
     
-    const { filters, updateFilters, loading, hasActiveFilters, clearFilters } = useFilters({
-        initialFilters: props.filters || {},
-        route: '/portal/fees'
-    });
-    
-    // Custom selection state management since useSelection expects string | number ID
+    const [loading, setLoading] = useState(false);
     const [selectedItems, setSelectedItems] = useState<Fee[]>([]);
     const [selectMode, setSelectMode] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+    
+    // Filter fees client-side
+    const filteredFees = useMemo(() => {
+        let filtered = [...fees.data];
+        
+        // Status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(fee => fee.status === statusFilter);
+        }
+        
+        // Search filter
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(fee => 
+                fee.fee_code?.toLowerCase().includes(query) ||
+                fee.description?.toLowerCase().includes(query) ||
+                fee.amount?.toString().includes(query)
+            );
+        }
+        
+        // Fee type filter
+        if (feeTypeFilter !== 'all') {
+            filtered = filtered.filter(fee => fee.fee_type_id?.toString() === feeTypeFilter);
+        }
+        
+        // Resident filter
+        if (residentFilter !== 'all') {
+            filtered = filtered.filter(fee => fee.resident_id?.toString() === residentFilter);
+        }
+        
+        // Year filter
+        if (yearFilter !== 'all') {
+            filtered = filtered.filter(fee => {
+                if (!fee.created_at) return false;
+                try {
+                    const feeYear = new Date(fee.created_at).getFullYear().toString();
+                    return feeYear === yearFilter;
+                } catch {
+                    return false;
+                }
+            });
+        }
+        
+        // Sorting
+        filtered.sort((a, b) => {
+            let comparison = 0;
+            
+            switch (sortBy) {
+                case 'date':
+                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    comparison = dateA - dateB;
+                    break;
+                case 'amount':
+                    comparison = (a.amount || 0) - (b.amount || 0);
+                    break;
+                case 'status':
+                    comparison = (a.status || '').localeCompare(b.status || '');
+                    break;
+            }
+            
+            return sortOrder === 'asc' ? comparison : -comparison;
+        });
+        
+        return filtered;
+    }, [fees.data, statusFilter, searchQuery, feeTypeFilter, residentFilter, yearFilter, sortBy, sortOrder]);
+    
+    // Pagination
+    const itemsPerPage = fees.per_page || 10;
+    const totalPages = Math.ceil(filteredFees.length / itemsPerPage);
+    const paginatedFees = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        return filteredFees.slice(start, end);
+    }, [filteredFees, currentPage, itemsPerPage]);
+    
+    // Reset to first page when filters change
+    const handleFilterChange = (filterType: string, value: string) => {
+        setCurrentPage(1);
+        
+        switch (filterType) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'search':
+                setSearchQuery(value);
+                break;
+            case 'feeType':
+                setFeeTypeFilter(value);
+                break;
+            case 'resident':
+                setResidentFilter(value);
+                break;
+            case 'year':
+                setYearFilter(value);
+                break;
+        }
+        
+        // Clear selection when changing filters
+        clearSelection();
+        setSelectMode(false);
+    };
+    
+    const hasActiveFilters = statusFilter !== 'all' || 
+                            searchQuery !== '' || 
+                            feeTypeFilter !== 'all' || 
+                            residentFilter !== 'all' || 
+                            yearFilter !== 'all';
+    
+    const clearFilters = () => {
+        setStatusFilter('all');
+        setSearchQuery('');
+        setFeeTypeFilter('all');
+        setResidentFilter('all');
+        setYearFilter('all');
+        setCurrentPage(1);
+        clearSelection();
+        setSelectMode(false);
+    };
     
     const toggleSelect = (fee: Fee) => {
         setSelectedItems(prev => {
@@ -102,7 +222,7 @@ export default function MyFees() {
     };
     
     const selectAll = () => {
-        setSelectedItems([...fees.data]);
+        setSelectedItems([...paginatedFees]);
     };
     
     const clearSelection = () => {
@@ -116,50 +236,19 @@ export default function MyFees() {
         }
     };
     
-    const [isExporting, setIsExporting] = useState(false);
-    
-    // Convert selected fees to number array for components that need just IDs
     const selectedFeeIds = selectedItems.map(fee => fee.id);
     
     const handleTabChange = (tab: string) => {
-        setStatusFilter(tab);
-        updateFilters({ status: tab === 'all' ? '' : tab, page: '1' });
+        handleFilterChange('status', tab);
         if (isMobile) setShowMobileFilters(false);
-        // Clear selection when changing tabs
-        clearSelection();
-        setSelectMode(false);
-    };
-    
-    const handleFeeTypeChange = (type: string) => {
-        updateFilters({ fee_type: type === 'all' ? '' : type, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-        // Clear selection when changing filters
-        clearSelection();
-        setSelectMode(false);
-    };
-    
-    const handleResidentChange = (resident: string) => {
-        updateFilters({ resident: resident === 'all' ? '' : resident, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-        // Clear selection when changing filters
-        clearSelection();
-        setSelectMode(false);
-    };
-    
-    const handleYearChange = (year: string) => {
-        updateFilters({ year: year === 'all' ? '' : year, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-        // Clear selection when changing filters
-        clearSelection();
-        setSelectMode(false);
     };
     
     const handlePrintFees = () => {
-        printFeesList(fees.data, statusFilter, formatDate, getCategoryDisplay, formatCurrency);
+        printFeesList(filteredFees, statusFilter, formatDate, getCategoryDisplay, formatCurrency);
     };
     
     const handleExportCSV = () => {
-        exportToCSV(fees.data, statusFilter, formatDate, getCategoryDisplay, setIsExporting, toast);
+        exportToCSV(filteredFees, statusFilter, formatDate, getCategoryDisplay, setIsExporting, toast);
     };
     
     const handleCopyFeeCode = (code: string) => {
@@ -167,9 +256,17 @@ export default function MyFees() {
         toast.success(`Copied: ${code}`);
     };
     
-    // Handle single fee selection for grid view
     const handleSelectFee = (fee: Fee) => {
         toggleSelect(fee);
+    };
+    
+    const getResidentName = (residentId?: number): string => {
+        if (!residentId) return 'N/A';
+        const resident = householdResidents.find(r => r.id === residentId);
+        if (resident) {
+            return `${resident.first_name} ${resident.last_name}`;
+        }
+        return 'Unknown';
     };
     
     if (!hasProfile) {
@@ -216,8 +313,13 @@ export default function MyFees() {
         );
     }
     
-    const currentFees = fees.data;
-    const tabHasData = currentFees.length > 0;
+    const tabHasData = paginatedFees.length > 0;
+    
+    // Calculate stats for each tab based on filtered data
+    const getStatusCountForTab = (status: string) => {
+        if (status === 'all') return filteredFees.length;
+        return filteredFees.filter(fee => fee.status === status).length;
+    };
     
     return (
         <>
@@ -259,16 +361,16 @@ export default function MyFees() {
                     
                     {!isMobile && (
                         <ModernFeeFilters
-                            search={filters.search || ''}
-                            setSearch={(value) => updateFilters({ search: value, page: '1' })}
-                            handleSearchSubmit={(e) => { e.preventDefault(); updateFilters({ search: filters.search, page: '1' }); }}
-                            handleSearchClear={() => updateFilters({ search: '', page: '1' })}
-                            feeTypeFilter={filters.fee_type || 'all'}
-                            handleFeeTypeChange={handleFeeTypeChange}
-                            residentFilter={filters.resident || 'all'}
-                            handleResidentChange={handleResidentChange}
-                            yearFilter={filters.year || 'all'}
-                            handleYearChange={handleYearChange}
+                            search={searchQuery}
+                            setSearch={(value) => handleFilterChange('search', value)}
+                            handleSearchSubmit={(e) => { e.preventDefault(); }}
+                            handleSearchClear={() => handleFilterChange('search', '')}
+                            feeTypeFilter={feeTypeFilter}
+                            handleFeeTypeChange={(type) => handleFilterChange('feeType', type)}
+                            residentFilter={residentFilter}
+                            handleResidentChange={(resident) => handleFilterChange('resident', resident)}
+                            yearFilter={yearFilter}
+                            handleYearChange={(year) => handleFilterChange('year', year)}
                             loading={loading}
                             availableFeeTypes={availableFeeTypes}
                             availableYears={availableYears}
@@ -279,7 +381,7 @@ export default function MyFees() {
                             hasActiveFilters={hasActiveFilters}
                             handleClearFilters={clearFilters}
                             onCopySummary={() => {
-                                const summary = `Fees Summary: Total ${availableFeeTypes.length}`;
+                                const summary = `Fees Summary: Total ${filteredFees.length}`;
                                 navigator.clipboard.writeText(summary);
                                 toast.success('Summary copied');
                             }}
@@ -290,7 +392,7 @@ export default function MyFees() {
                         <CustomTabs 
                             statusFilter={statusFilter}
                             handleTabChange={handleTabChange}
-                            getStatusCount={(status) => getStatusCount(stats, status, currentFees)}
+                            getStatusCount={getStatusCountForTab}
                         />
                         
                         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
@@ -298,7 +400,7 @@ export default function MyFees() {
                                 {selectMode && tabHasData && (
                                     <ModernSelectionBanner
                                         selectedCount={selectedItems.length}
-                                        totalCount={currentFees.length}
+                                        totalCount={paginatedFees.length}
                                         onSelectAll={selectAll}
                                         onDeselectAll={clearSelection}
                                         onCancel={toggleSelectMode}
@@ -312,9 +414,9 @@ export default function MyFees() {
                                 )}
                                 
                                 <ModernCardHeader
-                                    title={`${statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Fees`}
+                                    title={`${statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).replace('_', ' ')} Fees`}
                                     description={tabHasData 
-                                        ? `Showing ${currentFees.length} fee${currentFees.length !== 1 ? 's' : ''}`
+                                        ? `Showing ${paginatedFees.length} of ${filteredFees.length} fee${filteredFees.length !== 1 ? 's' : ''}`
                                         : `No ${statusFilter === 'all' ? 'fees' : statusFilter.replace('_', ' ')} found`
                                     }
                                     action={
@@ -331,7 +433,7 @@ export default function MyFees() {
                                                 <ViewToggle
                                                     viewMode={viewMode}
                                                     onViewChange={setViewMode}
-                                                    disabled={isMobile}
+                                                    disabled={false}
                                                 />
                                             )}
                                             {tabHasData && (
@@ -350,35 +452,70 @@ export default function MyFees() {
                                         hasFilters={hasActiveFilters}
                                         onClearFilters={clearFilters}
                                     />
-                                ) : viewMode === 'grid' ? (
-                                    <ModernFeeGridView
-                                        fees={currentFees}
-                                        selectMode={selectMode}
-                                        selectedFees={selectedFeeIds}
-                                        onSelectFee={handleSelectFee}
-                                        getCategoryDisplay={getCategoryDisplay}
-                                        formatDate={(date: string) => formatDate(date, isMobile)}
-                                        onPrint={(fee: Fee) => printFeesList([fee], 'single', formatDate, getCategoryDisplay, formatCurrency)}
-                                        isMobile={isMobile}
-                                    />
                                 ) : (
-                                    <ModernFeeListView
-                                        fees={currentFees}
-                                        selectMode={selectMode}
-                                        selectedFees={selectedFeeIds}
-                                        onSelectFee={handleSelectFee}
-                                        onSelectAll={selectAll}
-                                        onCopyFeeCode={handleCopyFeeCode}
-                                        onPrint={handlePrintFees}
-                                    />
+                                    // Mobile-specific rendering
+                                    isMobile ? (
+                                        viewMode === 'grid' ? (
+                                            <ModernFeeGridView
+                                                fees={paginatedFees}
+                                                selectMode={selectMode}
+                                                selectedFees={selectedFeeIds}
+                                                onSelectFee={handleSelectFee}
+                                                getCategoryDisplay={getCategoryDisplay}
+                                                formatDate={(date: string) => formatDate(date, true)}
+                                                onPrint={(fee: Fee) => printFeesList([fee], 'single', formatDate, getCategoryDisplay, formatCurrency)}
+                                                isMobile={true}
+                                            />
+                                        ) : (
+                                            <ModernFeeMobileListView
+                                                fees={paginatedFees}
+                                                selectMode={selectMode}
+                                                selectedFees={selectedFeeIds}
+                                                onSelectFee={handleSelectFee}
+                                                getResidentName={getResidentName}
+                                                getCategoryDisplay={getCategoryDisplay}
+                                                formatDate={(date: string) => formatDate(date, true)}
+                                                formatCurrency={formatCurrency}
+                                                formatFeeAmount={formatFeeAmount}
+                                                getFeeStatusLabel={getFeeStatusLabel}
+                                                getFeeStatusColor={getFeeStatusColor}
+                                                onPrintFee={(fee: Fee) => printFeesList([fee], 'single', formatDate, getCategoryDisplay, formatCurrency)}
+                                                onCopyFeeCode={handleCopyFeeCode}
+                                            />
+                                        )
+                                    ) : (
+                                        // Desktop rendering
+                                        viewMode === 'grid' ? (
+                                            <ModernFeeGridView
+                                                fees={paginatedFees}
+                                                selectMode={selectMode}
+                                                selectedFees={selectedFeeIds}
+                                                onSelectFee={handleSelectFee}
+                                                getCategoryDisplay={getCategoryDisplay}
+                                                formatDate={(date: string) => formatDate(date, false)}
+                                                onPrint={(fee: Fee) => printFeesList([fee], 'single', formatDate, getCategoryDisplay, formatCurrency)}
+                                                isMobile={false}
+                                            />
+                                        ) : (
+                                            <ModernFeeListView
+                                                fees={paginatedFees}
+                                                selectMode={selectMode}
+                                                selectedFees={selectedFeeIds}
+                                                onSelectFee={handleSelectFee}
+                                                onSelectAll={selectAll}
+                                                onCopyFeeCode={handleCopyFeeCode}
+                                                onPrint={handlePrintFees}
+                                            />
+                                        )
+                                    )
                                 )}
                                 
-                                {fees.last_page > 1 && (
+                                {totalPages > 1 && (
                                     <div className="mt-6">
                                         <ModernPagination
-                                            currentPage={fees.current_page}
-                                            lastPage={fees.last_page}
-                                            onPageChange={(page: number) => updateFilters({ page: page.toString() })}
+                                            currentPage={currentPage}
+                                            lastPage={totalPages}
+                                            onPageChange={(page: number) => setCurrentPage(page)}
                                             loading={loading}
                                         />
                                     </div>
@@ -393,10 +530,10 @@ export default function MyFees() {
                     onClose={() => setShowMobileFilters(false)}
                     title="Filter Fees"
                     description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
-                    search={filters.search || ''}
-                    onSearchChange={(value: string) => updateFilters({ search: value, page: '1' })}
-                    onSearchSubmit={(e: React.FormEvent) => { e.preventDefault(); updateFilters({ search: filters.search, page: '1' }); }}
-                    onSearchClear={() => updateFilters({ search: '', page: '1' })}
+                    search={searchQuery}
+                    onSearchChange={(value: string) => handleFilterChange('search', value)}
+                    onSearchSubmit={(e: React.FormEvent) => { e.preventDefault(); }}
+                    onSearchClear={() => handleFilterChange('search', '')}
                     loading={loading}
                     hasActiveFilters={hasActiveFilters}
                     onClearFilters={clearFilters}
@@ -404,10 +541,16 @@ export default function MyFees() {
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Fee Type</label>
                         <ModernSelect
-                            value={filters.fee_type || 'all'}
-                            onValueChange={handleFeeTypeChange}
+                            value={feeTypeFilter}
+                            onValueChange={(value) => handleFilterChange('feeType', value)}
                             placeholder="All fee types"
-                            options={availableFeeTypes.map((type: FeeType) => ({ value: type.id.toString(), label: type.name }))}
+                            options={[
+                                { value: 'all', label: 'All fee types' },
+                                ...availableFeeTypes.map((type: FeeType) => ({ 
+                                    value: type.id.toString(), 
+                                    label: type.name 
+                                }))
+                            ]}
                             disabled={loading}
                             icon={Receipt}
                         />
@@ -417,13 +560,16 @@ export default function MyFees() {
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Resident</label>
                             <ModernSelect
-                                value={filters.resident || 'all'}
-                                onValueChange={handleResidentChange}
+                                value={residentFilter}
+                                onValueChange={(value) => handleFilterChange('resident', value)}
                                 placeholder="All residents"
-                                options={householdResidents.map((resident: Resident) => ({
-                                    value: resident.id.toString(),
-                                    label: `${resident.first_name} ${resident.last_name}`
-                                }))}
+                                options={[
+                                    { value: 'all', label: 'All residents' },
+                                    ...householdResidents.map((resident: Resident) => ({
+                                        value: resident.id.toString(),
+                                        label: `${resident.first_name} ${resident.last_name}`
+                                    }))
+                                ]}
                                 disabled={loading}
                                 icon={User}
                             />
@@ -433,10 +579,16 @@ export default function MyFees() {
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Year</label>
                         <ModernSelect
-                            value={filters.year || 'all'}
-                            onValueChange={handleYearChange}
+                            value={yearFilter}
+                            onValueChange={(value) => handleFilterChange('year', value)}
                             placeholder="All years"
-                            options={availableYears.map((year: number) => ({ value: year.toString(), label: year.toString() }))}
+                            options={[
+                                { value: 'all', label: 'All years' },
+                                ...availableYears.map((year: number) => ({ 
+                                    value: year.toString(), 
+                                    label: year.toString() 
+                                }))
+                            ]}
                             disabled={loading}
                             icon={Calendar}
                         />

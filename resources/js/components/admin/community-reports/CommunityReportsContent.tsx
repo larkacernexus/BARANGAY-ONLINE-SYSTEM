@@ -1,5 +1,3 @@
-// resources/js/components/admin/community-reports/CommunityReportsContent.tsx
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -7,13 +5,21 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Link } from '@inertiajs/react';
 import { 
     FileText, 
     List, 
     Grid3X3, 
     Plus,
-    Smartphone
+    Smartphone,
+    ArrowUpDown
 } from 'lucide-react';
 import CommunityReportsTableView from './CommunityReportsTableView';
 import CommunityReportsGridView from './CommunityReportsGridView';
@@ -40,7 +46,7 @@ interface CommunityReportsContentProps {
     onSelectAllOnPage: () => void;
     onItemSelect: (id: number) => void;
     onClearFilters: () => void;
-    onDelete: (report: any) => void; // Use any to handle both old and new types
+    onDelete: (report: any) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onSort: (column: string) => void;
     isSelectAll: boolean;
@@ -50,12 +56,12 @@ interface CommunityReportsContentProps {
     safePriorities: Record<string, string>;
     safeUrgencies: Record<string, string>;
     windowWidth: number;
-    hasActiveFilters: boolean | string; // Allow both boolean and string
+    hasActiveFilters: boolean | string;
     isPerformingBulkAction?: boolean;
-    onMarkResolved?: (report: any) => void; // Use any to handle both old and new types
+    onMarkResolved?: (report: any) => void;
     onViewDetails?: (report: CommunityReport) => void;
     onPrintReport?: (report: CommunityReport) => void;
-    onBulkOperation?: (operation: string, customData?: any) => Promise<void>; // Expect string
+    onBulkOperation?: (operation: string, customData?: any) => Promise<void>;
     onCopySelectedData?: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
@@ -66,6 +72,10 @@ interface CommunityReportsContentProps {
     onSelectAllFiltered?: () => void;
     onSelectAll?: () => void;
     onClearSelection?: () => void;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function CommunityReportsContent({
@@ -108,7 +118,11 @@ export default function CommunityReportsContent({
     selectionMode = 'page',
     onSelectAllFiltered = () => {},
     onSelectAll = () => {},
-    onClearSelection = () => {}
+    onClearSelection = () => {},
+    sortBy = 'created_at',
+    sortOrder = 'desc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'created_at-desc'
 }: CommunityReportsContentProps) {
     const [isMobile, setIsMobile] = useState(false);
     const [localBulkMode, setLocalBulkMode] = useState(isBulkMode);
@@ -342,8 +356,40 @@ export default function CommunityReportsContent({
                         )}
                     </div>
                     
-                    {/* Bulk mode toggle */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="updated_at-desc">Updated (Newest first)</SelectItem>
+                                        <SelectItem value="updated_at-asc">Updated (Oldest first)</SelectItem>
+                                        <SelectItem value="status-asc">Status (A to Z)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Z to A)</SelectItem>
+                                        <SelectItem value="priority-asc">Priority (Low to High)</SelectItem>
+                                        <SelectItem value="priority-desc">Priority (High to Low)</SelectItem>
+                                        <SelectItem value="urgency-asc">Urgency (Low to High)</SelectItem>
+                                        <SelectItem value="urgency-desc">Urgency (High to Low)</SelectItem>
+                                        <SelectItem value="title-asc">Title (A to Z)</SelectItem>
+                                        <SelectItem value="title-desc">Title (Z to A)</SelectItem>
+                                        <SelectItem value="purok-asc">Purok (A to Z)</SelectItem>
+                                        <SelectItem value="purok-desc">Purok (Z to A)</SelectItem>
+                                        <SelectItem value="reporter_name-asc">Reporter (A to Z)</SelectItem>
+                                        <SelectItem value="reporter_name-desc">Reporter (Z to A)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && currentBulkMode && reports.length > 0 && (
                             <div className="flex items-center gap-2">
@@ -360,6 +406,7 @@ export default function CommunityReportsContent({
                             </div>
                         )}
                         
+                        {/* Bulk mode toggle */}
                         {!isMobile && (
                             <div className="flex items-center gap-2">
                                 <Tooltip>

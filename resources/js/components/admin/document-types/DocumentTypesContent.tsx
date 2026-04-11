@@ -1,11 +1,17 @@
-// components/admin/document-types/DocumentTypesContent.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { FileText, Grid3X3, Rows, AlertCircle } from 'lucide-react';
+import { FileText, Grid3X3, Rows, AlertCircle, ArrowUpDown } from 'lucide-react';
 
 // Import reusable components
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -65,6 +71,10 @@ interface DocumentTypesContentProps {
     getFileSizeMB: (bytes: number) => number;
     formatFileFormats: (formats?: string[]) => string;
     formatDate: (dateString: string) => string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function DocumentTypesContent({
@@ -114,7 +124,11 @@ export default function DocumentTypesContent({
     },
     getFileSizeMB,
     formatFileFormats,
-    formatDate
+    formatDate,
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc'
 }: DocumentTypesContentProps) {
     
     const handleBulkModeToggle = () => {
@@ -182,6 +196,39 @@ export default function DocumentTypesContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="code-asc">Code (A to Z)</SelectItem>
+                                        <SelectItem value="code-desc">Code (Z to A)</SelectItem>
+                                        <SelectItem value="category-asc">Category (A to Z)</SelectItem>
+                                        <SelectItem value="category-desc">Category (Z to A)</SelectItem>
+                                        <SelectItem value="max_file_size-asc">File Size (Small to Large)</SelectItem>
+                                        <SelectItem value="max_file_size-desc">File Size (Large to Small)</SelectItem>
+                                        <SelectItem value="sort_order-asc">Sort Order (Low to High)</SelectItem>
+                                        <SelectItem value="sort_order-desc">Sort Order (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="is_required-asc">Required (No to Yes)</SelectItem>
+                                        <SelectItem value="is_required-desc">Required (Yes to No)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && documentTypes.length > 0 && (
                             <div className="flex items-center gap-2">

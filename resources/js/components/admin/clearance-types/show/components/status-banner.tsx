@@ -7,7 +7,7 @@ import {
     AlertTriangle,
     Edit,
 } from 'lucide-react';
-import { ClearanceType } from '../types';
+import { ClearanceType } from '@/types/admin/clearance-types/clearance-types';
 
 interface Props {
     clearanceType: ClearanceType;

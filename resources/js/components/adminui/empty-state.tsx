@@ -1,6 +1,7 @@
 // components/adminui/empty-state.tsx
 
 import { Button } from '@/components/ui/button';
+import { Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -16,7 +17,8 @@ interface EmptyStateProps {
     children?: ReactNode;
     action?: {
         label: string;
-        onClick: () => void;
+        onClick?: () => void;
+        href?: string;
     };
     className?: string;
 }
@@ -37,12 +39,27 @@ export function EmptyState({
     const showAction = () => {
         // If action is provided directly, use that
         if (action) {
-            return (
-                <Button onClick={action.onClick} className="h-8 text-xs">
-                    <Plus className="h-3 w-3 mr-1" />
-                    {action.label}
-                </Button>
-            );
+            if (action.href) {
+                // Render as Link if href is provided
+                return (
+                    <Link href={action.href}>
+                        <Button className="h-8 text-xs">
+                            <Plus className="h-3 w-3 mr-1" />
+                            {action.label}
+                        </Button>
+                    </Link>
+                );
+            }
+            
+            if (action.onClick) {
+                // Render as button with onClick
+                return (
+                    <Button onClick={action.onClick} className="h-8 text-xs">
+                        <Plus className="h-3 w-3 mr-1" />
+                        {action.label}
+                    </Button>
+                );
+            }
         }
         
         // If there are active filters, show clear filters button

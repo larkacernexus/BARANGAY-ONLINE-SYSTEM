@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class RolePermissionController extends Controller
 {
@@ -22,11 +23,13 @@ class RolePermissionController extends Controller
         $query = RolePermission::with(['role', 'permission', 'granter'])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->input('search');
-                $query->whereHas('permission', function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('display_name', 'like', "%{$search}%");
-                })->orWhereHas('role', function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%");
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('permission', function ($sub) use ($search) {
+                        $sub->where('name', 'like', "%{$search}%")
+                            ->orWhere('display_name', 'like', "%{$search}%");
+                    })->orWhereHas('role', function ($sub) use ($search) {
+                        $sub->where('name', 'like', "%{$search}%");
+                    });
                 });
             })
             ->when($request->filled('role') && $request->input('role') !== 'all', function ($query) use ($request) {
@@ -38,39 +41,114 @@ class RolePermissionController extends Controller
                 });
             })
             ->when($request->filled('granter') && $request->input('granter') !== 'all', function ($query) use ($request) {
-                $query->where('granted_by', $request->input('granter'));
+                if ($request->input('granter') === 'system') {
+                    $query->whereNull('granted_by');
+                } else {
+                    $query->where('granted_by', $request->input('granter'));
+                }
             });
 
-        // Handle sorting
-        $sort = $request->input('sort', 'granted_at');
-        $order = $request->input('order', 'desc');
+        // Date range filter
+        if ($request->filled('date_range') && $request->input('date_range') !== '') {
+            $this->applyDateRangeFilter($query, $request->input('date_range'));
+        }
+
+        // Roles count range filter
+        if ($request->filled('roles_count_range') && $request->input('roles_count_range') !== '') {
+            $this->applyRolesCountRangeFilter($query, $request->input('roles_count_range'));
+        }
+
+        // Sorting - removed from filters, handled by table header
+        $sortBy = $request->input('sort_by', 'granted_at');
+        $sortOrder = $request->input('sort_order', 'desc');
         
-        if ($sort === 'module') {
-            $query->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
-                  ->orderBy('permissions.module', $order)
+        if ($sortBy === 'module') {
+            $query->leftJoin('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+                  ->orderBy('permissions.module', $sortOrder)
+                  ->select('role_permissions.*');
+        } elseif ($sortBy === 'permission_name') {
+            $query->leftJoin('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+                  ->orderBy('permissions.display_name', $sortOrder)
+                  ->select('role_permissions.*');
+        } elseif ($sortBy === 'role_name') {
+            $query->leftJoin('roles', 'role_permissions.role_id', '=', 'roles.id')
+                  ->orderBy('roles.name', $sortOrder)
+                  ->select('role_permissions.*');
+        } elseif ($sortBy === 'granter') {
+            $query->leftJoin('users', 'role_permissions.granted_by', '=', 'users.id')
+                  ->orderBy('users.username', $sortOrder)
                   ->select('role_permissions.*');
         } else {
-            $query->orderBy($sort, $order);
+            $query->orderBy($sortBy, $sortOrder);
         }
 
         // Get roles and modules for filters
         $roles = Role::orderBy('name')->get(['id', 'name']);
         $modules = Permission::distinct()->pluck('module')->filter()->values();
         
-        // Fixed granters query - use username instead of first_name/last_name
-        $granters = DB::table('users')
-            ->join('role_permissions', 'users.id', '=', 'role_permissions.granted_by')
-            ->select('users.id', 'users.username', 'users.email')
-            ->distinct()
+        // Get ALL users who CAN grant permissions
+        $granters = collect();
+        
+        // Get users with permission management capabilities
+        $usersWithPermission = User::whereHas('permissions', function ($query) {
+                $query->where('name', 'manage-permissions')
+                      ->orWhere('name', 'assign-permissions')
+                      ->orWhere('name', 'manage-roles');
+            })
+            ->orWhereHas('role.permissions', function ($query) {
+                $query->where('name', 'manage-permissions')
+                      ->orWhere('name', 'assign-permissions')
+                      ->orWhere('name', 'manage-roles');
+            })
+            ->select('id', 'username', 'email', 'first_name', 'last_name')
             ->orderBy('username')
             ->get()
             ->map(function ($user) {
                 return [
                     'id' => $user->id,
-                    'name' => $user->username,
+                    'name' => $user->username ?: ($user->first_name . ' ' . $user->last_name),
                     'email' => $user->email,
                 ];
             });
+        
+        $granters = $granters->concat($usersWithPermission);
+        
+        // If no users found with permissions, add admin users
+        if ($granters->isEmpty()) {
+            $adminUsers = User::whereHas('role', function ($query) {
+                    $query->where('name', 'admin')
+                          ->orWhere('name', 'super_admin');
+                })
+                ->select('id', 'username', 'email', 'first_name', 'last_name')
+                ->orderBy('username')
+                ->get()
+                ->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->username ?: ($user->first_name . ' ' . $user->last_name),
+                        'email' => $user->email,
+                    ];
+                });
+            
+            $granters = $granters->concat($adminUsers);
+        }
+        
+        // Add "System" option for NULL granted_by records
+        $granters->prepend([
+            'id' => 'system',
+            'name' => 'System',
+            'email' => 'system@local',
+        ]);
+        
+        // Add current user if not already in list
+        $currentUser = Auth::user();
+        if ($currentUser && !$granters->contains('id', $currentUser->id)) {
+            $granters->push([
+                'id' => $currentUser->id,
+                'name' => $currentUser->username ?: ($currentUser->first_name . ' ' . $currentUser->last_name),
+                'email' => $currentUser->email,
+            ]);
+        }
 
         // Paginate the results
         $perPage = $request->input('per_page', 15);
@@ -78,6 +156,16 @@ class RolePermissionController extends Controller
 
         // Format the response
         $formattedRolePermissions = $rolePermissions->through(function ($rolePermission) {
+            // Handle NULL granter
+            $granterData = null;
+            if ($rolePermission->granted_by) {
+                $granterData = $rolePermission->granter ? [
+                    'id' => $rolePermission->granter->id,
+                    'username' => $rolePermission->granter->username,
+                    'email' => $rolePermission->granter->email,
+                ] : null;
+            }
+            
             return [
                 'id' => $rolePermission->id,
                 'role_id' => $rolePermission->role_id,
@@ -100,17 +188,17 @@ class RolePermissionController extends Controller
                     'description' => $rolePermission->permission->description,
                     'is_active' => $rolePermission->permission->is_active,
                 ] : null,
-                'granter' => $rolePermission->granter ? [
-                    'id' => $rolePermission->granter->id,
-                    'username' => $rolePermission->granter->username,
-                    'email' => $rolePermission->granter->email,
-                ] : null,
+                'granter' => $granterData,
             ];
         });
 
         return Inertia::render('admin/RolePermissions/Index', [
             'role_permissions' => $formattedRolePermissions,
-            'filters' => $request->only(['search', 'role', 'module', 'granter', 'sort', 'order', 'per_page']),
+            'filters' => $request->only([
+                'search', 'role', 'module', 'granter', 
+                'date_range', 'roles_count_range', 
+                'sort_by', 'sort_order', 'per_page'
+            ]),
             'roles' => $roles,
             'modules' => $modules,
             'granters' => $granters,
@@ -118,11 +206,80 @@ class RolePermissionController extends Controller
     }
 
     /**
+     * Apply date range filter to query
+     */
+    private function applyDateRangeFilter($query, string $range): void
+    {
+        switch ($range) {
+            case 'today':
+                $query->whereDate('granted_at', Carbon::today());
+                break;
+            case 'yesterday':
+                $query->whereDate('granted_at', Carbon::yesterday());
+                break;
+            case 'this_week':
+                $query->whereBetween('granted_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
+                break;
+            case 'last_week':
+                $query->whereBetween('granted_at', [Carbon::now()->subWeek()->startOfWeek(), Carbon::now()->subWeek()->endOfWeek()]);
+                break;
+            case 'this_month':
+                $query->whereMonth('granted_at', Carbon::now()->month)
+                      ->whereYear('granted_at', Carbon::now()->year);
+                break;
+            case 'last_month':
+                $query->whereMonth('granted_at', Carbon::now()->subMonth()->month)
+                      ->whereYear('granted_at', Carbon::now()->subMonth()->year);
+                break;
+            case 'this_quarter':
+                $query->whereBetween('granted_at', [Carbon::now()->startOfQuarter(), Carbon::now()->endOfQuarter()]);
+                break;
+            case 'this_year':
+                $query->whereYear('granted_at', Carbon::now()->year);
+                break;
+        }
+    }
+
+    /**
+     * Apply roles count range filter to query
+     */
+    private function applyRolesCountRangeFilter($query, string $range): void
+    {
+        $subquery = DB::table('role_permissions')
+            ->select('permission_id', DB::raw('COUNT(*) as usage_count'))
+            ->groupBy('permission_id');
+        
+        $query->leftJoinSub($subquery, 'permission_usage', function ($join) {
+            $join->on('role_permissions.permission_id', '=', 'permission_usage.permission_id');
+        });
+        
+        switch ($range) {
+            case '0':
+                $query->where(function ($q) {
+                    $q->where('permission_usage.usage_count', 0)
+                      ->orWhereNull('permission_usage.usage_count');
+                });
+                break;
+            case '1':
+                $query->where('permission_usage.usage_count', 1);
+                break;
+            case '2-5':
+                $query->whereBetween('permission_usage.usage_count', [2, 5]);
+                break;
+            case '6-10':
+                $query->whereBetween('permission_usage.usage_count', [6, 10]);
+                break;
+            case '10+':
+                $query->where('permission_usage.usage_count', '>=', 10);
+                break;
+        }
+    }
+
+    /**
      * Show the form for creating a new resource.
      */
     public function create()
     {
-        // Load roles with their permissions
         $roles = Role::with(['permissions:id,name,display_name,module,is_active'])
             ->withCount(['users', 'permissions'])
             ->orderBy('name')
@@ -139,7 +296,6 @@ class RolePermissionController extends Controller
                 ];
             });
 
-        // Get active permissions
         $permissions = Permission::where('is_active', true)
             ->select('id', 'name', 'display_name', 'module', 'description', 'is_active')
             ->orderBy('module')
@@ -147,7 +303,6 @@ class RolePermissionController extends Controller
             ->get()
             ->groupBy('module');
 
-        // Get unique modules
         $modules = Permission::distinct('module')
             ->whereNotNull('module')
             ->pluck('module')
@@ -178,10 +333,7 @@ class RolePermissionController extends Controller
 
             $role = Role::findOrFail($validated['role_id']);
             
-            // Get existing permissions for this role
             $existingPermissions = $role->permissions()->pluck('permission_id')->toArray();
-            
-            // Filter out already assigned permissions
             $newPermissions = array_diff($validated['permission_ids'], $existingPermissions);
             
             if (empty($newPermissions)) {
@@ -190,7 +342,6 @@ class RolePermissionController extends Controller
                 ]);
             }
 
-            // Prepare data for bulk insert
             $assignments = [];
             foreach ($newPermissions as $permissionId) {
                 $assignments[] = [
@@ -261,7 +412,6 @@ class RolePermissionController extends Controller
      */
     public function destroy(RolePermission $rolePermission)
     {
-        // Check if role is system role (some system role permissions might be protected)
         if ($rolePermission->role->is_system_role) {
             return redirect()->back()->withErrors([
                 'error' => 'Cannot revoke permissions from system roles.'
@@ -293,12 +443,10 @@ class RolePermissionController extends Controller
         try {
             DB::beginTransaction();
 
-            // Get the role permissions to delete
             $rolePermissions = RolePermission::with('role')
                 ->whereIn('id', $validated['permission_ids'])
                 ->get();
 
-            // Filter out system role permissions
             $systemRolePermissions = $rolePermissions->filter(function ($rp) {
                 return $rp->role->is_system_role;
             });
@@ -310,7 +458,6 @@ class RolePermissionController extends Controller
                 ]);
             }
 
-            // Delete the permissions
             $deletedCount = RolePermission::whereIn('id', $validated['permission_ids'])->delete();
 
             DB::commit();
@@ -332,15 +479,31 @@ class RolePermissionController extends Controller
     {
         $query = RolePermission::with(['role', 'permission', 'granter']);
 
-        // Apply filters if any
-        if ($request->has('role') && $request->role !== 'all') {
+        // Apply filters
+        if ($request->filled('role') && $request->role !== 'all') {
             $query->where('role_id', $request->role);
         }
 
-        if ($request->has('module') && $request->module !== 'all') {
+        if ($request->filled('module') && $request->module !== 'all') {
             $query->whereHas('permission', function ($q) use ($request) {
                 $q->where('module', $request->module);
             });
+        }
+
+        if ($request->filled('granter') && $request->granter !== 'all') {
+            if ($request->granter === 'system') {
+                $query->whereNull('granted_by');
+            } else {
+                $query->where('granted_by', $request->granter);
+            }
+        }
+
+        if ($request->filled('date_range')) {
+            $this->applyDateRangeFilter($query, $request->date_range);
+        }
+
+        if ($request->filled('roles_count_range')) {
+            $this->applyRolesCountRangeFilter($query, $request->roles_count_range);
         }
 
         $rolePermissions = $query->get();
@@ -353,7 +516,6 @@ class RolePermissionController extends Controller
         $callback = function () use ($rolePermissions) {
             $file = fopen('php://output', 'w');
             
-            // Add CSV headers
             fputcsv($file, [
                 'Assignment ID',
                 'Role ID',
@@ -369,8 +531,9 @@ class RolePermissionController extends Controller
                 'Granted At',
             ]);
 
-            // Add data rows
             foreach ($rolePermissions as $rp) {
+                $granterName = $rp->granter->username ?? ($rp->granter->first_name . ' ' . $rp->granter->last_name) ?? 'System';
+                
                 fputcsv($file, [
                     $rp->id,
                     $rp->role_id,
@@ -380,9 +543,9 @@ class RolePermissionController extends Controller
                     $rp->permission->name ?? 'N/A',
                     $rp->permission->display_name ?? 'N/A',
                     $rp->permission->module ?? 'N/A',
-                    $rp->granted_by,
-                    $rp->granter->username ?? 'N/A',
-                    $rp->granter->email ?? 'N/A',
+                    $rp->granted_by ?? 'system',
+                    $granterName,
+                    $rp->granter->email ?? 'system@local',
                     $rp->granted_at,
                 ]);
             }
@@ -491,12 +654,10 @@ class RolePermissionController extends Controller
             $targetPermissions = $targetRole->permissions()->pluck('permission_id')->toArray();
 
             if ($validated['replace_existing'] ?? false) {
-                // Remove all existing permissions from target role
                 RolePermission::where('role_id', $targetRole->id)->delete();
                 $targetPermissions = [];
             }
 
-            // Find permissions to copy
             $permissionsToCopy = array_diff($sourcePermissions, $targetPermissions);
 
             if (empty($permissionsToCopy)) {
@@ -505,7 +666,6 @@ class RolePermissionController extends Controller
                 ]);
             }
 
-            // Prepare assignments
             $assignments = [];
             foreach ($permissionsToCopy as $permissionId) {
                 $assignments[] = [
@@ -551,6 +711,13 @@ class RolePermissionController extends Controller
                 ->leftJoin('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
                 ->groupBy('roles.id', 'roles.name')
                 ->orderBy('count', 'desc')
+                ->get()
+                ->toArray(),
+            'permissions_by_usage' => DB::table('role_permissions')
+                ->select('permission_id', DB::raw('COUNT(*) as usage_count'))
+                ->groupBy('permission_id')
+                ->orderBy('usage_count', 'desc')
+                ->limit(10)
                 ->get()
                 ->toArray(),
         ];

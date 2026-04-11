@@ -1,7 +1,7 @@
 // components/admin/dashboard/StatCard.tsx
 import { Link } from '@inertiajs/react';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
-import { StatItem } from '@/components/admin/dashboard/types/dashboard';
+import { StatItem } from '@/types/admin/dashboard/dashboard';
 
 interface StatCardProps {
     stat: StatItem;

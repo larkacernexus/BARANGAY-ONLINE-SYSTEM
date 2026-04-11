@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SelectionMode } from '@/types/backup';
+import { SelectionMode } from '@/types/admin/backup/backup';
 
 export const useBackupSelection = () => {
   const [selectedBackups, setSelectedBackups] = useState<string[]>([]);
@@ -89,9 +89,10 @@ export const useBackupSelection = () => {
     selectionMode,
     showSelectionOptions,
     
-    // Setters
+    // Setters - Keep both the direct setter and toggle function
     setSelectedBackups,
-    setIsBulkMode: toggleBulkMode,
+    setIsBulkMode, // Keep the original setter
+    toggleBulkMode, // Export toggle function separately
     setShowBulkActions,
     setIsSelectAll,
     setSelectionMode,

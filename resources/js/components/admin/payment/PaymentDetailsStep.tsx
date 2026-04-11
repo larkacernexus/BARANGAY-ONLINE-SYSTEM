@@ -9,51 +9,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
-import {
-    CreditCard,
-    Calculator,
-    Receipt,
-    Building,
-    FileText,
-    AlertCircle,
-    Smartphone,
-    Banknote,
-    Home,
-    User,
-    Users,
-    Phone,
-    MapPin,
-    FileDigit,
-    Lock,
-    Check,
-    FileBadge,
-    RefreshCw,
-    UserCircle,
-    MapPinHouse,
-    Hash,
-    IdCard,
-    Shield,
-    Award,
-    Briefcase,
-    UsersRound,
-    Eye,
-    Tag,
-    Percent,
-    CheckCircle2,
-    XCircle,
-    AlertTriangle,
-    DollarSign,
-    Wallet,
-    TrendingUp,
-    Globe,
-} from 'lucide-react';
-import { PaymentItem, PaymentFormData, DiscountRule } from './paymentCreate/types';
+// prettier-ignore
+import { CreditCard, Calculator, Receipt, Building, FileText, AlertCircle, Smartphone, Banknote, Home, User, Users, Phone, MapPin, FileDigit, Lock, Check, FileBadge, RefreshCw, UserCircle, MapPinHouse, Hash, IdCard, Shield, Award, Briefcase, UsersRound, TrendingUp, Globe, CheckCircle2, XCircle, AlertTriangle, DollarSign, Wallet, Percent, Calendar } from 'lucide-react';
 
-// ========== IMPORT FROM UTILS ==========
-import { 
-    generateORNumber
-} from '@/components/admin/payment/paymentCreate/utils';
+// Import ResidentAvatar component
+import { ResidentAvatar } from './ResidentAvatar';
+
+// Import types from central types file
+import {
+    PaymentFormData,
+    PaymentItem,
+    DiscountRule,
+    FeeType
+} from '@/types/admin/payments/payments';
+
+// Import utility functions
+import { generateORNumber } from '@/components/admin/payment/paymentCreate/utils';
 
 // ========== LOCAL HELPER FUNCTIONS ==========
 function formatCurrency(amount: number | undefined | null): string {
@@ -68,146 +39,13 @@ function formatPercentage(percent: number | undefined | null): string {
     return `${percent.toFixed(1)}%`;
 }
 
-// ========== DYNAMIC PRIVILEGE HELPER FUNCTIONS ==========
-
-/**
- * Get privilege icon based on code
- */
-function getPrivilegeIcon(code: string): string {
-    const firstChar = (code?.[0] || 'A').toUpperCase();
-    
-    const iconMap: Record<string, string> = {
-        'S': '👴',
-        'P': '♿',
-        'I': '🏠',
-        'F': '🌾',
-        'O': '✈️',
-        '4': '📦',
-        'U': '💼',
-        'A': '🎫',
-        'B': '🎫',
-        'C': '🎫',
-        'D': '🎫',
-        'E': '🎫',
-    };
-    
-    return iconMap[firstChar] || '🎫';
-}
-
-/**
- * Get privilege color for badge
- */
-function getPrivilegeColor(code: string): string {
-    const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
-    const colorIndex = firstChar % 8;
-    
-    const colors = [
-        'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
-        'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
-        'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
-        'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
-        'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-        'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
-        'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
-        'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
-    ];
-    
-    return colors[colorIndex] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
-}
-
-/**
- * Get resident's active privileges
- */
-function getActivePrivileges(resident: any): any[] {
-    if (!resident || !resident.privileges || !Array.isArray(resident.privileges)) {
-        return [];
-    }
-    
-    return resident.privileges.filter((p: any) => 
-        p.status === 'active' || p.status === 'expiring_soon'
-    );
-}
-
-/**
- * Get resident's privilege badges
- */
-function getPrivilegeBadges(resident: any): Array<{ code: string; name: string; icon: string; color: string; id_number?: string }> {
-    if (!resident) return [];
-    
-    const activePrivileges = getActivePrivileges(resident);
-    
-    return activePrivileges.map((p: any) => ({
-        code: p.code,
-        name: p.name || p.code,
-        icon: getPrivilegeIcon(p.code),
-        color: getPrivilegeColor(p.code),
-        id_number: p.id_number
-    }));
-}
-
-/**
- * Check if fee type allows discount for a specific privilege
- */
-function feeTypeAllowsPrivilege(feeType: any, privilegeCode: string): boolean {
-    if (!feeType) return false;
-    
-    // Check for has_{code}_discount field
-    const hasField = `has_${privilegeCode.toLowerCase()}_discount`;
-    const hasDiscount = feeType[hasField] === true;
-    
-    if (hasDiscount) return true;
-    
-    // Check for backward compatibility with specific fields
-    const legacyMap: Record<string, string[]> = {
-        'senior': ['has_senior_discount', 'senior_discount_percentage'],
-        'pwd': ['has_pwd_discount', 'pwd_discount_percentage'],
-        'solo_parent': ['has_solo_parent_discount', 'solo_parent_discount_percentage'],
-        'indigent': ['has_indigent_discount', 'indigent_discount_percentage'],
-    };
-    
-    const legacyType = Object.entries(legacyMap).find(([key]) => 
-        privilegeCode.toLowerCase().includes(key)
-    );
-    
-    if (legacyType && feeType[legacyType[1][0]] === true) {
-        return true;
-    }
-    
-    return false;
-}
-
-/**
- * Get discount percentage for a specific privilege from fee type
- */
-function getDiscountPercentage(feeType: any, privilegeCode: string, defaultPercentage: number = 0): number {
-    if (!feeType) return defaultPercentage;
-    
-    // Check for {code}_discount_percentage field
-    const percentageField = `${privilegeCode.toLowerCase()}_discount_percentage`;
-    const percentage = feeType[percentageField];
-    
-    if (percentage && !isNaN(percentage)) {
-        return percentage;
-    }
-    
-    // Check for backward compatibility
-    const legacyMap: Record<string, string[]> = {
-        'senior': ['senior_discount_percentage'],
-        'pwd': ['pwd_discount_percentage'],
-        'solo_parent': ['solo_parent_discount_percentage'],
-        'indigent': ['indigent_discount_percentage'],
-    };
-    
-    const legacyType = Object.entries(legacyMap).find(([key]) => 
-        privilegeCode.toLowerCase().includes(key)
-    );
-    
-    if (legacyType && feeType[legacyType[1][0]]) {
-        return feeType[legacyType[1][0]];
-    }
-    
-    return defaultPercentage;
-}
+// Helper function to get photo URL
+const getPhotoUrl = (photoPath: string | null | undefined): string | null => {
+    if (!photoPath) return null;
+    if (photoPath.startsWith('http')) return photoPath;
+    if (photoPath.startsWith('/storage')) return photoPath;
+    return `/storage/${photoPath}`;
+};
 
 // ========== INTERFACE DEFINITIONS ==========
 interface ClearanceType {
@@ -223,17 +61,7 @@ interface ClearanceType {
     requires_approval: boolean;
     is_online_only: boolean;
     is_discountable?: boolean;
-    [key: string]: any; // Dynamic discount fields
-}
-
-interface FeeType {
-    id: string | number;
-    name: string;
-    code: string;
-    base_amount: number | string;
-    category: string;
-    is_discountable?: boolean;
-    [key: string]: any; // Dynamic discount fields
+    [key: string]: any;
 }
 
 interface DiscountEligibility {
@@ -316,15 +144,13 @@ interface ResidentDetails {
     purok_id?: string | number;
     is_household_head?: boolean;
     household_info?: HouseholdInfo | null;
-    
-    // DYNAMIC: Privilege data
     privileges?: any[];
     privileges_count?: number;
     has_privileges?: boolean;
     discount_eligibility_list?: DiscountEligibility[];
     has_special_classification?: boolean;
-    
-    // DYNAMIC: Individual privilege flags will be added
+    photo_path?: string | null;
+    photo_url?: string | null;
     [key: string]: any;
 }
 
@@ -349,7 +175,61 @@ interface PaymentDetailsStepProps {
     selectedBusiness?: BusinessInfo | null;
     payerSource?: 'residents' | 'households' | 'businesses' | 'clearance' | 'fees' | 'other';
     feeTypes?: FeeType[];
-    allPrivileges?: any[]; // All privileges from database
+    allPrivileges?: any[];
+}
+
+// ========== HELPER FUNCTIONS FOR PRIVILEGES ==========
+function getPrivilegeIcon(code: string): string {
+    const firstChar = (code?.[0] || 'A').toUpperCase();
+    
+    const iconMap: Record<string, string> = {
+        'S': '👴',
+        'P': '♿',
+        'I': '🏠',
+        'F': '🌾',
+        'O': '✈️',
+        '4': '📦',
+        'U': '💼',
+        'A': '🎫',
+        'B': '🎫',
+        'C': '🎫',
+        'D': '🎫',
+        'E': '🎫',
+    };
+    
+    return iconMap[firstChar] || '🎫';
+}
+
+function getPrivilegeColor(code: string): string {
+    const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
+    const colorIndex = firstChar % 8;
+    
+    const colors = [
+        'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+        'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+        'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+        'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+        'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+        'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
+        'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
+        'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+    ];
+    
+    return colors[colorIndex] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+}
+
+function getPrivilegeBadges(resident: any): Array<{ code: string; name: string; icon: string; color: string; id_number?: string }> {
+    if (!resident || !resident.privileges) return [];
+    
+    return resident.privileges
+        .filter((p: any) => p.status === 'active' || p.status === 'expiring_soon')
+        .map((p: any) => ({
+            code: p.code,
+            name: p.name || p.code,
+            icon: getPrivilegeIcon(p.code),
+            color: getPrivilegeColor(p.code),
+            id_number: p.id_number
+        }));
 }
 
 export function PaymentDetailsStep({
@@ -376,54 +256,16 @@ export function PaymentDetailsStep({
     allPrivileges = []
 }: PaymentDetailsStepProps) {
     
-    // ========== DEBUG LOGGING ==========
-    console.log('🔍 PaymentDetailsStep - Data:', {
-        subtotal: data.subtotal,
-        surcharge: data.surcharge,
-        penalty: data.penalty,
-        discount: data.discount,
-        amount_paid: data.amount_paid,
-        total_amount: data.total_amount,
-        payer_type: data.payer_type,
-        payer_name: data.payer_name,
-        itemsCount: paymentItems.length
-    });
-
     // ========== STATE DECLARATIONS ==========
     const [purposeError, setPurposeError] = useState<string>('');
-    const [isCleared, setIsCleared] = useState(data.is_cleared || false);
-    const [validityDate, setValidityDate] = useState(data.validity_date || '');
     const [autoGeneratedOR, setAutoGeneratedOR] = useState<boolean>(false);
-    
-    // Amount paid state
     const [amountTendered, setAmountTendered] = useState<string>(
         data.amount_paid ? data.amount_paid.toString() : ''
     );
     
-    // ========== GET RESIDENT'S PRIVILEGES ==========
-    const residentPrivileges = useMemo(() => {
-        if (!selectedResident) return [];
-        return getPrivilegeBadges(selectedResident);
-    }, [selectedResident]);
-    
-    // ========== SYNC AMOUNT TENDERED WITH DATA ==========
-    useEffect(() => {
-        if (data.amount_paid !== undefined && data.amount_paid !== null) {
-            const amountValue = typeof data.amount_paid === 'number' 
-                ? data.amount_paid.toString() 
-                : data.amount_paid;
-            
-            if (amountTendered !== amountValue) {
-                setAmountTendered(amountValue);
-                console.log('💰 Syncing amountTendered with data.amount_paid:', amountValue);
-            }
-        }
-    }, [data.amount_paid]);
-    
     // ========== CORRECTED CALCULATIONS ==========
     const originalTotal = (data.subtotal || 0) + (data.surcharge || 0) + (data.penalty || 0);
     const discountAmount = data.discount || 0;
-    const discountPercentage = originalTotal > 0 ? (discountAmount / originalTotal) * 100 : 0;
     const amountDue = originalTotal - discountAmount;
     const amountPaid = data.amount_paid || 0;
     
@@ -440,22 +282,7 @@ export function PaymentDetailsStep({
                          (isExactAmount ? 'paid' : 
                          (isOverpaid ? 'overpaid' : 'unknown')));
     
-    console.log('💰 CORRECTED CALCULATIONS:', {
-        originalTotal,
-        discount: discountAmount,
-        discountPercentage,
-        amountDue,
-        amountPaid,
-        amountTendered,
-        isExactAmount,
-        isOverpaid,
-        isUnderpaid,
-        balance,
-        change,
-        paymentStatus
-    });
-
-    // ========== FIXED: Get ALL clearance items and filter fees ==========
+    // ========== GET CLEARANCE AND FEE ITEMS ==========
     const clearanceItems = useMemo(() => {
         return paymentItems.filter(item => 
             item.metadata?.is_clearance_fee === true || item.category === 'clearance'
@@ -473,6 +300,59 @@ export function PaymentDetailsStep({
     const isBusinessPayment = data.payer_type === 'business' || payerSource === 'businesses';
 
     const selectedDiscountRule = discountRules.find(rule => rule.code === selectedDiscountCode);
+
+    // ========== BUILD RESIDENT FOR AVATAR FROM DATA ==========
+    const residentForAvatar = useMemo(() => {
+        console.log('🔍 PaymentDetailsStep - Building residentForAvatar...');
+        console.log('📊 data.payer_type:', data.payer_type);
+        console.log('📊 data.photo_path:', data.photo_path);
+        console.log('📊 data.photo_url:', data.photo_url);
+        console.log('📊 selectedResident:', selectedResident);
+        
+        // Only for resident payer type
+        if (data.payer_type !== 'resident') {
+            console.log('❌ Not a resident payer type, skipping avatar');
+            return null;
+        }
+        
+        // Get photo from data first (passed from parent)
+        let photoPath = (data as any).photo_path;
+        let photoUrl = (data as any).photo_url;
+        let residentName = data.payer_name;
+        let residentId = Number(data.payer_id);
+        
+        // If no photo in data, try selectedResident
+        if (!photoPath && selectedResident) {
+            console.log('📸 Found photo in selectedResident');
+            photoPath = selectedResident.photo_path;
+            photoUrl = selectedResident.photo_url;
+            residentName = selectedResident.name || residentName;
+            residentId = Number(selectedResident.id) || residentId;
+        }
+        
+        // Build the full image URL
+        let fullPhotoUrl = photoUrl;
+        if (photoPath && !fullPhotoUrl) {
+            if (photoPath.startsWith('http')) {
+                fullPhotoUrl = photoPath;
+            } else if (photoPath.startsWith('/storage')) {
+                fullPhotoUrl = photoPath;
+            } else {
+                fullPhotoUrl = `/storage/${photoPath}`;
+            }
+        }
+        
+        const residentData = {
+            id: residentId,
+            name: residentName,
+            photo_path: photoPath,
+            photo_url: fullPhotoUrl
+        };
+        
+        console.log('🎯 Final residentForAvatar in PaymentDetailsStep:', residentData);
+        
+        return residentData;
+    }, [data.payer_type, data.payer_id, data.payer_name, (data as any).photo_path, (data as any).photo_url, selectedResident]);
 
     // Get display values with fallbacks
     const displayPayerName = data.payer_name || 
@@ -504,172 +384,30 @@ export function PaymentDetailsStep({
                         (selectedBusiness?.purok) || 
                         '';
 
-    // ========== DYNAMIC DISCOUNT ELIGIBILITY CHECKING ==========
-    
-    const isFeeTypeDiscountable = useCallback((feeTypeId?: string | number): boolean => {
-        if (!feeTypeId) return false;
-        const feeType = feeTypes.find(ft => ft.id == feeTypeId);
-        return feeType?.is_discountable === true;
-    }, [feeTypes]);
-
-    const isResidentEligibleForDiscount = useCallback((
-        resident: ResidentDetails | null,
-        privilegeCode: string,
-        feeTypeId?: string | number
-    ): { eligible: boolean; percentage: number; id_number?: string } => {
-        if (!resident) return { eligible: false, percentage: 0 };
-        
-        // Check if resident has the privilege
-        const hasPrivilege = resident.privileges?.some((p: any) => 
-            p.code?.toUpperCase() === privilegeCode?.toUpperCase() &&
-            (p.status === 'active' || p.status === 'expiring_soon')
-        );
-        
-        if (!hasPrivilege) return { eligible: false, percentage: 0 };
-        
-        // Check if fee type allows this discount
-        const feeType = feeTypeId ? feeTypes.find(ft => ft.id == feeTypeId) : null;
-        if (!feeTypeAllowsPrivilege(feeType, privilegeCode)) {
-            return { eligible: false, percentage: 0 };
-        }
-        
-        // Get discount percentage
-        const percentage = getDiscountPercentage(feeType, privilegeCode);
-        
-        // Get ID number from privilege
-        const residentPriv = resident.privileges?.find((p: any) => 
-            p.code?.toUpperCase() === privilegeCode?.toUpperCase()
-        );
-        
-        return {
-            eligible: true,
-            percentage,
-            id_number: residentPriv?.id_number
-        };
-    }, [feeTypes]);
-
-    const getBestDiscountForFee = useCallback((feeItem: PaymentItem): DiscountEligibility | null => {
-        if (!selectedResident || !selectedResident.privileges) return null;
-        
-        const feeTypeId = feeItem.fee_type_id;
-        const availableDiscounts: DiscountEligibility[] = [];
-        
-        // Check each privilege the resident has
-        for (const priv of selectedResident.privileges) {
-            if (priv.status !== 'active' && priv.status !== 'expiring_soon') continue;
-            
-            const eligibility = isResidentEligibleForDiscount(selectedResident, priv.code, feeTypeId);
-            if (eligibility.eligible) {
-                availableDiscounts.push({
-                    type: priv.code.toLowerCase(),
-                    label: priv.name || priv.code,
-                    percentage: eligibility.percentage,
-                    id_number: eligibility.id_number,
-                    has_id: !!eligibility.id_number,
-                    privilege_code: priv.code
-                });
-            }
-        }
-        
-        if (availableDiscounts.length === 0) return null;
-        
-        // Sort by percentage (highest first)
-        availableDiscounts.sort((a, b) => b.percentage - a.percentage);
-        
-        return availableDiscounts[0];
-    }, [selectedResident, isResidentEligibleForDiscount]);
-
-    const getAllPossibleDiscounts = useMemo(() => {
-        if (!selectedResident || !selectedResident.privileges) return [];
-        
-        const discountMap = new Map<string, DiscountEligibility>();
-        
-        feeItems.forEach(item => {
-            const bestDiscount = getBestDiscountForFee(item);
-            if (bestDiscount && !discountMap.has(bestDiscount.type)) {
-                discountMap.set(bestDiscount.type, bestDiscount);
-            }
-        });
-        
-        // Check clearance-specific discounts
-        clearanceItems.forEach(item => {
-            if (item.metadata) {
-                for (const priv of selectedResident.privileges) {
-                    if (priv.status !== 'active' && priv.status !== 'expiring_soon') continue;
-                    
-                    const hasDiscount = item.metadata[`has_${priv.code.toLowerCase()}_discount`];
-                    
-                    if (hasDiscount && !discountMap.has(priv.code.toLowerCase())) {
-                        discountMap.set(priv.code.toLowerCase(), {
-                            type: priv.code.toLowerCase(),
-                            label: priv.name || priv.code,
-                            percentage: item.metadata[`${priv.code.toLowerCase()}_discount_percentage`] || 0,
-                            id_number: priv.id_number,
-                            has_id: !!priv.id_number,
-                            privilege_code: priv.code
-                        });
-                    }
-                }
-            }
-        });
-        
-        const discounts = Array.from(discountMap.values());
-        
-        // Sort by percentage (highest first)
-        discounts.sort((a, b) => b.percentage - a.percentage);
-        
-        return discounts;
-    }, [selectedResident, feeItems, clearanceItems, getBestDiscountForFee]);
-
-    const isDiscountRuleApplicable = useCallback((rule: DiscountRule): boolean => {
-        if (!selectedResident) return true;
-        
-        // Check if discount rule maps to a privilege the resident has
-        const privilegeCode = rule.privilege_code || rule.code;
-        
-        const hasPrivilege = selectedResident.privileges?.some((p: any) => 
-            p.code?.toUpperCase() === privilegeCode?.toUpperCase() &&
-            (p.status === 'active' || p.status === 'expiring_soon')
-        );
-        
-        return hasPrivilege === true;
+    // ========== RESIDENT PRIVILEGES ==========
+    const residentPrivileges = useMemo(() => {
+        if (!selectedResident) return [];
+        return getPrivilegeBadges(selectedResident);
     }, [selectedResident]);
 
-    const filteredDiscountRules = useMemo(() => {
-        return discountRules.filter(rule => isDiscountRuleApplicable(rule));
-    }, [discountRules, isDiscountRuleApplicable]);
-
-    const getDiscountWarningMessage = useMemo(() => {
-        const possibleDiscounts = getAllPossibleDiscounts;
-        
-        if (possibleDiscounts.length > 1) {
-            return {
-                message: `You're eligible for multiple discounts (${possibleDiscounts.map(d => d.label).join(', ')}). Only one discount can be applied.`,
-                type: 'warning'
-            };
+    // ========== SYNC AMOUNT TENDERED WITH DATA ==========
+    useEffect(() => {
+        if (data.amount_paid !== undefined && data.amount_paid !== null) {
+            const amountValue = typeof data.amount_paid === 'number' 
+                ? data.amount_paid.toString() 
+                : String(data.amount_paid);
+            
+            if (amountTendered !== amountValue) {
+                setAmountTendered(amountValue);
+            }
         }
-        
-        if (possibleDiscounts.length === 1) {
-            return {
-                message: `You're eligible for ${possibleDiscounts[0].label} discount.`,
-                type: 'info'
-            };
-        }
-        
-        return null;
-    }, [getAllPossibleDiscounts]);
+    }, [data.amount_paid]);
 
-    // ========== EFFECTS ==========
+    // ========== INITIALIZATION EFFECTS ==========
     useEffect(() => {
         if (!data.or_number || data.or_number.trim() === '') {
             const newOR = generateORNumber();
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('or_number', newOR);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
-                }
-            }
+            setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
             setAutoGeneratedOR(true);
         }
     }, []);
@@ -677,45 +415,27 @@ export function PaymentDetailsStep({
     useEffect(() => {
         if (!data.payment_date) {
             const today = new Date().toISOString().split('T')[0];
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('payment_date', today);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
-                }
-            }
+            setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
         }
     }, []);
 
+    // ✅ AUTO-UPDATE AMOUNT PAID WHEN DISCOUNT CHANGES
+    // This eliminates the need to click "Pay Exact Amount" after applying a discount
     useEffect(() => {
-        if (!data.amount_paid && amountDue > 0) {
-            const dueValue = amountDue.toFixed(2);
-            setAmountTendered(dueValue);
-            
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('amount_paid', amountDue);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, amount_paid: amountDue }));
-                }
-            }
-        }
-    }, [amountDue, data.amount_paid]);
+        // Automatically set amount_paid to match amount_due
+        // This happens whenever discount is applied or removed
+        const dueValue = amountDue.toFixed(2);
+        setAmountTendered(dueValue);
+        setData((prev: PaymentFormData) => ({ ...prev, amount_paid: amountDue }));
+    }, [amountDue]);
 
     // ========== HANDLER FUNCTIONS ==========
     const handlePaymentMethodChange = (methodId: string) => {
-        if (typeof setData === 'function') {
-            if (setData.length === 2) {
-                setData('payment_method', methodId);
-                setData('reference_number', '');
-            } else {
-                setData((prev: PaymentFormData) => ({ 
-                    ...prev, 
-                    payment_method: methodId,
-                    reference_number: '' 
-                }));
-            }
-        }
+        setData((prev: PaymentFormData) => ({ 
+            ...prev, 
+            payment_method: methodId,
+            reference_number: '' 
+        }));
     };
 
     const handleAmountTenderedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -723,64 +443,22 @@ export function PaymentDetailsStep({
         setAmountTendered(value);
         
         const numericValue = parseFloat(value) || 0;
-        
-        if (typeof setData === 'function') {
-            if (setData.length === 2) {
-                setData('amount_paid', numericValue);
-            } else {
-                setData((prev: PaymentFormData) => ({ ...prev, amount_paid: numericValue }));
-            }
-        }
+        setData((prev: PaymentFormData) => ({ ...prev, amount_paid: numericValue }));
     };
 
     const handleQuickAmount = (amount: number) => {
         const newAmount = amount.toFixed(2);
         setAmountTendered(newAmount);
-        
-        if (typeof setData === 'function') {
-            if (setData.length === 2) {
-                setData('amount_paid', amount);
-            } else {
-                setData((prev: PaymentFormData) => ({ ...prev, amount_paid: amount }));
-            }
-        }
+        setData((prev: PaymentFormData) => ({ ...prev, amount_paid: amount }));
     };
 
     const handleExactAmount = () => {
         handleQuickAmount(amountDue);
     };
 
-    const handleClearedChange = (checked: boolean) => {
-        setIsCleared(checked);
-        if (typeof setData === 'function') {
-            if (setData.length === 2) {
-                setData('is_cleared', checked);
-            } else {
-                setData((prev: PaymentFormData) => ({ ...prev, is_cleared: checked }));
-            }
-        }
-    };
-
-    const handleValidityDateChange = (value: string) => {
-        setValidityDate(value);
-        if (typeof setData === 'function') {
-            if (setData.length === 2) {
-                setData('validity_date', value);
-            } else {
-                setData((prev: PaymentFormData) => ({ ...prev, validity_date: value }));
-            }
-        }
-    };
-
     const handleRegenerateOR = () => {
         const newOR = generateORNumber();
-        if (typeof setData === 'function') {
-            if (setData.length === 2) {
-                setData('or_number', newOR);
-            } else {
-                setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
-            }
-        }
+        setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
         setAutoGeneratedOR(true);
     };
 
@@ -789,14 +467,6 @@ export function PaymentDetailsStep({
             handleDiscountCodeChange('');
             return;
         }
-        
-        const warning = getDiscountWarningMessage;
-        if (warning && warning.type === 'warning' && !selectedDiscountCode) {
-            if (!confirm(`${warning.message}\n\nAre you sure you want to apply this discount?`)) {
-                return;
-            }
-        }
-        
         handleDiscountCodeChange(code);
     };
 
@@ -812,25 +482,13 @@ export function PaymentDetailsStep({
         
         if (!data.or_number || data.or_number.trim() === '') {
             const newOR = generateORNumber();
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('or_number', newOR);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
-                }
-            }
+            setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
             setAutoGeneratedOR(true);
         }
         
         if (!data.payment_date) {
             const today = new Date().toISOString().split('T')[0];
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('payment_date', today);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
-                }
-            }
+            setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
         }
         
         if (originalTotal <= 0) {
@@ -856,25 +514,13 @@ export function PaymentDetailsStep({
         
         if (!data.or_number || data.or_number.trim() === '') {
             const newOR = generateORNumber();
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('or_number', newOR);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
-                }
-            }
+            setData((prev: PaymentFormData) => ({ ...prev, or_number: newOR }));
             setAutoGeneratedOR(true);
         }
         
         if (!data.payment_date) {
             const today = new Date().toISOString().split('T')[0];
-            if (typeof setData === 'function') {
-                if (setData.length === 2) {
-                    setData('payment_date', today);
-                } else {
-                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
-                }
-            }
+            setData((prev: PaymentFormData) => ({ ...prev, payment_date: today }));
         }
         
         if (!isExactAmount && amountPaid > 0) {
@@ -1010,98 +656,8 @@ export function PaymentDetailsStep({
                         >
                             <span>{item.icon}</span>
                             <span className="text-xs">{item.name}</span>
-                            {item.id_number && (
-                                <span className="text-[10px] ml-1 opacity-75 font-mono">
-                                    #{item.id_number.split('-').pop()}
-                                </span>
-                            )}
                         </Badge>
                     ))}
-                </div>
-            </div>
-        );
-    };
-
-    const renderDiscountEligibilities = () => {
-        if (!selectedResident) return null;
-        
-        const possibleDiscounts = getAllPossibleDiscounts;
-        
-        if (possibleDiscounts.length === 0) {
-            const hasDiscountableFees = feeItems.some(item => {
-                return isFeeTypeDiscountable(item.fee_type_id);
-            });
-            
-            if (hasDiscountableFees) {
-                return (
-                    <div className="mt-3">
-                        <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            <Percent className="h-3 w-3" />
-                            Discount Eligibility
-                        </div>
-                        <div className="p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-md">
-                            <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                                <XCircle className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                                Some fees are discountable, but you're not eligible for any discounts.
-                            </p>
-                        </div>
-                    </div>
-                );
-            }
-            
-            return null;
-        }
-
-        return (
-            <div className="mt-3">
-                <div className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    <Percent className="h-3 w-3" />
-                    Available Discounts
-                </div>
-                <div className="space-y-2">
-                    {possibleDiscounts.map((eligibility, index) => {
-                        return (
-                            <div 
-                                key={index} 
-                                className={`flex items-center justify-between p-2 rounded-md border ${
-                                    index === 0 
-                                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-                                        : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700 opacity-75'
-                                }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs">{getPrivilegeIcon(eligibility.privilege_code || '')}</span>
-                                    <span className="text-xs font-medium dark:text-gray-200">{eligibility.label}</span>
-                                    <Badge variant="secondary" className={`text-[10px] ${
-                                        index === 0 
-                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                                    }`}>
-                                        {formatPercentage(eligibility.percentage)}
-                                    </Badge>
-                                </div>
-                                {eligibility.has_id && eligibility.id_number && (
-                                    <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono flex items-center gap-1">
-                                        <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                                        ID: {eligibility.id_number}
-                                    </span>
-                                )}
-                            </div>
-                        );
-                    })}
-                    
-                    {possibleDiscounts.length > 1 && (
-                        <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md mt-2">
-                            <p className="text-xs text-yellow-800 dark:text-yellow-400 flex items-center gap-1">
-                                <AlertTriangle className="h-3 w-3" />
-                                Note: Only one discount can be applied. The highest priority discount will be used.
-                            </p>
-                        </div>
-                    )}
-                    
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Select a discount from the dropdown below to apply
-                    </p>
                 </div>
             </div>
         );
@@ -1183,89 +739,8 @@ export function PaymentDetailsStep({
                             <span className={`font-medium ${selectedBusiness.is_permit_valid ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                                 {new Date(selectedBusiness.permit_expiry_date).toLocaleDateString()}
                             </span>
-                            {!selectedBusiness.is_permit_valid && (
-                                <Badge variant="outline" className="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400">
-                                    Expiring Soon
-                                </Badge>
-                            )}
                         </div>
                     )}
-
-                    {selectedBusiness.employee_count && (
-                        <div className="flex items-center gap-2 text-xs">
-                            <Users className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                            <span className="text-gray-600 dark:text-gray-400">Employees:</span>
-                            <span className="font-medium dark:text-gray-200">{selectedBusiness.employee_count}</span>
-                        </div>
-                    )}
-
-                    {selectedBusiness.capital_amount && (
-                        <div className="flex items-center gap-2 text-xs">
-                            <DollarSign className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                            <span className="text-gray-600 dark:text-gray-400">Capital:</span>
-                            <span className="font-medium dark:text-gray-200">{selectedBusiness.formatted_capital || formatCurrency(selectedBusiness.capital_amount)}</span>
-                        </div>
-                    )}
-
-                    {selectedBusiness.monthly_gross && (
-                        <div className="flex items-center gap-2 text-xs">
-                            <TrendingUp className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                            <span className="text-gray-600 dark:text-gray-400">Monthly Gross:</span>
-                            <span className="font-medium dark:text-gray-200">{selectedBusiness.formatted_monthly_gross || formatCurrency(selectedBusiness.monthly_gross)}</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    };
-
-    const renderFeeItemsWithDiscountInfo = () => {
-        if (feeItems.length === 0) return null;
-
-        return (
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-medium mb-2">
-                    <Receipt className="h-4 w-4" />
-                    <span className="text-sm">Fee Items ({feeItems.length})</span>
-                    <Badge className="ml-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800 text-xs">
-                        {feeItems.length} item(s)
-                    </Badge>
-                </div>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {feeItems.map((item) => {
-                        const isDiscountable = isFeeTypeDiscountable(item.fee_type_id);
-                        const bestDiscount = getBestDiscountForFee(item);
-                        
-                        return (
-                            <div key={item.id} className="p-2 bg-white dark:bg-gray-900 rounded border border-blue-100 dark:border-blue-900">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                        <div className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
-                                            {item.fee_name}
-                                            {isDiscountable && (
-                                                <Badge variant="outline" className="text-[10px] bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">
-                                                    <Tag className="h-2 w-2 mr-1" />
-                                                    Discountable
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">{item.fee_code}</div>
-                                        
-                                        {bestDiscount && (
-                                            <div className="mt-1">
-                                                <Badge variant="outline" className="text-[10px] bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400">
-                                                    Eligible: {bestDiscount.label} ({formatPercentage(bestDiscount.percentage)})
-                                                </Badge>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="font-medium text-sm dark:text-gray-200">
-                                        {formatCurrency(item.total_amount)}
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
                 </div>
             </div>
         );
@@ -1318,13 +793,7 @@ export function PaymentDetailsStep({
                                         <Input
                                             value={data.or_number || ''}
                                             onChange={(e) => {
-                                                if (typeof setData === 'function') {
-                                                    if (setData.length === 2) {
-                                                        setData('or_number', e.target.value);
-                                                    } else {
-                                                        setData((prev: PaymentFormData) => ({ ...prev, or_number: e.target.value }));
-                                                    }
-                                                }
+                                                setData((prev: PaymentFormData) => ({ ...prev, or_number: e.target.value }));
                                                 setAutoGeneratedOR(false);
                                             }}
                                             className="font-mono text-sm pr-20 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
@@ -1348,13 +817,7 @@ export function PaymentDetailsStep({
                                         type="date"
                                         value={data.payment_date || new Date().toISOString().split('T')[0]}
                                         onChange={(e) => {
-                                            if (typeof setData === 'function') {
-                                                if (setData.length === 2) {
-                                                    setData('payment_date', e.target.value);
-                                                } else {
-                                                    setData((prev: PaymentFormData) => ({ ...prev, payment_date: e.target.value }));
-                                                }
-                                            }
+                                            setData((prev: PaymentFormData) => ({ ...prev, payment_date: e.target.value }));
                                         }}
                                         className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     />
@@ -1381,7 +844,6 @@ export function PaymentDetailsStep({
                             </h3>
                             
                             <div className="space-y-4">
-                                {/* Summary of charges */}
                                 <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg space-y-1 text-sm border border-gray-200 dark:border-gray-700">
                                     <div className="flex justify-between">
                                         <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
@@ -1409,8 +871,7 @@ export function PaymentDetailsStep({
                                                 <span>Discount:</span>
                                                 {selectedDiscountRule && (
                                                     <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
-                                                        {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 
-                                                         selectedDiscountRule.formatted_value || 'Fixed'}
+                                                        {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 'Fixed'}
                                                     </Badge>
                                                 )}
                                             </div>
@@ -1423,7 +884,6 @@ export function PaymentDetailsStep({
                                     </div>
                                 </div>
 
-                                {/* Amount Tendered Input */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium dark:text-gray-300">Amount Tendered (Cash Received)</Label>
                                     <div className="relative">
@@ -1438,12 +898,8 @@ export function PaymentDetailsStep({
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Enter the cash amount received from the payer
-                                    </p>
                                 </div>
 
-                                {/* Quick Amount Buttons */}
                                 <div className="flex flex-wrap gap-2">
                                     <Button
                                         type="button"
@@ -1464,27 +920,8 @@ export function PaymentDetailsStep({
                                     >
                                         Round Up
                                     </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleQuickAmount(amountDue + 100)}
-                                        className="text-xs dark:border-gray-600 dark:text-gray-300"
-                                    >
-                                        +₱100
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleQuickAmount(amountDue + 500)}
-                                        className="text-xs dark:border-gray-600 dark:text-gray-300"
-                                    >
-                                        +₱500
-                                    </Button>
                                 </div>
 
-                                {/* Payment Summary */}
                                 <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg space-y-2 border border-gray-200 dark:border-gray-700">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-600 dark:text-gray-400">Amount Due:</span>
@@ -1514,7 +951,6 @@ export function PaymentDetailsStep({
                                         </div>
                                     ) : null}
 
-                                    {/* Payment Status Badge */}
                                     <div className="mt-2 flex justify-end">
                                         <Badge className={`${statusBadge.color} flex items-center gap-1`}>
                                             {statusBadge.icon}
@@ -1523,7 +959,6 @@ export function PaymentDetailsStep({
                                     </div>
                                 </div>
 
-                                {/* Amount Mismatch Warning */}
                                 {!isExactAmount && amountPaid > 0 && (
                                     <div className={`p-3 rounded-md ${
                                         isOverpaid 
@@ -1536,12 +971,12 @@ export function PaymentDetailsStep({
                                             {isOverpaid ? (
                                                 <>
                                                     <TrendingUp className="h-4 w-4" />
-                                                    Overpayment of {formatCurrency(change)}. Change of {formatCurrency(change)} will be given to the payer.
+                                                    Overpayment of {formatCurrency(change)}. Change will be given.
                                                 </>
                                             ) : (
                                                 <>
                                                     <AlertTriangle className="h-4 w-4" />
-                                                    Underpayment of {formatCurrency(balance)}. Remaining balance will be recorded as partial payment.
+                                                    Underpayment of {formatCurrency(balance)}. Partial payment will be recorded.
                                                 </>
                                             )}
                                         </p>
@@ -1641,13 +1076,7 @@ export function PaymentDetailsStep({
                                         placeholder="Enter transaction reference"
                                         value={data.reference_number || ''}
                                         onChange={(e) => {
-                                            if (typeof setData === 'function') {
-                                                if (setData.length === 2) {
-                                                    setData('reference_number', e.target.value);
-                                                } else {
-                                                    setData((prev: PaymentFormData) => ({ ...prev, reference_number: e.target.value }));
-                                                }
-                                            }
+                                            setData((prev: PaymentFormData) => ({ ...prev, reference_number: e.target.value }));
                                         }}
                                         className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                                     />
@@ -1655,7 +1084,7 @@ export function PaymentDetailsStep({
                             )}
                         </div>
 
-                        {/* Remarks - Optional */}
+                        {/* Remarks */}
                         <div className="space-y-2">
                             <Label className="text-xs dark:text-gray-300">Remarks (Optional)</Label>
                             <Textarea
@@ -1663,13 +1092,7 @@ export function PaymentDetailsStep({
                                 rows={2}
                                 value={data.remarks || ''}
                                 onChange={(e) => {
-                                    if (typeof setData === 'function') {
-                                        if (setData.length === 2) {
-                                            setData('remarks', e.target.value);
-                                        } else {
-                                            setData((prev: PaymentFormData) => ({ ...prev, remarks: e.target.value }));
-                                        }
-                                    }
+                                    setData((prev: PaymentFormData) => ({ ...prev, remarks: e.target.value }));
                                 }}
                                 className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
                             />
@@ -1707,41 +1130,44 @@ export function PaymentDetailsStep({
                 </Card>
             </div>
 
-            {/* Right Column - Summary Only */}
+            {/* Right Column - Summary */}
             <div className="space-y-6">
                 {/* Payer Summary */}
                 <Card className="dark:bg-gray-900">
                     <CardHeader className="pb-3">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded">
-                                <PayerIcon className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                        <div className="flex items-center gap-3">
+                            {/* Resident Avatar - Show for residents */}
+                            {data.payer_type === 'resident' && residentForAvatar ? (
+                                <ResidentAvatar 
+                                    resident={residentForAvatar} 
+                                    size="md"
+                                    className="flex-shrink-0"
+                                />
+                            ) : (
+                                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded">
+                                    <PayerIcon className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                                </div>
+                            )}
+                            <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-base dark:text-gray-100">Payer</CardTitle>
+                                    <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
+                                        {getPayerTypeLabel()}
+                                    </Badge>
+                                </div>
                             </div>
-                            <CardTitle className="text-base dark:text-gray-100">Payer</CardTitle>
-                            <Badge variant="outline" className="ml-auto text-xs dark:border-gray-600 dark:text-gray-300">
-                                {getPayerTypeLabel()}
-                            </Badge>
                         </div>
                     </CardHeader>
                     <CardContent className="pt-0">
                         <div className="space-y-3">
                             <div>
                                 <p className="font-medium text-gray-900 dark:text-gray-100">{displayPayerName}</p>
-                                {selectedResident?.suffix && (
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">{selectedResident.suffix}</span>
-                                )}
                             </div>
                             
                             <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <Phone className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                                 <span>{displayContactNumber}</span>
                             </div>
-                            
-                            {selectedResident?.email && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                    <Briefcase className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                    <span className="text-xs">{selectedResident.email}</span>
-                                </div>
-                            )}
                             
                             <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
                                 <MapPin className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5" />
@@ -1763,12 +1189,10 @@ export function PaymentDetailsStep({
                                 )}
                             </div>
 
-                            {/* Render appropriate info based on payer type */}
                             {data.payer_type === 'resident' && selectedResident && (
                                 <>
                                     {renderResidentPrivileges()}
                                     {renderHouseholdInfo()}
-                                    {renderDiscountEligibilities()}
                                 </>
                             )}
                             
@@ -1783,12 +1207,6 @@ export function PaymentDetailsStep({
                                             <span className="text-gray-500 dark:text-gray-400">Number:</span>
                                             <span className="font-medium dark:text-gray-200">{selectedHousehold.household_number}</span>
                                         </div>
-                                        {selectedHousehold.member_count && (
-                                            <div className="flex justify-between">
-                                                <span className="text-gray-500 dark:text-gray-400">Members:</span>
-                                                <span className="font-medium dark:text-gray-200">{selectedHousehold.member_count}</span>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1824,7 +1242,6 @@ export function PaymentDetailsStep({
                             </div>
                         )}
 
-                        {/* FIXED: Show ALL clearance details from payment items */}
                         {clearanceItems.length > 0 && (
                             <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-md border border-purple-200 dark:border-purple-800">
                                 <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400 font-medium mb-2">
@@ -1849,67 +1266,32 @@ export function PaymentDetailsStep({
                                                     {formatCurrency(item.total_amount)}
                                                 </span>
                                             </div>
-                                            {item.metadata?.purpose && (
-                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                                    {item.metadata.purpose}
-                                                </p>
-                                            )}
                                         </div>
                                     ))}
                                 </div>
-                                {data.validity_date && (
-                                    <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-purple-200 dark:border-purple-800">
-                                        <span className="text-gray-600 dark:text-gray-400">Valid Until:</span>
-                                        <span className="text-xs text-gray-700 dark:text-gray-300">{new Date(data.validity_date).toLocaleDateString()}</span>
-                                    </div>
-                                )}
-                                {/* Clearance status */}
-                                {data.is_cleared && (
-                                    <div className="mt-2 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        Ready to issue
-                                    </div>
-                                )}
                             </div>
                         )}
 
-                        {feeItems.length > 0 && renderFeeItemsWithDiscountInfo()}
-
                         {paymentItems.length > 0 && feeItems.length === 0 && !isClearanceFeePayment && (
                             <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {paymentItems.map((item) => {
-                                    const isClearance = item.metadata?.is_clearance_fee || item.category === 'clearance';
-                                    const isBusiness = item.category === 'business' || item.metadata?.is_business_fee;
-                                    return (
-                                        <div key={item.id} className="flex justify-between items-start text-sm">
-                                            <div className="flex-1">
-                                                <div className="font-medium flex items-center gap-1 dark:text-gray-200">
-                                                    {item.fee_name}
-                                                    {isClearance && (
-                                                        <Badge variant="outline" className="text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800">
-                                                            Clearance
-                                                        </Badge>
-                                                    )}
-                                                    {isBusiness && (
-                                                        <Badge variant="outline" className="text-xs bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800">
-                                                            Business
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">{item.fee_code}</div>
+                                {paymentItems.map((item) => (
+                                    <div key={item.id} className="flex justify-between items-start text-sm">
+                                        <div className="flex-1">
+                                            <div className="font-medium flex items-center gap-1 dark:text-gray-200">
+                                                {item.fee_name}
                                             </div>
-                                            <div className="font-medium dark:text-gray-200">
-                                                {formatCurrency(item.total_amount)}
-                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">{item.fee_code}</div>
                                         </div>
-                                    );
-                                })}
+                                        <div className="font-medium dark:text-gray-200">
+                                            {formatCurrency(item.total_amount)}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
 
                         <Separator className="dark:bg-gray-700" />
 
-                        {/* Totals */}
                         <div className="space-y-1.5">
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
@@ -1937,8 +1319,7 @@ export function PaymentDetailsStep({
                                         <span>Discount</span>
                                         {selectedDiscountRule && (
                                             <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
-                                                {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 
-                                                 selectedDiscountRule.formatted_value || 'Fixed'}
+                                                {selectedDiscountRule.percentage ? formatPercentage(selectedDiscountRule.percentage) : 'Fixed'}
                                             </Badge>
                                         )}
                                     </div>
@@ -1949,7 +1330,6 @@ export function PaymentDetailsStep({
 
                         <Separator className="dark:bg-gray-700" />
 
-                        {/* Payment Status Summary */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
                                 <span className="font-semibold text-gray-900 dark:text-gray-100">Amount Due</span>
@@ -1996,34 +1376,24 @@ export function PaymentDetailsStep({
                                 </SelectTrigger>
                                 <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                     <SelectItem value="no_discount">No Discount</SelectItem>
-                                    {filteredDiscountRules.map((rule) => {
-                                        const privilegeCode = rule.privilege_code || rule.code;
-                                        const icon = getPrivilegeIcon(privilegeCode);
-                                        
-                                        return (
-                                            <SelectItem key={rule.id} value={rule.code} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs">{icon}</span>
-                                                    <span>{rule.name}</span>
-                                                    <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
-                                                        {rule.percentage ? formatPercentage(rule.percentage) : 
-                                                         rule.formatted_value || 'Fixed amount'}
+                                    {discountRules.map((rule) => (
+                                        <SelectItem key={rule.id} value={rule.code} className="dark:text-gray-300 dark:focus:bg-gray-700">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span>{rule.name}</span>
+                                                <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
+                                                    {rule.value_type === 'percentage' 
+                                                        ? `${rule.discount_value}%` 
+                                                        : `₱${rule.discount_value}`}
+                                                </Badge>
+                                                {rule.requires_verification && (
+                                                    <Badge variant="outline" className="text-xs bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">
+                                                        <IdCard className="h-3 w-3 mr-1" />
+                                                        Requires ID
                                                     </Badge>
-                                                    {rule.requires_verification && (
-                                                        <Badge variant="outline" className="text-xs bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800">
-                                                            <IdCard className="h-3 w-3 mr-1" />
-                                                            Requires ID
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </SelectItem>
-                                        );
-                                    })}
-                                    {filteredDiscountRules.length === 0 && discountRules.length > 0 && (
-                                        <SelectItem value="no_discount" disabled className="dark:text-gray-500">
-                                            No applicable discounts for this resident
+                                                )}
+                                            </div>
                                         </SelectItem>
-                                    )}
+                                    ))}
                                 </SelectContent>
                             </Select>
                             
@@ -2033,36 +1403,11 @@ export function PaymentDetailsStep({
                                         <Shield className="h-3 w-3" />
                                         Verified with ID: {data.verification_id_number}
                                     </p>
-                                </div>
-                            )}
-                            
-                            {selectedDiscountRule?.minimum_purchase_amount && originalTotal < selectedDiscountRule.minimum_purchase_amount && (
-                                <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                                    <p className="text-xs text-yellow-800 dark:text-yellow-400 flex items-center gap-1">
-                                        <AlertCircle className="h-3 w-3" />
-                                        Minimum purchase of {formatCurrency(selectedDiscountRule.minimum_purchase_amount)} required
-                                    </p>
-                                </div>
-                            )}
-
-                            {getDiscountWarningMessage && (
-                                <div className={`p-2 ${
-                                    getDiscountWarningMessage.type === 'warning' 
-                                        ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800' 
-                                        : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                                } border rounded-md mt-2`}>
-                                    <p className={`text-xs flex items-center gap-1 ${
-                                        getDiscountWarningMessage.type === 'warning'
-                                            ? 'text-yellow-800 dark:text-yellow-400'
-                                            : 'text-blue-800 dark:text-blue-400'
-                                    }`}>
-                                        {getDiscountWarningMessage.type === 'warning' ? (
-                                            <AlertTriangle className="h-3 w-3" />
-                                        ) : (
-                                            <CheckCircle2 className="h-3 w-3" />
-                                        )}
-                                        {getDiscountWarningMessage.message}
-                                    </p>
+                                    {(data as any).verified_discount_type_name && (
+                                        <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                                            Discount Type: {(data as any).verified_discount_type_name} ({(data as any).verified_percentage}% OFF)
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>

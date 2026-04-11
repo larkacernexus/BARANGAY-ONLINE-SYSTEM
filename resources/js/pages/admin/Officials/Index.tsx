@@ -1,4 +1,3 @@
-// pages/admin/officials/index.tsx
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -30,24 +29,44 @@ import OfficialsDialogs from '@/components/admin/officials/OfficialsDialogs';
 import { Button } from '@/components/ui/button';
 import { KeyRound } from 'lucide-react';
 
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
+const getSafeSortOrder = (value: any): 'asc' | 'desc' => {
+    if (value === 'asc') return 'asc';
+    if (value === 'desc') return 'desc';
+    return 'asc';
+};
+
 export default function Officials() {
     const { props } = usePage<OfficialsProps>();
     const { officials, stats, filters, positions, committees, statusOptions, typeOptions } = props;
     
-    // State management
-    const [search, setSearch] = useState(filters.search || '');
-    const [filtersState, setFiltersState] = useState<FilterState>({
-        search: filters.search || '',  
-        status: filters.status || 'active',
-        position: filters.position || 'all',
-        committee: filters.committee || 'all',
-        type: filters.type || 'all',
-        sort_by: filters.sort_by || 'order',
-        sort_order: filters.sort_order || 'asc'
-    });
+    // Safe data extraction
+    const safeOfficials = officials || { data: [], current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 };
+    const allOfficials = safeOfficials.data || [];
+    const safeFilters = filters || {};
+    const safeStats = stats || { total: 0, active: 0, inactive: 0, current: 0, former: 0, regular: 0, ex_officio: 0, by_position: {} };
+    const safePositions = positions || {};
+    const safeCommittees = committees || {};
+    
+    // Filter states - client-side only
+    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'active'));
+    const [positionFilter, setPositionFilter] = useState<string>(getSafeString(safeFilters.position, 'all'));
+    const [committeeFilter, setCommitteeFilter] = useState<string>(getSafeString(safeFilters.committee, 'all'));
+    const [typeFilter, setTypeFilter] = useState<string>(getSafeString(safeFilters.type, 'all'));
+    const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'order'));
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(15);
+    const itemsPerPage = 15;
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -86,7 +105,7 @@ export default function Officials() {
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, statusFilter, positionFilter, committeeFilter, typeFilter, sortBy, sortOrder]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -96,61 +115,134 @@ export default function Officials() {
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedOfficials.length > 0) {
-                        setSelectedOfficials([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Ctrl/Cmd + F to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            // Delete key for bulk delete
-            if (e.key === 'Delete' && isBulkMode && selectedOfficials.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedOfficials, isMobile]);
-
-    // Filter officials
+    // Filter officials client-side
     const filteredOfficials = useMemo(() => {
-        return filterOfficials(
-            officials.data,
-            search,
-            filtersState,
-            positions,
-            committees
-        );
-    }, [officials.data, search, filtersState, positions, committees]);
+        if (!allOfficials || allOfficials.length === 0) {
+            return [];
+        }
+        
+        let filtered = [...allOfficials];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(official =>
+                official?.resident?.full_name?.toLowerCase().includes(searchLower) ||
+                official?.position_name?.toLowerCase().includes(searchLower) ||
+                official?.email?.toLowerCase().includes(searchLower) ||
+                official?.contact_number?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Status filter
+        if (statusFilter && statusFilter !== 'all') {
+            if (statusFilter === 'current') {
+                filtered = filtered.filter(official => official?.is_current === true);
+            } else {
+                filtered = filtered.filter(official => official?.status === statusFilter);
+            }
+        }
+        
+        // Position filter
+        if (positionFilter && positionFilter !== 'all') {
+            filtered = filtered.filter(official => official?.position_code === positionFilter);
+        }
+        
+        // Committee filter
+        if (committeeFilter && committeeFilter !== 'all') {
+            filtered = filtered.filter(official => official?.committee_code === committeeFilter);
+        }
+        
+        // Type filter
+        if (typeFilter && typeFilter !== 'all') {
+            filtered = filtered.filter(official => official?.is_regular === (typeFilter === 'regular'));
+        }
+        
+        // Apply sorting
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'order':
+                        valueA = a?.order || 0;
+                        valueB = b?.order || 0;
+                        break;
+                    case 'name':
+                        valueA = a?.resident?.full_name || '';
+                        valueB = b?.resident?.full_name || '';
+                        break;
+                    case 'position':
+                        valueA = a?.position_name || '';
+                        valueB = b?.position_name || '';
+                        break;
+                    case 'committee':
+                        valueA = a?.committee_name || '';
+                        valueB = b?.committee_name || '';
+                        break;
+                    case 'status':
+                        valueA = a?.status || '';
+                        valueB = b?.status || '';
+                        break;
+                    case 'type':
+                        valueA = a?.is_regular ? 1 : 0;
+                        valueB = b?.is_regular ? 1 : 0;
+                        break;
+                    case 'start_date':
+                        valueA = a?.term_start ? new Date(a.term_start).getTime() : 0;
+                        valueB = b?.term_start ? new Date(b.term_start).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.order || 0;
+                        valueB = b?.order || 0;
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [allOfficials, search, statusFilter, positionFilter, committeeFilter, typeFilter, sortBy, sortOrder]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        if (!filteredOfficials || filteredOfficials.length === 0) {
+            return safeStats;
+        }
+        
+        const active = filteredOfficials.filter(o => o?.status === 'active').length;
+        const inactive = filteredOfficials.filter(o => o?.status === 'inactive').length;
+        const current = filteredOfficials.filter(o => o?.is_current === true).length;
+        const former = filteredOfficials.filter(o => o?.status === 'former').length;
+        const regular = filteredOfficials.filter(o => o?.is_regular === true).length;
+        const ex_officio = filteredOfficials.filter(o => o?.is_regular === false).length;
+        
+        const by_position: Record<string, number> = {};
+        filteredOfficials.forEach(o => {
+            if (o?.position_code) {
+                by_position[o.position_code] = (by_position[o.position_code] || 0) + 1;
+            }
+        });
+        
+        return {
+            total: filteredOfficials.length,
+            active,
+            inactive,
+            current,
+            former,
+            regular,
+            ex_officio,
+            by_position
+        };
+    }, [filteredOfficials, safeStats]);
 
     // Pagination
     const totalItems = filteredOfficials.length;
@@ -184,9 +276,9 @@ export default function Officials() {
     };
 
     const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${officials.total || 0} officials. This action may take a moment.`)) {
-            const pageIds = paginatedOfficials.map(official => official.id);
-            setSelectedOfficials(pageIds);
+        if (confirm(`This will select ALL ${totalItems} officials. This action may take a moment.`)) {
+            const allIds = filteredOfficials.map(official => official.id);
+            setSelectedOfficials(allIds);
             setSelectionMode('all');
         }
     };
@@ -218,8 +310,19 @@ export default function Officials() {
         return getSelectionStats(selectedOfficialsData);
     }, [selectedOfficialsData]);
 
-    // ========== REVISED BULK OPERATIONS ==========
-    // ONE FUNCTION FOR ALL BULK STATUS UPDATES
+    // Handle sort change from dropdown
+    const handleSortChange = (value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    };
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = (): string => {
+        return `${sortBy}-${sortOrder}`;
+    };
+
+    // Bulk operations
     const handleBulkStatusUpdate = (status: 'active' | 'inactive' | 'former' | 'current') => {
         if (selectedOfficials.length === 0) {
             toast.error('Please select at least one official');
@@ -254,7 +357,6 @@ export default function Officials() {
         });
     };
 
-    // Bulk delete
     const handleBulkDelete = () => {
         if (selectedOfficials.length === 0) {
             toast.error('Please select at least one official');
@@ -286,7 +388,6 @@ export default function Officials() {
         });
     };
 
-    // Export
     const handleExport = () => {
         if (selectedOfficials.length === 0) {
             toast.error('Please select at least one official');
@@ -306,7 +407,6 @@ export default function Officials() {
         toast.success('Export completed successfully');
     };
 
-    // Print
     const handlePrint = () => {
         if (selectedOfficials.length === 0) {
             toast.error('Please select at least one official');
@@ -319,7 +419,6 @@ export default function Officials() {
         toast.success(`${selectedOfficials.length} official(s) opened for printing`);
     };
 
-    // Message
     const handleMessage = () => {
         if (selectedOfficials.length === 0) {
             toast.error('Please select at least one official');
@@ -343,7 +442,6 @@ export default function Officials() {
         }
     };
 
-    // Generate report
     const handleGenerateReport = () => {
         if (selectedOfficials.length === 0) {
             toast.error('Please select at least one official');
@@ -355,7 +453,6 @@ export default function Officials() {
         toast.success(`Generating report for ${selectedOfficials.length} official(s)`);
     };
 
-    // Main bulk operation handler
     const handleBulkOperation = async (operation: string) => {
         switch (operation) {
             case 'delete':
@@ -391,7 +488,6 @@ export default function Officials() {
         }
     };
 
-    // Copy selected data to clipboard
     const handleCopySelectedData = () => {
         if (selectedOfficialsData.length === 0) {
             toast.error('No data to copy');
@@ -407,7 +503,6 @@ export default function Officials() {
         });
     };
 
-    // Individual official operations
     const handleDelete = (official: Official) => {
         if (confirm(`Are you sure you want to delete official "${official.resident?.full_name || 'Untitled'}"?`)) {
             router.delete(`/admin/officials/${official.id}`, {
@@ -432,24 +527,20 @@ export default function Officials() {
     };
 
     const handleSort = (column: string) => {
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column,
-            sort_order: prev.sort_by === column && prev.sort_order === 'asc' ? 'desc' : 'asc'
-        }));
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
     };
 
     const handleClearFilters = () => {
         setSearch('');
-        setFiltersState({
-            search: '',  // Add this missing property
-            status: 'active',
-            position: 'all',
-            committee: 'all',
-            type: 'all',
-            sort_by: 'order',
-            sort_order: 'asc'
-        });
+        setStatusFilter('active');
+        setPositionFilter('all');
+        setCommitteeFilter('all');
+        setTypeFilter('all');
+        setSortBy('order');
+        setSortOrder('asc');
+        setCurrentPage(1);
     };
 
     const handleClearSelection = () => {
@@ -458,16 +549,69 @@ export default function Officials() {
     };
 
     const updateFilter = (key: keyof FilterState, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'position':
+                setPositionFilter(value);
+                break;
+            case 'committee':
+                setCommitteeFilter(value);
+                break;
+            case 'type':
+                setTypeFilter(value);
+                break;
+        }
     };
 
     const hasActiveFilters = Boolean(
         search || 
-        filtersState.status !== 'active' ||
-        filtersState.position !== 'all' || 
-        filtersState.committee !== 'all' ||
-        filtersState.type !== 'all'
+        (statusFilter && statusFilter !== 'active') ||
+        (positionFilter && positionFilter !== 'all') || 
+        (committeeFilter && committeeFilter !== 'all') ||
+        (typeFilter && typeFilter !== 'all')
     );
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedOfficials.length > 0) {
+                        setSelectedOfficials([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedOfficials.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedOfficials, isMobile]);
 
     return (
         <AppLayout
@@ -486,22 +630,29 @@ export default function Officials() {
                     />
 
                     <OfficialsStats 
-                        stats={stats}
-                        positions={positions}
-                        committees={committees}
+                        stats={filteredStats}
+                        positions={safePositions}
+                        committees={safeCommittees}
                     />
 
                     <OfficialsFilters
                         search={search}
                         setSearch={setSearch}
-                        filtersState={filtersState}
+                        filtersState={{
+                            status: statusFilter,
+                            position: positionFilter,
+                            committee: committeeFilter,
+                            type: typeFilter,
+                            sort_by: sortBy,
+                            sort_order: sortOrder
+                        }}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
-                        positions={positions}
-                        committees={committees}
+                        positions={safePositions}
+                        committees={safeCommittees}
                         statusOptions={statusOptions}
                         typeOptions={typeOptions}
                         isMobile={isMobile}
@@ -515,7 +666,7 @@ export default function Officials() {
 
                     <OfficialsContent
                         officials={paginatedOfficials}
-                        stats={stats}
+                        stats={filteredStats}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -541,13 +692,24 @@ export default function Officials() {
                         onSort={handleSort}
                         onBulkOperation={handleBulkOperation}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
-                        filtersState={filtersState}
+                        filtersState={{
+                            status: statusFilter,
+                            position: positionFilter,
+                            committee: committeeFilter,
+                            type: typeFilter,
+                            sort_by: sortBy,
+                            sort_order: sortOrder
+                        }}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
-                        positions={positions}
-                        committees={committees}
+                        positions={safePositions}
+                        committees={safeCommittees}
                         windowWidth={windowWidth}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Keyboard Shortcuts Help */}

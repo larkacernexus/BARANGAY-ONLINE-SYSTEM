@@ -18,7 +18,7 @@ import {
     Trash2,
 } from 'lucide-react';
 import { route } from 'ziggy-js';
-import { Form } from '../types';
+import { Form } from '@/types/admin/forms/forms.types';
 
 interface Props {
     form: Form;

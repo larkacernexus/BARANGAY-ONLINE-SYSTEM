@@ -1,11 +1,18 @@
-// components/admin/fee-types/FeeTypesContent.tsx
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { FileText, Grid3X3, Rows, DollarSign } from 'lucide-react';
+import { FileText, Grid3X3, Rows, DollarSign, Loader2, ArrowUpDown } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 
 // Import reusable components
@@ -19,7 +26,7 @@ import FeeTypesGridView from './FeeTypesGridView';
 import FeeTypesBulkActions from './FeeTypesBulkActions';
 
 // Import types
-import { FeeType, BulkOperation, BulkEditField, SelectionMode, FilterState, SelectionStats } from '@/types/fee-types';
+import { FeeType, BulkOperation, BulkEditField, SelectionMode, FilterState, SelectionStats } from '@/types/admin/fee-types/fee.types';
 
 interface FeeTypesContentProps {
     feeTypes: FeeType[];
@@ -62,12 +69,21 @@ interface FeeTypesContentProps {
         name: string;
         icon: React.ReactNode;
         color: string;
+        bgColor: string;
+        textColor: string;
+        borderColor: string;
     };
     formatCurrency: (amount: any) => string;
     formatDate: (dateString: string) => string;
+    isLoading?: boolean;
+    loadingText?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
-export default function FeeTypesContent({
+export default React.memo(function FeeTypesContent({
     feeTypes,
     isBulkMode,
     setIsBulkMode,
@@ -110,20 +126,89 @@ export default function FeeTypesContent({
         autoGenerate: 0,
         totalAmount: 0,
         fixedAmount: 0,
-        variableAmount: 0
+        variableAmount: 0,
+        byCategory: {},
+        byStatus: {},
+        byAmountType: {},
+        byFrequency: {},
+        byDiscountType: {}
     },
     categories,
     getCategoryDetails,
     formatCurrency,
-    formatDate
+    formatDate,
+    isLoading = false,
+    loadingText = 'Loading fee types...',
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc'
 }: FeeTypesContentProps) {
     
-    const handleBulkModeToggle = () => {
+    const handleBulkModeToggle = useCallback(() => {
         setIsBulkMode(!isBulkMode);
         if (isBulkMode) {
             onClearSelection();
         }
-    };
+    }, [isBulkMode, setIsBulkMode, onClearSelection]);
+
+    const handleViewModeToggle = useCallback(() => {
+        setViewMode(viewMode === 'table' ? 'grid' : 'table');
+    }, [viewMode, setViewMode]);
+
+    // Memoized values
+    const pageInfoText = useMemo(() => {
+        return `Page ${currentPage} of ${totalPages}`;
+    }, [currentPage, totalPages]);
+
+    const selectionSummaryText = useMemo(() => {
+        if (!isBulkMode || selectedFeeTypes.length === 0) return null;
+        return `${selectedFeeTypes.length} selected`;
+    }, [isBulkMode, selectedFeeTypes.length]);
+
+    const showSelectAllFloat = useMemo(() => {
+        return viewMode === 'grid' && feeTypes.length > 0 && selectedFeeTypes.length < feeTypes.length && isBulkMode;
+    }, [viewMode, feeTypes.length, selectedFeeTypes.length, isBulkMode]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                handleBulkModeToggle();
+            }
+            if (e.ctrlKey && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                onSelectAllOnPage();
+            }
+            if (e.key === 'Escape' && isBulkMode) {
+                e.preventDefault();
+                setIsBulkMode(false);
+                onClearSelection();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedFeeTypes.length > 0) {
+                e.preventDefault();
+                onBulkOperation('delete');
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedFeeTypes.length, handleBulkModeToggle, onSelectAllOnPage, setIsBulkMode, onClearSelection, onBulkOperation]);
+
+    // Loading state
+    if (isLoading) {
+        return (
+            <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
+                <CardContent className="flex justify-center items-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{loadingText}</span>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <>
@@ -150,7 +235,7 @@ export default function FeeTypesContent({
             )}
 
             {/* Floating Select All for Grid View */}
-            {viewMode === 'grid' && feeTypes.length > 0 && selectedFeeTypes.length < feeTypes.length && isBulkMode && (
+            {showSelectAllFloat && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
                     onSelectAll={onSelectAllOnPage}
@@ -168,13 +253,15 @@ export default function FeeTypesContent({
                             <DollarSign className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                             <CardTitle className="text-base sm:text-lg md:text-xl font-semibold dark:text-gray-100">
                                 Fee Types List
-                                {selectedFeeTypes.length > 0 && isBulkMode && (
+                                {selectionSummaryText && (
                                     <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
-                                        {selectedFeeTypes.length} selected
+                                        {selectionSummaryText}
                                     </span>
                                 )}
                             </CardTitle>
                         </div>
+                        
+                        {/* Desktop View Toggle */}
                         {!isMobile && (
                             <ViewToggle
                                 viewMode={viewMode}
@@ -182,8 +269,60 @@ export default function FeeTypesContent({
                                 isMobile={isMobile}
                             />
                         )}
+                        
+                        {/* Mobile View Toggle */}
+                        {isMobile && (
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleViewModeToggle}
+                                    className="p-2 h-8 w-8"
+                                    aria-label={`Switch to ${viewMode === 'table' ? 'grid' : 'table'} view`}
+                                >
+                                    {viewMode === 'table' ? 
+                                        <Grid3X3 className="h-4 w-4" /> : 
+                                        <Rows className="h-4 w-4" />
+                                    }
+                                </Button>
+                            </div>
+                        )}
                     </div>
+                    
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="code-asc">Code (A to Z)</SelectItem>
+                                        <SelectItem value="code-desc">Code (Z to A)</SelectItem>
+                                        <SelectItem value="base_amount-asc">Amount (Low to High)</SelectItem>
+                                        <SelectItem value="base_amount-desc">Amount (High to Low)</SelectItem>
+                                        <SelectItem value="category-asc">Category (A to Z)</SelectItem>
+                                        <SelectItem value="category-desc">Category (Z to A)</SelectItem>
+                                        <SelectItem value="frequency-asc">Frequency (A to Z)</SelectItem>
+                                        <SelectItem value="frequency-desc">Frequency (Z to A)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="has_penalty-asc">Has Penalty (No to Yes)</SelectItem>
+                                        <SelectItem value="has_penalty-desc">Has Penalty (Yes to No)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && feeTypes.length > 0 && (
                             <div className="flex items-center gap-2">
@@ -210,6 +349,7 @@ export default function FeeTypesContent({
                                                 checked={isBulkMode}
                                                 onCheckedChange={handleBulkModeToggle}
                                                 className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
+                                                aria-label="Toggle bulk selection mode"
                                             />
                                             <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                                 Bulk Mode
@@ -227,10 +367,11 @@ export default function FeeTypesContent({
                         
                         {/* Page Info */}
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                            Page {currentPage} of {totalPages}
+                            {pageInfoText}
                         </div>
                     </div>
                 </CardHeader>
+                
                 <CardContent className="p-0 dark:bg-gray-900">
                     {/* Empty State with dark mode */}
                     {feeTypes.length === 0 ? (
@@ -324,4 +465,4 @@ export default function FeeTypesContent({
             </Card>
         </>
     );
-}
+});

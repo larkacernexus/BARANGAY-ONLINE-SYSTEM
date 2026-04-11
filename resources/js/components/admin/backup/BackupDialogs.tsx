@@ -35,7 +35,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { BackupProgress, SelectionStats } from '@/types/backup';
+import { BackupProgress, SelectionStats } from '@/types/admin/backup/backup';
 import { PROGRESS_ICONS, PROGRESS_COLORS, PROGRESS_MESSAGES } from '@/admin-utils/backupUtils';
 
 interface BackupDialogsProps {

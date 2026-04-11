@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Link, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { Send, Layers, HistoryIcon, Zap } from 'lucide-react';
-import { CommunityReport } from './types';
+import { CommunityReport } from '@/types/admin/reports/community-report';
 
 interface QuickActionsCardProps {
     report: CommunityReport;

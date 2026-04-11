@@ -1,4 +1,3 @@
-// /components/residentui/reports/MobileHeader.tsx
 import { Button } from '@/components/ui/button';
 import { Filter, ChevronUp, ChevronDown, Plus } from 'lucide-react';
 import { Link } from '@inertiajs/react';

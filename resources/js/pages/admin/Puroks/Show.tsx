@@ -35,6 +35,7 @@ import {
     XCircle,
     HelpCircle,
     Sparkles,
+    Award,
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,7 @@ import { SystemInfoCard } from '@/components/admin/puroks/show/components/system
 import { HouseholdsTable } from '@/components/admin/puroks/show/components/households-table';
 import { ResidentsTable } from '@/components/admin/puroks/show/components/residents-table';
 import { DemographicsDetailsCard } from '@/components/admin/puroks/show/components/demographics-details-card';
+import { ResidentPrivilegesCard } from '@/components/admin/puroks/show/components/ResidentPrivilegesCard';
 
 // Import types and utilities
 import { Purok, PurokStats, Household, Resident, PaginatedData } from '@/types/admin/puroks/purok';
@@ -91,14 +93,23 @@ interface DemographicsData {
     };
 }
 
+interface PrivilegeSummary {
+    id: number;
+    name: string;
+    code: string;
+    count: number;
+    discountPercentage: number;
+}
+
 interface PurokShowProps {
     purok: Purok;
     stats: PurokStats;
     recentHouseholds: Household[];
     recentResidents: Resident[];
     demographics: DemographicsData;
-    households: PaginatedData<Household>;  // Generic with Household type
-    residents: PaginatedData<Resident>;    // Generic with Resident type
+    households: PaginatedData<Household>;
+    residents: PaginatedData<Resident>;
+    privilegeSummary?: PrivilegeSummary[];
 }
 
 export default function PurokShow({ 
@@ -108,7 +119,8 @@ export default function PurokShow({
     recentResidents, 
     demographics,
     households,
-    residents 
+    residents,
+    privilegeSummary = []
 }: PurokShowProps) {
     
     const [copied, setCopied] = useState(false);
@@ -149,6 +161,7 @@ export default function PurokShow({
         const data = {
             purok,
             demographics,
+            privilegeSummary,
             households: households.total,
             residents: residents.total
         };
@@ -187,6 +200,12 @@ export default function PurokShow({
             label: 'Demographics', 
             icon: <BarChart3 className="h-4 w-4" />,
         },
+        { 
+            id: 'privileges', 
+            label: 'Privileges', 
+            icon: <Award className="h-4 w-4" />,
+            count: privilegeSummary.length
+        },
     ];
 
     // Get status badge variant
@@ -200,6 +219,19 @@ export default function PurokShow({
                 return 'outline';
         }
     };
+
+    // Calculate total residents with privileges
+    const residentsWithPrivileges = useMemo(() => {
+        return residents.data.filter((resident: any) => 
+            resident.has_privileges === true || 
+            (resident.privileges_list && resident.privileges_list.length > 0)
+        ).length;
+    }, [residents.data]);
+
+    // Calculate total privileges assigned
+    const totalPrivilegesAssigned = useMemo(() => {
+        return privilegeSummary.reduce((sum, p) => sum + p.count, 0);
+    }, [privilegeSummary]);
 
     return (
         <>
@@ -259,6 +291,12 @@ export default function PurokShow({
                                                 <Users className="h-3 w-3" />
                                                 {residents.total} RESIDENTS
                                             </span>
+                                            {totalPrivilegesAssigned > 0 && (
+                                                <span className="flex items-center gap-1 leading-none text-amber-600 dark:text-amber-400">
+                                                    <Award className="h-3 w-3" />
+                                                    {totalPrivilegesAssigned} PRIVILEGES
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -379,6 +417,57 @@ export default function PurokShow({
                                 <div className="grid gap-6 md:grid-cols-2">
                                     <DemographicsCard demographics={demographics} />
                                     <DemographicsDetailsCard demographics={demographics} />
+                                </div>
+                            </AdminTabPanel>
+
+                            {/* Privileges Tab */}
+                            <AdminTabPanel value="privileges">
+                                <div className="space-y-6">
+                                    {/* Privileges Summary Stats */}
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Privilege Types</p>
+                                                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{privilegeSummary.length}</p>
+                                                </div>
+                                                <div className="rounded-full bg-purple-100 p-3 dark:bg-purple-900/20">
+                                                    <Award className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Privileges Assigned</p>
+                                                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{totalPrivilegesAssigned}</p>
+                                                </div>
+                                                <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/20">
+                                                    <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Residents with Privileges</p>
+                                                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{residentsWithPrivileges}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                        out of {residents.total} total residents
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/20">
+                                                    <Award className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Resident Privileges Card */}
+                                    <ResidentPrivilegesCard 
+                                        residents={residents.data}
+                                        privilegeSummary={privilegeSummary}
+                                    />
                                 </div>
                             </AdminTabPanel>
                         </AdminTabsWithContent>

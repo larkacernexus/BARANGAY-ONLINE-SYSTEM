@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
-import { StatItem } from '@/components/admin/dashboard/types/dashboard';
+import { StatItem } from '@/types/admin/dashboard/dashboard';
 
 interface DetailedStatsGridProps {
     stats: StatItem[];

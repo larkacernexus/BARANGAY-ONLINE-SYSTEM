@@ -1,11 +1,17 @@
-// components/admin/clearance-types/ClearanceTypesContent.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { FileText, Grid3X3, Rows, User } from 'lucide-react';
+import { FileText, ArrowUpDown } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 
 // Import reusable components
@@ -19,38 +25,18 @@ import ClearanceTypesGridView from './ClearanceTypesGridView';
 import ClearanceTypesBulkActions from './ClearanceTypesBulkActions';
 
 // Import types
-import { ClearanceType, BulkOperation, BulkEditField, SelectionMode } from '@/types/clearance-types';
-
-interface FilterState {
-    search: string;
-    status: string;
-    requires_payment: string;
-    sort: string;
-    direction: string;
-}
-
-interface SelectionStats {
-    active: number;
-    inactive: number;
-    paid: number;
-    free: number;
-    needsApproval: number;
-    onlineOnly: number;
-    totalValue: number;
-    avgProcessingDays: number;
-}
+import { 
+    ClearanceType, 
+    BulkOperation, 
+    SelectionMode, 
+    FilterState, 
+    SelectionStats,
+    getPurposeOptionsCount,
+    PaginatedClearanceTypesResponse
+} from '@/types/admin/clearance-types/clearance-types';
 
 interface ClearanceTypesContentProps {
-    clearanceTypes: {
-        data: ClearanceType[];
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
-        from: number;
-        to: number;
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-    };
+    clearanceTypes: PaginatedClearanceTypesResponse;
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -63,7 +49,7 @@ interface ClearanceTypesContentProps {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
-    onPageChange: (pageUrl: string) => void;
+    onPageChange: (page: number) => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
@@ -71,24 +57,26 @@ interface ClearanceTypesContentProps {
     onClearFilters: () => void;
     onClearSelection: () => void;
     onDelete: (type: ClearanceType) => void;
-    onToggleStatus?: (type: ClearanceType) => void;
-    onDuplicate?: (type: ClearanceType) => void;
+    onToggleStatus: (type: ClearanceType) => void;
+    onToggleDiscountable?: (type: ClearanceType) => void;
+    onDuplicate: (type: ClearanceType) => void;
     onViewPhoto: (type: ClearanceType) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onCopySelectedData: () => void;
     onSort: (column: string) => void;
     onBulkOperation: (operation: BulkOperation) => void;
     onSmartBulkToggle: () => void;
+    onSmartBulkDiscountableToggle?: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkEditDialog?: (show: boolean) => void;
     filtersState: FilterState;
     isPerformingBulkAction: boolean;
     selectionMode: SelectionMode;
-    selectionStats?: SelectionStats;
-    truncateText: (text: string, maxLength?: number) => string;
-    getStatusBadgeVariant: (isActive: boolean) => "default" | "secondary" | "destructive" | "outline";
-    getPurposeOptionsCount: (type: ClearanceType) => number;
-    formatDate: (dateString: string) => string;
+    selectionStats: SelectionStats;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
     getTruncationLength: (type: 'name' | 'description' | 'code') => number;
 }
 
@@ -115,6 +103,7 @@ export default function ClearanceTypesContent({
     onClearSelection,
     onDelete,
     onToggleStatus,
+    onToggleDiscountable,
     onDuplicate,
     onViewPhoto,
     onCopyToClipboard,
@@ -122,16 +111,17 @@ export default function ClearanceTypesContent({
     onSort,
     onBulkOperation,
     onSmartBulkToggle,
+    onSmartBulkDiscountableToggle,
     setShowBulkDeleteDialog,
     setShowBulkEditDialog,
     filtersState,
     isPerformingBulkAction,
     selectionMode,
     selectionStats,
-    truncateText,
-    getStatusBadgeVariant,
-    getPurposeOptionsCount,
-    formatDate,
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc',
     getTruncationLength
 }: ClearanceTypesContentProps) {
     
@@ -160,6 +150,7 @@ export default function ClearanceTypesContent({
                     onBulkOperation={onBulkOperation}
                     onCopySelectedData={onCopySelectedData}
                     onSmartBulkToggle={onSmartBulkToggle}
+                    onSmartBulkDiscountableToggle={onSmartBulkDiscountableToggle}
                     setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                     setShowBulkEditDialog={setShowBulkEditDialog}
                 />
@@ -200,6 +191,41 @@ export default function ClearanceTypesContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="code-asc">Code (A to Z)</SelectItem>
+                                        <SelectItem value="code-desc">Code (Z to A)</SelectItem>
+                                        <SelectItem value="fee-asc">Fee (Low to High)</SelectItem>
+                                        <SelectItem value="fee-desc">Fee (High to Low)</SelectItem>
+                                        <SelectItem value="processing_days-asc">Processing Days (Low to High)</SelectItem>
+                                        <SelectItem value="processing_days-desc">Processing Days (High to Low)</SelectItem>
+                                        <SelectItem value="validity_days-asc">Validity Days (Low to High)</SelectItem>
+                                        <SelectItem value="validity_days-desc">Validity Days (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="requires_payment-asc">Requires Payment (No to Yes)</SelectItem>
+                                        <SelectItem value="requires_payment-desc">Requires Payment (Yes to No)</SelectItem>
+                                        <SelectItem value="is_discountable-asc">Discountable (No to Yes)</SelectItem>
+                                        <SelectItem value="is_discountable-desc">Discountable (Yes to No)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && clearanceTypes.data.length > 0 && (
                             <div className="flex items-center gap-2">
@@ -280,13 +306,12 @@ export default function ClearanceTypesContent({
                                     onClearFilters={onClearFilters}
                                     onDelete={onDelete}
                                     onToggleStatus={onToggleStatus}
+                                    onToggleDiscountable={onToggleDiscountable}
                                     onDuplicate={onDuplicate}
                                     onViewPhoto={onViewPhoto}
                                     onCopyToClipboard={onCopyToClipboard}
                                     onSelectAllOnPage={onSelectAllOnPage}
                                     isSelectAll={isSelectAll}
-                                    truncateText={truncateText}
-                                    getStatusBadgeVariant={getStatusBadgeVariant}
                                     getPurposeOptionsCount={getPurposeOptionsCount}
                                     getTruncationLength={getTruncationLength}
                                 />
@@ -301,11 +326,10 @@ export default function ClearanceTypesContent({
                                     onClearFilters={onClearFilters}
                                     onDelete={onDelete}
                                     onToggleStatus={onToggleStatus}
+                                    onToggleDiscountable={onToggleDiscountable}
                                     onDuplicate={onDuplicate}
                                     onViewPhoto={onViewPhoto}
                                     onCopyToClipboard={onCopyToClipboard}
-                                    truncateText={truncateText}
-                                    getStatusBadgeVariant={getStatusBadgeVariant}
                                     getPurposeOptionsCount={getPurposeOptionsCount}
                                     getTruncationLength={getTruncationLength}
                                 />
@@ -324,10 +348,10 @@ export default function ClearanceTypesContent({
                             )}
 
                             {/* Pagination with dark mode */}
-                            {clearanceTypes.last_page > 1 && (
+                            {totalPages > 1 && (
                                 <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                                        Showing {clearanceTypes.from} to {clearanceTypes.to} of {clearanceTypes.total} results
+                                        Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} results
                                     </div>
                                     <div className="flex gap-2">
                                         <Pagination
@@ -335,10 +359,7 @@ export default function ClearanceTypesContent({
                                             totalPages={totalPages}
                                             totalItems={totalItems}
                                             itemsPerPage={itemsPerPage}
-                                            onPageChange={(page) => {
-                                                const link = clearanceTypes.links.find(l => l.label === page.toString());
-                                                if (link) onPageChange(link.url || '');
-                                            }}
+                                            onPageChange={onPageChange}
                                             showCount={true}
                                         />
                                     </div>

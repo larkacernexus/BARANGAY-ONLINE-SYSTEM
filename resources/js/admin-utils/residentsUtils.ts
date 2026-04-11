@@ -22,7 +22,14 @@ interface FilterState {
 
 // Extended Privilege type with additional properties needed for the UI
 // This matches the structure from your pivot relationship
-interface PrivilegeWithDetails extends Privilege {
+// Using Partial<Privilege> to make base properties optional
+interface PrivilegeWithDetails extends Partial<Privilege> {
+    // Required core properties
+    id: number;
+    code: string;
+    name: string;
+    // Additional UI properties
+    pivot: any;
     id_number?: string;
     expires_at?: string;
     status?: 'active' | 'expiring_soon' | 'expired' | 'pending';
@@ -61,9 +68,70 @@ const isPrivilegeWithDetails = (value: unknown): value is PrivilegeWithDetails =
 
 /**
  * Type guard to check if a value is an array of Privilege
+ * This now properly handles both ResidentPrivilege and PrivilegeWithDetails
  */
 const isPrivilegeArray = (value: unknown): value is PrivilegeWithDetails[] => {
-    return Array.isArray(value) && value.every(isPrivilegeWithDetails);
+    if (!Array.isArray(value)) return false;
+    
+    // Check if each item has the minimum required properties
+    return value.every(item => {
+        if (!item || typeof item !== 'object') return false;
+        const obj = item as Record<string, unknown>;
+        // Allow either name or code to be present (for flexibility)
+        return (typeof obj.id === 'number' || typeof obj.id === 'string') &&
+               (typeof obj.code === 'string' || typeof obj.name === 'string');
+    });
+};
+
+/**
+ * Helper function to get privilege status from dates
+ */
+const getPrivilegeStatusFromDates = (validUntil?: string): 'active' | 'expiring_soon' | 'expired' | 'pending' => {
+    if (!validUntil) return 'active';
+    
+    try {
+        const expiryDate = new Date(validUntil);
+        const now = new Date();
+        const diffDays = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) {
+            return 'expired';
+        } else if (diffDays <= 30) {
+            return 'expiring_soon';
+        }
+        
+        return 'active';
+    } catch {
+        return 'active';
+    }
+};
+
+/**
+ * Type guard to safely convert any privilege to PrivilegeWithDetails
+ */
+const toPrivilegeWithDetails = (privilege: any): PrivilegeWithDetails => {
+    // Get the valid_until date from various possible sources
+    const validUntil = privilege.valid_until || privilege.expires_at || privilege.pivot?.valid_until;
+    
+    // Return the extended object with all required properties
+    return {
+        id: privilege.id || 0,
+        code: privilege.code || '',
+        name: privilege.name || privilege.privilege_name || privilege.title || 'Unknown Privilege',
+        description: privilege.description || '',
+        category: privilege.category || null,
+        valid_until: validUntil,
+        is_active: privilege.is_active !== undefined ? privilege.is_active : true,
+        requires_verification: privilege.requires_verification !== undefined ? privilege.requires_verification : false,
+        created_at: privilege.created_at || null,
+        updated_at: privilege.updated_at || null,
+        pivot: privilege.pivot || null,
+        id_number: privilege.id_number || privilege.pivot?.id_number?.toString(),
+        expires_at: privilege.expires_at || validUntil,
+        granted_at: privilege.granted_at || privilege.pivot?.granted_at,
+        granted_by: privilege.granted_by || privilege.pivot?.granted_by,
+        status: privilege.status || getPrivilegeStatusFromDates(validUntil)
+    };
 };
 
 /**
@@ -409,29 +477,44 @@ export const getTruncationLength = (type: 'name' | 'address' | 'contact' | 'occu
 // ========== PRIVILEGE UTILITIES ==========
 
 /**
+ * Safely convert any privilege array to PrivilegeWithDetails[]
+ */
+const safePrivilegesArray = (privileges: any[] | undefined): PrivilegeWithDetails[] => {
+    if (!privileges || !Array.isArray(privileges)) {
+        return [];
+    }
+    
+    return privileges.map(privilege => toPrivilegeWithDetails(privilege));
+};
+
+/**
  * Get privilege status from pivot data
  */
-const getPrivilegeStatus = (privilege: PrivilegeWithDetails): 'active' | 'expiring_soon' | 'expired' | 'pending' => {
+const getPrivilegeStatus = (privilege: any): 'active' | 'expiring_soon' | 'expired' | 'pending' => {
     // If status is already set in the privilege object
     if (privilege.status) {
         return privilege.status;
     }
     
-    // Check if there's a valid_until date in the pivot
-    const validUntil = privilege.valid_until || privilege.pivot?.valid_until;
+    // Check if there's a valid_until date
+    const validUntil = privilege.valid_until || privilege.pivot?.valid_until || privilege.expires_at;
     
     if (!validUntil) {
         return 'active';
     }
     
-    const expiryDate = new Date(validUntil);
-    const now = new Date();
-    const diffDays = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0) {
-        return 'expired';
-    } else if (diffDays <= 30) {
-        return 'expiring_soon';
+    try {
+        const expiryDate = new Date(validUntil);
+        const now = new Date();
+        const diffDays = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) {
+            return 'expired';
+        } else if (diffDays <= 30) {
+            return 'expiring_soon';
+        }
+    } catch {
+        // Invalid date format
     }
     
     return 'active';
@@ -441,11 +524,7 @@ const getPrivilegeStatus = (privilege: PrivilegeWithDetails): 'active' | 'expiri
  * Get active privileges from resident
  */
 export const getActivePrivileges = (resident: Resident): PrivilegeWithDetails[] => {
-    const privileges = resident.privileges;
-    
-    if (!isPrivilegeArray(privileges)) {
-        return [];
-    }
+    const privileges = safePrivilegesArray(resident.privileges);
     
     return privileges.filter(p => {
         const status = getPrivilegeStatus(p);
@@ -457,19 +536,15 @@ export const getActivePrivileges = (resident: Resident): PrivilegeWithDetails[] 
  * Get all privileges from resident with details
  */
 export const getAllPrivileges = (resident: Resident): PrivilegeWithDetails[] => {
-    const privileges = resident.privileges;
-    
-    if (!isPrivilegeArray(privileges)) {
-        return [];
-    }
+    const privileges = safePrivilegesArray(resident.privileges);
     
     return privileges.map(p => ({
         ...p,
         status: getPrivilegeStatus(p),
-        id_number: (p as any).id_number || p.pivot?.id_number?.toString(),
-        expires_at: (p as any).expires_at || p.valid_until || p.pivot?.valid_until,
-        granted_at: (p as any).granted_at || p.pivot?.granted_at,
-        granted_by: (p as any).granted_by || p.pivot?.granted_by
+        id_number: p.id_number || p.pivot?.id_number?.toString(),
+        expires_at: p.expires_at || p.valid_until || p.pivot?.valid_until,
+        granted_at: p.granted_at || p.pivot?.granted_at,
+        granted_by: p.granted_by || p.pivot?.granted_by
     }));
 };
 
@@ -477,11 +552,7 @@ export const getAllPrivileges = (resident: Resident): PrivilegeWithDetails[] => 
  * Check if resident has a specific privilege by code
  */
 export const hasPrivilege = (resident: Resident, privilegeCode: string): boolean => {
-    const privileges = resident.privileges;
-    
-    if (!isPrivilegeArray(privileges)) {
-        return false;
-    }
+    const privileges = safePrivilegesArray(resident.privileges);
     
     const code = safeString(privilegeCode).toUpperCase();
     
@@ -494,11 +565,7 @@ export const hasPrivilege = (resident: Resident, privilegeCode: string): boolean
  * Check if resident has active specific privilege
  */
 export const hasActivePrivilege = (resident: Resident, privilegeCode: string): boolean => {
-    const privileges = resident.privileges;
-    
-    if (!isPrivilegeArray(privileges)) {
-        return false;
-    }
+    const privileges = safePrivilegesArray(resident.privileges);
     
     const code = safeString(privilegeCode).toUpperCase();
     
@@ -520,11 +587,7 @@ export const hasPrivilegeByCode = (resident: Resident, privilegeCode: string): b
  * Get privilege count by status
  */
 export const getPrivilegeCountByStatus = (resident: Resident, status: string): number => {
-    const privileges = resident.privileges;
-    
-    if (!isPrivilegeArray(privileges)) {
-        return 0;
-    }
+    const privileges = safePrivilegesArray(resident.privileges);
     
     const statusLower = safeString(status).toLowerCase();
     
@@ -582,8 +645,8 @@ export const getPrivilegeColor = (code: unknown): string => {
  */
 export const formatPrivilegeDisplay = (privilege: PrivilegeWithDetails): string => {
     const name = safeString(privilege.name || privilege.code);
-    const idNumber = safeString((privilege as any).id_number);
-    const expiresAt = (privilege as any).expires_at || privilege.valid_until;
+    const idNumber = safeString(privilege.id_number);
+    const expiresAt = privilege.expires_at || privilege.valid_until;
     
     let display = name || 'Unknown';
     
@@ -711,12 +774,12 @@ export const filterResidents = (
                 }
             }
             
-            // Search in privileges
-            const privilegeMatches = isPrivilegeArray(resident.privileges) &&
-                resident.privileges.some((p: PrivilegeWithDetails) => 
-                    safeString(p.name).toLowerCase().includes(searchLower) ||
+            // Search in privileges - SAFELY handle any privilege type
+            const privilegeMatches = Array.isArray(resident.privileges) &&
+                resident.privileges.some((p: any) => 
+                    safeString(p.name || p.privilege_name).toLowerCase().includes(searchLower) ||
                     safeString(p.code).toLowerCase().includes(searchLower) ||
-                    safeString((p as any).id_number).toLowerCase().includes(searchLower)
+                    safeString(p.id_number).toLowerCase().includes(searchLower)
                 );
             
             return fullName.includes(searchLower) ||
@@ -778,8 +841,8 @@ export const filterResidents = (
     if (filters.privilege_id && filters.privilege_id !== 'all') {
         const privilegeId = safeNumber(filters.privilege_id);
         result = result.filter(resident => 
-            isPrivilegeArray(resident.privileges) &&
-            resident.privileges.some((p: PrivilegeWithDetails) => p.id === privilegeId)
+            Array.isArray(resident.privileges) &&
+            resident.privileges.some((p: any) => p.id === privilegeId)
         );
     }
 
@@ -835,8 +898,8 @@ export const filterResidents = (
                 bValue = safeString(bHousehold?.name).toLowerCase();
                 break;
             case 'privileges_count':
-                aValue = isPrivilegeArray(a.privileges) ? a.privileges.length : 0;
-                bValue = isPrivilegeArray(b.privileges) ? b.privileges.length : 0;
+                aValue = Array.isArray(a.privileges) ? a.privileges.length : 0;
+                bValue = Array.isArray(b.privileges) ? b.privileges.length : 0;
                 break;
             default:
                 aValue = safeString(a.last_name).toLowerCase();
@@ -893,11 +956,11 @@ export const getSelectionStats = (selectedResidents: Resident[]): SelectionStats
         ? selectedResidents.reduce((sum, r) => sum + (r.age || 0), 0) / selectedResidents.length
         : 0;
     
-    // Calculate privilege counts
+    // Calculate privilege counts - SAFELY handle any privilege type
     const privilegeCounts: Record<string, number> = {};
     selectedResidents.forEach(resident => {
-        if (isPrivilegeArray(resident.privileges)) {
-            resident.privileges.forEach((p: PrivilegeWithDetails) => {
+        if (Array.isArray(resident.privileges)) {
+            resident.privileges.forEach((p: any) => {
                 const code = safeString(p.code);
                 if (code) {
                     privilegeCounts[code] = (privilegeCounts[code] || 0) + 1;
@@ -907,17 +970,18 @@ export const getSelectionStats = (selectedResidents: Resident[]): SelectionStats
     });
     
     return {
-    total: selectedResidents.length,
-    male: selectedResidents.filter(r => r.gender === 'male').length,
-    female: selectedResidents.filter(r => r.gender === 'female').length,
-    other: selectedResidents.filter(r => r.gender === 'other').length,
-    voters: selectedResidents.filter(r => r.is_voter === true).length,
-    heads: selectedResidents.filter(r => isHeadOfHousehold(r)).length,
-    active: selectedResidents.filter(r => r.status === 'active').length,
-    hasPhotos: selectedResidents.filter(r => (r as any).photo_path).length,
-    averageAge: Math.round(avgAge * 10) / 10,
-    inactive: selectedResidents.filter(r => r.status === 'inactive').length,
-    privilegeCounts};
+        total: selectedResidents.length,
+        male: selectedResidents.filter(r => r.gender === 'male').length,
+        female: selectedResidents.filter(r => r.gender === 'female').length,
+        other: selectedResidents.filter(r => r.gender === 'other').length,
+        voters: selectedResidents.filter(r => r.is_voter === true).length,
+        heads: selectedResidents.filter(r => isHeadOfHousehold(r)).length,
+        active: selectedResidents.filter(r => r.status === 'active').length,
+        hasPhotos: selectedResidents.filter(r => (r as any).photo_path).length,
+        averageAge: Math.round(avgAge * 10) / 10,
+        inactive: selectedResidents.filter(r => r.status === 'inactive').length,
+        privilegeCounts
+    };
 };
 
 // ========== FORMATTING ==========
@@ -972,12 +1036,12 @@ export const formatForClipboard = (residents: Resident[]): string => {
     const rows = residents.map(resident => {
         // Format privileges as pipe-separated codes with status
         let privilegesFormatted = '';
-        if (isPrivilegeArray(resident.privileges)) {
+        if (Array.isArray(resident.privileges)) {
             privilegesFormatted = resident.privileges
-                .map((p: PrivilegeWithDetails) => {
+                .map((p: any) => {
                     let priv = safeString(p.code);
                     const status = getPrivilegeStatus(p);
-                    const idNumber = safeString((p as any).id_number);
+                    const idNumber = safeString(p.id_number);
                     
                     if (status && status !== 'active') {
                         priv += `(${status})`;

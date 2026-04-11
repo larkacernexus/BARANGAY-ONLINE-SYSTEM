@@ -23,7 +23,7 @@ class HouseholdShowController extends BaseHouseholdController
     {
         Log::info('Viewing household details', ['household_id' => $household->id]);
         
-        // Load household with relationships including resident privileges
+        // Load household with relationships including resident privileges and discount types
         $household->load([
             'householdMembers.resident.purok',
             'householdMembers.resident.residentPrivileges.privilege.discountType',
@@ -31,7 +31,9 @@ class HouseholdShowController extends BaseHouseholdController
         ]);
         
         $activePrivileges = cache()->remember('active_privileges', 3600, 
-            fn() => Privilege::where('is_active', true)->get()
+            fn() => Privilege::with('discountType')
+                ->where('is_active', true)
+                ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
         );
         
         $headMember = $household->householdMembers->firstWhere('is_head', true);
@@ -544,13 +546,24 @@ class HouseholdShowController extends BaseHouseholdController
             })
             ->with(['householdMemberships' => function($q) {
                 $q->with('household')->where('is_head', false);
-            }])
+            }, 'residentPrivileges.privilege.discountType'])
             ->select(['id', 'first_name', 'last_name', 'middle_name', 'age', 'address', 'photo_path'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get()
             ->map(function($resident) {
                 $membership = $resident->householdMemberships->first();
+                
+                // Get active privileges for display
+                $activePrivileges = $resident->residentPrivileges
+                    ->filter(fn($rp) => $rp->isActive())
+                    ->map(fn($rp) => [
+                        'code' => $rp->privilege->code,
+                        'name' => $rp->privilege->name,
+                        'discount_percentage' => $rp->discount_percentage ?? $rp->privilege->discountType?->percentage ?? 0,
+                    ])
+                    ->values()
+                    ->toArray();
                 
                 $householdStatus = 'none';
                 $statusLabel = 'Not in any household';
@@ -586,6 +599,8 @@ class HouseholdShowController extends BaseHouseholdController
                     'can_be_added' => $canBeAdded,
                     'restriction_reason' => $restrictionReason,
                     'current_household' => $currentHousehold,
+                    'privileges' => $activePrivileges,
+                    'has_privileges' => count($activePrivileges) > 0,
                 ];
             })
             ->values()
@@ -621,7 +636,6 @@ class HouseholdShowController extends BaseHouseholdController
                 'resident_id' => $userAccount->resident_id,
                 'resident_name' => $userAccount->first_name . ' ' . $userAccount->last_name,
             ] : null,
-            // GOOGLE MAPS FIELDS
             'google_maps_url' => $household->google_maps_url,
             'latitude' => $household->latitude,
             'longitude' => $household->longitude,
@@ -665,13 +679,22 @@ class HouseholdShowController extends BaseHouseholdController
         ];
     }
 
+    /**
+     * Transform privilege data - FIXED: Uses discountType relationship for percentage
+     */
     private function transformPrivilegeData($residentPrivilege): array
     {
         $privilege = $residentPrivilege->privilege;
+        $discountType = $privilege?->discountType;
         $now = Carbon::now();
         $expiresAt = $residentPrivilege->expires_at ? Carbon::parse($residentPrivilege->expires_at) : null;
         
         $status = $this->determinePrivilegeStatus($residentPrivilege, $now, $expiresAt);
+        
+        // Get discount percentage from pivot, privilege's discount type, or default 0
+        $discountPercentage = $residentPrivilege->discount_percentage 
+            ?? ($discountType ? $discountType->percentage : 0)
+            ?? 0;
         
         return [
             'id' => $residentPrivilege->id,
@@ -683,20 +706,21 @@ class HouseholdShowController extends BaseHouseholdController
             'expires_at' => $residentPrivilege->expires_at?->toISOString(),
             'remarks' => $residentPrivilege->remarks,
             'status' => $status,
-            'discount_percentage' => $residentPrivilege->discount_percentage ?? $privilege->default_discount_percentage,
+            'discount_percentage' => (float) $discountPercentage,
             'privilege_id' => $privilege->id,
             'privilege_name' => $privilege->name,
             'privilege_code' => $privilege->code,
             'privilege_description' => $privilege->description,
-            'requires_id_number' => (bool) $privilege->requires_id_number,
-            'requires_verification' => (bool) $privilege->requires_verification,
-            'validity_years' => $privilege->validity_years,
+            'requires_id_number' => (bool) ($discountType?->requires_id_number ?? false),
+            'requires_verification' => (bool) ($discountType?->requires_verification ?? false),
+            'validity_days' => $discountType?->validity_days ?? 0,
             'created_at' => $residentPrivilege->created_at?->toISOString(),
             'updated_at' => $residentPrivilege->updated_at?->toISOString(),
-            'discount_type' => $privilege->discountType ? [
-                'id' => $privilege->discountType->id,
-                'name' => $privilege->discountType->name,
-                'code' => $privilege->discountType->code,
+            'discount_type' => $discountType ? [
+                'id' => $discountType->id,
+                'name' => $discountType->name,
+                'code' => $discountType->code,
+                'percentage' => (float) $discountType->percentage,
             ] : null,
         ];
     }
@@ -760,35 +784,47 @@ class HouseholdShowController extends BaseHouseholdController
     }
 
     protected function getResidentBaseData(Resident $resident): array
-{
-    return [
-        'id' => $resident->id,
-        'first_name' => $resident->first_name,
-        'last_name' => $resident->last_name,
-        'middle_name' => $resident->middle_name,
-        'suffix' => $resident->suffix,
-        'full_name' => $resident->full_name,
-        'age' => $resident->age,
-        'gender' => $resident->gender,
-        'civil_status' => $resident->civil_status,
-        'contact_number' => $resident->contact_number,
-        'email' => $resident->email,
-        'occupation' => $resident->occupation,
-        'education' => $resident->education,
-        'religion' => $resident->religion,
-        'is_voter' => (bool) $resident->is_voter,
-        'place_of_birth' => $resident->place_of_birth,
-        'purok' => $resident->purok?->name,
-        'purok_id' => $resident->purok_id,
-        'address' => $resident->address,
-        'photo_path' => $resident->photo_path,
-        'photo_url' => $resident->photo_path ? Storage::url($resident->photo_path) : null,
-        'has_photo' => !empty($resident->photo_path),
-        'is_head_of_household' => $resident->isHeadOfHousehold(),
-        // 'relationship_to_head' => $resident->relationshipToHead(), // REMOVE THIS LINE
-        'has_user_account' => false,
-        'created_at' => $resident->created_at?->toISOString(),
-        'updated_at' => $resident->updated_at?->toISOString(),
-    ];
-}
+    {
+        // Get active privileges for the resident
+        $activePrivileges = $resident->residentPrivileges
+            ->filter(fn($rp) => $rp->isActive())
+            ->map(fn($rp) => [
+                'code' => $rp->privilege->code,
+                'name' => $rp->privilege->name,
+                'discount_percentage' => $rp->discount_percentage ?? $rp->privilege->discountType?->percentage ?? 0,
+            ])
+            ->values()
+            ->toArray();
+        
+        return [
+            'id' => $resident->id,
+            'first_name' => $resident->first_name,
+            'last_name' => $resident->last_name,
+            'middle_name' => $resident->middle_name,
+            'suffix' => $resident->suffix,
+            'full_name' => $resident->full_name,
+            'age' => $resident->age,
+            'gender' => $resident->gender,
+            'civil_status' => $resident->civil_status,
+            'contact_number' => $resident->contact_number,
+            'email' => $resident->email,
+            'occupation' => $resident->occupation,
+            'education' => $resident->education,
+            'religion' => $resident->religion,
+            'is_voter' => (bool) $resident->is_voter,
+            'place_of_birth' => $resident->place_of_birth,
+            'purok' => $resident->purok?->name,
+            'purok_id' => $resident->purok_id,
+            'address' => $resident->address,
+            'photo_path' => $resident->photo_path,
+            'photo_url' => $resident->photo_path ? Storage::url($resident->photo_path) : null,
+            'has_photo' => !empty($resident->photo_path),
+            'is_head_of_household' => $resident->isHeadOfHousehold(),
+            'has_user_account' => false,
+            'created_at' => $resident->created_at?->toISOString(),
+            'updated_at' => $resident->updated_at?->toISOString(),
+            'privileges' => $activePrivileges,
+            'has_privileges' => count($activePrivileges) > 0,
+        ];
+    }
 }

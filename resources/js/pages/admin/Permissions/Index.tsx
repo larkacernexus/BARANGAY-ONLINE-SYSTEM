@@ -1,4 +1,3 @@
-// resources/js/pages/admin/permissions/index.tsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
@@ -29,11 +28,20 @@ import {
     BarChart3,
     Layers,
     MessageCircle,
-    X
+    X,
+    ArrowUpDown,
+    ChevronDown,
+    ChevronUp,
+    Filter,
+    FilterX,
+    Calendar,
+    Activity,
+    Hash
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
     Table,
@@ -85,6 +93,8 @@ const TRUNCATION_LENGTHS = {
 } as const;
 
 type DeviceType = 'mobile' | 'tablet' | 'smallDesktop' | 'largeDesktop';
+type StatusFilterType = 'all' | 'active' | 'inactive';
+type RolesCountFilterType = 'all' | '0' | '1-5' | '6-10' | '10+';
 
 const developerDetails: DeveloperContactDetails = {
     name: "System Security Team",
@@ -105,17 +115,25 @@ export default function PermissionsIndex({
     filters: initialFilters, 
     stats: propsStats 
 }: PermissionsIndexProps) {
-    // State management with proper types
-    const [filters, setFilters] = useState<FilterParams>({
-        search: initialFilters.search || '',
-        module: initialFilters.module || 'all',
-        status: initialFilters.status || PermissionStatus.ALL,
-    });
+    // State management - only for UI, no URL updates
+    const [search, setSearch] = useState<string>(initialFilters.search || '');
+    const [moduleFilter, setModuleFilter] = useState<string>(initialFilters.module || 'all');
+    const [statusFilter, setStatusFilter] = useState<StatusFilterType>(
+        initialFilters.status === 'active' ? 'active' : 
+        initialFilters.status === 'inactive' ? 'inactive' : 'all'
+    );
+    const [rolesCountFilter, setRolesCountFilter] = useState<RolesCountFilterType>('all');
+    const [dateRange, setDateRange] = useState<string>('');
     
-    const [localSearch, setLocalSearch] = useState(initialFilters.search || '');
-    const [isSearching, setIsSearching] = useState(false);
+    // ✅ Separate sort states for table header
+    const [sortBy, setSortBy] = useState<string>('name');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const itemsPerPage = 10;
+    
     const [showDeveloperModal, setShowDeveloperModal] = useState(false);
-    const [currentPage, setCurrentPage] = useState(permissions.meta?.current_page || 1);
     const [windowWidth, setWindowWidth] = useState<number>(
         typeof window !== 'undefined' ? window.innerWidth : 1024
     );
@@ -138,13 +156,133 @@ export default function PermissionsIndex({
         };
     }, [windowWidth]);
 
+    // Get all permissions data
+    const allPermissions = permissions.data || [];
+
+    // ✅ Helper function to check roles count range
+    const checkRolesCountRange = (count: number, range: string): boolean => {
+        switch (range) {
+            case '0': return count === 0;
+            case '1-5': return count >= 1 && count <= 5;
+            case '6-10': return count >= 6 && count <= 10;
+            case '10+': return count >= 10;
+            default: return true;
+        }
+    };
+
+    // ✅ Helper function to check date range
+    const checkDateRange = (dateString: string, range: string): boolean => {
+        if (!dateString) return false;
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+        
+        switch (range) {
+            case 'last_7_days': return diffDays <= 7;
+            case 'last_30_days': return diffDays <= 30;
+            case 'last_90_days': return diffDays <= 90;
+            case 'last_year': return diffDays <= 365;
+            default: return true;
+        }
+    };
+
+    // Filter and sort permissions (client-side) - removed sort dropdown logic
+    const filteredAndSortedPermissions = useMemo(() => {
+        let filtered = [...allPermissions];
+        
+        // Apply search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(permission =>
+                permission.name.toLowerCase().includes(searchLower) ||
+                permission.display_name.toLowerCase().includes(searchLower) ||
+                (permission.description?.toLowerCase() || '').includes(searchLower)
+            );
+        }
+        
+        // Apply module filter
+        if (moduleFilter !== 'all') {
+            filtered = filtered.filter(permission => permission.module === moduleFilter);
+        }
+        
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(permission => {
+                if (statusFilter === 'active') return permission.is_active;
+                if (statusFilter === 'inactive') return !permission.is_active;
+                return true;
+            });
+        }
+        
+        // ✅ Apply roles count filter
+        if (rolesCountFilter !== 'all') {
+            filtered = filtered.filter(permission => 
+                checkRolesCountRange(permission.roles_count || 0, rolesCountFilter)
+            );
+        }
+        
+        // ✅ Apply date range filter
+        if (dateRange) {
+            filtered = filtered.filter(permission => 
+                checkDateRange(permission.created_at, dateRange)
+            );
+        }
+        
+        // ✅ Apply sorting (for table header)
+        filtered.sort((a, b) => {
+            let valueA: any;
+            let valueB: any;
+            
+            switch (sortBy) {
+                case 'name':
+                    valueA = a.name;
+                    valueB = b.name;
+                    break;
+                case 'display_name':
+                    valueA = a.display_name;
+                    valueB = b.display_name;
+                    break;
+                case 'module':
+                    valueA = a.module || '';
+                    valueB = b.module || '';
+                    break;
+                case 'status':
+                    valueA = a.is_active ? 1 : 0;
+                    valueB = b.is_active ? 1 : 0;
+                    break;
+                case 'roles_count':
+                    valueA = a.roles_count || 0;
+                    valueB = b.roles_count || 0;
+                    break;
+                case 'created_at':
+                    valueA = new Date(a.created_at).getTime();
+                    valueB = new Date(b.created_at).getTime();
+                    break;
+                default:
+                    valueA = a.name;
+                    valueB = b.name;
+            }
+            
+            if (typeof valueA === 'string') {
+                valueA = valueA.toLowerCase();
+                valueB = valueB.toLowerCase();
+            }
+            
+            if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+            if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        return filtered;
+    }, [allPermissions, search, moduleFilter, statusFilter, rolesCountFilter, dateRange, sortBy, sortOrder]);
+
     // Calculate global stats
     const globalStats = useMemo((): PermissionStats => {
-        const totalPermissions = permissions.meta?.total || 0;
-        const activePermissions = permissions.data.filter(p => p.is_active).length;
-        const inactivePermissions = permissions.data.filter(p => !p.is_active).length;
-        const totalModules = Array.isArray(modules) ? modules.length : 0;
-        const totalRolesAssigned = permissions.data.reduce((sum, p) => sum + (p.roles_count || 0), 0);
+        const totalPermissions = allPermissions.length;
+        const activePermissions = allPermissions.filter(p => p.is_active).length;
+        const inactivePermissions = allPermissions.filter(p => !p.is_active).length;
+        const totalModules = Array.from(new Set(allPermissions.map(p => p.module))).length;
+        const totalRolesAssigned = allPermissions.reduce((sum, p) => sum + (p.roles_count || 0), 0);
         
         return {
             total: propsStats?.total ?? totalPermissions,
@@ -153,59 +291,55 @@ export default function PermissionsIndex({
             modules: propsStats?.modules ?? totalModules,
             rolesAssigned: propsStats?.rolesAssigned ?? totalRolesAssigned,
         };
-    }, [propsStats, permissions, modules]);
+    }, [allPermissions, propsStats]);
 
     // Calculate filtered stats
     const filteredStats = useMemo((): PermissionStats => {
-        const filteredData = permissions.data.filter(permission => {
-            // Apply search filter
-            if (filters.search && !permission.name.toLowerCase().includes(filters.search.toLowerCase()) && 
-                !permission.display_name.toLowerCase().includes(filters.search.toLowerCase()) &&
-                !permission.description?.toLowerCase().includes(filters.search.toLowerCase())) {
-                return false;
-            }
-            
-            // Apply module filter
-            if (filters.module !== 'all' && permission.module !== filters.module) {
-                return false;
-            }
-            
-            // Apply status filter
-            if (filters.status !== PermissionStatus.ALL) {
-                const isActive = permission.is_active;
-                if (filters.status === PermissionStatus.ACTIVE && !isActive) return false;
-                if (filters.status === PermissionStatus.INACTIVE && isActive) return false;
-            }
-            
-            return true;
-        });
-
-        const uniqueModules = new Set(filteredData.map(p => p.module)).size;
-
+        const uniqueModules = new Set(filteredAndSortedPermissions.map(p => p.module)).size;
+        
         return {
-            total: filteredData.length,
-            active: filteredData.filter(p => p.is_active).length,
-            inactive: filteredData.filter(p => !p.is_active).length,
+            total: filteredAndSortedPermissions.length,
+            active: filteredAndSortedPermissions.filter(p => p.is_active).length,
+            inactive: filteredAndSortedPermissions.filter(p => !p.is_active).length,
             modules: uniqueModules,
-            rolesAssigned: filteredData.reduce((sum, p) => sum + (p.roles_count || 0), 0),
+            rolesAssigned: filteredAndSortedPermissions.reduce((sum, p) => sum + (p.roles_count || 0), 0),
         };
-    }, [permissions.data, filters]);
+    }, [filteredAndSortedPermissions]);
 
-    // Get available modules from permissions or provided modules
+    // Get available modules from permissions
     const availableModules = useMemo((): string[] => {
-        if (modules && modules.length > 0) {
-            // Handle both string arrays and object arrays
-            if (typeof modules[0] === 'string') {
-                return modules as string[];
-            } else if (typeof modules[0] === 'object' && modules[0] !== null) {
-                // Extract module names from objects
-                const moduleObjects = modules as ModuleInfo[];
-                return moduleObjects.map(m => m.name).filter(Boolean);
-            }
-        }
-        // Fallback: get modules from permissions data
-        return Array.from(new Set(permissions.data.map(p => p.module))).filter(Boolean);
-    }, [modules, permissions.data]);
+        return Array.from(new Set(allPermissions.map(p => p.module))).filter(Boolean);
+    }, [allPermissions]);
+
+    // Roles count filter options
+    const rolesCountOptions = [
+        { value: 'all', label: 'All Permissions' },
+        { value: '0', label: 'No Roles Assigned (0)' },
+        { value: '1-5', label: 'Low Usage (1-5 roles)' },
+        { value: '6-10', label: 'Moderate Usage (6-10 roles)' },
+        { value: '10+', label: 'High Usage (10+ roles)' }
+    ];
+
+    // Date range options
+    const dateRangeOptions = [
+        { value: '', label: 'All Time' },
+        { value: 'last_7_days', label: 'Last 7 Days' },
+        { value: 'last_30_days', label: 'Last 30 Days' },
+        { value: 'last_90_days', label: 'Last 90 Days' },
+        { value: 'last_year', label: 'Last Year' }
+    ];
+
+    // Pagination
+    const totalItems = filteredAndSortedPermissions.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedPermissions = filteredAndSortedPermissions.slice(startIndex, endIndex);
+
+    // Reset to first page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, moduleFilter, statusFilter, rolesCountFilter, dateRange]);
 
     // Track window resize
     useEffect(() => {
@@ -219,6 +353,13 @@ export default function PermissionsIndex({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // ✅ Handle sort from table header
+    const handleSort = (column: string): void => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    };
+
     // Format date utility
     const formatDate = (dateString: string): string => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -228,83 +369,31 @@ export default function PermissionsIndex({
         });
     };
 
-    // Helper function to convert FilterParams to router-compatible object
-    const prepareFiltersForRouter = (filtersToPrepare: FilterParams): Record<string, string | number> => {
-        const prepared: Record<string, string | number> = {};
-        
-        // Only add non-undefined values
-        if (filtersToPrepare.search && filtersToPrepare.search !== '') {
-            prepared.search = filtersToPrepare.search;
-        }
-        if (filtersToPrepare.module && filtersToPrepare.module !== 'all') {
-            prepared.module = filtersToPrepare.module;
-        }
-        if (filtersToPrepare.status && filtersToPrepare.status !== PermissionStatus.ALL) {
-            prepared.status = filtersToPrepare.status;
-        }
-        if (filtersToPrepare.page && filtersToPrepare.page > 1) {
-            prepared.page = filtersToPrepare.page;
-        }
-        if (filtersToPrepare.per_page) {
-            prepared.per_page = filtersToPrepare.per_page;
-        }
-        if (filtersToPrepare.sort_by) {
-            prepared.sort_by = filtersToPrepare.sort_by;
-        }
-        if (filtersToPrepare.sort_order) {
-            prepared.sort_order = filtersToPrepare.sort_order;
-        }
-        
-        return prepared;
+    // Get sort icon for table header
+    const getSortIcon = (column: string) => {
+        if (sortBy !== column) return null;
+        return sortOrder === 'asc' 
+            ? <ChevronUp className="h-4 w-4 ml-1" /> 
+            : <ChevronDown className="h-4 w-4 ml-1" />;
     };
 
-    // Event handlers with proper types
-    const handleApplyFilters = (): void => {
-        setIsSearching(true);
-        router.get(route('admin.permissions.index'), prepareFiltersForRouter(filters), {
-            preserveState: true,
-            replace: true,
-            onFinish: () => setIsSearching(false),
-        });
-    };
-
-    const handleSearch = (): void => {
-        setIsSearching(true);
-        router.get(route('admin.permissions.index'), prepareFiltersForRouter(filters), {
-            preserveState: true,
-            replace: true,
-            onFinish: () => setIsSearching(false),
-        });
-    };
-
+    // Event handlers
     const handleClearSearch = (): void => {
-        const updatedFilters = { ...filters, search: '' };
-        setFilters(updatedFilters);
-        setLocalSearch('');
-        router.get(route('admin.permissions.index'), prepareFiltersForRouter(updatedFilters), {
-            preserveState: true,
-            replace: true,
-        });
-    };
-
-    const handleFilterChange = (key: keyof FilterParams, value: string): void => {
-        setFilters(prev => ({ ...prev, [key]: value }));
+        setSearch('');
+        if (searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
     };
 
     const resetFilters = (): void => {
-        const newFilters: FilterParams = {
-            search: '',
-            module: 'all',
-            status: PermissionStatus.ALL,
-        };
-        setFilters(newFilters);
-        setLocalSearch('');
-        setIsSearching(true);
-        router.get(route('admin.permissions.index'), prepareFiltersForRouter(newFilters), {
-            preserveState: true,
-            replace: true,
-            onFinish: () => setIsSearching(false),
-        });
+        setSearch('');
+        setModuleFilter('all');
+        setStatusFilter('all');
+        setRolesCountFilter('all');
+        setDateRange('');
+        setSortBy('name');
+        setSortOrder('asc');
+        setCurrentPage(1);
     };
 
     const togglePermissionStatus = (permission: Permission): void => {
@@ -334,16 +423,33 @@ export default function PermissionsIndex({
     };
 
     const handleExport = (): void => {
-        const exportUrl = new URL(route('admin.permissions.export'), window.location.origin);
-        if (filters.search) exportUrl.searchParams.append('search', filters.search);
-        if (filters.module && filters.module !== 'all') exportUrl.searchParams.append('module', filters.module);
-        if (filters.status && filters.status !== PermissionStatus.ALL) exportUrl.searchParams.append('status', filters.status);
-        window.open(exportUrl.toString(), '_blank');
+        const exportData = filteredAndSortedPermissions.map(permission => ({
+            'Name': permission.name,
+            'Display Name': permission.display_name,
+            'Module': permission.module,
+            'Description': permission.description || '',
+            'Status': permission.is_active ? 'Active' : 'Inactive',
+            'Roles Count': permission.roles_count || 0,
+            'Created At': formatDate(permission.created_at),
+        }));
+        
+        const csv = [
+            Object.keys(exportData[0]).join(','),
+            ...exportData.map(row => Object.values(row).map(v => `"${v}"`).join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `permissions-export-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
     };
 
     const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>): void => {
         if (e.key === 'Enter') {
-            handleSearch();
+            // Just trigger search (already handled by useMemo)
         }
     };
 
@@ -351,28 +457,11 @@ export default function PermissionsIndex({
         setShowDeveloperModal(true);
     };
 
-    const handlePageChange = (page: number): void => {
-        setIsSearching(true);
-        router.get(route('admin.permissions.index'), prepareFiltersForRouter({ ...filters, page }), {
-            preserveState: true,
-            replace: true,
-            onFinish: () => setIsSearching(false),
-        });
-    };
-
     // Computed values for UI
     const hasActiveFilters = Boolean(
-        filters.search || (filters.module && filters.module !== 'all') || 
-        (filters.status && filters.status !== PermissionStatus.ALL)
+        search || moduleFilter !== 'all' || statusFilter !== 'all' || rolesCountFilter !== 'all' || dateRange
     );
     
-    const totalItems = permissions.meta?.total || 0;
-    const totalPages = permissions.meta?.last_page || 1;
-    const currentPageNum = permissions.meta?.current_page || 1;
-    const perPage = permissions.meta?.per_page || 10;
-    const startIndex = (currentPageNum - 1) * perPage + 1;
-    const endIndex = Math.min(currentPageNum * perPage, totalItems);
-
     // Generate pagination items
     const paginationItems = useMemo(() => {
         const items: number[] = [];
@@ -380,16 +469,16 @@ export default function PermissionsIndex({
         
         if (totalPages <= maxVisible) {
             for (let i = 1; i <= totalPages; i++) items.push(i);
-        } else if (currentPageNum <= 3) {
+        } else if (currentPage <= 3) {
             for (let i = 1; i <= 5; i++) items.push(i);
-        } else if (currentPageNum >= totalPages - 2) {
+        } else if (currentPage >= totalPages - 2) {
             for (let i = totalPages - 4; i <= totalPages; i++) items.push(i);
         } else {
-            for (let i = currentPageNum - 2; i <= currentPageNum + 2; i++) items.push(i);
+            for (let i = currentPage - 2; i <= currentPage + 2; i++) items.push(i);
         }
         
         return items;
-    }, [totalPages, currentPageNum]);
+    }, [totalPages, currentPage]);
 
     return (
         <AdminLayout
@@ -452,41 +541,94 @@ export default function PermissionsIndex({
                 <PermissionsStats 
                     globalStats={globalStats}
                     filteredStats={filteredStats}
-                    isLoading={isSearching}
+                    isLoading={false}
                 />
 
-                {/* Search and Filters */}
-                <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-                    <CardContent className="p-4 sm:p-6">
+                {/* Search and Filters - Redesigned without sort dropdown */}
+                <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                    <CardContent className="pt-6">
                         <div className="flex flex-col space-y-4">
+                            {/* Search Bar */}
                             <div className="flex flex-col md:flex-row gap-4">
                                 <div className="flex-1 relative">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
-                                    <Input 
+                                    <Input
                                         ref={searchInputRef}
-                                        placeholder="Search permissions by name or description... (Ctrl+F)" 
-                                        className="pl-10 pr-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200 dark:placeholder:text-gray-500"
-                                        value={filters.search || ''}
-                                        onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                                        placeholder="Search permissions by name or description... (Ctrl+F)"
+                                        className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
                                         onKeyPress={handleKeyPress}
-                                        disabled={isSearching}
                                     />
-                                    {filters.search && (
-                                        <button
+                                    {search && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                                             onClick={handleClearSearch}
-                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                            aria-label="Clear search"
                                         >
-                                            <X className="h-4 w-4" />
-                                        </button>
+                                            <X className="h-3 w-3" />
+                                        </Button>
                                     )}
                                 </div>
                                 <div className="flex gap-2">
-                                    <select 
-                                        className="border rounded px-3 py-2 text-sm w-32 bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200"
-                                        value={filters.module || 'all'}
-                                        onChange={(e) => handleFilterChange('module', e.target.value)}
-                                        disabled={isSearching}
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    >
+                                        <Filter className="h-4 w-4 mr-2" />
+                                        <span className="hidden sm:inline">
+                                            {showAdvancedFilters ? 'Hide Filters' : 'More Filters'}
+                                        </span>
+                                        <span className="sm:hidden">
+                                            {showAdvancedFilters ? 'Hide' : 'Filters'}
+                                        </span>
+                                    </Button>
+                                    <Button 
+                                        variant="outline"
+                                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        onClick={handleExport}
+                                    >
+                                        <Download className="h-4 w-4 mr-2" />
+                                        <span className="hidden sm:inline">Export</span>
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Active Filters Info and Clear Button */}
+                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} permissions
+                                    {search && ` matching "${search}"`}
+                                </div>
+                                
+                                <div className="flex items-center gap-3">
+                                    {hasActiveFilters && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={resetFilters}
+                                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                        >
+                                            <FilterX className="h-3.5 w-3.5 mr-1" />
+                                            Clear Filters
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Basic Filters - Module + Status + Roles Count + Date Range */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                        <Layers className="h-3 w-3" />
+                                        Module
+                                    </Label>
+                                    <select
+                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                        value={moduleFilter}
+                                        onChange={(e) => setModuleFilter(e.target.value)}
                                         aria-label="Filter by module"
                                     >
                                         <option value="all">All Modules</option>
@@ -496,75 +638,139 @@ export default function PermissionsIndex({
                                             </option>
                                         ))}
                                     </select>
-                                    
-                                    <select 
-                                        className="border rounded px-3 py-2 text-sm w-28 bg-white dark:bg-gray-900 dark:border-gray-700 dark:text-gray-200"
-                                        value={filters.status || PermissionStatus.ALL}
-                                        onChange={(e) => handleFilterChange('status', e.target.value)}
-                                        disabled={isSearching}
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                        <Activity className="h-3 w-3" />
+                                        Status
+                                    </Label>
+                                    <select
+                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value as StatusFilterType)}
                                         aria-label="Filter by status"
                                     >
-                                        <option value={PermissionStatus.ALL}>All Status</option>
-                                        <option value={PermissionStatus.ACTIVE}>Active</option>
-                                        <option value={PermissionStatus.INACTIVE}>Inactive</option>
+                                        <option value="all">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
                                     </select>
-                                    
-                                    <Button 
-                                        variant="outline"
-                                        className="h-9 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
-                                        onClick={handleApplyFilters}
-                                        disabled={isSearching}
-                                    >
-                                        {isSearching ? (
-                                            <RefreshCw className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Search className="h-4 w-4 mr-2" />
-                                        )}
-                                        <span className="hidden sm:inline">Search</span>
-                                    </Button>
+                                </div>
 
-                                    <Button 
-                                        variant="outline"
-                                        className="h-9 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
-                                        onClick={handleExport}
-                                        disabled={isSearching}
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                        <Users className="h-3 w-3" />
+                                        Roles Count
+                                    </Label>
+                                    <select
+                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                        value={rolesCountFilter}
+                                        onChange={(e) => setRolesCountFilter(e.target.value as RolesCountFilterType)}
                                     >
-                                        <Download className="h-4 w-4 mr-2" />
-                                        <span className="hidden sm:inline">Export</span>
-                                    </Button>
+                                        {rolesCountOptions.map(option => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" />
+                                        Created Date
+                                    </Label>
+                                    <select
+                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                        value={dateRange}
+                                        onChange={(e) => setDateRange(e.target.value)}
+                                    >
+                                        {dateRangeOptions.map(option => (
+                                            <option key={option.value} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
-                            {/* Active filters indicator */}
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    Showing {startIndex} to {endIndex} of {totalItems} permissions
-                                    {filters.search && ` matching "${filters.search}"`}
-                                    {filters.module && filters.module !== 'all' && ` • Module: ${filters.module}`}
-                                    {filters.status && filters.status !== PermissionStatus.ALL && ` • Status: ${filters.status}`}
-                                </div>
-                                
-                                <div className="flex gap-2">
-                                    {hasActiveFilters && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={resetFilters}
-                                            disabled={isSearching}
-                                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8"
-                                        >
-                                            Clear All Filters
-                                        </Button>
-                                    )}
-                                    
-                                    {isSearching && (
-                                        <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
-                                            <RefreshCw className="h-3 w-3 animate-spin" />
-                                            Searching...
+                            {/* Advanced Filters */}
+                            {showAdvancedFilters && (
+                                <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
+                                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Quick Actions</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Filters</Label>
+                                            <div className="flex flex-wrap gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        setStatusFilter('active');
+                                                        setShowAdvancedFilters(false);
+                                                    }}
+                                                >
+                                                    Active Only
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        setStatusFilter('inactive');
+                                                        setShowAdvancedFilters(false);
+                                                    }}
+                                                >
+                                                    Inactive Only
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        setRolesCountFilter('0');
+                                                        setShowAdvancedFilters(false);
+                                                    }}
+                                                >
+                                                    Unused Permissions
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        setRolesCountFilter('10+');
+                                                        setShowAdvancedFilters(false);
+                                                    }}
+                                                >
+                                                    Popular Permissions
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={() => {
+                                                        setDateRange('last_30_days');
+                                                        setShowAdvancedFilters(false);
+                                                    }}
+                                                >
+                                                    Recently Added
+                                                </Button>
+                                            </div>
                                         </div>
-                                    )}
+
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Information</Label>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                                                <p>• <span className="font-medium">Roles Count</span> - Number of roles using this permission</p>
+                                                <p>• <span className="font-medium">Created Date</span> - When the permission was added</p>
+                                                <p>• Use the table header to sort by any column</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -574,7 +780,7 @@ export default function PermissionsIndex({
                     <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
                         <CardTitle className="text-lg sm:text-xl dark:text-gray-100">Permissions List</CardTitle>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Page {currentPageNum} of {totalPages}
+                            Page {currentPage} of {totalPages}
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -584,23 +790,59 @@ export default function PermissionsIndex({
                                     <Table className="min-w-full">
                                         <TableHeader>
                                             <TableRow className="bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700">
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[180px]">
-                                                    Permission
+                                                <TableHead 
+                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    onClick={() => handleSort('name')}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        Permission
+                                                        {getSortIcon('name')}
+                                                    </div>
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px]">
-                                                    Display Name
+                                                <TableHead 
+                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    onClick={() => handleSort('display_name')}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        Display Name
+                                                        {getSortIcon('display_name')}
+                                                    </div>
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px]">
-                                                    Module
+                                                <TableHead 
+                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    onClick={() => handleSort('module')}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        Module
+                                                        {getSortIcon('module')}
+                                                    </div>
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px]">
-                                                    Status
+                                                <TableHead 
+                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    onClick={() => handleSort('status')}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        Status
+                                                        {getSortIcon('status')}
+                                                    </div>
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px]">
-                                                    Roles
+                                                <TableHead 
+                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    onClick={() => handleSort('roles_count')}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        Roles
+                                                        {getSortIcon('roles_count')}
+                                                    </div>
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px]">
-                                                    Created
+                                                <TableHead 
+                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    onClick={() => handleSort('created_at')}
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        Created
+                                                        {getSortIcon('created_at')}
+                                                    </div>
                                                 </TableHead>
                                                 <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900/50 min-w-[80px]">
                                                     Actions
@@ -608,14 +850,14 @@ export default function PermissionsIndex({
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {permissions.data.length === 0 ? (
+                                            {paginatedPermissions.length === 0 ? (
                                                 <TableRow>
                                                     <TableCell colSpan={7} className="text-center py-8 text-gray-500 dark:text-gray-400">
                                                         <div className="flex flex-col items-center justify-center space-y-4">
                                                             <Key className="h-16 w-16 text-gray-300 dark:text-gray-700" />
                                                             <div>
                                                                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                                                    {isSearching ? 'Searching...' : 'No permissions found'}
+                                                                    No permissions found
                                                                 </h3>
                                                                 <p className="text-gray-500 dark:text-gray-400">
                                                                     {hasActiveFilters 
@@ -629,7 +871,6 @@ export default function PermissionsIndex({
                                                                         variant="outline"
                                                                         onClick={resetFilters}
                                                                         className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
-                                                                        disabled={isSearching}
                                                                     >
                                                                         Clear Filters
                                                                     </Button>
@@ -656,22 +897,10 @@ export default function PermissionsIndex({
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                permissions.data.map((permission) => (
+                                                paginatedPermissions.map((permission) => (
                                                     <TableRow key={permission.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors border-gray-200 dark:border-gray-700">
                                                         <TableCell className="px-4 py-3 whitespace-nowrap dark:text-gray-300">
-                                                            <div 
-                                                                className="flex items-center gap-3 cursor-text select-text"
-                                                                onDoubleClick={(e) => {
-                                                                    const selection = window.getSelection();
-                                                                    if (selection) {
-                                                                        const range = document.createRange();
-                                                                        range.selectNodeContents(e.currentTarget);
-                                                                        selection.removeAllRanges();
-                                                                        selection.addRange(range);
-                                                                    }
-                                                                }}
-                                                                title={`Double-click to select all\nPermission: ${permission.name}\nDescription: ${permission.description || 'No description'}`}
-                                                            >
+                                                            <div className="flex items-center gap-3">
                                                                 <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
                                                                     <Key className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                                                 </div>
@@ -728,7 +957,6 @@ export default function PermissionsIndex({
                                                                         ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50'
                                                                         : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'
                                                                 }`}
-                                                                disabled={isSearching}
                                                             >
                                                                 {permission.is_active ? (
                                                                     <CheckCircle className="h-3 w-3 mr-1" />
@@ -760,7 +988,6 @@ export default function PermissionsIndex({
                                                                     <Button 
                                                                         variant="ghost" 
                                                                         className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
-                                                                        disabled={isSearching}
                                                                     >
                                                                         <span className="sr-only">Open menu</span>
                                                                         <MoreVertical className="h-4 w-4" />
@@ -817,14 +1044,14 @@ export default function PermissionsIndex({
                         {totalPages > 1 && (
                             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t border-gray-200 dark:border-gray-700">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    Showing {startIndex} to {endIndex} of {totalItems} results
+                                    Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} results
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handlePageChange(currentPageNum - 1)}
-                                        disabled={currentPageNum === 1 || isSearching}
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
                                         className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
                                     >
                                         <ChevronLeft className="h-4 w-4 mr-1" />
@@ -834,15 +1061,14 @@ export default function PermissionsIndex({
                                         {paginationItems.map((pageNum) => (
                                             <Button
                                                 key={pageNum}
-                                                variant={currentPageNum === pageNum ? "default" : "outline"}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
                                                 size="sm"
-                                                onClick={() => handlePageChange(pageNum)}
+                                                onClick={() => setCurrentPage(pageNum)}
                                                 className={`h-8 w-8 p-0 ${
-                                                    currentPageNum === pageNum 
+                                                    currentPage === pageNum 
                                                         ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
                                                         : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900'
                                                 }`}
-                                                disabled={isSearching}
                                             >
                                                 {pageNum}
                                             </Button>
@@ -851,8 +1077,8 @@ export default function PermissionsIndex({
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handlePageChange(currentPageNum + 1)}
-                                        disabled={currentPageNum === totalPages || isSearching}
+                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        disabled={currentPage === totalPages}
                                         className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
                                     >
                                         Next
@@ -873,7 +1099,7 @@ export default function PermissionsIndex({
                         <CardContent className="pt-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <Link href={route('admin.roles.index')}>
-                                    <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900" disabled={isSearching}>
+                                    <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
                                         <Users className="h-3 w-3 mr-2" />
                                         <span className="truncate">Manage Roles</span>
                                     </Button>
@@ -882,25 +1108,12 @@ export default function PermissionsIndex({
                                     variant="outline" 
                                     size="sm" 
                                     className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
-                                    onClick={() => {
-                                        alert('Bulk assign feature coming soon!');
-                                    }}
-                                    disabled={isSearching}
-                                >
-                                    <Layers className="h-3 w-3 mr-2" />
-                                    <span className="truncate">Bulk Assign</span>
-                                </Button>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
                                     onClick={handleExport}
-                                    disabled={isSearching}
                                 >
                                     <Download className="h-3 w-3 mr-2" />
                                     <span className="truncate">Export CSV</span>
                                 </Button>
-                                <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900" disabled={isSearching}>
+                                <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
                                     <BarChart3 className="h-3 w-3 mr-2" />
                                     <span className="truncate">Usage Report</span>
                                 </Button>
@@ -931,10 +1144,10 @@ export default function PermissionsIndex({
                             <CardTitle className="text-lg dark:text-gray-100">Module Distribution</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
-                            {permissions.data.length > 0 ? (
+                            {filteredAndSortedPermissions.length > 0 ? (
                                 <div className="space-y-3">
-                                    {Array.from(new Set(permissions.data.map(p => p.module))).slice(0, 4).map((module) => {
-                                        const modulePermissions = permissions.data.filter(p => p.module === module);
+                                    {Array.from(new Set(filteredAndSortedPermissions.map(p => p.module))).slice(0, 4).map((module) => {
+                                        const modulePermissions = filteredAndSortedPermissions.filter(p => p.module === module);
                                         const activeCount = modulePermissions.filter(p => p.is_active).length;
                                         
                                         return (
@@ -958,14 +1171,13 @@ export default function PermissionsIndex({
                                             </div>
                                         );
                                     })}
-                                    {Array.from(new Set(permissions.data.map(p => p.module))).length > 4 && (
+                                    {Array.from(new Set(filteredAndSortedPermissions.map(p => p.module))).length > 4 && (
                                         <div className="text-center pt-2">
                                             <Button 
                                                 variant="ghost" 
                                                 size="sm"
                                                 className="h-8 dark:text-gray-300 dark:hover:bg-gray-900"
                                                 onClick={resetFilters}
-                                                disabled={isSearching}
                                             >
                                                 View All Modules
                                             </Button>

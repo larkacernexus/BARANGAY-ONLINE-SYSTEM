@@ -32,12 +32,15 @@ class ResidentPrivilege extends Model
         'expires_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'discount_percentage' => 'decimal:2',
     ];
 
     protected $dates = [
         'verified_at',
         'expires_at',
     ];
+
+    // ========== RELATIONSHIPS ==========
 
     /**
      * Get the resident that owns this privilege assignment
@@ -62,6 +65,8 @@ class ResidentPrivilege extends Model
     {
         return $this->belongsTo(DiscountType::class);
     }
+
+    // ========== ACCESSORS ==========
 
     /**
      * Check if this privilege assignment is active
@@ -105,23 +110,94 @@ class ResidentPrivilege extends Model
 
     /**
      * Get the effective discount percentage
+     * ✅ FIXED: Use 'percentage' from DiscountType
      */
     public function getEffectiveDiscountPercentageAttribute(): ?float
     {
+        // Priority 1: Direct discount_percentage on the pivot
         if ($this->discount_percentage) {
-            return $this->discount_percentage;
+            return (float) $this->discount_percentage;
         }
         
-        if ($this->discountType) {
-            return $this->discountType->default_percentage;
+        // Priority 2: Percentage from DiscountType
+        if ($this->discountType && $this->discountType->percentage) {
+            return (float) $this->discountType->percentage;
         }
         
-        if ($this->privilege) {
-            return $this->privilege->default_discount_percentage;
+        // Priority 3: Percentage from Privilege's DiscountType
+        if ($this->privilege && $this->privilege->discountType) {
+            return (float) $this->privilege->discountType->percentage;
         }
         
         return null;
     }
+
+    /**
+     * Get formatted discount percentage
+     */
+    public function getFormattedDiscountPercentageAttribute(): string
+    {
+        $percentage = $this->effective_discount_percentage;
+        return $percentage ? $percentage . '%' : '0%';
+    }
+
+    /**
+     * Check if privilege requires ID number
+     */
+    public function getRequiresIdNumberAttribute(): bool
+    {
+        if ($this->discountType) {
+            return (bool) $this->discountType->requires_id_number;
+        }
+        if ($this->privilege && $this->privilege->discountType) {
+            return (bool) $this->privilege->discountType->requires_id_number;
+        }
+        return true;
+    }
+
+    /**
+     * Check if privilege requires verification
+     */
+    public function getRequiresVerificationAttribute(): bool
+    {
+        if ($this->discountType) {
+            return (bool) $this->discountType->requires_verification;
+        }
+        if ($this->privilege && $this->privilege->discountType) {
+            return (bool) $this->privilege->discountType->requires_verification;
+        }
+        return true;
+    }
+
+    /**
+     * Get verification document requirement
+     */
+    public function getVerificationDocumentAttribute(): ?string
+    {
+        if ($this->discountType) {
+            return $this->discountType->verification_document;
+        }
+        if ($this->privilege && $this->privilege->discountType) {
+            return $this->privilege->discountType->verification_document;
+        }
+        return null;
+    }
+
+    /**
+     * Get validity days
+     */
+    public function getValidityDaysAttribute(): int
+    {
+        if ($this->discountType) {
+            return (int) $this->discountType->validity_days;
+        }
+        if ($this->privilege && $this->privilege->discountType) {
+            return (int) $this->privilege->discountType->validity_days;
+        }
+        return 365;
+    }
+
+    // ========== SCOPES ==========
 
     /**
      * Scope for active privileges
@@ -185,5 +261,15 @@ class ResidentPrivilege extends Model
     public function scopeByPrivilege($query, $privilegeId)
     {
         return $query->where('privilege_id', $privilegeId);
+    }
+
+    /**
+     * Scope by privilege code
+     */
+    public function scopeByPrivilegeCode($query, $code)
+    {
+        return $query->whereHas('privilege', function($q) use ($code) {
+            $q->where('code', $code);
+        });
     }
 }

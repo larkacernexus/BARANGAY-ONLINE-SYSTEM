@@ -11,7 +11,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
-import { SelectionStats, BulkOperation } from '@/types/admin/fees/fees'; // Use correct import path
+import { SelectionStats, BulkOperation } from '@/types/admin/fees/fees'; 
 
 interface FeesDialogsProps {
     showBulkDeleteDialog: boolean;

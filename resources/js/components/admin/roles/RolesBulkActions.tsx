@@ -20,12 +20,13 @@ import {
     ChevronDown
 } from 'lucide-react';
 import { useState, useRef } from 'react';
-import { SelectionMode, SelectionStats } from '@/admin-utils/rolesUtils';
+import { SelectionMode } from '@/admin-utils/rolesUtils';
+import { BulkOperation, SelectionStats } from '@/types/admin/roles/roles'; // CHANGE THIS IMPORT
 
 interface RolesBulkActionsProps {
     selectedRoles: number[];
     selectionMode: SelectionMode;
-    selectionStats: SelectionStats;
+    selectionStats?: SelectionStats; // Now uses the correct type
     isPerformingBulkAction: boolean;
     isSelectAll: boolean;
     isMobile: boolean;
@@ -33,10 +34,10 @@ interface RolesBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void;
     onCopySelectedData: () => void;
-    setShowBulkDeleteDialog: (show: boolean) => void;
-    setShowBulkTypeDialog: (show: boolean) => void;
+    setShowBulkDeleteDialog?: (show: boolean) => void;
+    setShowBulkTypeDialog?: (show: boolean) => void;
     bulkEditValue: string;
     setBulkEditValue: (value: string) => void;
 }
@@ -147,7 +148,7 @@ export default function RolesBulkActions({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setShowBulkTypeDialog(true)}
+                                    onClick={() => setShowBulkTypeDialog && setShowBulkTypeDialog(true)}
                                     className="h-8"
                                     disabled={isPerformingBulkAction}
                                 >
@@ -212,7 +213,7 @@ export default function RolesBulkActions({
                                     <Button
                                         variant="ghost"
                                         className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        onClick={() => setShowBulkDeleteDialog(true)}
+                                        onClick={() => setShowBulkDeleteDialog && setShowBulkDeleteDialog(true)}
                                     >
                                         <Trash2 className="h-3.5 w-3.5 mr-2" />
                                         Delete Selected
@@ -234,7 +235,7 @@ export default function RolesBulkActions({
                 </div>
             </div>
             
-            {/* Enhanced stats of selected items */}
+            {/* Enhanced stats of selected items - using the correct property names */}
             {selectedRoles.length > 0 && selectionStats && (
                 <div className="mt-3 pt-3 border-t border-blue-100 dark:border-blue-800">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
@@ -253,24 +254,24 @@ export default function RolesBulkActions({
                         <div className="flex items-center gap-2">
                             <Edit className="h-3.5 w-3.5 text-green-500" />
                             <span>
-                                {selectionStats.custom} custom
+                                {selectionStats.customRoles} custom {/* CHANGED: custom to customRoles */}
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
                             <Shield className="h-3.5 w-3.5 text-purple-500" />
                             <span>
-                                {selectionStats.system} system
+                                {selectionStats.systemRoles} system {/* CHANGED: system to systemRoles */}
                             </span>
                         </div>
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-500">
                         <div className="flex items-center gap-1">
                             <Users className="h-3 w-3 text-green-500" />
-                            <span>Avg users: {selectionStats.avgUsers}</span>
+                            <span>Total permissions: {selectionStats.totalPermissions}</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <Trash2 className="h-3 w-3 text-red-500" />
-                            <span>Deletable: {selectionStats.deletable}</span>
+                            <span>Latest: {selectionStats.latestRole || 'N/A'}</span>
                         </div>
                     </div>
                 </div>

@@ -1,4 +1,5 @@
-// resources/js/Pages/Admin/ClearanceTypes/components/clearance-type-header.tsx
+// components/admin/clearance-types/show/components/clearance-type-header.tsx
+
 import React, { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -27,18 +28,18 @@ import {
     MoreVertical,
     Tag,
     Trash2,
-    Award,
-    Hash,
-    FileText,
     Sparkles,
     DollarSign,
     Clock,
-    Users,
-    Shield
+    FileText,
+    Hash
 } from 'lucide-react';
-import { ClearanceType } from '../types';
 
-interface Props {
+// Import types from central types file
+import { ClearanceType, formatCurrency } from '@/types/admin/clearance-types/clearance-types';
+import { route } from 'ziggy-js';
+
+interface ClearanceTypeHeaderProps {
     clearanceType: ClearanceType;
     isNew: boolean;
     onCopyLink: () => void;
@@ -49,6 +50,7 @@ interface Props {
     onDelete: () => void;
     getStatusColor: (isActive: boolean) => string;
     getStatusIcon: (isActive: boolean) => React.ReactNode;
+    formatCurrency?: (amount: number) => string;
 }
 
 const getStatusBadgeColor = (isActive: boolean): string => {
@@ -71,8 +73,9 @@ export const ClearanceTypeHeader = ({
     onDuplicate,
     onDelete,
     getStatusColor,
-    getStatusIcon
-}: Props) => {
+    getStatusIcon,
+    formatCurrency: formatCurrencyProp
+}: ClearanceTypeHeaderProps) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopyLink = () => {
@@ -89,11 +92,14 @@ export const ClearanceTypeHeader = ({
         }
     };
 
+    // Use the provided formatCurrency or fallback to the imported one
+    const formatAmount = formatCurrencyProp || formatCurrency;
+
     return (
         <TooltipProvider>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <Link href="/clearance-types">
+                    <Link href="/admin/clearance-types">
                         <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Back to Clearance Types
@@ -157,7 +163,7 @@ export const ClearanceTypeHeader = ({
                                         <div className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 rounded-full cursor-default">
                                             <DollarSign className="h-3 w-3" />
                                             <span className="text-sm font-medium">
-                                                {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(clearanceType.base_price)}
+                                                {formatAmount(clearanceType.fee)}
                                             </span>
                                         </div>
                                     </TooltipTrigger>
@@ -196,7 +202,7 @@ export const ClearanceTypeHeader = ({
 
                 <div className="flex items-center gap-2">
                     {/* Edit Button - Primary Action */}
-                    <Link href={`/clearance-types/${clearanceType.id}/edit`}>
+                    <Link href={route('admin.clearance-types.edit', clearanceType.id)}>
                         <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700 dark:hover:from-blue-800 dark:hover:to-indigo-800">
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
@@ -253,7 +259,7 @@ export const ClearanceTypeHeader = ({
                                 className="dark:text-gray-300 dark:hover:bg-gray-700"
                             >
                                 <Tag className="h-4 w-4 mr-2" />
-                                {clearanceType.is_discountable ? 'Disable Discounts' : 'Enable Discounts'}
+                                {clearanceType.is_discountable ? 'Mark Non-Discountable' : 'Mark Discountable'}
                             </DropdownMenuItem>
                             
                             {clearanceType.clearances_count === 0 && (

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Search, X } from 'lucide-react';
-import { Resident } from './BlotterTypes';
+import { Resident } from '@/types/admin/blotters/blotter';
 
 interface SearchableResidentSelectProps {
     residents: Resident[];

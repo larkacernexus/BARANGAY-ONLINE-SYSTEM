@@ -52,7 +52,7 @@ class FeeCreateController extends Controller
             }
 
             if ($request->has('resident_id')) {
-                $resident = Resident::with(['purok', 'residentPrivileges.privilege'])->find($request->resident_id);
+                $resident = Resident::with(['purok', 'residentPrivileges.privilege.discountType'])->find($request->resident_id);
                 Log::debug('Preselected resident', ['resident_id' => $request->resident_id]);
             }
 
@@ -67,23 +67,24 @@ class FeeCreateController extends Controller
                 $initialData = $this->prepareDuplicateData($feeToDuplicate);
             }
 
-            // Get ALL active privileges from database
-            $allPrivileges = Privilege::where('is_active', true)
+            // Get ALL active privileges from database with their discount types
+            $allPrivileges = Privilege::with('discountType')
+                ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'code', 'description', 'default_discount_percentage'])
+                ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
                 ->map(function ($privilege) {
                     return [
                         'id' => $privilege->id,
                         'name' => $privilege->name,
                         'code' => $privilege->code,
                         'description' => $privilege->description,
-                        'default_discount_percentage' => (float) $privilege->default_discount_percentage,
+                        'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
                     ];
                 })
                 ->values()
                 ->toArray();
 
-            // Get fee types with document category
+            // Get fee types with document category and discount fields
             $feeTypes = FeeType::with(['documentCategory'])
                 ->active()
                 ->get()
@@ -107,6 +108,8 @@ class FeeCreateController extends Controller
                         'amount_type' => $type->amount_type,
                         'computation_formula' => $type->computation_formula,
                         'unit' => $type->unit,
+                        'category' => $type->document_category_id,
+                        'category_name' => $type->documentCategory?->name ?? 'Uncategorized',
                         
                         // Discount eligibility flags - dynamically set for all privileges
                         'is_discountable' => (bool) $type->is_discountable,
@@ -115,13 +118,13 @@ class FeeCreateController extends Controller
                         'has_surcharge' => (bool) $type->has_surcharge,
                         'surcharge_percentage' => (float) $type->surcharge_percentage,
                         'surcharge_fixed' => (float) $type->surcharge_fixed,
-                        'surcharge_description' => $type->surcharge_description,
+                        'surcharge_description' => $type->surcharge_description ?? null,
                         
                         // Penalty fields
                         'has_penalty' => (bool) $type->has_penalty,
                         'penalty_percentage' => (float) $type->penalty_percentage,
                         'penalty_fixed' => (float) $type->penalty_fixed,
-                        'penalty_description' => $type->penalty_description,
+                        'penalty_description' => $type->penalty_description ?? null,
                         
                         // Other fields
                         'frequency' => $type->frequency,
@@ -150,7 +153,7 @@ class FeeCreateController extends Controller
                 });
 
             // Get residents with their privileges
-            $residents = Resident::with(['purok', 'residentPrivileges.privilege'])
+            $residents = Resident::with(['purok', 'residentPrivileges.privilege.discountType'])
                 ->select(['id', 'first_name', 'last_name', 'middle_name', 'suffix', 'purok_id', 'contact_number', 'birth_date', 'address'])
                 ->orderBy('last_name')
                 ->get()
@@ -164,16 +167,22 @@ class FeeCreateController extends Controller
                         })
                         ->map(function ($rp) use ($allPrivileges) {
                             $privilege = $rp->privilege;
+                            // Get discount percentage from either the pivot or the discount type
+                            $discountPercentage = $rp->discount_percentage ?? 
+                                                  ($privilege->discountType?->percentage ?? 
+                                                   collect($allPrivileges)->firstWhere('code', $privilege->code)['default_discount_percentage'] ?? 0);
+                            
                             return [
                                 'id' => $rp->id,
                                 'privilege_id' => $privilege->id,
                                 'code' => $privilege->code,
                                 'name' => $privilege->name,
                                 'id_number' => $rp->id_number,
-                                'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                                'discount_percentage' => (float) $discountPercentage,
                                 'expires_at' => $rp->expires_at?->format('Y-m-d'),
                                 'verified_at' => $rp->verified_at?->format('Y-m-d'),
                                 'is_active' => true,
+                                'status' => $this->getPrivilegeStatus($rp),
                             ];
                         })
                         ->values()
@@ -211,6 +220,7 @@ class FeeCreateController extends Controller
                         'purok' => $resident->purok ? $resident->purok->name : null,
                         'purok_id' => $resident->purok_id,
                         'contact_number' => $resident->contact_number,
+                        'phone' => $resident->contact_number,
                         'address' => $resident->address,
                         'birth_date' => $resident->birth_date ? $resident->birth_date->format('Y-m-d') : null,
                         'age' => $age,
@@ -227,7 +237,7 @@ class FeeCreateController extends Controller
             $households = Household::with([
                 'purok',
                 'householdMembers' => function ($query) {
-                    $query->where('is_head', true)->with(['resident', 'resident.residentPrivileges.privilege']);
+                    $query->where('is_head', true)->with(['resident', 'resident.residentPrivileges.privilege.discountType']);
                 }
             ])
                 ->select(['id', 'household_number', 'purok_id', 'contact_number', 'address'])
@@ -251,12 +261,17 @@ class FeeCreateController extends Controller
                             ->filter(function ($rp) {
                                 return $rp->isActive();
                             })
-                            ->map(function ($rp) {
+                            ->map(function ($rp) use ($allPrivileges) {
                                 $privilege = $rp->privilege;
+                                $discountPercentage = $rp->discount_percentage ?? 
+                                                      ($privilege->discountType?->percentage ?? 
+                                                       collect($allPrivileges)->firstWhere('code', $privilege->code)['default_discount_percentage'] ?? 0);
+                                
                                 return [
                                     'code' => $privilege->code,
                                     'name' => $privilege->name,
                                     'id_number' => $rp->id_number,
+                                    'discount_percentage' => (float) $discountPercentage,
                                 ];
                             })
                             ->values()
@@ -300,15 +315,19 @@ class FeeCreateController extends Controller
                     ->filter(function ($rp) {
                         return $rp->isActive();
                     })
-                    ->map(function ($rp) {
+                    ->map(function ($rp) use ($allPrivileges) {
                         $privilege = $rp->privilege;
+                        $discountPercentage = $rp->discount_percentage ?? 
+                                              ($privilege->discountType?->percentage ?? 
+                                               collect($allPrivileges)->firstWhere('code', $privilege->code)['default_discount_percentage'] ?? 0);
+                        
                         return [
                             'id' => $rp->id,
                             'privilege_id' => $privilege->id,
                             'code' => $privilege->code,
                             'name' => $privilege->name,
                             'id_number' => $rp->id_number,
-                            'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                            'discount_percentage' => (float) $discountPercentage,
                         ];
                     })
                     ->values()
@@ -339,6 +358,7 @@ class FeeCreateController extends Controller
                     'last_name' => $resident->last_name,
                     'purok' => $resident->purok ? $resident->purok->name : null,
                     'contact_number' => $resident->contact_number,
+                    'phone' => $resident->contact_number,
                     'address' => $resident->address,
                     'birth_date' => $resident->birth_date ? $resident->birth_date->format('Y-m-d') : null,
                     'age' => $age,
@@ -353,7 +373,7 @@ class FeeCreateController extends Controller
             if ($household) {
                 $household->load([
                     'householdMembers' => function ($query) {
-                        $query->where('is_head', true)->with(['resident', 'resident.residentPrivileges.privilege']);
+                        $query->where('is_head', true)->with(['resident', 'resident.residentPrivileges.privilege.discountType']);
                     }
                 ]);
 
@@ -372,12 +392,17 @@ class FeeCreateController extends Controller
                         ->filter(function ($rp) {
                             return $rp->isActive();
                         })
-                        ->map(function ($rp) {
+                        ->map(function ($rp) use ($allPrivileges) {
                             $privilege = $rp->privilege;
+                            $discountPercentage = $rp->discount_percentage ?? 
+                                                  ($privilege->discountType?->percentage ?? 
+                                                   collect($allPrivileges)->firstWhere('code', $privilege->code)['default_discount_percentage'] ?? 0);
+                            
                             return [
                                 'code' => $privilege->code,
                                 'name' => $privilege->name,
                                 'id_number' => $rp->id_number,
+                                'discount_percentage' => (float) $discountPercentage,
                             ];
                         })
                         ->values()
@@ -405,21 +430,27 @@ class FeeCreateController extends Controller
                 ], $privilegeFlags);
             }
 
+            // Get puroks for filtering - FIXED: Removed is_active filter
+            $puroksList = \App\Models\Purok::pluck('name')
+                ->filter()
+                ->values();
+
             return Inertia::render('admin/Fees/Create', [
-                'feeTypes' => $feeTypes,
+                'fee_types' => $feeTypes,
                 'residents' => $residents,
                 'households' => $households,
                 'preselectedResident' => $preselectedResidentData,
                 'preselectedHousehold' => $preselectedHouseholdData,
-                'puroks' => \App\Models\Purok::pluck('name')->filter()->values(),
+                'puroks' => $puroksList,
                 'documentCategories' => DocumentCategory::active()->ordered()->get(),
-                'allPrivileges' => $allPrivileges, // Send all privileges to frontend
+                'allPrivileges' => $allPrivileges,
                 'initialData' => $initialData,
                 'duplicateFrom' => $feeToDuplicate ? [
                     'id' => $feeToDuplicate->id,
                     'fee_code' => $feeToDuplicate->fee_code,
                     'fee_type_name' => $feeToDuplicate->feeType->name ?? 'Unknown',
                 ] : null,
+                'discountRules' => [],
             ]);
 
         } catch (\Exception $e) {
@@ -431,6 +462,30 @@ class FeeCreateController extends Controller
 
             return back()->with('error', 'Failed to load fee creation form. Please try again.');
         }
+    }
+
+    /**
+     * Get privilege status based on expiry
+     */
+    private function getPrivilegeStatus($residentPrivilege): string
+    {
+        if (!$residentPrivilege->verified_at) {
+            return 'pending';
+        }
+        
+        if ($residentPrivilege->expires_at) {
+            $daysUntilExpiry = Carbon::now()->diffInDays($residentPrivilege->expires_at, false);
+            
+            if ($daysUntilExpiry <= 0) {
+                return 'expired';
+            }
+            
+            if ($daysUntilExpiry <= 30) {
+                return 'expiring_soon';
+            }
+        }
+        
+        return 'active';
     }
 
     /**

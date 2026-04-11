@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Paperclip, Eye, Download, FileImage, FileVideo, FileText } from 'lucide-react';
-import { CommunityReport } from './types';
+import { CommunityReport } from '@/types/admin/reports/community-report';
 
 interface EvidenceCardProps {
     report: CommunityReport;

@@ -43,6 +43,7 @@ export interface PositionStats {
 }
 
 export interface PositionFilters {
+    officials_range: any;
     search?: string;
     status?: string;
     requires_account?: 'all' | 'yes' | 'no';
@@ -433,7 +434,8 @@ export const defaultPositionFilters: PositionFilters = {
     status: 'all',
     requires_account: 'all',
     sort_by: 'order',
-    sort_order: 'asc'
+    sort_order: 'asc',
+    officials_range: undefined
 };
 
 export const defaultPositionFormData: PositionFormData = {

@@ -1,5 +1,7 @@
 // utils/feeTypesUtils.ts
-import { FeeType, FilterState, SelectionStats } from '@/types/fee-types';
+import { FeeType, FilterState, SelectionStats, CategoryDetails } from '@/types/admin/fee-types/fee.types';
+import { FileText, Briefcase, Shield, DollarSign, Heart, Tag } from 'lucide-react';
+import React from 'react';
 
 export const formatCurrency = (amount: any): string => {
     if (amount === null || amount === undefined || amount === '') {
@@ -29,45 +31,113 @@ export const formatDate = (dateString: string): string => {
     }
 };
 
+// Remove the old getCategoryIcon and getCategoryColor functions since they're no longer needed
+// or keep them for backward compatibility but mark as deprecated
+
 export const getCategoryIcon = (iconName?: string) => {
-    if (!iconName) return null;
-    
-    // Import icons as needed
+    // Deprecated - kept for backward compatibility
     return null;
 };
 
 export const getCategoryColor = (color?: string) => {
-    if (!color) return 'bg-gray-100 text-gray-800 border-gray-200';
-    
-    const colorMap: Record<string, string> = {
-        'purple': 'bg-purple-100 text-purple-800 border-purple-200',
-        'pink': 'bg-pink-100 text-pink-800 border-pink-200',
-        'green': 'bg-green-100 text-green-800 border-green-200',
-        'red': 'bg-red-100 text-red-800 border-red-200',
-        'amber': 'bg-amber-100 text-amber-800 border-amber-200',
-        'indigo': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-        'blue': 'bg-blue-100 text-blue-800 border-blue-200',
-        'orange': 'bg-orange-100 text-orange-800 border-orange-200',
-        'gray': 'bg-gray-100 text-gray-800 border-gray-200',
-    };
-    
-    return colorMap[color] || 'bg-gray-100 text-gray-800 border-gray-200';
+    // Deprecated - kept for backward compatibility
+    return 'bg-gray-100 text-gray-800 border-gray-200';
 };
 
-export const getCategoryDetails = (feeType: FeeType) => {
-    if (!feeType.document_category) {
+// Updated getCategoryDetails function that matches the expected return type
+export const getCategoryDetails = (feeType: FeeType): CategoryDetails => {
+    // Get category slug or name from feeType
+    const categoryName = feeType.document_category?.name?.toLowerCase() || '';
+    const categorySlug = feeType.document_category?.slug?.toLowerCase() || categoryName;
+    
+    // Define category configurations with all required properties
+    const categories: Record<string, CategoryDetails> = {
+        tax: {
+            name: 'Taxes',
+            icon: React.createElement(Briefcase, { className: "h-4 w-4" }),
+            color: 'blue',
+            bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+            textColor: 'text-blue-700 dark:text-blue-400',
+            borderColor: 'border-blue-200 dark:border-blue-800'
+        },
+        clearance: {
+            name: 'Clearances',
+            icon: React.createElement(FileText, { className: "h-4 w-4" }),
+            color: 'green',
+            bgColor: 'bg-green-100 dark:bg-green-900/30',
+            textColor: 'text-green-700 dark:text-green-400',
+            borderColor: 'border-green-200 dark:border-green-800'
+        },
+        permit: {
+            name: 'Permits',
+            icon: React.createElement(Shield, { className: "h-4 w-4" }),
+            color: 'purple',
+            bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+            textColor: 'text-purple-700 dark:text-purple-400',
+            borderColor: 'border-purple-200 dark:border-purple-800'
+        },
+        fee: {
+            name: 'Fees',
+            icon: React.createElement(DollarSign, { className: "h-4 w-4" }),
+            color: 'yellow',
+            bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+            textColor: 'text-yellow-700 dark:text-yellow-400',
+            borderColor: 'border-yellow-200 dark:border-yellow-800'
+        },
+        donation: {
+            name: 'Donations',
+            icon: React.createElement(Heart, { className: "h-4 w-4" }),
+            color: 'red',
+            bgColor: 'bg-red-100 dark:bg-red-900/30',
+            textColor: 'text-red-700 dark:text-red-400',
+            borderColor: 'border-red-200 dark:border-red-800'
+        },
+        barangay: {
+            name: 'Barangay',
+            icon: React.createElement(FileText, { className: "h-4 w-4" }),
+            color: 'teal',
+            bgColor: 'bg-teal-100 dark:bg-teal-900/30',
+            textColor: 'text-teal-700 dark:text-teal-400',
+            borderColor: 'border-teal-200 dark:border-teal-800'
+        },
+        business: {
+            name: 'Business',
+            icon: React.createElement(Briefcase, { className: "h-4 w-4" }),
+            color: 'indigo',
+            bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+            textColor: 'text-indigo-700 dark:text-indigo-400',
+            borderColor: 'border-indigo-200 dark:border-indigo-800'
+        },
+        default: {
+            name: feeType.document_category?.name || 'Other',
+            icon: React.createElement(Tag, { className: "h-4 w-4" }),
+            color: 'gray',
+            bgColor: 'bg-gray-100 dark:bg-gray-800',
+            textColor: 'text-gray-700 dark:text-gray-400',
+            borderColor: 'border-gray-200 dark:border-gray-700'
+        }
+    };
+    
+    // Try to find a matching category
+    let matchedKey = 'default';
+    for (const key of Object.keys(categories)) {
+        if (categorySlug.includes(key) || categoryName.includes(key)) {
+            matchedKey = key;
+            break;
+        }
+    }
+    
+    const result = categories[matchedKey] || categories.default;
+    
+    // Override the name with the actual category name if available
+    if (feeType.document_category?.name && matchedKey === 'default') {
         return {
-            name: 'Uncategorized',
-            icon: null,
-            color: 'bg-gray-100 text-gray-800 border-gray-200'
+            ...result,
+            name: feeType.document_category.name
         };
     }
     
-    return {
-        name: feeType.document_category.name,
-        icon: getCategoryIcon(feeType.document_category.icon),
-        color: getCategoryColor(feeType.document_category.color)
-    };
+    return result;
 };
 
 export const safeNumber = (value: any, defaultValue: number = 0): number => {
@@ -84,15 +154,54 @@ export const getSelectionStats = (selectedFeeTypes: FeeType[]): SelectionStats =
         return sum + (isNaN(numAmount) ? 0 : numAmount);
     }, 0);
 
+    // Calculate by category
+    const byCategory: Record<string, number> = {};
+    const byStatus: Record<string, number> = { active: 0, inactive: 0 };
+    const byAmountType: Record<string, number> = { fixed: 0, variable: 0 };
+    const byFrequency: Record<string, number> = { one_time: 0, annual: 0, quarterly: 0, monthly: 0 };
+    const byDiscountType: Record<string, number> = {
+        senior: 0, pwd: 0, solo_parent: 0, indigent: 0
+    };
+
+    selectedFeeTypes.forEach(ft => {
+        // By category
+        const categoryId = ft.document_category_id?.toString() || 'uncategorized';
+        byCategory[categoryId] = (byCategory[categoryId] || 0) + 1;
+        
+        // By status
+        if (ft.is_active) byStatus.active++;
+        else byStatus.inactive++;
+        
+        // By amount type
+        if (ft.amount_type === 'fixed') byAmountType.fixed++;
+        else byAmountType.variable++;
+        
+        // By frequency
+        if (byFrequency[ft.frequency] !== undefined) {
+            byFrequency[ft.frequency]++;
+        }
+        
+        // By discount type
+        if (ft.has_senior_discount) byDiscountType.senior++;
+        if (ft.has_pwd_discount) byDiscountType.pwd++;
+        if (ft.has_solo_parent_discount) byDiscountType.solo_parent++;
+        if (ft.has_indigent_discount) byDiscountType.indigent++;
+    });
+
     return {
         total: selectedFeeTypes.length,
-        active: selectedFeeTypes.filter(ft => ft.is_active).length,
-        inactive: selectedFeeTypes.filter(ft => !ft.is_active).length,
+        active: byStatus.active,
+        inactive: byStatus.inactive,
         mandatory: selectedFeeTypes.filter(ft => ft.is_mandatory).length,
         autoGenerate: selectedFeeTypes.filter(ft => ft.auto_generate).length,
         totalAmount: totalAmount,
-        fixedAmount: selectedFeeTypes.filter(ft => ft.amount_type === 'fixed').length,
-        variableAmount: selectedFeeTypes.filter(ft => ft.amount_type === 'variable').length,
+        fixedAmount: byAmountType.fixed,
+        variableAmount: byAmountType.variable,
+        byCategory,
+        byStatus,
+        byAmountType,
+        byFrequency,
+        byDiscountType
     };
 };
 
@@ -118,16 +227,38 @@ export const filterFeeTypes = (
     }
 
     // Apply category filter
-    if (filters.category !== 'all') {
+    if (filters.category && filters.category !== 'all') {
         const categoryId = parseInt(filters.category);
         filtered = filtered.filter(feeType => feeType.document_category_id === categoryId);
     }
 
     // Apply status filter
-    if (filters.status !== 'all') {
+    if (filters.status && filters.status !== 'all') {
         filtered = filtered.filter(feeType => 
             filters.status === 'active' ? feeType.is_active : !feeType.is_active
         );
+    }
+
+    // Apply has discount filter
+    if (filters.hasDiscount && filters.hasDiscount !== 'all') {
+        const hasDiscount = filters.hasDiscount === 'yes';
+        filtered = filtered.filter(feeType => 
+            (feeType.has_senior_discount || 
+             feeType.has_pwd_discount || 
+             feeType.has_solo_parent_discount || 
+             feeType.has_indigent_discount) === hasDiscount
+        );
+    }
+
+    // Apply has penalty filter
+    if (filters.hasPenalty && filters.hasPenalty !== 'all') {
+        const hasPenalty = filters.hasPenalty === 'yes';
+        filtered = filtered.filter(feeType => feeType.has_penalty === hasPenalty);
+    }
+
+    // Apply frequency filter
+    if (filters.frequency && filters.frequency !== 'all') {
+        filtered = filtered.filter(feeType => feeType.frequency === filters.frequency);
     }
 
     // Apply sorting
@@ -176,6 +307,8 @@ export const formatForClipboard = (feeTypes: FeeType[]): string => {
         Frequency: feeType.frequency,
         Status: feeType.is_active ? 'Active' : 'Inactive',
     }));
+    
+    if (data.length === 0) return '';
     
     return [
         Object.keys(data[0]).join(','),

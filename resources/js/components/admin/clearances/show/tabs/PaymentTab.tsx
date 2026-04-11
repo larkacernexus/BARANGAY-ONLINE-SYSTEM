@@ -27,7 +27,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ClearanceRequest, ClearanceType, Payment } from '@/types/admin/clearances/clearance-types'; // Fix import
+import { ClearanceRequest, ClearanceType, Payment } from '@/types/admin/clearances/clearance'; // Fix import
 import { useState } from 'react';
 import { toast } from 'sonner';
 

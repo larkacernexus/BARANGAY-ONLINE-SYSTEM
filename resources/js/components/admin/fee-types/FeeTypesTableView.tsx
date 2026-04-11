@@ -40,34 +40,8 @@ import {
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
-interface FeeType {
-    id: number;
-    code: string;
-    name: string;
-    short_name: string;
-    description?: string;
-    base_amount: number | string | null;
-    amount_type: string;
-    frequency: string;
-    validity_days: number | null;
-    is_active: boolean;
-    is_mandatory: boolean;
-    auto_generate: boolean;
-    document_category_id: number | null;
-    document_category?: {
-        name: string;
-        icon?: string;
-        color?: string;
-    };
-    created_at: string;
-    updated_at: string;
-}
-
-interface FilterState {
-    search: string;
-    category: string;
-    status: string;
-}
+// Import shared types
+import { FeeType, FilterState, CategoryDetails } from '@/types/admin/fee-types/fee.types';
 
 interface FeeTypesTableViewProps {
     feeTypes: FeeType[];
@@ -85,11 +59,7 @@ interface FeeTypesTableViewProps {
     onCopyToClipboard: (text: string, label: string) => void;
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
-    getCategoryDetails: (feeType: FeeType) => {
-        name: string;
-        icon: React.ReactNode;
-        color: string;
-    };
+    getCategoryDetails: (feeType: FeeType) => CategoryDetails;
     formatCurrency: (amount: any) => string;
     formatDate: (dateString: string) => string;
 }
@@ -115,7 +85,7 @@ export default function FeeTypesTableView({
     formatDate
 }: FeeTypesTableViewProps) {
     
-    // Get sort icon
+    // Get sort icon - simplified version
     const getSortIcon = (field: string) => {
         // This is a simplified version - in a real app you'd track sort state
         return null;
@@ -140,7 +110,7 @@ export default function FeeTypesTableView({
                                     </TableHead>
                                 )}
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('code')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -149,7 +119,7 @@ export default function FeeTypesTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[160px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('name')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -158,7 +128,7 @@ export default function FeeTypesTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('category')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -167,7 +137,7 @@ export default function FeeTypesTableView({
                                     </div>
                                 </TableHead>
                                 <TableHead 
-                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100"
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
                                     onClick={() => onSort('base_amount')}
                                 >
                                     <div className="flex items-center gap-1">
@@ -220,21 +190,21 @@ export default function FeeTypesTableView({
                                             </TableCell>
                                         )}
                                         <TableCell className="px-4 py-3 whitespace-nowrap">
-                                            <div className="font-mono font-medium">{feeType.code || 'N/A'}</div>
+                                            <div className="font-mono font-medium dark:text-gray-200">{feeType.code || 'N/A'}</div>
                                             {feeType.short_name && (
-                                                <div className="text-xs text-gray-500">{feeType.short_name}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">{feeType.short_name}</div>
                                             )}
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <div className="font-medium">{feeType.name || 'Unnamed'}</div>
+                                            <div className="font-medium dark:text-gray-200">{feeType.name || 'Unnamed'}</div>
                                             {feeType.description && (
-                                                <div className="text-sm text-gray-500 truncate max-w-xs">
+                                                <div className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
                                                     {feeType.description}
                                                 </div>
                                             )}
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <Badge variant="outline" className={categoryDetails.color}>
+                                            <Badge variant="outline" className={`${categoryDetails.bgColor} ${categoryDetails.textColor} ${categoryDetails.borderColor}`}>
                                                 <span className="flex items-center gap-1">
                                                     {categoryDetails.icon}
                                                     {categoryDetails.name}
@@ -242,60 +212,60 @@ export default function FeeTypesTableView({
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <div className="font-medium">{formatCurrency(feeType.base_amount)}</div>
-                                            <div className="text-xs text-gray-500 capitalize">
+                                            <div className="font-medium dark:text-gray-200">{formatCurrency(feeType.base_amount)}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
                                                 {(feeType.amount_type || 'fixed') === 'fixed' ? 'Fixed' : 'Variable'}
                                             </div>
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <Badge variant="secondary" className="capitalize">
+                                            <Badge variant="secondary" className="capitalize dark:bg-gray-800 dark:text-gray-300">
                                                 {(feeType.frequency || 'one_time').replace('_', ' ')}
                                             </Badge>
                                             {feeType.validity_days && (
-                                                <div className="text-xs text-gray-500 mt-1">
+                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                                     {feeType.validity_days} days valid
                                                 </div>
                                             )}
                                         </TableCell>
                                         <TableCell className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <Badge variant={feeType.is_active ? "default" : "secondary"}>
                                                     {feeType.is_active ? 'Active' : 'Inactive'}
                                                 </Badge>
                                                 {feeType.is_mandatory && (
-                                                    <Badge variant="outline" className="text-red-600 border-red-200">
+                                                    <Badge variant="outline" className="text-red-600 border-red-200 dark:text-red-400 dark:border-red-800">
                                                         Mandatory
                                                     </Badge>
                                                 )}
                                                 {feeType.auto_generate && (
-                                                    <Badge variant="outline" className="text-blue-600 border-blue-200">
+                                                    <Badge variant="outline" className="text-blue-600 border-blue-200 dark:text-blue-400 dark:border-blue-800">
                                                         Auto-gen
                                                     </Badge>
                                                 )}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
+                                        <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] dark:shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.3)]">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button 
                                                         variant="ghost" 
-                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
+                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <span className="sr-only">Open menu</span>
                                                         <MoreVertical className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="w-48">
+                                                <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.fee-types.show', feeType.id)} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.fee-types.show', feeType.id)} className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100">
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             <span>View Details</span>
                                                         </Link>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.fee-types.edit', feeType.id)} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.fee-types.edit', feeType.id)} className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100">
                                                             <Edit className="mr-2 h-4 w-4" />
                                                             <span>Edit Fee Type</span>
                                                         </Link>
@@ -304,25 +274,25 @@ export default function FeeTypesTableView({
                                                     {onDuplicate && (
                                                         <DropdownMenuItem 
                                                             onClick={() => onDuplicate(feeType)}
-                                                            className="flex items-center cursor-pointer"
+                                                            className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100"
                                                         >
                                                             <Copy className="mr-2 h-4 w-4" />
                                                             <span>Duplicate</span>
                                                         </DropdownMenuItem>
                                                     )}
                                                     
-                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                     
                                                     <DropdownMenuItem 
                                                         onClick={() => onCopyToClipboard(feeType.code || '', 'Fee Type Code')}
-                                                        className="flex items-center cursor-pointer"
+                                                        className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100"
                                                     >
                                                         <Clipboard className="mr-2 h-4 w-4" />
                                                         <span>Copy Code</span>
                                                     </DropdownMenuItem>
                                                     
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.fees.index', { fee_type: feeType.id })} className="flex items-center cursor-pointer">
+                                                        <Link href={route('admin.fees.index', { fee_type: feeType.id })} className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100">
                                                             <DollarSign className="mr-2 h-4 w-4" />
                                                             <span>View Fees</span>
                                                         </Link>
@@ -330,10 +300,10 @@ export default function FeeTypesTableView({
 
                                                     {isBulkMode && (
                                                         <>
-                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                             <DropdownMenuItem 
                                                                 onClick={() => onItemSelect(feeType.id)}
-                                                                className="flex items-center cursor-pointer"
+                                                                className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100"
                                                             >
                                                                 {isSelected ? (
                                                                     <>
@@ -350,10 +320,10 @@ export default function FeeTypesTableView({
                                                         </>
                                                     )}
                                                     
-                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                     
                                                     <DropdownMenuItem 
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-900/20"
                                                         onClick={() => onDelete(feeType)}
                                                     >
                                                         <Trash2 className="mr-2 h-4 w-4" />

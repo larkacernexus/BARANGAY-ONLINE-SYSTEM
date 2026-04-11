@@ -4,6 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { 
     Shield, 
     Key, 
@@ -18,18 +24,54 @@ import {
     Clock,
     Fingerprint,
     QrCode,
-    Trash2
+    Trash2,
+    ShieldCheck,
+    ShieldOff,
+    Loader2,
+    Calendar,
+    Globe
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
+import { User } from '@/types/admin/users/user-types';
 
 interface SecurityTabProps {
-    user: any;
+    user: User;
     onResetPassword: () => void;
     onToggle2FA: () => void;
     onDelete: () => void;
     isResettingPassword: boolean;
     formatDate: (date: string | null, includeTime?: boolean) => string;
+    has2FA?: boolean;
+    onClearSessions?: () => void;
+    isClearingSessions?: boolean;
+    onResendVerification?: () => void;
+    isResendingVerification?: boolean;
 }
+
+// Password strength indicator component
+const PasswordStrengthIndicator = ({ strength }: { strength: 'weak' | 'medium' | 'strong' }) => {
+    const getStrengthConfig = () => {
+        switch (strength) {
+            case 'weak':
+                return { width: '33%', color: 'bg-red-500', text: 'Weak', textColor: 'text-red-600 dark:text-red-400' };
+            case 'medium':
+                return { width: '66%', color: 'bg-yellow-500', text: 'Medium', textColor: 'text-yellow-600 dark:text-yellow-400' };
+            case 'strong':
+                return { width: '100%', color: 'bg-green-500', text: 'Strong', textColor: 'text-green-600 dark:text-green-400' };
+        }
+    };
+
+    const config = getStrengthConfig();
+
+    return (
+        <div className="mt-1 flex items-center gap-2">
+            <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className={`h-full ${config.color} rounded-full`} style={{ width: config.width }} />
+            </div>
+            <span className={`text-sm ${config.textColor}`}>{config.text}</span>
+        </div>
+    );
+};
 
 export const SecurityTab = ({
     user,
@@ -37,10 +79,27 @@ export const SecurityTab = ({
     onToggle2FA,
     onDelete,
     isResettingPassword,
-    formatDate
+    formatDate,
+    has2FA: propHas2FA,
+    onClearSessions,
+    isClearingSessions = false,
+    onResendVerification,
+    isResendingVerification = false,
 }: SecurityTabProps) => {
-    const has2FA = !!user.two_factor_confirmed_at;
+    // Safe access with fallbacks
+    const has2FA = propHas2FA ?? !!user.two_factor_confirmed_at;
     const emailVerified = !!user.email_verified_at;
+    const twoFactorEnabledAt = user.two_factor_confirmed_at;
+    const emailVerifiedAt = user.email_verified_at;
+    const lastPasswordChange = (user as any).password_changed_at || user.created_at;
+    const lastActivityAt = (user as any).last_activity_at || user.last_login_at;
+    const hasSessions = (user as any).sessions?.length > 0;
+
+    // Calculate password strength (mock - replace with actual logic)
+    const getPasswordStrength = (): 'weak' | 'medium' | 'strong' => {
+        // This is a mock implementation. Replace with actual password strength logic
+        return 'strong';
+    };
 
     return (
         <div className="grid gap-6 md:grid-cols-2">
@@ -48,11 +107,11 @@ export const SecurityTab = ({
             <Card className="dark:bg-gray-900">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                        <Key className="h-5 w-5" />
+                        <Key className="h-5 w-5 text-blue-500" />
                         Password Security
                     </CardTitle>
                     <CardDescription className="dark:text-gray-400">
-                        Manage password and authentication
+                        Manage password and authentication settings
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -60,34 +119,42 @@ export const SecurityTab = ({
                         <div>
                             <p className="font-medium dark:text-gray-200">Password</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Last changed: {formatDate(user.password_changed_at, true)}
+                                Last changed: {formatDate(lastPasswordChange, true)}
                             </p>
                         </div>
-                        <Button
-                            variant="outline"
-                            onClick={onResetPassword}
-                            disabled={isResettingPassword}
-                        >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${isResettingPassword ? 'animate-spin' : ''}`} />
-                            {isResettingPassword ? 'Sending...' : 'Reset Password'}
-                        </Button>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        onClick={onResetPassword}
+                                        disabled={isResettingPassword}
+                                    >
+                                        {isResettingPassword ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                Sending...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <RefreshCw className="h-4 w-4 mr-2" />
+                                                Reset Password
+                                            </>
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Send password reset email to user</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
 
-                    <Separator className="dark:bg-gray-700" />
+                    <Separator className="dark:bg-gray-800" />
 
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="font-medium dark:text-gray-200">Password Strength</p>
-                            <div className="mt-1 flex items-center gap-2">
-                                <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                    <div 
-                                        className="h-full bg-green-500 rounded-full" 
-                                        style={{ width: '100%' }}
-                                    />
-                                </div>
-                                <span className="text-sm text-green-600 dark:text-green-400">Strong</span>
-                            </div>
-                        </div>
+                    <div>
+                        <p className="font-medium dark:text-gray-200">Password Strength</p>
+                        <PasswordStrengthIndicator strength={getPasswordStrength()} />
                     </div>
                 </CardContent>
             </Card>
@@ -96,20 +163,20 @@ export const SecurityTab = ({
             <Card className="dark:bg-gray-900">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                        <Smartphone className="h-5 w-5" />
+                        <Smartphone className="h-5 w-5 text-purple-500" />
                         Two-Factor Authentication
                     </CardTitle>
                     <CardDescription className="dark:text-gray-400">
-                        Add an extra layer of security to your account
+                        Add an extra layer of security to the account
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {has2FA ? (
-                                <CheckCircle className="h-5 w-5 text-green-500" />
+                                <ShieldCheck className="h-5 w-5 text-green-500" />
                             ) : (
-                                <XCircle className="h-5 w-5 text-gray-400" />
+                                <ShieldOff className="h-5 w-5 text-gray-400" />
                             )}
                             <div>
                                 <p className="font-medium dark:text-gray-200">
@@ -117,34 +184,43 @@ export const SecurityTab = ({
                                 </p>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                     {has2FA 
-                                        ? `Enabled on ${formatDate(user.two_factor_confirmed_at, true)}`
-                                        : 'Protect your account with two-factor authentication'}
+                                        ? `Enabled on ${formatDate(twoFactorEnabledAt, true)}`
+                                        : 'Protect account with two-factor authentication'}
                                 </p>
                             </div>
                         </div>
-                        <Button
-                            variant={has2FA ? 'outline' : 'default'}
-                            onClick={onToggle2FA}
-                        >
-                            {has2FA ? (
-                                <>
-                                    <Unlock className="h-4 w-4 mr-2" />
-                                    Disable 2FA
-                                </>
-                            ) : (
-                                <>
-                                    <Lock className="h-4 w-4 mr-2" />
-                                    Enable 2FA
-                                </>
-                            )}
-                        </Button>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant={has2FA ? 'outline' : 'default'}
+                                        onClick={onToggle2FA}
+                                    >
+                                        {has2FA ? (
+                                            <>
+                                                <Unlock className="h-4 w-4 mr-2" />
+                                                Disable 2FA
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Lock className="h-4 w-4 mr-2" />
+                                                Enable 2FA
+                                            </>
+                                        )}
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{has2FA ? 'Disable two-factor authentication' : 'Enable two-factor authentication'}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
 
                     {!has2FA && (
-                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                             <p className="text-sm text-blue-700 dark:text-blue-400 flex items-center gap-2">
                                 <QrCode className="h-4 w-4" />
-                                Scan QR code with authenticator app to enable 2FA
+                                User can scan QR code with authenticator app to enable 2FA
                             </p>
                         </div>
                     )}
@@ -155,7 +231,7 @@ export const SecurityTab = ({
             <Card className="dark:bg-gray-900">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                        <Mail className="h-5 w-5" />
+                        <Mail className="h-5 w-5 text-green-500" />
                         Email Verification
                     </CardTitle>
                     <CardDescription className="dark:text-gray-400">
@@ -176,15 +252,39 @@ export const SecurityTab = ({
                                 </p>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                     {emailVerified 
-                                        ? `Verified on ${formatDate(user.email_verified_at, true)}`
+                                        ? `Verified on ${formatDate(emailVerifiedAt, true)}`
                                         : 'Verify email to recover account if needed'}
                                 </p>
                             </div>
                         </div>
-                        {!emailVerified && (
-                            <Button variant="outline" size="sm">
-                                Resend Verification
-                            </Button>
+                        {!emailVerified && onResendVerification && (
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm"
+                                            onClick={onResendVerification}
+                                            disabled={isResendingVerification}
+                                        >
+                                            {isResendingVerification ? (
+                                                <>
+                                                    <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                                    Sending...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Mail className="h-3 w-3 mr-2" />
+                                                    Resend
+                                                </>
+                                            )}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Resend verification email</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         )}
                     </div>
                 </CardContent>
@@ -194,7 +294,7 @@ export const SecurityTab = ({
             <Card className="dark:bg-gray-900">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                        <Fingerprint className="h-5 w-5" />
+                        <Fingerprint className="h-5 w-5 text-indigo-500" />
                         Session Management
                     </CardTitle>
                     <CardDescription className="dark:text-gray-400">
@@ -206,25 +306,51 @@ export const SecurityTab = ({
                         <div>
                             <p className="font-medium dark:text-gray-200">Current Session</p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Last active: {formatDate(user.last_activity_at, true)}
+                                Last active: {formatDate(lastActivityAt, true)}
                             </p>
                         </div>
-                        <Badge variant="outline">Active</Badge>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            Active
+                        </Badge>
                     </div>
 
-                    <Separator className="dark:bg-gray-700" />
-
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="font-medium dark:text-gray-200">Remembered Devices</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Devices that remember your login
-                            </p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={onResetPassword}>
-                            Clear All
-                        </Button>
-                    </div>
+                    {hasSessions && (
+                        <>
+                            <Separator className="dark:bg-gray-800" />
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-medium dark:text-gray-200">Remembered Devices</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        Devices that remember this user's login
+                                    </p>
+                                </div>
+                                {onClearSessions && (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={onClearSessions}
+                                                    disabled={isClearingSessions}
+                                                >
+                                                    {isClearingSessions ? (
+                                                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                                                    ) : (
+                                                        <Globe className="h-3 w-3 mr-2" />
+                                                    )}
+                                                    Clear All
+                                                </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Clear all remembered devices and sessions</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </CardContent>
             </Card>
 
@@ -240,21 +366,30 @@ export const SecurityTab = ({
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-950/30 rounded-lg">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
                         <div>
                             <p className="font-medium text-red-800 dark:text-red-300">Delete Account</p>
                             <p className="text-sm text-red-600 dark:text-red-400">
-                                Permanently delete this user account and all associated data
+                                Permanently delete this user account and all associated data. This action cannot be undone.
                             </p>
                         </div>
-                        <Button
-                            variant="destructive"
-                            onClick={onDelete}
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete User
-                        </Button>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={onDelete}
+                                        className="bg-red-600 hover:bg-red-700 text-white shadow-sm shrink-0"
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete User
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Permanently delete user account</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </div>
                 </CardContent>
             </Card>

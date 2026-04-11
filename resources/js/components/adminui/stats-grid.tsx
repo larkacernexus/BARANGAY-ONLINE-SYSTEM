@@ -1,5 +1,7 @@
 // components/adminui/stats-grid.tsx
-import { ReactNode, ReactElement } from 'react';
+
+import { ReactNode } from 'react';
+import { Progress } from '@/components/ui/progress';
 
 interface StatCardProps {
     title: string;
@@ -12,6 +14,9 @@ interface StatCardProps {
     isLoading?: boolean;
     onClick?: () => void;
     color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple' | 'gray';
+    footer?: string | ReactNode;
+    valueClassName?: string;
+    progress?: number;
 }
 
 export function StatCard({ 
@@ -24,7 +29,10 @@ export function StatCard({
     className = '',
     isLoading = false,
     onClick,
-    color = 'blue'
+    color = 'blue',
+    footer,
+    valueClassName = '',
+    progress
 }: StatCardProps) {
     const colorClasses = {
         blue: {
@@ -122,7 +130,7 @@ export function StatCard({
                         )}
                         {title}
                     </p>
-                    <p className="mt-2 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                    <p className={`mt-2 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white ${valueClassName}`}>
                         {value}
                     </p>
                 </div>
@@ -132,9 +140,22 @@ export function StatCard({
                     </div>
                 )}
             </div>
+            
             {description && (
                 <div className="mt-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                     {description}
+                </div>
+            )}
+            
+            {progress !== undefined && progress !== null && (
+                <div className="mt-3">
+                    <Progress value={progress} className="h-2" />
+                </div>
+            )}
+            
+            {footer && (
+                <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
+                    {footer}
                 </div>
             )}
         </div>
@@ -173,7 +194,6 @@ export function StatsGrid({
     );
 }
 
-// Optional: Add a StatsRow component for horizontal layouts
 interface StatsRowProps {
     children: ReactNode;
     className?: string;

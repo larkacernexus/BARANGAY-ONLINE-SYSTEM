@@ -1,5 +1,5 @@
-// resources/js/Pages/Admin/Households/Show/components/members/ResidentDetailsModal.tsx
-
+// resources/js/Pages/Admin/Puroks/components/resident-details-modal.tsx
+import React from 'react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { Badge } from '@/components/ui/badge';
@@ -16,13 +16,9 @@ import {
     CheckCircle,
     Clock,
     AlertCircle,
-    Home,
-    Users,
-    Star,
     Heart,
     Shield,
     Briefcase as BriefcaseIcon,
-    Calendar as CalendarIcon,
     Mail as MailIcon,
     Phone as PhoneIcon,
     MapPin as MapPinIcon,
@@ -31,7 +27,9 @@ import {
     UserRound,
     School,
     FileText,
-    Crown
+    Home,
+    Users,
+    Star
 } from 'lucide-react';
 import {
     Dialog,
@@ -43,93 +41,115 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-
-// Import types from shared types file
-import { HouseholdMember, Resident, Privilege } from '@/types/admin/households/household.types';
-import { 
-    getFullName, 
-    getPhotoUrl, 
-    calculateAge, 
-    getGenderLabel, 
-    getCivilStatusLabel,
-    formatDate,
-    formatDateTime,
-    getRelativeTime,
-    getRelationshipLabel,
-    ExtendedMember
-} from '@/types/admin/households/household.types';
-
-
-
-
+import { Resident } from '@/types/admin/puroks/purok';
 
 interface ResidentDetailsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    member: ExtendedMember | null;
+    resident: Resident | null;
 }
 
-export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDetailsModalProps) => {
-    if (!member) return null;
+interface StatCardProps {
+    icon: React.ElementType;
+    label: string;
+    value: string;
+    color?: string;
+}
 
-    const resident = member.resident;
+interface DetailCardProps {
+    icon: React.ElementType;
+    title: string;
+    children: React.ReactNode;
+    className?: string;
+}
 
-    // Get full name using shared utility
-    const fullName = resident.full_name || getFullName(resident.first_name, resident.last_name, resident.middle_name);
+interface DetailRowProps {
+    icon: React.ElementType;
+    label: string;
+    value: string | number | boolean | null | undefined;
+    highlight?: boolean;
+}
+
+const getFullName = (resident: Resident): string => {
+    let name = `${resident.first_name || ''}`;
+    if (resident.middle_name) {
+        name += ` ${resident.middle_name.charAt(0)}.`;
+    }
+    name += ` ${resident.last_name || ''}`;
+    return name.trim();
+};
+
+// ✅ FIXED: Handle photo_path as string, with type assertion
+const getPhotoUrl = (photoPath: any): string | null => {
+    if (!photoPath) return null;
+    if (typeof photoPath !== 'string') return null;
+    if (photoPath.startsWith('http')) return photoPath;
+    return `/storage/${photoPath}`;
+};
+
+const calculateAge = (birthDate: string | null): number | null => {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age;
+};
+
+const formatDate = (dateString: string | null): string => {
+    if (!dateString) return 'N/A';
+    try {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    } catch {
+        return dateString;
+    }
+};
+
+const getGenderLabel = (gender: string | null): string => {
+    if (!gender) return 'N/A';
+    const genderMap: Record<string, string> = {
+        male: 'Male',
+        female: 'Female',
+        other: 'Other',
+    };
+    return genderMap[gender.toLowerCase()] || gender;
+};
+
+const getCivilStatusLabel = (status: string | null): string => {
+    if (!status) return 'N/A';
+    const statusMap: Record<string, string> = {
+        single: 'Single',
+        married: 'Married',
+        widowed: 'Widowed',
+        divorced: 'Divorced',
+        separated: 'Separated',
+    };
+    return statusMap[status.toLowerCase()] || status;
+};
+
+export const ResidentDetailsModal = ({ open, onOpenChange, resident }: ResidentDetailsModalProps) => {
+    if (!resident) return null;
+
+    const fullName = getFullName(resident);
+    // ✅ FIXED: Access photo_path as property with type assertion
+    const photoPath = (resident as any).photo_path;
+    const photoUrl = photoPath ? getPhotoUrl(photoPath) : null;
+    const age = resident.age || calculateAge(resident.birth_date);
     
-    // Get photo URL using shared utility
-    const photoUrl = getPhotoUrl(resident.photo_path, resident.photo_url);
-    
-    // Calculate age if not provided
-    const age = resident.age || (resident.date_of_birth ? calculateAge(resident.date_of_birth) : undefined);
-    
-    // Get avatar initials
     const getInitials = () => {
         const first = resident.first_name?.[0] || '';
         const last = resident.last_name?.[0] || '';
         return (first + last).toUpperCase();
     };
 
-    const getPrivilegeIcon = (status: string) => {
-        switch (status) {
-            case 'active':
-                return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
-            case 'expiring_soon':
-                return <Clock className="h-3.5 w-3.5 text-yellow-500" />;
-            case 'expired':
-                return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
-            default:
-                return <Award className="h-3.5 w-3.5 text-gray-500" />;
-        }
-    };
-
-    const getPrivilegeBadgeClass = (status: string) => {
-        switch (status) {
-            case 'active':
-                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800';
-            case 'expiring_soon':
-                return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
-            case 'expired':
-                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700';
-        }
-    };
-
-    const getStatusLabel = (status: string) => {
-        switch (status) {
-            case 'expiring_soon':
-                return 'Expiring Soon';
-            case 'expired':
-                return 'Expired';
-            case 'pending':
-                return 'Pending';
-            default:
-                return 'Active';
-        }
-    };
-
-    const StatCard = ({ icon: Icon, label, value, color = "blue" }: any) => (
+    const StatCard = ({ icon: Icon, label, value, color = "blue" }: StatCardProps) => (
         <div className="group relative overflow-hidden rounded-xl bg-white dark:bg-gray-800/50 p-4 shadow-sm transition-all hover:shadow-md border border-gray-100 dark:border-gray-700">
             <div className="flex items-start justify-between">
                 <div className="space-y-1">
@@ -146,7 +166,7 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
         </div>
     );
 
-    const DetailCard = ({ icon: Icon, title, children, className }: any) => (
+    const DetailCard = ({ icon: Icon, title, children, className }: DetailCardProps) => (
         <div className={cn("rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800/30 p-5 shadow-sm", className)}>
             <div className="flex items-center gap-2 mb-4">
                 <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-2">
@@ -160,7 +180,7 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
         </div>
     );
 
-    const DetailRow = ({ icon: Icon, label, value, highlight = false }: any) => (
+    const DetailRow = ({ icon: Icon, label, value, highlight = false }: DetailRowProps) => (
         <div className="flex items-start gap-3 text-sm">
             <Icon className="h-4 w-4 text-gray-400 mt-0.5 shrink-0" />
             <div className="flex-1">
@@ -175,9 +195,12 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
         </div>
     );
 
+    // Get privileges from resident data
+    const privilegesList = (resident as any).privileges_list || [];
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[95vw] w-full max-h-[90vh] h-auto sm:max-w-[90vw] md:max-w-[85vw] lg:max-w-[80vw] xl:max-w-[75vw] 2xl:max-w-[70vw] landscape:max-w-[85vw] landscape:lg:max-w-[75vw] p-0 dark:bg-gray-900 overflow-hidden">
+            <DialogContent className="max-w-[95vw] w-full max-h-[90vh] h-auto sm:max-w-[90vw] md:max-w-[85vw] lg:max-w-[80vw] xl:max-w-[75vw] 2xl:max-w-[70vw] p-0 dark:bg-gray-900 overflow-hidden">
                 <ScrollArea className="max-h-[90vh]">
                     <div className="p-6">
                         {/* Header */}
@@ -208,11 +231,6 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                                 </AvatarFallback>
                                             )}
                                         </Avatar>
-                                        {member.is_head && (
-                                            <div className="absolute -bottom-2 -right-2 rounded-full bg-blue-500 p-1.5 border-2 border-white dark:border-gray-800">
-                                                <Crown className="h-3 w-3 text-white" />
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Name and Status */}
@@ -222,12 +240,12 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                         </h3>
                                         <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
                                             <Badge className="bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-300 border-0 shadow-sm px-3 py-1">
-                                                <Users className="h-3 w-3 mr-1" />
-                                                {member.relationship_to_head || getRelationshipLabel(member.relationship)}
+                                                <Home className="h-3 w-3 mr-1" />
+                                                Resident
                                             </Badge>
-                                            {member.is_head && (
+                                            {(resident as any).is_head_of_household && (
                                                 <Badge className="bg-blue-500 text-white border-0 shadow-sm px-3 py-1">
-                                                    <Home className="h-3 w-3 mr-1" />
+                                                    <Users className="h-3 w-3 mr-1" />
                                                     Household Head
                                                 </Badge>
                                             )}
@@ -238,8 +256,8 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                     <div className="grid grid-cols-2 gap-3 min-w-[200px]">
                                         <StatCard 
                                             icon={Calendar} 
-                                            label="Member Since" 
-                                            value={member.created_at ? formatDate(member.created_at) : 'N/A'} 
+                                            label="Registered" 
+                                            value={resident.created_at ? formatDate(resident.created_at) : 'N/A'} 
                                             color="blue" 
                                         />
                                         <StatCard 
@@ -268,9 +286,8 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                             highlight={resident.is_voter}
                                         />
                                         <DetailRow icon={School} label="Religion" value={resident.religion} />
-                                        {/* Date of Birth is now properly typed */}
-                                        {resident.date_of_birth && (
-                                            <DetailRow icon={CalendarIcon} label="Date of Birth" value={formatDate(resident.date_of_birth)} />
+                                        {resident.birth_date && (
+                                            <DetailRow icon={Calendar} label="Date of Birth" value={formatDate(resident.birth_date)} />
                                         )}
                                     </DetailCard>
 
@@ -303,38 +320,32 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                 </div>
                             </div>
 
-                            <Separator className="my-2" />
-
                             {/* Privileges Section */}
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between flex-wrap gap-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 p-2">
-                                            <Star className="h-4 w-4 text-white" />
+                            {privilegesList.length > 0 && (
+                                <>
+                                    <Separator className="my-2" />
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 p-2">
+                                                <Star className="h-4 w-4 text-white" />
+                                            </div>
+                                            <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">
+                                                Benefits & Privileges
+                                            </h4>
+                                            <Badge variant="secondary" className="ml-2">
+                                                {privilegesList.length}
+                                            </Badge>
                                         </div>
-                                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">
-                                            Benefits & Privileges
-                                        </h4>
-                                        <Badge variant="secondary" className="ml-2">
-                                            {resident.privileges_list?.length || 0} Total
-                                        </Badge>
-                                    </div>
-                                </div>
 
-                                {resident.privileges_list && resident.privileges_list.length > 0 ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {resident.privileges_list.map((privilege) => (
-                                            <div 
-                                                key={privilege.id} 
-                                                className="group relative overflow-hidden rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800/30 p-4 transition-all hover:shadow-md hover:border-gray-200 dark:hover:border-gray-600"
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-start gap-3 flex-1">
-                                                        <div className={cn(
-                                                            "p-2 rounded-lg transition-colors",
-                                                            getPrivilegeBadgeClass(privilege.status).replace('border-', 'bg-').split(' ')[0]
-                                                        )}>
-                                                            {getPrivilegeIcon(privilege.status)}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {privilegesList.map((privilege: any) => (
+                                                <div 
+                                                    key={privilege.id} 
+                                                    className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800/30 p-4"
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                            <Award className="h-4 w-4 text-gray-500" />
                                                         </div>
                                                         <div className="flex-1">
                                                             <h5 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
@@ -349,52 +360,24 @@ export const ResidentDetailsModal = ({ open, onOpenChange, member }: ResidentDet
                                                                         ID: {privilege.id_number}
                                                                     </span>
                                                                 )}
-                                                                {privilege.discount_percentage && (
+                                                                {privilege.discount_percentage && privilege.discount_percentage > 0 && (
                                                                     <span className="text-green-600 dark:text-green-400 font-medium">
                                                                         {privilege.discount_percentage}% OFF
                                                                     </span>
                                                                 )}
-                                                                {privilege.expiry_date && (
+                                                                {privilege.expires_at && (
                                                                     <span className="text-gray-500 dark:text-gray-400">
-                                                                        Expires: {formatDate(privilege.expiry_date)}
+                                                                        Expires: {formatDate(privilege.expires_at)}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <Badge className={cn(
-                                                        "ml-3 shrink-0 border",
-                                                        getPrivilegeBadgeClass(privilege.status)
-                                                    )}>
-                                                        {getStatusLabel(privilege.status)}
-                                                    </Badge>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/30 rounded-xl border border-gray-100 dark:border-gray-700">
-                                        <Award className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                                        <p className="text-gray-500 dark:text-gray-400">No benefits or privileges assigned</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Timeline */}
-                            {member.created_at && (
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                                        <Calendar className="h-4 w-4" />
-                                        <span>Added to household: {formatDateTime(member.created_at)}</span>
-                                        <span className="text-xs text-gray-400">({getRelativeTime(member.created_at)})</span>
-                                    </div>
-                                    {member.updated_at && member.updated_at !== member.created_at && (
-                                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                                            <Clock className="h-4 w-4" />
-                                            <span>Last updated: {formatDateTime(member.updated_at)}</span>
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                </>
                             )}
 
                             {/* Actions */}

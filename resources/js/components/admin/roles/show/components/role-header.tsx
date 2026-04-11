@@ -1,5 +1,5 @@
 // resources/js/Pages/Admin/Roles/components/role-header.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,19 +32,19 @@ import {
     Users,
     CalendarDays,
     ShieldCheck,
-    AlertCircle,
-    Sparkles
 } from 'lucide-react';
 import { route } from 'ziggy-js';
-import { Role } from '../types';
+import { Role } from '@/types/admin/roles/roles';
+import { formatDate } from '@/admin-utils/rolesUtils';
 
-interface Props {
+interface RoleHeaderProps {
     role: Role;
     onCopyLink: () => void;
     onExport: () => void;
     onManagePermissions: () => void;
     onDelete: () => void;
     canDelete: boolean;
+    copied?: boolean;
 }
 
 const getRoleGradient = (isSystemRole: boolean): string => {
@@ -69,101 +69,140 @@ export const RoleHeader = ({
     onExport,
     onManagePermissions,
     onDelete,
-    canDelete
-}: Props) => {
-    const [copied, setCopied] = useState(false);
+    canDelete,
+    copied = false
+}: RoleHeaderProps) => {
+    // Safe access with fallbacks
+    const usersCount = role.users_count ?? 0;
+    const permissionsCount = role.permissions_count ?? 0;
+    const hasUsers = usersCount > 0;
 
     const handleCopyLink = () => {
         onCopyLink();
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
     };
 
     return (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-                <Link href={route('admin.roles.index')}>
-                    <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Back to Roles
-                    </Button>
-                </Link>
-                <div className="flex items-center gap-3">
-                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-lg bg-gradient-to-r ${getRoleGradient(role.is_system_role)}`}>
-                        <Shield className="h-6 w-6 text-white" />
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-4 mb-4">
+                    <Link href={route('admin.roles.index')}>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="shrink-0 dark:border-gray-600 dark:text-gray-300"
+                        >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Back to Roles
+                        </Button>
+                    </Link>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                    <div className={`h-14 w-14 rounded-xl flex items-center justify-center shadow-lg bg-gradient-to-r ${getRoleGradient(role.is_system_role)} shrink-0`}>
+                        <Shield className="h-7 w-7 text-white" />
                     </div>
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
-                            {role.name}
-                        </h1>
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {/* Role Type Badge */}
+                    
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100 break-words">
+                                {role.name}
+                            </h1>
                             <Badge variant="outline" className={getRoleBadgeColor(role.is_system_role)}>
                                 {getRoleIcon(role.is_system_role)}
                                 <span className="ml-1">{role.is_system_role ? 'System Role' : 'Custom Role'}</span>
                             </Badge>
-
+                        </div>
+                        
+                        {role.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                                {role.description}
+                            </p>
+                        )}
+                        
+                        <div className="flex items-center gap-2 mt-3 flex-wrap">
                             {/* Role ID Badge with Copy */}
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <div 
-                                            className="flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-800 border border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800 rounded-full cursor-pointer hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors"
+                                        <button
                                             onClick={handleCopyLink}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                         >
-                                            <Hash className="h-3 w-3" />
+                                            <Hash className="h-3.5 w-3.5" />
                                             <span className="text-sm font-mono">
                                                 ID: {role.id}
                                             </span>
                                             {copied ? (
-                                                <Check className="h-3 w-3 ml-1" />
+                                                <Check className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                                             ) : (
-                                                <Copy className="h-3 w-3 ml-1" />
+                                                <Copy className="h-3.5 w-3.5" />
                                             )}
-                                        </div>
+                                        </button>
                                     </TooltipTrigger>
                                     <TooltipContent>Click to copy role ID</TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
 
-                            {/* Stats Badges - Replace with actual data */}
+                            {/* Slug Badge */}
+                            {role.slug && (
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 rounded-full">
+                                                <Shield className="h-3.5 w-3.5" />
+                                                <span className="text-sm font-mono">{role.slug}</span>
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Role Slug</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            )}
+
+                            {/* Permissions Badge */}
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 rounded-full cursor-default">
-                                            <Key className="h-3 w-3" />
-                                            <span className="text-sm font-medium">0</span>
+                                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 rounded-full">
+                                            <Key className="h-3.5 w-3.5" />
+                                            <span className="text-sm font-medium">{permissionsCount}</span>
+                                            <span className="text-xs hidden sm:inline">
+                                                permission{permissionsCount !== 1 ? 's' : ''}
+                                            </span>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent>Permissions</TooltipContent>
+                                    <TooltipContent>Total permissions granted</TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
 
+                            {/* Users Badge */}
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <div className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 rounded-full cursor-default">
-                                            <Users className="h-3 w-3" />
-                                            <span className="text-sm font-medium">0</span>
+                                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 rounded-full">
+                                            <Users className="h-3.5 w-3.5" />
+                                            <span className="text-sm font-medium">{usersCount}</span>
+                                            <span className="text-xs hidden sm:inline">
+                                                user{usersCount !== 1 ? 's' : ''}
+                                            </span>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent>Users with this role</TooltipContent>
+                                    <TooltipContent>Users assigned to this role</TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
 
-                            {/* Created At Badge - Optional */}
+                            {/* Created At Badge */}
                             {role.created_at && (
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <div className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 rounded-full cursor-default">
-                                                <CalendarDays className="h-3 w-3" />
+                                            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 rounded-full">
+                                                <CalendarDays className="h-3.5 w-3.5" />
                                                 <span className="text-sm">
-                                                    {new Date(role.created_at).toLocaleDateString()}
+                                                    {formatDate(role.created_at)}
                                                 </span>
                                             </div>
                                         </TooltipTrigger>
-                                        <TooltipContent>Created</TooltipContent>
+                                        <TooltipContent>Date created</TooltipContent>
                                     </Tooltip>
                                 </TooltipProvider>
                             )}
@@ -172,11 +211,11 @@ export const RoleHeader = ({
                 </div>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
                 {/* Manage Permissions Button - Primary Action */}
                 <Button
                     onClick={onManagePermissions}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700 dark:hover:from-blue-800 dark:hover:to-indigo-800"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700 dark:hover:from-blue-800 dark:hover:to-indigo-800 shadow-sm"
                 >
                     <Key className="h-4 w-4 mr-2" />
                     Manage Permissions
@@ -185,17 +224,21 @@ export const RoleHeader = ({
                 {/* 3-Dots Menu */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
+                        <Button 
+                            variant="outline" 
+                            size="default"
+                            className="dark:border-gray-600 dark:text-gray-300"
+                        >
                             <MoreVertical className="h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                    <DropdownMenuContent align="end" className="w-56 dark:bg-gray-900 dark:border-gray-700">
                         <DropdownMenuLabel className="dark:text-gray-100">Actions</DropdownMenuLabel>
                         <DropdownMenuSeparator className="dark:bg-gray-700" />
                         
                         <DropdownMenuItem 
                             onClick={handleCopyLink}
-                            className="dark:text-gray-300 dark:hover:bg-gray-700"
+                            className="dark:text-gray-300 dark:hover:bg-gray-700 cursor-pointer"
                         >
                             <Copy className="h-4 w-4 mr-2" />
                             Copy Link
@@ -203,15 +246,15 @@ export const RoleHeader = ({
                         
                         <DropdownMenuItem 
                             onClick={() => window.print()}
-                            className="dark:text-gray-300 dark:hover:bg-gray-700"
+                            className="dark:text-gray-300 dark:hover:bg-gray-700 cursor-pointer"
                         >
                             <Printer className="h-4 w-4 mr-2" />
-                            Print
+                            Print Details
                         </DropdownMenuItem>
                         
                         <DropdownMenuItem 
                             onClick={onExport}
-                            className="dark:text-gray-300 dark:hover:bg-gray-700"
+                            className="dark:text-gray-300 dark:hover:bg-gray-700 cursor-pointer"
                         >
                             <Download className="h-4 w-4 mr-2" />
                             Export as JSON
@@ -222,7 +265,7 @@ export const RoleHeader = ({
                             <>
                                 <DropdownMenuSeparator className="dark:bg-gray-700" />
                                 <DropdownMenuItem asChild className="dark:text-gray-300 dark:hover:bg-gray-700">
-                                    <Link href={route('admin.roles.edit', role.id)} className="flex items-center cursor-pointer">
+                                    <Link href={route('admin.roles.edit', role.id)} className="flex items-center cursor-pointer w-full">
                                         <Edit className="h-4 w-4 mr-2" />
                                         Edit Role
                                     </Link>
@@ -236,10 +279,10 @@ export const RoleHeader = ({
                                 <DropdownMenuSeparator className="dark:bg-gray-700" />
                                 <DropdownMenuItem 
                                     onClick={onDelete} 
-                                    className="text-red-600 dark:text-red-400 dark:hover:bg-red-950/50"
+                                    className="text-red-600 dark:text-red-400 dark:hover:bg-red-950/50 cursor-pointer"
                                 >
                                     <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
+                                    Delete Role
                                 </DropdownMenuItem>
                             </>
                         )}

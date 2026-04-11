@@ -43,6 +43,15 @@ class RolePermission extends Model
     }
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = [
+        'granter_name',
+    ];
+
+    /**
      * Get the role that owns the permission assignment.
      */
     public function role(): BelongsTo
@@ -64,6 +73,22 @@ class RolePermission extends Model
     public function granter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'granted_by');
+    }
+
+    /**
+     * Get granter name attribute (handles NULL)
+     */
+    public function getGranterNameAttribute(): string
+    {
+        if (!$this->granted_by) {
+            return 'System';
+        }
+        
+        if ($this->relationLoaded('granter') && $this->granter) {
+            return $this->granter->username ?: ($this->granter->first_name . ' ' . $this->granter->last_name);
+        }
+        
+        return 'System';
     }
 
     /**

@@ -7,7 +7,7 @@ import {
     Filters, 
     Stats, 
     BulkOperation 
-} from '@/types/communityReportTypes';
+} from '@/types/admin/reports/communityReportTypes';
 import { 
     formatDate, 
     formatDateTime, 

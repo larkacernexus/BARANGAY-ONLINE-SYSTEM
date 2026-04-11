@@ -1,9 +1,9 @@
 // components/admin/payments/PaymentsFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
     Search, 
     Filter, 
@@ -17,27 +17,13 @@ import {
 } from 'lucide-react';
 import { RefObject } from 'react';
 
-interface PaymentMethod {
-    value: string;
-    label: string;
-    icon: string;
-}
-
-interface StatusOption {
-    value: string;
-    label: string;
-}
-
-interface PayerTypeOption {
-    value: string;
-    label: string;
-}
-
-interface PaginationMeta {
-    from: number;
-    to: number;
-    total: number;
-}
+// Import types from centralized location
+import type { 
+    PaymentMethod, 
+    StatusOption, 
+    PayerTypeOption,
+    PaginationMeta 
+} from '@/types/admin/payments/payments';
 
 interface PaymentsFiltersProps {
     search: string;
@@ -61,7 +47,7 @@ interface PaymentsFiltersProps {
     paymentMethods: PaymentMethod[];
     statusOptions: StatusOption[];
     payerTypeOptions: PayerTypeOption[];
-    searchInputRef: RefObject<HTMLInputElement>;
+    searchInputRef: RefObject<HTMLInputElement | null>;
     payments: {
         meta: PaginationMeta;
     };
@@ -70,7 +56,7 @@ interface PaymentsFiltersProps {
     handleSelectAllOnPage: () => void;
     handleSelectAllFiltered: () => void;
     handleSelectAll: () => void;
-    selectionRef: RefObject<HTMLDivElement>;
+    selectionRef: RefObject<HTMLDivElement | null>;
     showSelectionOptions: boolean;
     setShowSelectionOptions: (value: boolean) => void;
     setSelectedPayments: (value: number[] | ((prev: number[]) => number[])) => void;
@@ -110,16 +96,23 @@ export default function PaymentsFilters({
     setShowSelectionOptions,
     setSelectedPayments
 }: PaymentsFiltersProps) {
+    
+    // Convert hasActiveFilters to boolean
+    const activeFilters = typeof hasActiveFilters === 'string' 
+        ? hasActiveFilters === 'true' || hasActiveFilters === '1'
+        : Boolean(hasActiveFilters);
+
     return (
         <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <CardContent className="pt-6">
                 <div className="flex flex-col space-y-4">
+                    {/* Search Bar */}
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
                             <Input
                                 ref={searchInputRef}
-                                placeholder="Search by OR number, payer name, reference number... (Ctrl+F)"
+                                placeholder="Search by OR number, payer name, reference number..."
                                 className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -163,7 +156,7 @@ export default function PaymentsFilters({
                         </div>
                     </div>
 
-                    {/* Active filters indicator and clear button */}
+                    {/* Active Filters Info and Clear Button */}
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                             Showing {payments.meta?.from || 1} to {payments.meta?.to || 0} of {payments.meta?.total || 0} payments
@@ -171,17 +164,33 @@ export default function PaymentsFilters({
                         </div>
                         
                         <div className="flex items-center gap-3">
-                            {hasActiveFilters && (
+                            {activeFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleClearFilters}
                                     disabled={isLoading}
-                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 h-8"
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
                                 >
                                     <FilterX className="h-3.5 w-3.5 mr-1" />
                                     Clear Filters
                                 </Button>
+                            )}
+                            {isBulkMode && selectedPayments.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 rounded-md text-xs">
+                                        <Layers className="h-3 w-3" />
+                                        <span>{selectedPayments.length} selected</span>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setSelectedPayments([])}
+                                        className="h-7 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                                    >
+                                        Clear
+                                    </Button>
+                                </div>
                             )}
                             {isBulkMode && (
                                 <div className="flex items-center gap-2 relative" ref={selectionRef}>
@@ -195,6 +204,7 @@ export default function PaymentsFilters({
                                         <Layers className="h-3.5 w-3.5 mr-1" />
                                         Select
                                     </Button>
+                                    
                                     {showSelectionOptions && (
                                         <div className="absolute right-0 top-full mt-1 z-50 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg">
                                             <div className="p-2">
@@ -207,7 +217,7 @@ export default function PaymentsFilters({
                                                     onClick={handleSelectAllOnPage}
                                                 >
                                                     <Rows className="h-3.5 w-3.5 mr-2" />
-                                                    Current Page ({payments.meta?.to || 0})
+                                                    Current Page
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
@@ -229,7 +239,10 @@ export default function PaymentsFilters({
                                                 <Button
                                                     variant="ghost"
                                                     className="w-full justify-start h-8 text-sm text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50"
-                                                    onClick={() => setSelectedPayments([])}
+                                                    onClick={() => {
+                                                        setSelectedPayments([]);
+                                                        setShowSelectionOptions(false);
+                                                    }}
                                                 >
                                                     <RotateCcw className="h-3.5 w-3.5 mr-2" />
                                                     Clear Selection
@@ -243,52 +256,52 @@ export default function PaymentsFilters({
                     </div>
 
                     {/* Basic Filters */}
-                    <div className="flex flex-wrap gap-2 sm:gap-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Status:</span>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Status</Label>
                             <select
-                                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 disabled={isLoading}
                             >
-                                <option value="all" className="bg-white dark:bg-gray-900">All Status</option>
+                                <option value="all">All Status</option>
                                 {statusOptions.map((option) => (
-                                    <option key={option.value} value={option.value} className="bg-white dark:bg-gray-900">
+                                    <option key={option.value} value={option.value}>
                                         {option.label}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Method:</span>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Payment Method</Label>
                             <select
-                                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={methodFilter}
                                 onChange={(e) => setMethodFilter(e.target.value)}
                                 disabled={isLoading}
                             >
-                                <option value="all" className="bg-white dark:bg-gray-900">All Methods</option>
+                                <option value="all">All Methods</option>
                                 {paymentMethods.map((method) => (
-                                    <option key={method.value} value={method.value} className="bg-white dark:bg-gray-900">
+                                    <option key={method.value} value={method.value}>
                                         {method.label}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Payer:</span>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Payer Type</Label>
                             <select
-                                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={payerTypeFilter}
                                 onChange={(e) => setPayerTypeFilter(e.target.value)}
                                 disabled={isLoading}
                             >
-                                <option value="all" className="bg-white dark:bg-gray-900">All Types</option>
+                                <option value="all">All Types</option>
                                 {payerTypeOptions.map((type) => (
-                                    <option key={type.value} value={type.value} className="bg-white dark:bg-gray-900">
+                                    <option key={type.value} value={type.value}>
                                         {type.label}
                                     </option>
                                 ))}
@@ -298,29 +311,60 @@ export default function PaymentsFilters({
 
                     {/* Advanced Filters */}
                     {showAdvancedFilters && (
-                        <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* Date Range Filter */}
+                        <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Advanced Filters</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Date Range */}
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Date Range</Label>
-                                    <div className="flex gap-2">
+                                    <div className="grid grid-cols-2 gap-2">
                                         <Input
-                                            placeholder="From date"
+                                            placeholder="From Date"
                                             type="date"
-                                            className="flex-1 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             value={dateFrom}
                                             onChange={(e) => setDateFrom(e.target.value)}
+                                            className="text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             disabled={isLoading}
                                         />
-                                        <span className="self-center text-sm text-gray-500 dark:text-gray-400">to</span>
                                         <Input
-                                            placeholder="To date"
+                                            placeholder="To Date"
                                             type="date"
-                                            className="flex-1 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             value={dateTo}
                                             onChange={(e) => setDateTo(e.target.value)}
+                                            className="text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                             disabled={isLoading}
                                         />
+                                    </div>
+                                    <div className="flex gap-2 mt-1">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs h-7"
+                                            onClick={() => {
+                                                const today = new Date();
+                                                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                                                setDateFrom(firstDay.toISOString().split('T')[0]);
+                                                setDateTo(today.toISOString().split('T')[0]);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            This Month
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs h-7"
+                                            onClick={() => {
+                                                const today = new Date();
+                                                const thirtyDaysAgo = new Date(today);
+                                                thirtyDaysAgo.setDate(today.getDate() - 30);
+                                                setDateFrom(thirtyDaysAgo.toISOString().split('T')[0]);
+                                                setDateTo(today.toISOString().split('T')[0]);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Last 30 Days
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
@@ -328,9 +372,9 @@ export default function PaymentsFilters({
                     )}
                 </div>
                 
+                {/* Loading indicator */}
                 {isLoading && (
-                    <div className="mt-3 text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent"></div>
+                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 animate-pulse">
                         Loading payments...
                     </div>
                 )}

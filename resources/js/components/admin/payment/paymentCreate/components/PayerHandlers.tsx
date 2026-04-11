@@ -9,7 +9,7 @@ import {
     OutstandingFee, 
     PaymentFormData,
     FeeType 
-} from '../types';
+} from '@/types/admin/payments/payments';
 import { 
     parseAmount, 
     calculateMonthsLate,

@@ -6,8 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Users, Search, X, User } from 'lucide-react';
-import { Resident } from './BlotterTypes';
-
+import { Resident } from '@/types/admin/blotters/blotter';
 interface InvolvedResidentsCardProps {
     residents: Resident[];
     selectedResidents: Resident[];

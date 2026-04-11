@@ -68,7 +68,7 @@ class ResidentFeeController extends Controller
         // Replace the collection with formatted data
         $fees->setCollection($formattedFees);
         
-        // Calculate stats for the entire household
+        // Calculate stats for the entire household using actual fee data
         $stats = $this->calculateHouseholdFeeStats($householdResidentIds, $householdId, $allPrivileges);
         
         // Get household members list for reference
@@ -90,7 +90,7 @@ class ResidentFeeController extends Controller
                 'currentResidentName' => $currentResident->full_name,
                 'householdSize' => count($householdResidentIds),
             ],
-            'allPrivileges' => $allPrivileges, // Send all privileges to frontend
+            'allPrivileges' => $allPrivileges,
         ]);
     }
 
@@ -121,7 +121,7 @@ class ResidentFeeController extends Controller
         // Update eager loading to use payer
         $fee->load([
             'feeType.documentCategory:id,name,slug',
-            'payer', // Load polymorphic payer
+            'payer',
             'paymentItems.payment' => function ($query) {
                 $query->select('id', 'payment_date', 'or_number', 'payment_method', 'status');
             }
@@ -152,16 +152,28 @@ class ResidentFeeController extends Controller
     private function getAllPrivileges(): array
     {
         return Cache::remember('all_active_privileges', 3600, function () {
-            return Privilege::where('is_active', true)
+            return Privilege::with('discountType')
+                ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'code', 'description', 'default_discount_percentage'])
+                ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
                 ->map(function ($privilege) {
                     return [
                         'id' => $privilege->id,
                         'name' => $privilege->name,
                         'code' => $privilege->code,
                         'description' => $privilege->description,
-                        'default_discount_percentage' => $privilege->default_discount_percentage,
+                        'discount_type_id' => $privilege->discount_type_id,
+                        'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
+                        'discount_type' => $privilege->discountType ? [
+                            'id' => $privilege->discountType->id,
+                            'code' => $privilege->discountType->code,
+                            'name' => $privilege->discountType->name,
+                            'percentage' => (float) $privilege->discountType->percentage,
+                            'requires_id_number' => (bool) $privilege->discountType->requires_id_number,
+                            'requires_verification' => (bool) $privilege->discountType->requires_verification,
+                            'verification_document' => $privilege->discountType->verification_document,
+                            'validity_days' => $privilege->discountType->validity_days,
+                        ] : null,
                     ];
                 })
                 ->toArray();
@@ -176,28 +188,24 @@ class ResidentFeeController extends Controller
         $cacheKey = "auth_resident_{$user->id}";
         
         return Cache::remember($cacheKey, 300, function () use ($user) {
-            // First try to get the resident from current_resident_id
             if ($user->current_resident_id) {
-                $resident = Resident::with(['household', 'residentPrivileges.privilege'])->find($user->current_resident_id);
+                $resident = Resident::with(['household', 'residentPrivileges.privilege.discountType'])->find($user->current_resident_id);
                 if ($resident) {
                     return $resident;
                 }
             }
             
-            // If user has household_id, try to find the head resident
             if ($user->household_id) {
-                // Find household head through household members
                 $householdMember = HouseholdMember::where('household_id', $user->household_id)
                     ->where('is_head', true)
-                    ->with(['resident.residentPrivileges.privilege'])
+                    ->with(['resident.residentPrivileges.privilege.discountType'])
                     ->first();
                     
                 if ($householdMember && $householdMember->resident) {
                     return $householdMember->resident;
                 }
                 
-                // If no head found, get the first resident in the household
-                $firstResident = Resident::with(['residentPrivileges.privilege'])
+                $firstResident = Resident::with(['residentPrivileges.privilege.discountType'])
                     ->where('household_id', $user->household_id)
                     ->first();
                     
@@ -231,7 +239,6 @@ class ResidentFeeController extends Controller
         return Cache::remember($cacheKey, 300, function () use ($resident) {
             $residentIds = [$resident->id];
             
-            // Get all residents in the same household through household_id
             if ($resident->household_id) {
                 $householdResidents = Resident::where('household_id', $resident->household_id)
                     ->pluck('id')
@@ -239,7 +246,6 @@ class ResidentFeeController extends Controller
                 
                 $residentIds = array_unique(array_merge($residentIds, $householdResidents));
                 
-                // Also get residents through household members table (for additional safety)
                 $householdMembers = HouseholdMember::where('household_id', $resident->household_id)
                     ->pluck('resident_id')
                     ->toArray();
@@ -260,13 +266,11 @@ class ResidentFeeController extends Controller
     {
         $query = Fee::query()
             ->where(function ($query) use ($residentIds, $householdId) {
-                // Include fees where payer is any resident in the household
                 $query->where(function ($q) use ($residentIds) {
                     $q->where('payer_type', 'App\\Models\\Resident')
                       ->whereIn('payer_id', $residentIds);
                 });
                 
-                // Include fees where payer is the household itself
                 if ($householdId) {
                     $query->orWhere(function ($q) use ($householdId) {
                         $q->where('payer_type', 'App\\Models\\Household')
@@ -276,11 +280,10 @@ class ResidentFeeController extends Controller
             })
             ->with([
                 'feeType.documentCategory:id,name,slug',
-                'payer', // Load polymorphic payer
+                'payer',
             ])
             ->latest('issue_date');
         
-        // Apply filters
         $this->applyFilters($query, $request, $residentIds, $householdId);
         
         return $query;
@@ -291,7 +294,6 @@ class ResidentFeeController extends Controller
      */
     private function applyFilters($query, Request $request, array $residentIds, ?int $householdId): void
     {
-        // Search filter
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -306,7 +308,6 @@ class ResidentFeeController extends Controller
             });
         }
         
-        // Status filter
         if ($request->filled('status') && $request->status !== 'all') {
             if ($request->status === 'overdue') {
                 $query->where('balance', '>', 0)
@@ -317,21 +318,17 @@ class ResidentFeeController extends Controller
             }
         }
         
-        // Fee type filter
         if ($request->filled('fee_type') && $request->fee_type !== 'all') {
             $query->where('fee_type_id', $request->fee_type);
         }
         
-        // Year filter
         if ($request->filled('year') && $request->year !== 'all') {
             $query->whereYear('issue_date', $request->year);
         }
         
-        // Resident filter - filter by specific resident within the household
         if ($request->filled('resident') && $request->resident !== 'all') {
             $residentId = $request->resident;
             
-            // Only apply filter if the selected resident is part of the household
             if (in_array($residentId, $residentIds)) {
                 $query->where(function ($q) use ($residentId) {
                     $q->where('payer_type', 'App\\Models\\Resident')
@@ -340,9 +337,7 @@ class ResidentFeeController extends Controller
             }
         }
         
-        // Payer type filter
         if ($request->filled('payer_type') && $request->payer_type !== 'all') {
-            // Convert simple payer type to model class
             $payerTypeMap = [
                 'resident' => 'App\\Models\\Resident',
                 'household' => 'App\\Models\\Household',
@@ -428,25 +423,29 @@ class ResidentFeeController extends Controller
     {
         return Resident::query()
             ->whereIn('id', $residentIds)
-            ->with(['residentPrivileges.privilege'])
+            ->with(['residentPrivileges.privilege.discountType'])
             ->orderBy('first_name')
             ->get()
             ->map(function ($resident) use ($allPrivileges) {
-                // Get active privileges
                 $activePrivileges = $resident->residentPrivileges
                     ->filter(function ($rp) {
                         return $rp->isActive();
                     })
                     ->map(function ($rp) {
+                        $privilege = $rp->privilege;
+                        $discountPercentage = $rp->discount_percentage 
+                            ?? $privilege->discountType?->percentage 
+                            ?? 0;
+                        
                         return [
-                            'code' => $rp->privilege->code,
-                            'name' => $rp->privilege->name,
+                            'code' => $privilege->code,
+                            'name' => $privilege->name,
+                            'discount_percentage' => (float) $discountPercentage,
                         ];
                     })
                     ->values()
                     ->toArray();
 
-                // DYNAMIC privilege flags
                 $privilegeFlags = [];
                 foreach ($activePrivileges as $priv) {
                     $code = strtolower($priv['code']);
@@ -478,27 +477,31 @@ class ResidentFeeController extends Controller
                 'householdMemberships' => function ($query) {
                     $query->where('is_head', true);
                 },
-                'residentPrivileges.privilege'
+                'residentPrivileges.privilege.discountType'
             ])
             ->get()
             ->map(function ($resident) use ($allPrivileges) {
                 $isHead = $resident->householdMemberships->isNotEmpty();
                 
-                // Get active privileges
                 $activePrivileges = $resident->residentPrivileges
                     ->filter(function ($rp) {
                         return $rp->isActive();
                     })
                     ->map(function ($rp) {
+                        $privilege = $rp->privilege;
+                        $discountPercentage = $rp->discount_percentage 
+                            ?? $privilege->discountType?->percentage 
+                            ?? 0;
+                        
                         return [
-                            'code' => $rp->privilege->code,
-                            'name' => $rp->privilege->name,
+                            'code' => $privilege->code,
+                            'name' => $privilege->name,
+                            'discount_percentage' => (float) $discountPercentage,
                         ];
                     })
                     ->values()
                     ->toArray();
 
-                // DYNAMIC privilege flags
                 $privilegeFlags = [];
                 foreach ($activePrivileges as $priv) {
                     $code = strtolower($priv['code']);
@@ -520,13 +523,15 @@ class ResidentFeeController extends Controller
 
     /**
      * Calculate fee statistics for the entire household
+     * FIXED: Uses base_amount instead of total_amount for accurate calculations
      */
     private function calculateHouseholdFeeStats(array $residentIds, ?int $householdId, array $allPrivileges): array
     {
         $now = now();
         $currentYear = $now->year;
         
-        $baseQuery = Fee::query()
+        // Get all fees for calculation
+        $allFees = Fee::query()
             ->where(function ($query) use ($residentIds, $householdId) {
                 $query->where(function ($q) use ($residentIds) {
                     $q->where('payer_type', 'App\\Models\\Resident')
@@ -539,54 +544,92 @@ class ResidentFeeController extends Controller
                           ->where('payer_id', $householdId);
                     });
                 }
-            });
+            })
+            ->get();
         
-        $totalStats = (clone $baseQuery)
-            ->selectRaw('COUNT(*) as total_count')
-            ->selectRaw('SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) as pending_count')
-            ->selectRaw('SUM(CASE WHEN status = "paid" THEN 1 ELSE 0 END) as paid_count')
-            ->selectRaw('SUM(CASE WHEN status = "issued" THEN 1 ELSE 0 END) as issued_count')
-            ->selectRaw('SUM(CASE WHEN due_date < ? AND status IN ("pending", "issued", "partially_paid") AND balance > 0 THEN 1 ELSE 0 END) as overdue_count', [$now])
-            ->selectRaw('SUM(CASE WHEN status IN ("pending", "overdue", "issued", "partially_paid") THEN balance ELSE 0 END) as total_balance')
-            ->selectRaw('SUM(amount_paid) as total_paid')
-            ->first();
+        // Calculate totals using base_amount
+        $totalAmount = $allFees->sum('base_amount');
+        $totalPaid = $allFees->sum('amount_paid');
+        $totalBalance = $allFees->sum(function ($fee) {
+            return max(0, $fee->base_amount - $fee->amount_paid);
+        });
         
-        $currentYearStats = (clone $baseQuery)
-            ->whereYear('issue_date', $currentYear)
-            ->selectRaw('SUM(total_amount) as year_total')
-            ->selectRaw('SUM(amount_paid) as year_paid')
-            ->selectRaw('SUM(CASE WHEN status IN ("pending", "overdue", "issued", "partially_paid") THEN balance ELSE 0 END) as year_balance')
-            ->first();
+        // Count by status
+        $totalCount = $allFees->count();
+        $pendingCount = $allFees->whereIn('status', ['pending', 'issued'])->count();
+        $paidCount = $allFees->where('status', 'paid')->count();
+        $issuedCount = $allFees->where('status', 'issued')->count();
+        $overdueCount = $allFees->filter(function ($fee) use ($now) {
+            return $fee->due_date && 
+                   $fee->due_date < $now && 
+                   !in_array($fee->status, ['paid', 'cancelled', 'waived']) && 
+                   $fee->balance > 0;
+        })->count();
+        
+        // Calculate amounts by status using base_amount
+        $pendingAmount = $allFees->filter(function ($fee) {
+            return in_array($fee->status, ['pending', 'issued']);
+        })->sum(function ($fee) {
+            return max(0, $fee->base_amount - $fee->amount_paid);
+        });
+        
+        $overdueAmount = $allFees->filter(function ($fee) use ($now) {
+            return $fee->due_date && 
+                   $fee->due_date < $now && 
+                   !in_array($fee->status, ['paid', 'cancelled', 'waived']) && 
+                   $fee->balance > 0;
+        })->sum(function ($fee) {
+            return max(0, $fee->base_amount - $fee->amount_paid);
+        });
+        
+        $paidAmount = $allFees->where('status', 'paid')->sum('base_amount');
+        
+        // Yearly stats
+        $currentYearFees = $allFees->filter(function ($fee) use ($currentYear) {
+            return $fee->issue_date && $fee->issue_date->year == $currentYear;
+        });
+        
+        $currentYearTotal = $currentYearFees->sum('base_amount');
+        $currentYearPaid = $currentYearFees->sum('amount_paid');
+        $currentYearBalance = $currentYearFees->sum(function ($fee) {
+            return max(0, $fee->base_amount - $fee->amount_paid);
+        });
+        
+        // Payment rate
+        $paymentRate = $totalAmount > 0 ? round(($totalPaid / $totalAmount) * 100, 1) : 0;
         
         // Calculate per-resident stats with privilege info
         $perResidentStats = [];
         foreach ($residentIds as $residentId) {
-            $resident = Resident::with(['residentPrivileges.privilege'])->find($residentId);
+            $resident = Resident::with(['residentPrivileges.privilege.discountType'])->find($residentId);
             if ($resident) {
-                $residentFees = Fee::where('payer_type', 'App\\Models\\Resident')
-                    ->where('payer_id', $residentId)
-                    ->count();
+                $residentFees = $allFees->filter(function ($fee) use ($residentId) {
+                    return $fee->payer_type === 'App\\Models\\Resident' && $fee->payer_id == $residentId;
+                });
                 
-                $residentBalance = Fee::where('payer_type', 'App\\Models\\Resident')
-                    ->where('payer_id', $residentId)
-                    ->whereIn('status', ['pending', 'overdue', 'issued', 'partially_paid'])
-                    ->sum('balance');
+                $residentBalance = $residentFees->sum(function ($fee) {
+                    return max(0, $fee->base_amount - $fee->amount_paid);
+                });
                 
-                // Get active privileges
                 $activePrivileges = $resident->residentPrivileges
                     ->filter(function ($rp) {
                         return $rp->isActive();
                     })
                     ->map(function ($rp) {
+                        $privilege = $rp->privilege;
+                        $discountPercentage = $rp->discount_percentage 
+                            ?? $privilege->discountType?->percentage 
+                            ?? 0;
+                        
                         return [
-                            'code' => $rp->privilege->code,
-                            'name' => $rp->privilege->name,
+                            'code' => $privilege->code,
+                            'name' => $privilege->name,
+                            'discount_percentage' => (float) $discountPercentage,
                         ];
                     })
                     ->values()
                     ->toArray();
 
-                // DYNAMIC privilege flags
                 $privilegeFlags = [];
                 foreach ($activePrivileges as $priv) {
                     $code = strtolower($priv['code']);
@@ -596,7 +639,7 @@ class ResidentFeeController extends Controller
                 $perResidentStats[] = array_merge([
                     'resident_id' => $residentId,
                     'resident_name' => $resident->full_name,
-                    'fee_count' => $residentFees,
+                    'fee_count' => $residentFees->count(),
                     'balance' => (float) $residentBalance,
                     'privileges' => $activePrivileges,
                     'has_privileges' => count($activePrivileges) > 0,
@@ -605,16 +648,32 @@ class ResidentFeeController extends Controller
         }
         
         return [
-            'total_fees' => (int) ($totalStats->total_count ?? 0),
-            'pending_fees' => (int) ($totalStats->pending_count ?? 0),
-            'overdue_fees' => (int) ($totalStats->overdue_count ?? 0),
-            'paid_fees' => (int) ($totalStats->paid_count ?? 0),
-            'issued_fees' => (int) ($totalStats->issued_count ?? 0),
-            'total_balance' => (float) ($totalStats->total_balance ?? 0),
-            'total_paid' => (float) ($totalStats->total_paid ?? 0),
-            'current_year_total' => (float) ($currentYearStats->year_total ?? 0),
-            'current_year_paid' => (float) ($currentYearStats->year_paid ?? 0),
-            'current_year_balance' => (float) ($currentYearStats->year_balance ?? 0),
+            // Counts
+            'total_fees' => $totalCount,
+            'pending_fees' => $pendingCount,
+            'overdue_fees' => $overdueCount,
+            'paid_fees' => $paidCount,
+            'issued_fees' => $issuedCount,
+            
+            // Amounts
+            'total_amount' => (float) $totalAmount,
+            'total_balance' => (float) $totalBalance,
+            'total_paid' => (float) $totalPaid,
+            
+            // Amounts by status
+            'pending_amount' => (float) $pendingAmount,
+            'overdue_amount' => (float) $overdueAmount,
+            'paid_amount' => (float) $paidAmount,
+            
+            // Yearly stats
+            'current_year_total' => (float) $currentYearTotal,
+            'current_year_paid' => (float) $currentYearPaid,
+            'current_year_balance' => (float) $currentYearBalance,
+            
+            // Payment rate
+            'payment_rate' => $paymentRate,
+            
+            // Per resident stats
             'per_resident_stats' => $perResidentStats,
         ];
     }
@@ -624,12 +683,10 @@ class ResidentFeeController extends Controller
      */
     private function authorizeFeeAccess(Fee $fee, array $residentIds, ?int $householdId): bool
     {
-        // Check if fee belongs to any resident in the household
         if ($fee->payer_type === 'App\\Models\\Resident') {
             return in_array($fee->payer_id, $residentIds);
         }
         
-        // Check if fee belongs to the household
         if ($fee->payer_type === 'App\\Models\\Household') {
             return $fee->payer_id === $householdId;
         }
@@ -643,22 +700,26 @@ class ResidentFeeController extends Controller
     private function getPayerInfo(Fee $fee, array $allPrivileges): array
     {
         if ($fee->payer_type === 'App\\Models\\Resident' && $fee->payer) {
-            // Get resident's active privileges
             $activePrivileges = $fee->payer->residentPrivileges
                 ->filter(function ($rp) {
                     return $rp->isActive();
                 })
                 ->map(function ($rp) {
+                    $privilege = $rp->privilege;
+                    $discountPercentage = $rp->discount_percentage 
+                        ?? $privilege->discountType?->percentage 
+                        ?? 0;
+                    
                     return [
-                        'code' => $rp->privilege->code,
-                        'name' => $rp->privilege->name,
+                        'code' => $privilege->code,
+                        'name' => $privilege->name,
                         'id_number' => $rp->id_number,
+                        'discount_percentage' => (float) $discountPercentage,
                     ];
                 })
                 ->values()
                 ->toArray();
 
-            // DYNAMIC privilege flags
             $privilegeFlags = [];
             foreach ($activePrivileges as $priv) {
                 $code = strtolower($priv['code']);
@@ -691,9 +752,14 @@ class ResidentFeeController extends Controller
 
     /**
      * Format fee for frontend
+     * FIXED: Uses base_amount when total_amount is 0
      */
     private function formatFeeForFrontend($fee, array $allPrivileges): array
     {
+        // Calculate actual total amount (use base_amount if total_amount is 0)
+        $actualTotalAmount = $fee->total_amount > 0 ? $fee->total_amount : $fee->base_amount;
+        $actualBalance = $fee->balance > 0 ? $fee->balance : max(0, $actualTotalAmount - $fee->amount_paid);
+        
         // Convert payer_type for frontend display
         $displayPayerType = 'other';
         if ($fee->payer_type === 'App\\Models\\Resident') {
@@ -724,15 +790,15 @@ class ResidentFeeController extends Controller
             'surcharge_amount' => (float) $fee->surcharge_amount,
             'penalty_amount' => (float) $fee->penalty_amount,
             'discount_amount' => (float) $fee->discount_amount,
-            'total_amount' => (float) $fee->total_amount,
+            'total_amount' => (float) $actualTotalAmount,
             'amount_paid' => (float) $fee->amount_paid,
-            'balance' => (float) $fee->balance,
+            'balance' => (float) max(0, $actualBalance),
             'status' => $fee->status,
             'remarks' => $fee->remarks,
             'formatted_issue_date' => $fee->issue_date?->format('M d, Y') ?? 'N/A',
             'formatted_due_date' => $fee->due_date?->format('M d, Y') ?? 'N/A',
-            'formatted_total' => '₱' . number_format($fee->total_amount, 2),
-            'formatted_balance' => '₱' . number_format($fee->balance, 2),
+            'formatted_total' => '₱' . number_format($actualTotalAmount, 2),
+            'formatted_balance' => '₱' . number_format(max(0, $actualBalance), 2),
             'formatted_amount_paid' => '₱' . number_format($fee->amount_paid, 2),
             'is_overdue' => $this->checkIfOverdue($fee),
             'days_overdue' => $this->calculateDaysOverdue($fee),
@@ -741,21 +807,25 @@ class ResidentFeeController extends Controller
         // Add payer data with privileges
         if ($fee->payer) {
             if ($fee->payer_type === 'App\\Models\\Resident') {
-                // Get active privileges
                 $activePrivileges = $fee->payer->residentPrivileges
                     ->filter(function ($rp) {
                         return $rp->isActive();
                     })
                     ->map(function ($rp) {
+                        $privilege = $rp->privilege;
+                        $discountPercentage = $rp->discount_percentage 
+                            ?? $privilege->discountType?->percentage 
+                            ?? 0;
+                        
                         return [
-                            'code' => $rp->privilege->code,
-                            'name' => $rp->privilege->name,
+                            'code' => $privilege->code,
+                            'name' => $privilege->name,
+                            'discount_percentage' => (float) $discountPercentage,
                         ];
                     })
                     ->values()
                     ->toArray();
 
-                // DYNAMIC privilege flags
                 $privilegeFlags = [];
                 foreach ($activePrivileges as $priv) {
                     $code = strtolower($priv['code']);
@@ -892,11 +962,16 @@ class ResidentFeeController extends Controller
                 'overdue_fees' => 0,
                 'paid_fees' => 0,
                 'issued_fees' => 0,
+                'total_amount' => 0,
                 'total_balance' => 0,
                 'total_paid' => 0,
+                'pending_amount' => 0,
+                'overdue_amount' => 0,
+                'paid_amount' => 0,
                 'current_year_total' => 0,
                 'current_year_paid' => 0,
                 'current_year_balance' => 0,
+                'payment_rate' => 0,
                 'per_resident_stats' => [],
             ],
             'availableYears' => [],

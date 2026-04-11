@@ -1,4 +1,3 @@
-// app/Pages/Admin/Users.tsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -12,20 +11,25 @@ import UsersDialogs from '@/components/admin/users/UsersDialogs';
 import UsersKeyboardShortcuts from '@/components/admin/users/UsersKeyboardShortcuts';
 import UsersPermissionsOverview from '@/components/admin/users/UsersPermissionsOverview';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 // Import types
 import type { 
   UsersPageProps, 
-  User, 
   UserStatus, 
   SortOrder,
   BulkOperation,
   SelectionMode,
-  UserRole,
-  LaravelPaginatedData,
   ViewMode
 } from '@/types/admin/users/user-types';
+
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
 
 // Page props with data (matches Laravel response)
 interface PageProps extends UsersPageProps {
@@ -35,15 +39,29 @@ interface PageProps extends UsersPageProps {
 export default function Users() {
   const { users, stats, roles, filters, can, departments } = usePage<PageProps>().props;
   
-  // Filter states
-  const [search, setSearch] = useState(filters.search || '');
-  const [roleFilter, setRoleFilter] = useState<string>(filters.role_id?.toString() || 'all');
-  const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
-  const [sortBy, setSortBy] = useState(filters.sort_by || 'name');
-  const [sortOrder, setSortOrder] = useState<SortOrder>(filters.sort_order || 'asc');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  // Safe data extraction
+  const safeUsers = users || { data: [], current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 };
+  const allUsers = safeUsers.data || [];
+  const safeFilters = filters || {};
+  const safeStats = stats || { total: 0, active: 0, inactive: 0, new_this_month: 0, by_role: {}, by_status: {} };
+  const safeRoles = roles || [];
+  const safeDepartments = departments || [];
   
-  // UI states
+  // Filter states - client-side only (removed sortBy/sortOrder from filters, kept for table sorting)
+  const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+  const [roleFilter, setRoleFilter] = useState<string>(getSafeString(safeFilters.role_id, 'all'));
+  const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
+  const [emailVerifiedFilter, setEmailVerifiedFilter] = useState<string>(getSafeString(safeFilters.email_verified, ''));
+  const [lastLoginRange, setLastLoginRange] = useState<string>(getSafeString(safeFilters.last_login_range, ''));
+  const [departmentFilter, setDepartmentFilter] = useState<string>(getSafeString(safeFilters.department_id, 'all'));
+  
+  // Sorting is now handled by table header only
+  const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'name'));
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [perPage, setPerPage] = useState<number>(15);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [viewMode, setViewMode] = useState<ViewMode>(isMobile ? 'grid' : 'table');
@@ -83,7 +101,6 @@ export default function Users() {
       const mobile = width < 768;
       setIsMobile(mobile);
       
-      // Auto switch to grid view on mobile
       if (mobile && viewMode === 'table') {
         setViewMode('grid');
       }
@@ -101,7 +118,12 @@ export default function Users() {
     }
   }, []);
 
-  // Reset selection when bulk mode is turned off or filters change
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter, statusFilter, emailVerifiedFilter, lastLoginRange, departmentFilter, sortBy, sortOrder]);
+
+  // Reset selection when bulk mode is turned off
   useEffect(() => {
     if (!isBulkMode) {
       setSelectedUsers([]);
@@ -109,30 +131,188 @@ export default function Users() {
     }
   }, [isBulkMode]);
 
-  // Check if all items on current page are selected
-  useEffect(() => {
-    const allPageIds = users.data.map(user => user.id);
-    const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedUsers.includes(id));
-    setIsSelectAll(allSelected);
-  }, [selectedUsers, users.data]);
+  // Helper function to check last login range
+  const checkLastLoginRange = (lastLoginAt: string | null, range: string): boolean => {
+    if (!lastLoginAt && range === 'never') return true;
+    if (!lastLoginAt) return false;
+    
+    const lastLogin = new Date(lastLoginAt);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24));
+    
+    switch (range) {
+      case 'today': return diffDays === 0;
+      case 'last_7_days': return diffDays <= 7;
+      case 'last_30_days': return diffDays <= 30;
+      case 'last_90_days': return diffDays <= 90;
+      case 'never': return false;
+      default: return true;
+    }
+  };
 
-  // Ensure hasActiveFilters returns boolean, not string | boolean
-  const hasActiveFilters = useMemo(() => {
-    return !!(search || roleFilter !== 'all' || statusFilter !== 'all');
-  }, [search, roleFilter, statusFilter]);
+  // Filter users client-side
+  const filteredUsers = useMemo(() => {
+    if (!allUsers || allUsers.length === 0) {
+      return [];
+    }
+    
+    let filtered = [...allUsers];
+    
+    // Search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(user =>
+        user?.first_name?.toLowerCase().includes(searchLower) ||
+        user?.last_name?.toLowerCase().includes(searchLower) ||
+        user?.email?.toLowerCase().includes(searchLower) ||
+        user?.username?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Role filter
+    if (roleFilter && roleFilter !== 'all') {
+      filtered = filtered.filter(user => user?.role_id?.toString() === roleFilter);
+    }
+    
+    // Status filter
+    if (statusFilter && statusFilter !== 'all') {
+      filtered = filtered.filter(user => user?.status === statusFilter);
+    }
+    
+    // Email verified filter
+    if (emailVerifiedFilter) {
+      if (emailVerifiedFilter === 'verified') {
+        filtered = filtered.filter(user => user?.email_verified_at !== null);
+      } else if (emailVerifiedFilter === 'unverified') {
+        filtered = filtered.filter(user => user?.email_verified_at === null);
+      }
+    }
+    
+    // Last login range filter
+    if (lastLoginRange) {
+      filtered = filtered.filter(user => checkLastLoginRange(user?.last_login_at, lastLoginRange));
+    }
+    
+    // Department filter
+    if (departmentFilter && departmentFilter !== 'all') {
+      filtered = filtered.filter(user => user?.department_id?.toString() === departmentFilter);
+    }
+    
+    // Apply sorting (for table header)
+    if (filtered.length > 0) {
+      filtered.sort((a, b) => {
+        let valueA: any;
+        let valueB: any;
+        
+        switch (sortBy) {
+          case 'name':
+            const nameA = `${a?.first_name || ''} ${a?.last_name || ''}`.trim();
+            const nameB = `${b?.first_name || ''} ${b?.last_name || ''}`.trim();
+            valueA = nameA || a?.email || '';
+            valueB = nameB || b?.email || '';
+            break;
+          case 'email':
+            valueA = a?.email || '';
+            valueB = b?.email || '';
+            break;
+          case 'role':
+            valueA = a?.role?.name || '';
+            valueB = b?.role?.name || '';
+            break;
+          case 'status':
+            valueA = a?.status || '';
+            valueB = b?.status || '';
+            break;
+          case 'created_at':
+            valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+            valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+            break;
+          case 'last_login_at':
+            valueA = a?.last_login_at ? new Date(a.last_login_at).getTime() : 0;
+            valueB = b?.last_login_at ? new Date(b.last_login_at).getTime() : 0;
+            break;
+          case 'email_verified':
+            valueA = a?.email_verified_at ? 1 : 0;
+            valueB = b?.email_verified_at ? 1 : 0;
+            break;
+          default:
+            const defaultNameA = `${a?.first_name || ''} ${a?.last_name || ''}`.trim();
+            const defaultNameB = `${b?.first_name || ''} ${b?.last_name || ''}`.trim();
+            valueA = defaultNameA || a?.email || '';
+            valueB = defaultNameB || b?.email || '';
+        }
+        
+        if (typeof valueA === 'string') {
+          valueA = valueA.toLowerCase();
+          valueB = valueB.toLowerCase();
+        }
+        
+        if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+        if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return filtered;
+  }, [allUsers, search, roleFilter, statusFilter, emailVerifiedFilter, lastLoginRange, departmentFilter, sortBy, sortOrder]);
 
-  const selectedUsersData = useMemo(() => {
-    return users.data.filter(user => selectedUsers.includes(user.id));
-  }, [users.data, selectedUsers]);
+  // Calculate filtered stats
+  const filteredStats = useMemo(() => {
+    if (!filteredUsers || filteredUsers.length === 0) {
+      return safeStats;
+    }
+    
+    const active = filteredUsers.filter(u => u?.status === 'active').length;
+    const inactive = filteredUsers.filter(u => u?.status === 'inactive').length;
+    const suspended = filteredUsers.filter(u => u?.status === 'suspended').length;
+    const pending = filteredUsers.filter(u => u?.status === 'pending').length;
+    const emailVerified = filteredUsers.filter(u => u?.email_verified_at !== null).length;
+    const neverLoggedIn = filteredUsers.filter(u => !u?.last_login_at).length;
+    
+    const by_role: Record<string, number> = {};
+    filteredUsers.forEach(u => {
+      if (u?.role_id) {
+        by_role[u.role_id] = (by_role[u.role_id] || 0) + 1;
+      }
+    });
+    
+    const by_status = { active, inactive, suspended, pending };
+    
+  return {
+    total: filteredUsers.length,
+    active,
+    inactive,
+    new_this_month: (safeStats as any).new_this_month || 0,
+    by_role,
+    by_status,
+    email_verified: emailVerified,
+    never_logged_in: neverLoggedIn
+  };
+  
+  }, [filteredUsers, safeStats]);
 
-  // Create a wrapper for setViewMode that matches the expected signature
-  const handleSetViewMode = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-  }, []);
+  // Pagination
+  const totalItems = filteredUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / perPage));
+  const startIndex = (currentPage - 1) * perPage;
+  const endIndex = Math.min(startIndex + perPage, totalItems);
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
-  // Bulk selection handlers
+  // Update pagination data structure to match what UsersContent expects
+  const paginatedUsersData = {
+    ...safeUsers,
+    data: paginatedUsers,
+    current_page: currentPage,
+    last_page: totalPages,
+    total: totalItems,
+    per_page: perPage,
+    from: startIndex + 1,
+    to: endIndex
+  };
+
+  // Selection handlers
   const handleSelectAllOnPage = useCallback(() => {
-    const pageIds = users.data.map(user => user.id);
+    const pageIds = paginatedUsers.map(user => user.id);
     if (isSelectAll) {
       setSelectedUsers(prev => prev.filter(id => !pageIds.includes(id)));
     } else {
@@ -141,10 +321,10 @@ export default function Users() {
     }
     setIsSelectAll(!isSelectAll);
     setSelectionMode('page');
-  }, [users.data, isSelectAll, selectedUsers]);
+  }, [paginatedUsers, isSelectAll, selectedUsers]);
 
   const handleSelectAllFiltered = useCallback(() => {
-    const allIds = users.data.map(user => user.id);
+    const allIds = filteredUsers.map(user => user.id);
     if (selectedUsers.length === allIds.length && allIds.every(id => selectedUsers.includes(id))) {
       setSelectedUsers(prev => prev.filter(id => !allIds.includes(id)));
     } else {
@@ -152,15 +332,15 @@ export default function Users() {
       setSelectedUsers(newSelected);
       setSelectionMode('filtered');
     }
-  }, [users.data, selectedUsers]);
+  }, [filteredUsers, selectedUsers]);
 
   const handleSelectAll = useCallback(() => {
-    if (window.confirm(`This will select ALL ${users.total} users. This action may take a moment.`)) {
-      const pageIds = users.data.map(user => user.id);
-      setSelectedUsers(pageIds);
+    if (window.confirm(`This will select ALL ${totalItems} users. This action may take a moment.`)) {
+      const allIds = filteredUsers.map(user => user.id);
+      setSelectedUsers(allIds);
       setSelectionMode('all');
     }
-  }, [users.data, users.total]);
+  }, [filteredUsers, totalItems]);
 
   const handleItemSelect = useCallback((id: number) => {
     setSelectedUsers(prev => {
@@ -172,56 +352,31 @@ export default function Users() {
     });
   }, []);
 
-  const handleClearSelection = useCallback(() => {
-    setSelectedUsers([]);
-    setIsSelectAll(false);
+  // Check if all items on current page are selected
+  useEffect(() => {
+    const allPageIds = paginatedUsers.map(user => user.id);
+    const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedUsers.includes(id));
+    setIsSelectAll(allSelected);
+  }, [selectedUsers, paginatedUsers]);
+
+  // Get selected users data
+  const selectedUsersData = useMemo(() => {
+    return filteredUsers.filter(user => selectedUsers.includes(user.id));
+  }, [selectedUsers, filteredUsers]);
+
+  // Handle sort change from table header
+  const handleSortChange = useCallback((value: string) => {
+    const [newSortBy, newSortOrder] = value.split('-');
+    setSortBy(newSortBy);
+    setSortOrder(newSortOrder as 'asc' | 'desc');
   }, []);
 
-  const handleClearFilters = useCallback(() => {
-    setSearch('');
-    setRoleFilter('all');
-    setStatusFilter('all');
-    setSortBy('name');
-    setSortOrder('asc');
-    router.get('/admin/users', {}, { 
-      preserveState: true, 
-      replace: true 
-    });
-  }, []);
-
-  const handlePageChange = useCallback((page: number) => {
-    router.get('/admin/users', {
-      ...filters,
-      page,
-      search: search || undefined,
-      role_id: roleFilter !== 'all' ? roleFilter : undefined,
-      status: statusFilter !== 'all' ? statusFilter : undefined,
-      sort_by: sortBy,
-      sort_order: sortOrder,
-    }, {
-      preserveState: true,
-      replace: true,
-    });
-  }, [filters, search, roleFilter, statusFilter, sortBy, sortOrder]);
-
-  const handleSort = useCallback((column: string) => {
-    const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
-    setSortBy(column);
-    setSortOrder(newSortOrder);
+  // Get current sort value for dropdown
+  const getCurrentSortValue = useCallback((): string => {
+    return `${sortBy}-${sortOrder}`;
   }, [sortBy, sortOrder]);
 
-  const handleRefresh = useCallback(() => {
-    setIsRefreshing(true);
-    router.reload({ 
-      only: ['users', 'stats'],
-      onFinish: () => {
-        setIsRefreshing(false);
-        toast.success('Data refreshed');
-      }
-    });
-  }, []);
-
-  // Bulk operation handler with proper typing
+  // Bulk operations
   const handleBulkOperation = useCallback(async (operation: BulkOperation) => {
     if (selectedUsers.length === 0) {
       toast.error('Please select at least one user');
@@ -232,7 +387,6 @@ export default function Users() {
     try {
       switch (operation) {
         case 'export':
-          // Export logic
           const exportData = selectedUsersData.map(user => ({
             'Name': user.first_name ? `${user.first_name} ${user.last_name}`.trim() : user.email,
             'Email': user.email,
@@ -261,7 +415,6 @@ export default function Users() {
           toast.success(`Exported ${selectedUsers.length} users`);
           break;
         case 'activate':
-          // Make API call to Laravel backend
           router.post('/admin/users/bulk-activate', 
             { users: selectedUsers, selection_mode: selectionMode },
             {
@@ -323,57 +476,88 @@ export default function Users() {
     });
   }, [selectedUsersData]);
 
-  // Confirm bulk delete
-  const handleBulkDeleteConfirm = useCallback(() => {
-    router.delete('/admin/users/bulk', 
-      { 
-        data: { users: selectedUsers, selection_mode: selectionMode },
-        preserveState: true,
-        onSuccess: () => {
-          toast.success(`${selectedUsers.length} users deleted`);
-          setShowBulkDeleteDialog(false);
-          setSelectedUsers([]);
-          setIsBulkMode(false);
-        },
-        onError: () => toast.error('Failed to delete users')
-      }
-    );
-  }, [selectedUsers, selectionMode]);
+  const handleClearFilters = useCallback(() => {
+    setSearch('');
+    setRoleFilter('all');
+    setStatusFilter('all');
+    setEmailVerifiedFilter('');
+    setLastLoginRange('');
+    setDepartmentFilter('all');
+    setSortBy('name');
+    setSortOrder('asc');
+    setCurrentPage(1);
+  }, []);
 
-  // Confirm bulk status change
-  const handleBulkStatusConfirm = useCallback((status: UserStatus) => {
-    router.post('/admin/users/bulk-status', 
-      { users: selectedUsers, status, selection_mode: selectionMode },
-      {
-        preserveState: true,
-        onSuccess: () => {
-          toast.success(`${selectedUsers.length} users updated to ${status}`);
-          setShowBulkStatusDialog(false);
-          setSelectedUsers([]);
-          setIsBulkMode(false);
-        },
-        onError: () => toast.error('Failed to update users')
-      }
-    );
-  }, [selectedUsers, selectionMode]);
+  const handleClearSelection = useCallback(() => {
+    setSelectedUsers([]);
+    setIsSelectAll(false);
+  }, []);
 
-  // Confirm bulk role change
-  const handleBulkRoleConfirm = useCallback((roleId: number) => {
-    router.post('/admin/users/bulk-role', 
-      { users: selectedUsers, role_id: roleId, selection_mode: selectionMode },
-      {
-        preserveState: true,
-        onSuccess: () => {
-          const roleName = roles.find(r => r.id === roleId)?.name;
-          toast.success(`${selectedUsers.length} users assigned to ${roleName}`);
-          setShowBulkRoleDialog(false);
-          setSelectedUsers([]);
-          setIsBulkMode(false);
-        },
-        onError: () => toast.error('Failed to update user roles')
+  const handleSort = useCallback((column: string) => {
+    const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortBy(column);
+    setSortOrder(newSortOrder);
+  }, [sortBy, sortOrder]);
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handlePerPageChange = useCallback((newPerPage: number) => {
+    setPerPage(newPerPage);
+    setCurrentPage(1);
+  }, []);
+
+  const hasActiveFilters = useMemo(() => {
+    return !!(search || roleFilter !== 'all' || statusFilter !== 'all' || 
+              emailVerifiedFilter || lastLoginRange || departmentFilter !== 'all');
+  }, [search, roleFilter, statusFilter, emailVerifiedFilter, lastLoginRange, departmentFilter]);
+
+  // Create wrapper for setViewMode
+  const handleSetViewMode = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (isMobile) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleSelectAllFiltered();
+        } else {
+          handleSelectAllOnPage();
+        }
       }
-    );
-  }, [selectedUsers, selectionMode, roles]);
+      if (e.key === 'Escape') {
+        if (isBulkMode) {
+          if (selectedUsers.length > 0) {
+            setSelectedUsers([]);
+          } else {
+            setIsBulkMode(false);
+          }
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+        e.preventDefault();
+        setIsBulkMode(!isBulkMode);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        // Focus search input
+      }
+      if (e.key === 'Delete' && isBulkMode && selectedUsers.length > 0) {
+        e.preventDefault();
+        setShowBulkDeleteDialog(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isBulkMode, selectedUsers, isMobile, handleSelectAllOnPage, handleSelectAllFiltered]);
 
   return (
     <AppLayout
@@ -385,29 +569,16 @@ export default function Users() {
       ]}
     >
       <TooltipProvider>
-        <div className="space-y-6">
-          {/* Header with actions */}
-          <div className="flex items-center justify-between">
-            <UsersHeader
-              isBulkMode={isBulkMode}
-              setIsBulkMode={setIsBulkMode}
-              isMobile={isMobile}
-              canCreateUsers={safeCan.create_users}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
+        <div className="space-y-4 sm:space-y-6">
+          {/* Header - Now matches Residents pattern exactly */}
+          <UsersHeader
+            isBulkMode={isBulkMode}
+            setIsBulkMode={setIsBulkMode}
+            isMobile={isMobile}
+          />
 
           {/* Stats Cards */}
-          <UsersStats stats={stats} />
+          <UsersStats stats={filteredStats} />
 
           {/* Filters */}
           <UsersFilters
@@ -417,22 +588,27 @@ export default function Users() {
             setRoleFilter={setRoleFilter}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
+            emailVerifiedFilter={emailVerifiedFilter}
+            setEmailVerifiedFilter={setEmailVerifiedFilter}
+            lastLoginRange={lastLoginRange}
+            setLastLoginRange={setLastLoginRange}
+            departmentFilter={departmentFilter}
+            setDepartmentFilter={setDepartmentFilter}
             showAdvancedFilters={showAdvancedFilters}
             setShowAdvancedFilters={setShowAdvancedFilters}
             hasActiveFilters={hasActiveFilters}
             handleClearFilters={handleClearFilters}
-            roles={roles}
-            departments={departments}
+            roles={safeRoles}
+            departments={safeDepartments}
             isBulkMode={isBulkMode}
             selectedUsers={selectedUsers}
             setSelectedUsers={setSelectedUsers}
             setIsSelectAll={setIsSelectAll}
-            users={users}
+            users={paginatedUsersData}
             selectionMode={selectionMode}
             setSelectionMode={setSelectionMode}
-            onSelectAllOnPage={handleSelectAllOnPage}
-            onSelectAllFiltered={handleSelectAllFiltered}
-            onSelectAll={handleSelectAll}
+            perPage={perPage}
+            onPerPageChange={handlePerPageChange}
             isLoading={isRefreshing}
           />
 
@@ -443,9 +619,11 @@ export default function Users() {
               <span className="flex-1">
                 Active filters applied. 
                 {search && ` Search: "${search}"`}
-                {roleFilter !== 'all' && ` Role: ${roles.find(r => r.id.toString() === roleFilter)?.name}`}
+                {roleFilter !== 'all' && ` Role: ${safeRoles.find(r => r.id.toString() === roleFilter)?.name}`}
                 {statusFilter !== 'all' && ` Status: ${statusFilter}`}
-                {sortBy !== 'name' && ` Sorted by: ${sortBy} (${sortOrder})`}
+                {emailVerifiedFilter && ` Email: ${emailVerifiedFilter === 'verified' ? 'Verified' : 'Unverified'}`}
+                {lastLoginRange && ` Last login: ${lastLoginRange.replace('_', ' ')}`}
+                {departmentFilter !== 'all' && ` Department: ${safeDepartments.find(d => d.id.toString() === departmentFilter)?.name}`}
               </span>
               <Button
                 variant="ghost"
@@ -460,7 +638,7 @@ export default function Users() {
 
           {/* Main Content */}
           <UsersContent
-            users={users}
+            users={paginatedUsersData}
             selectedUsers={selectedUsers}
             selectedUsersData={selectedUsersData}
             isBulkMode={isBulkMode}
@@ -477,7 +655,7 @@ export default function Users() {
             setShowBulkDeleteDialog={setShowBulkDeleteDialog}
             setShowBulkStatusDialog={setShowBulkStatusDialog}
             setShowBulkRoleDialog={setShowBulkRoleDialog}
-            roles={roles}
+            roles={safeRoles}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSort={handleSort}
@@ -487,6 +665,10 @@ export default function Users() {
             isLoading={isRefreshing}
             canEdit={safeCan.edit_users}
             canDelete={safeCan.delete_users}
+            sortByProp={sortBy}
+            sortOrderProp={sortOrder}
+            onSortChange={handleSortChange}
+            getCurrentSortValue={getCurrentSortValue}
           />
 
           {/* Permissions Overview */}
@@ -545,11 +727,30 @@ export default function Users() {
         isPerformingBulkAction={isPerformingBulkAction}
         bulkEditValue={bulkEditValue}
         setBulkEditValue={setBulkEditValue}
-        roles={roles}
-        departments={departments}
-        onBulkDeleteConfirm={handleBulkDeleteConfirm}
-        onBulkStatusConfirm={handleBulkStatusConfirm}
-        onBulkRoleConfirm={handleBulkRoleConfirm}
+        roles={safeRoles}
+        departments={safeDepartments}
+        onBulkDeleteConfirm={() => {
+          if (confirm(`Are you sure you want to delete ${selectedUsers.length} user(s)?`)) {
+            router.delete('/admin/users/bulk', 
+              { data: { users: selectedUsers, selection_mode: selectionMode } }
+            );
+            setShowBulkDeleteDialog(false);
+            setSelectedUsers([]);
+            setIsBulkMode(false);
+          }
+        }}
+        onBulkStatusConfirm={(status) => {
+          router.post('/admin/users/bulk-status', 
+            { users: selectedUsers, status, selection_mode: selectionMode }
+          );
+          setShowBulkStatusDialog(false);
+        }}
+        onBulkRoleConfirm={(roleId) => {
+          router.post('/admin/users/bulk-role', 
+            { users: selectedUsers, role_id: roleId, selection_mode: selectionMode }
+          );
+          setShowBulkRoleDialog(false);
+        }}
       />
 
       {/* Keyboard Shortcuts Component */}

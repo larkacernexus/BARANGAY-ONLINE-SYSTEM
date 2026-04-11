@@ -1,111 +1,66 @@
 // resources/js/components/admin/puroks/PuroksHeader.tsx
 
 import { Button } from '@/components/ui/button';
-import { Link } from '@inertiajs/react';
-import { 
-    MousePointer,
-    Layers,
-    Plus,
-    RefreshCw,
-    BarChart3
-} from 'lucide-react';
+import { Plus, Layers, MousePointer, RefreshCw } from 'lucide-react';
 
 interface PuroksHeaderProps {
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
-    isMobile: boolean;
-    isRefreshing?: boolean;
-    onRefresh?: () => void;
-    onUpdateStatistics?: () => void; // Add this prop
+    isMobile?: boolean;
+    onUpdateStatistics?: () => void;
 }
 
-export default function PuroksHeader({ 
-    isBulkMode, 
-    setIsBulkMode, 
-    isMobile,
-    isRefreshing = false,
-    onRefresh,
+export default function PuroksHeader({
+    isBulkMode,
+    setIsBulkMode,
+    isMobile = false,
     onUpdateStatistics
 }: PuroksHeaderProps) {
     return (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-                    Purok Management
-                </h1>
-                <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
+                <h1 className="text-2xl font-bold tracking-tight">Purok Management</h1>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Manage barangay puroks/zones and their information
                 </p>
             </div>
             <div className="flex items-center gap-2">
+                {onUpdateStatistics && (
+                    <Button
+                        variant="outline"
+                        onClick={onUpdateStatistics}
+                        className="gap-2"
+                        title="Update statistics for all puroks"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        <span className="hidden sm:inline">Update Stats</span>
+                    </Button>
+                )}
                 <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => setIsBulkMode(!isBulkMode)}
-                    className={`
-                        h-9 
-                        bg-white dark:bg-gray-900 
-                        border-gray-200 dark:border-gray-700
-                        text-gray-700 dark:text-gray-300
-                        hover:bg-gray-100 dark:hover:bg-gray-700
-                        ${isBulkMode ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50' : ''}
-                    `}
+                    onClick={() => {
+                        setIsBulkMode(!isBulkMode);
+                    }}
+                    className={isBulkMode ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
                 >
                     {isBulkMode ? (
                         <>
                             <Layers className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">Bulk Mode</span>
-                            <span className="sm:hidden">Bulk</span>
+                            Bulk Mode
                         </>
                     ) : (
                         <>
                             <MousePointer className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">Bulk Select</span>
-                            <span className="sm:hidden">Select</span>
+                            Bulk Select
                         </>
                     )}
                 </Button>
-                
-                {/* Update Statistics Button */}
-                {onUpdateStatistics && (
-                    <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={onUpdateStatistics}
-                        disabled={isRefreshing}
-                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Update Stats</span>
-                        <span className="sm:hidden">Stats</span>
-                    </Button>
-                )}
-                
-                {/* Optional refresh button */}
-                {onRefresh && (
-                    <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={onRefresh}
-                        disabled={isRefreshing}
-                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-                        <span className="sm:hidden">{isRefreshing ? '...' : 'Refresh'}</span>
-                    </Button>
-                )}
-                
-                <Link href="/admin/puroks/create">
-                    <Button 
-                        size="sm"
-                        className="h-9 bg-primary-600 hover:bg-primary-700 text-white dark:bg-primary-600 dark:hover:bg-primary-700"
-                    >
+                <Button asChild>
+                    <a href="/admin/puroks/create">
                         <Plus className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Add Purok</span>
-                        <span className="sm:hidden">Add</span>
-                    </Button>
-                </Link>
+                        Add Purok
+                    </a>
+                </Button>
             </div>
         </div>
     );

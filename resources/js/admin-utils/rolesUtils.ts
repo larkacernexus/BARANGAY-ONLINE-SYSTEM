@@ -1,5 +1,5 @@
 // admin-utils/rolesUtils.ts
-import { Role } from '@/types/admin/roles/roles';
+import { Role, SelectionStats } from '@/types/admin/roles/roles';
 
 export interface FilterState {
     search: string;
@@ -9,21 +9,28 @@ export interface FilterState {
 }
 
 export type BulkOperation = 
-    'export' | 'print' | 'delete' | 'archive' | 'duplicate' | 
-    'change_type' | 'generate_report' | 'send_notification' | 
-    'assign_permissions' | 'export_permissions';
+    | 'export' 
+    | 'export_csv'
+    | 'print' 
+    | 'delete' 
+    | 'archive' 
+    | 'duplicate' 
+    | 'change_type' 
+    | 'generate_report' 
+    | 'send_notification' 
+    | 'assign_permissions' 
+    | 'export_permissions';
 
 export type SelectionMode = 'page' | 'filtered' | 'all';
 
-export interface SelectionStats {
+export interface RoleStats {
     total: number;
-    system: number;
-    custom: number;
-    totalUsers: number;
-    deletable: number;
-    avgUsers: string;
-    hasSystemRoles: boolean;
-    hasUsers: boolean;
+    system_roles: number;
+    custom_roles: number;
+    active_roles: number;
+    total_permissions: number;
+    total_users: number;
+    recent_roles?: Role[];
 }
 
 // Filter roles
@@ -58,22 +65,20 @@ export const filterRoles = (
 
 // Calculate selection stats
 export const getSelectionStats = (selectedRoles: Role[]): SelectionStats => {
-    const selectedData = selectedRoles;
-    const systemCount = selectedData.filter(role => role.is_system_role).length;
-    const customCount = selectedData.filter(role => !role.is_system_role).length;
-    const totalUsers = selectedData.reduce((sum, r) => sum + (r.users_count || 0), 0);
-    const deletableCount = selectedData.filter(role => canDeleteRole(role)).length;
+    const systemCount = selectedRoles.filter(role => role.is_system_role).length;
+    const customCount = selectedRoles.filter(role => !role.is_system_role).length;
+    const totalUsers = selectedRoles.reduce((sum, r) => sum + (r.users_count || 0), 0);
+    const totalPermissions = selectedRoles.reduce((sum, r) => sum + (r.permissions_count || 0), 0);
     
     return {
-        total: selectedData.length,
-        system: systemCount,
-        custom: customCount,
-        totalUsers: totalUsers,
-        deletable: deletableCount,
-        avgUsers: selectedData.length > 0 ? (totalUsers / selectedData.length).toFixed(1) : '0',
-        hasSystemRoles: systemCount > 0,
-        hasUsers: totalUsers > 0,
-    };
+    total: selectedRoles.length,
+    systemRoles: systemCount, // Changed from 'system'
+    customRoles: customCount, // Changed from 'custom'
+    totalUsers: totalUsers,
+    totalPermissions: totalPermissions,
+    latestRole: selectedRoles[0]?.name,
+    deletable: 0,
+};
 };
 
 // Check if a role can be deleted
@@ -83,6 +88,10 @@ export const canDeleteRole = (role: Role): boolean => {
 
 // Format for clipboard/export
 export const formatForClipboard = (roles: Role[]): string => {
+    if (!roles || roles.length === 0) {
+        return '';
+    }
+    
     const exportData = roles.map(role => ({
         'Role ID': role.id || 'N/A',
         'Name': role.name || 'N/A',
@@ -101,9 +110,10 @@ export const formatForClipboard = (roles: Role[]): string => {
         ...exportData.map(row => 
             headers.map(header => {
                 const value = row[header as keyof typeof row];
-                return typeof value === 'string' && value.includes(',') 
-                    ? `"${value}"` 
-                    : value;
+                if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+                    return `"${value.replace(/"/g, '""')}"`;
+                }
+                return value;
             }).join(',')
         )
     ].join('\n');
@@ -114,6 +124,7 @@ export const formatDate = (dateString: string): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid Date';
         return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
@@ -182,28 +193,135 @@ export const getQuickFilterActions = (appliedFilters: FilterState) => {
     ];
 };
 
-// Normalize stats
-export const normalizeStats = (propsStats: any, roles: Role[]) => {
-    if (Array.isArray(propsStats)) {
-        return propsStats;
+// Normalize stats - returns RoleStats object
+export const normalizeStats = (propsStats: any, roles: Role[]): RoleStats => {
+    // If propsStats is already a valid RoleStats object with total property
+    if (propsStats && typeof propsStats === 'object' && propsStats.total !== undefined) {
+        return {
+            total: propsStats.total || 0,
+            system_roles: propsStats.system_roles || propsStats.systemRoles || 0,
+            custom_roles: propsStats.custom_roles || propsStats.customRoles || 0,
+            active_roles: propsStats.active_roles || propsStats.activeRoles || roles.length,
+            total_permissions: propsStats.total_permissions || propsStats.totalPermissions || 0,
+            total_users: propsStats.total_users || propsStats.totalUsers || 0,
+            recent_roles: propsStats.recent_roles || propsStats.recentRoles || roles.slice(0, 5)
+        };
     }
     
-    if (propsStats && typeof propsStats === 'object' && !Array.isArray(propsStats)) {
-        return Object.entries(propsStats).map(([label, value]) => ({
-            label: typeof label === 'string' ? label.replace(/_/g, ' ') : 'Stat',
-            value: typeof value === 'number' || typeof value === 'string' ? value : String(value),
-        }));
-    }
-    
-    const totalRoles = roles.length;
+    // Calculate stats from roles array if propsStats is missing or invalid
     const systemRoles = roles.filter(r => r.is_system_role).length;
     const customRoles = roles.filter(r => !r.is_system_role).length;
     const totalUsers = roles.reduce((sum, r) => sum + (r.users_count || 0), 0);
+    const totalPermissions = roles.reduce((sum, r) => sum + (r.permissions_count || 0), 0);
     
-    return [
-        { label: 'Total Roles', value: totalRoles },
-        { label: 'System Roles', value: systemRoles },
-        { label: 'Custom Roles', value: customRoles },
-        { label: 'Total Users', value: totalUsers },
-    ];
+    return {
+        total: roles.length,
+        system_roles: systemRoles,
+        custom_roles: customRoles,
+        active_roles: roles.length,
+        total_permissions: totalPermissions,
+        total_users: totalUsers,
+        recent_roles: roles.slice(0, 5)
+    };
+};
+
+// Additional helper function for bulk operations validation
+export const validateBulkOperation = (
+    operation: BulkOperation,
+    selectedRoles: Role[]
+): { valid: boolean; message?: string } => {
+    if (!selectedRoles || selectedRoles.length === 0) {
+        return { valid: false, message: 'Please select at least one role' };
+    }
+
+    switch (operation) {
+        case 'delete':
+            const deletableCount = selectedRoles.filter(role => canDeleteRole(role)).length;
+            if (deletableCount === 0) {
+                return { valid: false, message: 'No deletable roles selected. System roles or roles with users cannot be deleted.' };
+            }
+            break;
+        case 'change_type':
+            const hasSystemRoles = selectedRoles.some(role => role.is_system_role);
+            if (hasSystemRoles) {
+                return { valid: false, message: 'Cannot change type of system roles' };
+            }
+            break;
+        case 'archive':
+            const hasArchived = selectedRoles.some(role => role.is_system_role);
+            if (hasArchived) {
+                return { valid: false, message: 'Cannot archive system roles' };
+            }
+            break;
+        // Export operations are always valid
+        case 'export':
+        case 'export_csv':
+        case 'export_permissions':
+        case 'duplicate':
+        case 'generate_report':
+        case 'print':
+        case 'send_notification':
+        case 'assign_permissions':
+            break;
+        default:
+            // Handle any unknown operations
+            const exhaustiveCheck: never = operation;
+            return { valid: false, message: `Unknown operation: ${operation}` };
+    }
+
+    return { valid: true };
+};
+
+// Helper to get bulk operation label
+export const getBulkOperationLabel = (operation: BulkOperation): string => {
+    const labels: Record<BulkOperation, string> = {
+        'delete': 'Delete',
+        'archive': 'Archive',
+        'duplicate': 'Duplicate',
+        'change_type': 'Change Type',
+        'export': 'Export',
+        'export_csv': 'Export as CSV',
+        'print': 'Print',
+        'generate_report': 'Generate Report',
+        'send_notification': 'Send Notification',
+        'assign_permissions': 'Assign Permissions',
+        'export_permissions': 'Export Permissions'
+    };
+    return labels[operation] || operation;
+};
+
+// Helper to get bulk operation icon
+export const getBulkOperationIcon = (operation: BulkOperation): string => {
+    const icons: Record<BulkOperation, string> = {
+        'delete': 'Trash2',
+        'archive': 'Archive',
+        'duplicate': 'Copy',
+        'change_type': 'Tags',
+        'export': 'Download',
+        'export_csv': 'FileSpreadsheet',
+        'print': 'Printer',
+        'generate_report': 'FileText',
+        'send_notification': 'Bell',
+        'assign_permissions': 'Key',
+        'export_permissions': 'FileKey'
+    };
+    return icons[operation] || 'Settings';
+};
+
+// Helper to get bulk operation color
+export const getBulkOperationColor = (operation: BulkOperation): string => {
+    const colors: Record<BulkOperation, string> = {
+        'delete': 'destructive',
+        'archive': 'warning',
+        'duplicate': 'default',
+        'change_type': 'default',
+        'export': 'secondary',
+        'export_csv': 'secondary',
+        'print': 'secondary',
+        'generate_report': 'default',
+        'send_notification': 'default',
+        'assign_permissions': 'default',
+        'export_permissions': 'secondary'
+    };
+    return colors[operation] || 'default';
 };

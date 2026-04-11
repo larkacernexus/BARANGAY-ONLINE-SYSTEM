@@ -1,10 +1,25 @@
 // hooks/useFileHandling.ts
-
 import { useState, useRef } from 'react';
 import { FileWithPreview, PreviewModalState } from '@/types/portal/reports/community-report';
 import { toast } from 'sonner';
 
-export const useFileHandling = () => {
+interface UseFileHandlingProps {
+    maxFiles?: number;
+    maxFileSize?: number;
+    allowedTypes?: string[];
+    setData?: any;  // Add setData as optional prop
+    data?: any;     // Add data as optional prop
+}
+
+export const useFileHandling = (props?: UseFileHandlingProps) => {
+    const {
+        maxFiles = 10,
+        maxFileSize = 5 * 1024 * 1024,
+        allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'video/mp4', 'video/mov', 'video/avi'],
+        setData,  // Destructure setData
+        data      // Destructure data
+    } = props || {};
+    
     const [files, setFiles] = useState<FileWithPreview[]>([]);
     const [existingFiles, setExistingFiles] = useState<Array<{name: string, size: number, type: string, lastModified: number, preview?: string}>>([]);
     const [previewModal, setPreviewModal] = useState<PreviewModalState>({
@@ -16,25 +31,33 @@ export const useFileHandling = () => {
     
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, setData: any, data: any) => {
+    // Helper function to update evidence in parent state
+    const updateEvidenceInParent = (newFiles: File[]) => {
+        if (setData && data) {
+            const currentEvidence = Array.isArray(data.evidence) ? data.evidence : [];
+            setData('evidence', [...currentEvidence, ...newFiles]);
+        }
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFiles = Array.from(e.target.files || []);
         
-        if (selectedFiles.length + files.length > 10) {
-            toast.error('Maximum 10 files allowed');
+        // Use the configured maxFiles
+        if (selectedFiles.length + files.length > maxFiles) {
+            toast.error(`Maximum ${maxFiles} files allowed`);
             return;
         }
         
         const validFiles = selectedFiles.filter(file => {
-            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'video/mp4', 'video/mov', 'video/avi'];
-            const maxSize = 5 * 1024 * 1024;
-            
-            if (!validTypes.includes(file.type)) {
-                toast.error(`Invalid file type: ${file.name}. Use JPG, PNG, GIF, WebP, PDF, MP4, MOV, or AVI.`);
+            // Use the configured allowedTypes
+            if (!allowedTypes.includes(file.type)) {
+                toast.error(`Invalid file type: ${file.name}. Allowed types: ${allowedTypes.join(', ')}`);
                 return false;
             }
             
-            if (file.size > maxSize) {
-                toast.error(`File too large (max 5MB): ${file.name}`);
+            // Use the configured maxFileSize
+            if (file.size > maxFileSize) {
+                toast.error(`File too large (max ${maxFileSize / (1024 * 1024)}MB): ${file.name}`);
                 return false;
             }
             
@@ -50,9 +73,12 @@ export const useFileHandling = () => {
 
         setFiles(prev => [...prev, ...newFiles]);
         
-        const currentEvidence = Array.isArray(data.evidence) ? data.evidence : [];
-        const updatedEvidence = [...currentEvidence, ...validFiles];
-        setData('evidence', updatedEvidence);
+        // Update parent state if setData and data are provided
+        if (setData && data) {
+            const currentEvidence = Array.isArray(data.evidence) ? data.evidence : [];
+            const updatedEvidence = [...currentEvidence, ...validFiles];
+            setData('evidence', updatedEvidence);
+        }
         
         if (validFiles.length > 0) {
             toast.success(`Added ${validFiles.length} file(s)`);
@@ -72,6 +98,19 @@ export const useFileHandling = () => {
                 URL.revokeObjectURL(removedFile.preview);
             }
             
+            // Update parent state to remove the file
+            if (setData && data) {
+                const currentEvidence = Array.isArray(data.evidence) ? data.evidence : [];
+                // Find the file to remove by name and size (or use a better identifier)
+                const fileToRemove = removedFile;
+                if (fileToRemove) {
+                    const updatedEvidence = currentEvidence.filter((file: File) => 
+                        file.name !== fileToRemove.name || file.size !== fileToRemove.size
+                    );
+                    setData('evidence', updatedEvidence);
+                }
+            }
+            
             return newFiles;
         });
         
@@ -81,7 +120,18 @@ export const useFileHandling = () => {
     const removeExistingFile = (index: number) => {
         setExistingFiles(prev => {
             const updated = [...prev];
+            const removedFile = updated[index];
             updated.splice(index, 1);
+            
+            // Update parent state to remove existing file
+            if (setData && data && removedFile) {
+                const currentEvidence = Array.isArray(data.evidence) ? data.evidence : [];
+                const updatedEvidence = currentEvidence.filter((file: any) => 
+                    !(file.name === removedFile.name && file.size === removedFile.size)
+                );
+                setData('evidence', updatedEvidence);
+            }
+            
             return updated;
         });
         toast.info('File removed from draft');
@@ -112,6 +162,11 @@ export const useFileHandling = () => {
             }
         });
         setFiles([]);
+        
+        // Clear parent state
+        if (setData && data) {
+            setData('evidence', []);
+        }
     };
 
     return {

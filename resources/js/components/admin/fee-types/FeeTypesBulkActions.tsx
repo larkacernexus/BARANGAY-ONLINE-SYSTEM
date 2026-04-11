@@ -25,7 +25,7 @@ import {
     Copy,
     Timer
 } from 'lucide-react';
-import { BulkOperation, SelectionMode, SelectionStats } from '@/types/fee-types';
+import { BulkOperation, SelectionMode, SelectionStats } from '@/types/admin/fee-types/fee.types';
 
 interface FeeTypesBulkActionsProps {
     selectedFeeTypes: number[];

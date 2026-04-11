@@ -18,7 +18,6 @@ import {
     DollarSign,
     Calendar,
     Clock,
-    CheckCircle,
     XCircle,
     Plus,
     Trash2,
@@ -31,44 +30,37 @@ import {
     Shield,
     Heart,
     HeartHandshake,
-    Baby,
-    HandHeart,
-    Users,
-    Briefcase,
     Home,
-    MapPin,
+    Briefcase,
     User,
     GraduationCap,
     Scale,
     Gavel,
     Wallet,
     Vote,
-    Info,
     Hash,
     Tag,
     Settings,
     Eye
 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { route } from 'ziggy-js';
 
-interface EligibilityCriterion {
-    field: string;
-    operator: string;
-    value: string;
-}
+// Import types from centralized types file
+import {
+    type ClearanceTypeFormData,
+    type PrivilegeData,
+    type ClearanceType
+} from '@/types/admin/clearance-types/clearance-types';
 
-interface CommonType {
-    name: string;
-    code: string;
-    description: string;
-    fee: number;
-    processing_days: number;
-    validity_days: number;
-    requires_payment?: boolean;
-}
+// Import helper functions
+import {
+    getPrivilegeIcon,
+    getPrivilegeColor
+} from '@/components/admin/clearance-types/show/utils/helpers';
 
+// Local interfaces for document types and other structures not in the central types
 interface DocumentType {
     id: number;
     name: string;
@@ -82,17 +74,20 @@ interface DocumentType {
     is_active: boolean;
 }
 
-// ========== DYNAMIC PRIVILEGE TYPES ==========
-interface PrivilegeData {
-    id: number;
+interface CommonType {
     name: string;
     code: string;
-    description?: string;
-    default_discount_percentage?: number;
-    requires_id_number?: boolean;
-    requires_verification?: boolean;
-    validity_years?: number;
-    is_active: boolean;
+    description: string;
+    fee: number;
+    processing_days: number;
+    validity_days: number;
+    requires_payment?: boolean;
+}
+
+interface EligibilityCriterion {
+    field: string;
+    operator: string;
+    value: string;
 }
 
 interface DiscountConfig {
@@ -110,48 +105,14 @@ interface PageProps {
     documentTypes: DocumentType[];
     defaultPurposeOptions: string[];
     eligibilityOperators: Array<{ value: string; label: string }>;
-    // DYNAMIC: All privileges from database
     privileges?: PrivilegeData[];
 }
 
-// ========== HELPER FUNCTIONS ==========
-function getPrivilegeIcon(code: string): React.ReactNode {
-    const firstChar = (code?.[0] || 'A').toUpperCase();
-    
-    const iconMap: Record<string, React.ReactNode> = {
-        'S': <Award className="h-4 w-4" />,
-        'P': <HeartHandshake className="h-4 w-4" />,
-        'I': <Home className="h-4 w-4" />,
-        'F': <Briefcase className="h-4 w-4" />,
-        'O': <Users className="h-4 w-4" />,
-        '4': <Heart className="h-4 w-4" />,
-        'U': <User className="h-4 w-4" />,
-        'A': <Award className="h-4 w-4" />,
-        'B': <Award className="h-4 w-4" />,
-        'C': <Award className="h-4 w-4" />,
-        'D': <Award className="h-4 w-4" />,
-        'E': <Award className="h-4 w-4" />,
-    };
-    
-    return iconMap[firstChar] || <Award className="h-4 w-4" />;
-}
-
-function getPrivilegeColor(code: string): string {
-    const firstChar = (code?.[0] || 'A').toUpperCase().charCodeAt(0);
-    const colorIndex = firstChar % 8;
-    
-    const colors = [
-        'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
-        'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
-        'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
-        'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
-        'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-        'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
-        'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
-        'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
-    ];
-    
-    return colors[colorIndex] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+// Extended form data for create page (includes fields not in base ClearanceTypeFormData)
+interface CreateClearanceTypeFormData extends ClearanceTypeFormData {
+    document_type_ids: number[];
+    eligibility_criteria: EligibilityCriterion[];
+    discount_configs: DiscountConfig[];
 }
 
 export default function CreateClearanceType({ 
@@ -159,8 +120,9 @@ export default function CreateClearanceType({
     documentTypes: initialDocumentTypes,
     defaultPurposeOptions,
     eligibilityOperators,
-    privileges = [] // DYNAMIC: Get all privileges from database
+    privileges = []
 }: PageProps) {
+    // State Management
     const [selectedCommonType, setSelectedCommonType] = useState<string>('');
     const [purposeOptions, setPurposeOptions] = useState<string[]>(defaultPurposeOptions);
     const [newPurposeOption, setNewPurposeOption] = useState('');
@@ -169,15 +131,14 @@ export default function CreateClearanceType({
     ]);
     const [showEligibilityForm, setShowEligibilityForm] = useState(false);
     const [selectedDocumentTypes, setSelectedDocumentTypes] = useState<number[]>([]);
-    const [documentTypes, setDocumentTypes] = useState<DocumentType[]>(initialDocumentTypes);
+    const [documentTypes] = useState<DocumentType[]>(initialDocumentTypes);
     const [documentCategory, setDocumentCategory] = useState<string>('all');
     const [searchDocument, setSearchDocument] = useState('');
-    
-    // DYNAMIC: Discount configuration state
     const [discountConfigs, setDiscountConfigs] = useState<DiscountConfig[]>([]);
     const [showDiscounts, setShowDiscounts] = useState(false);
 
-    const { data, setData, post, processing, errors } = useForm({
+    // Form Setup using extended form data
+    const { data, setData, post, processing, errors } = useForm<CreateClearanceTypeFormData>({
         name: '',
         code: '',
         description: '',
@@ -188,34 +149,68 @@ export default function CreateClearanceType({
         requires_payment: true,
         requires_approval: false,
         is_online_only: false,
-        document_type_ids: [] as number[],
-        eligibility_criteria: [] as EligibilityCriterion[],
-        purpose_options: defaultPurposeOptions.join(', '),
-        // DYNAMIC: Discount fields
         is_discountable: false,
-        discount_configs: [] as DiscountConfig[],
-        // DYNAMIC: Individual discount flags (will be populated dynamically)
+        purpose_options: defaultPurposeOptions.join(', '),
+        document_type_ids: [],
+        eligibility_criteria: [],
+        discount_configs: [],
     });
 
     // Initialize discount configs from privileges
     useEffect(() => {
         if (privileges && privileges.length > 0) {
-            const initialConfigs = privileges
+            const initialConfigs: DiscountConfig[] = privileges
                 .filter(p => p.is_active)
                 .map(p => ({
                     privilege_id: p.id,
                     privilege_code: p.code,
                     privilege_name: p.name,
-                    discount_percentage: p.default_discount_percentage || 0,
+                    discount_percentage: p.default_discount_percentage ?? 0,
                     is_active: false,
-                    requires_verification: p.requires_verification || false,
-                    requires_id_number: p.requires_id_number || false
+                    requires_verification: p.requires_verification ?? false,
+                    requires_id_number: p.requires_id_number ?? false
                 }));
             setDiscountConfigs(initialConfigs);
         }
     }, [privileges]);
 
-    const handleCommonTypeSelect = (typeKey: string) => {
+    // Memoized Values
+    const documentCategories = useMemo(() => [
+        'all', 
+        ...Array.from(new Set(
+            documentTypes
+                .map(doc => doc.category)
+                .filter((category): category is string => category != null && category !== '')
+        ))
+    ], [documentTypes]);
+
+    const filteredDocumentTypes = useMemo(() => {
+        return documentTypes.filter(doc => {
+            const matchesCategory = documentCategory === 'all' || doc.category === documentCategory;
+            const matchesSearch = doc.name.toLowerCase().includes(searchDocument.toLowerCase()) ||
+                                (doc.description && doc.description.toLowerCase().includes(searchDocument.toLowerCase()));
+            return matchesCategory && matchesSearch;
+        });
+    }, [documentTypes, documentCategory, searchDocument]);
+
+    const residentFields = useMemo(() => [
+        { value: 'age', label: 'Age', icon: <Calendar className="h-4 w-4" /> },
+        { value: 'civil_status', label: 'Civil Status', icon: <Heart className="h-4 w-4" /> },
+        { value: 'educational_attainment', label: 'Educational Attainment', icon: <GraduationCap className="h-4 w-4" /> },
+        { value: 'occupation', label: 'Occupation', icon: <Briefcase className="h-4 w-4" /> },
+        { value: 'monthly_income', label: 'Monthly Income', icon: <Wallet className="h-4 w-4" /> },
+        { value: 'is_registered_voter', label: 'Registered Voter', icon: <Vote className="h-4 w-4" /> },
+        { value: 'years_in_barangay', label: 'Years in Barangay', icon: <Clock className="h-4 w-4" /> },
+        { value: 'has_pending_case', label: 'Has Pending Case', icon: <Gavel className="h-4 w-4" /> },
+        ...privileges.map(p => ({
+            value: `has_${p.code.toLowerCase()}`,
+            label: p.name,
+            icon: getPrivilegeIcon(p.code)
+        }))
+    ], [privileges]);
+
+    // Event Handlers
+    const handleCommonTypeSelect = useCallback((typeKey: string) => {
         if (typeKey === 'custom') {
             setSelectedCommonType('custom');
             return;
@@ -235,9 +230,9 @@ export default function CreateClearanceType({
                 requires_payment: commonType.requires_payment !== false,
             });
         }
-    };
+    }, [commonTypes, data, setData]);
 
-    const handleDocumentTypeToggle = (documentTypeId: number) => {
+    const handleDocumentTypeToggle = useCallback((documentTypeId: number) => {
         setSelectedDocumentTypes(prev => {
             let updatedSelection;
             if (prev.includes(documentTypeId)) {
@@ -248,114 +243,80 @@ export default function CreateClearanceType({
             setData('document_type_ids', updatedSelection);
             return updatedSelection;
         });
-    };
+    }, [setData]);
 
-    const handleAddPurposeOption = () => {
+    const handleAddPurposeOption = useCallback(() => {
         if (newPurposeOption.trim()) {
             const updatedOptions = [...purposeOptions, newPurposeOption.trim()];
             setPurposeOptions(updatedOptions);
             setData('purpose_options', updatedOptions.join(', '));
             setNewPurposeOption('');
         }
-    };
+    }, [newPurposeOption, purposeOptions, setData]);
 
-    const handleRemovePurposeOption = (index: number) => {
+    const handleRemovePurposeOption = useCallback((index: number) => {
         const updatedOptions = purposeOptions.filter((_, i) => i !== index);
         setPurposeOptions(updatedOptions);
         setData('purpose_options', updatedOptions.join(', '));
-    };
+    }, [purposeOptions, setData]);
 
-    const handleAddEligibilityCriterion = () => {
-        setEligibilityCriteria([
-            ...eligibilityCriteria,
+    const handleAddEligibilityCriterion = useCallback(() => {
+        setEligibilityCriteria(prev => [
+            ...prev,
             { field: '', operator: 'equals', value: '' }
         ]);
-    };
+    }, []);
 
-    const handleUpdateEligibilityCriterion = (index: number, field: keyof EligibilityCriterion, value: string) => {
-        const updatedCriteria = [...eligibilityCriteria];
-        updatedCriteria[index][field] = value;
-        setEligibilityCriteria(updatedCriteria);
-        setData('eligibility_criteria', updatedCriteria);
-    };
-
-    const handleRemoveEligibilityCriterion = (index: number) => {
-        const updatedCriteria = eligibilityCriteria.filter((_, i) => i !== index);
-        setEligibilityCriteria(updatedCriteria);
-        setData('eligibility_criteria', updatedCriteria);
-    };
-
-    // DYNAMIC: Handle discount toggle
-    const handleDiscountToggle = (index: number, checked: boolean) => {
-        const updatedConfigs = [...discountConfigs];
-        updatedConfigs[index].is_active = checked;
-        setDiscountConfigs(updatedConfigs);
-        
-        // Update form data with active discounts
-        const activeDiscounts = updatedConfigs.filter(c => c.is_active);
-        setData('discount_configs', activeDiscounts);
-        setData('is_discountable', activeDiscounts.length > 0);
-        
-        // Create individual fields for each active discount
-        activeDiscounts.forEach(config => {
-            const code = config.privilege_code.toLowerCase();
-            setData(`has_${code}_discount`, true);
-            setData(`${code}_discount_percentage`, config.discount_percentage);
+    const handleUpdateEligibilityCriterion = useCallback((index: number, field: keyof EligibilityCriterion, value: string) => {
+        setEligibilityCriteria(prev => {
+            const updatedCriteria = [...prev];
+            updatedCriteria[index][field] = value;
+            setData('eligibility_criteria', updatedCriteria);
+            return updatedCriteria;
         });
-    };
+    }, [setData]);
 
-    // DYNAMIC: Handle discount percentage change
-    const handleDiscountPercentageChange = (index: number, percentage: number) => {
-        const updatedConfigs = [...discountConfigs];
-        updatedConfigs[index].discount_percentage = percentage;
-        setDiscountConfigs(updatedConfigs);
-        
-        if (updatedConfigs[index].is_active) {
-            const code = updatedConfigs[index].privilege_code.toLowerCase();
-            setData(`${code}_discount_percentage`, percentage);
-        }
-    };
+    const handleRemoveEligibilityCriterion = useCallback((index: number) => {
+        setEligibilityCriteria(prev => {
+            const updatedCriteria = prev.filter((_, i) => i !== index);
+            setData('eligibility_criteria', updatedCriteria);
+            return updatedCriteria;
+        });
+    }, [setData]);
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(route('clearance-types.store'));
-    };
+    const handleDiscountToggle = useCallback((index: number, checked: boolean) => {
+        setDiscountConfigs(prev => {
+            const updatedConfigs = [...prev];
+            updatedConfigs[index].is_active = checked;
+            
+            // Update form data with active discounts
+            const activeDiscounts = updatedConfigs.filter(c => c.is_active);
+            setData('discount_configs', activeDiscounts);
+            setData('is_discountable', activeDiscounts.length > 0);
+            
+            return updatedConfigs;
+        });
+    }, [setData]);
 
-    // Filter document types based on category and search
-    const filteredDocumentTypes = documentTypes.filter(doc => {
-        const matchesCategory = documentCategory === 'all' || doc.category === documentCategory;
-        const matchesSearch = doc.name.toLowerCase().includes(searchDocument.toLowerCase()) ||
-                            (doc.description && doc.description.toLowerCase().includes(searchDocument.toLowerCase()));
-        return matchesCategory && matchesSearch;
-    });
+    const handleDiscountPercentageChange = useCallback((index: number, percentage: number) => {
+        setDiscountConfigs(prev => {
+            const updatedConfigs = [...prev];
+            updatedConfigs[index].discount_percentage = percentage;
+            
+            // Update form data if discount is active
+            if (updatedConfigs[index].is_active) {
+                const activeDiscounts = updatedConfigs.filter(c => c.is_active);
+                setData('discount_configs', activeDiscounts);
+            }
+            
+            return updatedConfigs;
+        });
+    }, [setData]);
 
-    // Get unique categories from document types
-    const documentCategories = [
-        'all', 
-        ...Array.from(new Set(
-            documentTypes
-                .map(doc => doc.category)
-                .filter(category => category != null && category !== '')
-        ))
-    ];
-
-    // Resident fields for eligibility criteria
-    const residentFields = [
-        { value: 'age', label: 'Age', icon: <Calendar className="h-4 w-4" /> },
-        { value: 'civil_status', label: 'Civil Status', icon: <Heart className="h-4 w-4" /> },
-        { value: 'educational_attainment', label: 'Educational Attainment', icon: <GraduationCap className="h-4 w-4" /> },
-        { value: 'occupation', label: 'Occupation', icon: <Briefcase className="h-4 w-4" /> },
-        { value: 'monthly_income', label: 'Monthly Income', icon: <Wallet className="h-4 w-4" /> },
-        { value: 'is_registered_voter', label: 'Registered Voter', icon: <Vote className="h-4 w-4" /> },
-        { value: 'years_in_barangay', label: 'Years in Barangay', icon: <Clock className="h-4 w-4" /> },
-        { value: 'has_pending_case', label: 'Has Pending Case', icon: <Gavel className="h-4 w-4" /> },
-        // DYNAMIC: Add privilege-based fields
-        ...privileges.map(p => ({
-            value: `has_${p.code.toLowerCase()}`,
-            label: p.name,
-            icon: getPrivilegeIcon(p.code)
-        }))
-    ];
+        const submit = useCallback((e: React.FormEvent) => {
+            e.preventDefault();
+            post(route('clearance-types.store'));
+        }, [post]);
 
     return (
         <AppLayout
@@ -368,7 +329,7 @@ export default function CreateClearanceType({
         >
             <form onSubmit={submit}>
                 <div className="space-y-6">
-                    {/* Header */}
+                    {/* Header - Same as before */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/clearance-types">
@@ -839,6 +800,7 @@ export default function CreateClearanceType({
                                         <Button
                                             type="button"
                                             onClick={handleAddPurposeOption}
+                                            variant="outline"
                                             className="dark:border-gray-600 dark:text-gray-300"
                                         >
                                             <Plus className="h-4 w-4" />
@@ -847,7 +809,7 @@ export default function CreateClearanceType({
                                 </CardContent>
                             </Card>
 
-                            {/* DYNAMIC: Discount Configuration Section */}
+                            {/* Discount Configuration Section */}
                             {privileges.length > 0 && (
                                 <Card className="dark:bg-gray-900">
                                     <CardHeader>
@@ -1175,7 +1137,7 @@ export default function CreateClearanceType({
                                         </div>
                                         <div className="flex justify-between py-2 border-b dark:border-gray-700">
                                             <span className="text-gray-500 dark:text-gray-400">Fee:</span>
-                                            <span className="font-medium dark:text-gray-200">₱{data.fee.toFixed(2)}</span>
+                                            <span className="font-medium dark:text-gray-200">₱{typeof data.fee === 'number' ? data.fee.toFixed(2) : parseFloat(data.fee).toFixed(2)}</span>
                                         </div>
                                         <div className="flex justify-between py-2 border-b dark:border-gray-700">
                                             <span className="text-gray-500 dark:text-gray-400">Processing:</span>

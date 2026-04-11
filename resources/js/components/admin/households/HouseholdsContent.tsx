@@ -1,11 +1,16 @@
-// components/admin/households/HouseholdsContent.tsx
-
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     FileSpreadsheet, 
     Edit, 
@@ -17,7 +22,8 @@ import {
     Download,
     Home,
     CheckSquare,
-    Square
+    Square,
+    ArrowUpDown
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -74,6 +80,8 @@ interface HouseholdsContentProps {
     setShowBulkStatusDialog?: (show: boolean) => void;
     setShowBulkPurokDialog?: (show: boolean) => void;
     selectionMode: SelectionMode;
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function HouseholdsContent({
@@ -112,7 +120,9 @@ export default function HouseholdsContent({
     setShowBulkDeleteDialog,
     setShowBulkStatusDialog,
     setShowBulkPurokDialog,
-    selectionMode
+    selectionMode,
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'household_number-asc'
 }: HouseholdsContentProps) {
     
     // Bulk action items configuration
@@ -241,6 +251,35 @@ export default function HouseholdsContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="household_number-asc">Household # (A to Z)</SelectItem>
+                                        <SelectItem value="household_number-desc">Household # (Z to A)</SelectItem>
+                                        <SelectItem value="head_name-asc">Head of Household (A to Z)</SelectItem>
+                                        <SelectItem value="head_name-desc">Head of Household (Z to A)</SelectItem>
+                                        <SelectItem value="member_count-asc">Members (Low to High)</SelectItem>
+                                        <SelectItem value="member_count-desc">Members (High to Low)</SelectItem>
+                                        <SelectItem value="purok-asc">Purok (A to Z)</SelectItem>
+                                        <SelectItem value="purok-desc">Purok (Z to A)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && hasHouseholds && (
                             <div className="flex items-center gap-2">

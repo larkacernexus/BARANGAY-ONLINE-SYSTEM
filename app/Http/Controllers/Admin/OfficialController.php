@@ -26,7 +26,7 @@ class OfficialController extends Controller
     {
         $query = Official::with([
             'resident' => function ($q) {
-                $q->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 'contact_number', 'photo_path');
+                $q->select('id', 'first_name', 'last_name', 'middle_name', 'suffix', 'age', 'gender', 'contact_number', 'photo_path');
             },
             'positionData',
             'committeeData',
@@ -34,12 +34,13 @@ class OfficialController extends Controller
         ]);
 
         // Apply search filter
-        if ($request->has('search') && $request->search) {
-            $query->search($request->search);
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->search($search);
         }
 
         // Apply status filter
-        if ($request->has('status') && $request->status !== 'all') {
+        if ($request->filled('status') && $request->status !== 'all') {
             if ($request->status === 'current') {
                 $query->current();
             } else {
@@ -48,7 +49,7 @@ class OfficialController extends Controller
         }
 
         // Apply position filter
-        if ($request->has('position') && $request->position !== 'all') {
+        if ($request->filled('position') && $request->position !== 'all') {
             $position = Position::where('code', $request->position)->first();
             if ($position) {
                 $query->where('position_id', $position->id);
@@ -56,7 +57,7 @@ class OfficialController extends Controller
         }
 
         // Apply committee filter
-        if ($request->has('committee') && $request->committee !== 'all') {
+        if ($request->filled('committee') && $request->committee !== 'all') {
             $committee = Committee::where('code', $request->committee)->first();
             if ($committee) {
                 $query->where('committee_id', $committee->id);
@@ -64,7 +65,7 @@ class OfficialController extends Controller
         }
 
         // Apply type filter
-        if ($request->has('type') && $request->type !== 'all') {
+        if ($request->filled('type') && $request->type !== 'all') {
             if ($request->type === 'regular') {
                 $query->where('is_regular', true);
             } else if ($request->type === 'ex_officio') {
@@ -72,25 +73,51 @@ class OfficialController extends Controller
             }
         }
 
-        // Apply sorting
+        // Apply sorting - Handle all sort options from dropdown
         $sortBy = $request->get('sort_by', 'order');
         $sortOrder = $request->get('sort_order', 'asc');
         
-        if ($sortBy === 'position') {
-            $query->join('positions', 'officials.position_id', '=', 'positions.id')
-                  ->orderBy('positions.order', $sortOrder)
-                  ->select('officials.*');
-        } else if ($sortBy === 'name') {
-            $query->join('residents', 'officials.resident_id', '=', 'residents.id')
-                  ->orderBy('residents.last_name', $sortOrder)
-                  ->orderBy('residents.first_name', $sortOrder)
-                  ->select('officials.*');
-        } else if ($sortBy === 'committee') {
-            $query->leftJoin('committees', 'officials.committee_id', '=', 'committees.id')
-                  ->orderBy('committees.name', $sortOrder)
-                  ->select('officials.*');
-        } else {
-            $query->orderBy($sortBy, $sortOrder);
+        switch ($sortBy) {
+            case 'position':
+                $query->join('positions', 'officials.position_id', '=', 'positions.id')
+                      ->orderBy('positions.order', $sortOrder)
+                      ->orderBy('positions.name', $sortOrder)
+                      ->select('officials.*');
+                break;
+                
+            case 'name':
+                $query->join('residents', 'officials.resident_id', '=', 'residents.id')
+                      ->orderBy('residents.last_name', $sortOrder)
+                      ->orderBy('residents.first_name', $sortOrder)
+                      ->orderBy('residents.middle_name', $sortOrder)
+                      ->select('officials.*');
+                break;
+                
+            case 'committee':
+                $query->leftJoin('committees', 'officials.committee_id', '=', 'committees.id')
+                      ->orderBy('committees.name', $sortOrder)
+                      ->select('officials.*');
+                break;
+                
+            case 'status':
+                $query->orderBy('status', $sortOrder);
+                break;
+                
+            case 'type':
+                $query->orderBy('is_regular', $sortOrder === 'asc' ? 'desc' : 'asc');
+                break;
+                
+            case 'start_date':
+                $query->orderBy('term_start', $sortOrder);
+                break;
+                
+            case 'order':
+                $query->orderBy('order', $sortOrder);
+                break;
+                
+            default:
+                $query->orderBy($sortBy, $sortOrder);
+                break;
         }
 
         // Get paginated results
@@ -148,115 +175,115 @@ class OfficialController extends Controller
     }
 
     /**
- * End an official's term (make former)
- */
-public function endTerm(Request $request, Official $official)
-{
-    Log::info('Ending term for official', [
-        'official_id' => $official->id,
-        'current_status' => $official->status,
-        'current_term_end' => $official->term_end
-    ]);
-
-    try {
-        // Validate that the official exists and is active
-        if ($official->status !== 'active') {
-            return redirect()->back()->with('error', 'Only active officials can have their term ended.');
-        }
-
-        // Get today's date
-        $today = now()->format('Y-m-d');
-        
-        // Allow ending term on the same day it starts (>= instead of >)
-        if ($official->term_start > $today) {
-            return redirect()->back()->with('error', 'Cannot end term before it starts.');
-        }
-
-        // Start transaction
-        DB::beginTransaction();
-        
-        // Update the official
-        $official->update([
-            'term_end' => $today,
-            'status' => 'former'
-        ]);
-
-        // Handle user account if needed
-        if ($official->user_id) {
-            $this->handleReplacedOfficial($official->resident, $official);
-        }
-
-        DB::commit();
-
-        Log::info('Term ended successfully', [
+     * End an official's term (make former)
+     */
+    public function endTerm(Request $request, Official $official)
+    {
+        Log::info('Ending term for official', [
             'official_id' => $official->id,
-            'new_status' => $official->status,
-            'new_term_end' => $official->term_end
+            'current_status' => $official->status,
+            'current_term_end' => $official->term_end
         ]);
 
-        return redirect()->back()->with('success', 'Term ended successfully. Official marked as former.');
+        try {
+            // Validate that the official exists and is active
+            if ($official->status !== 'active') {
+                return redirect()->back()->with('error', 'Only active officials can have their term ended.');
+            }
 
-    } catch (\Exception $e) {
-        DB::rollBack();
-        
-        Log::error('Failed to end term', [
-            'official_id' => $official->id,
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
+            // Get today's date
+            $today = now()->format('Y-m-d');
+            
+            // Allow ending term on the same day it starts (>= instead of >)
+            if ($official->term_start > $today) {
+                return redirect()->back()->with('error', 'Cannot end term before it starts.');
+            }
 
-        return redirect()->back()->with('error', 'Failed to end term: ' . $e->getMessage());
+            // Start transaction
+            DB::beginTransaction();
+            
+            // Update the official
+            $official->update([
+                'term_end' => $today,
+                'status' => 'former'
+            ]);
+
+            // Handle user account if needed
+            if ($official->user_id) {
+                $this->handleReplacedOfficial($official->resident, $official);
+            }
+
+            DB::commit();
+
+            Log::info('Term ended successfully', [
+                'official_id' => $official->id,
+                'new_status' => $official->status,
+                'new_term_end' => $official->term_end
+            ]);
+
+            return redirect()->back()->with('success', 'Term ended successfully. Official marked as former.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('Failed to end term', [
+                'official_id' => $official->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->back()->with('error', 'Failed to end term: ' . $e->getMessage());
+        }
     }
-}
 
-/**
- * Reactivate a former official
- */
-public function reactivate(Request $request, Official $official)
-{
-    Log::info('Reactivating official', [
-        'official_id' => $official->id,
-        'current_status' => $official->status
-    ]);
+    /**
+     * Reactivate a former official
+     */
+    public function reactivate(Request $request, Official $official)
+    {
+        Log::info('Reactivating official', [
+            'official_id' => $official->id,
+            'current_status' => $official->status
+        ]);
 
-    try {
-        // Validate that the official is former
-        if ($official->status !== 'former') {
-            return redirect()->back()->with('error', 'Only former officials can be reactivated.');
+        try {
+            // Validate that the official is former
+            if ($official->status !== 'former') {
+                return redirect()->back()->with('error', 'Only former officials can be reactivated.');
+            }
+
+            // Set new term end date (3 years from now)
+            $newTermEnd = now()->addYears(3)->format('Y-m-d');
+
+            DB::beginTransaction();
+
+            // Update the official
+            $official->update([
+                'term_end' => $newTermEnd,
+                'status' => 'active'
+            ]);
+
+            DB::commit();
+
+            Log::info('Official reactivated successfully', [
+                'official_id' => $official->id,
+                'new_status' => $official->status,
+                'new_term_end' => $official->term_end
+            ]);
+
+            return redirect()->back()->with('success', 'Official reactivated successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            Log::error('Failed to reactivate official', [
+                'official_id' => $official->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return redirect()->back()->with('error', 'Failed to reactivate: ' . $e->getMessage());
         }
-
-        // Set new term end date (3 years from now)
-        $newTermEnd = now()->addYears(3)->format('Y-m-d');
-
-        DB::beginTransaction();
-
-        // Update the official
-        $official->update([
-            'term_end' => $newTermEnd,
-            'status' => 'active'
-        ]);
-
-        DB::commit();
-
-        Log::info('Official reactivated successfully', [
-            'official_id' => $official->id,
-            'new_status' => $official->status,
-            'new_term_end' => $official->term_end
-        ]);
-
-        return redirect()->back()->with('success', 'Official reactivated successfully.');
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        
-        Log::error('Failed to reactivate official', [
-            'official_id' => $official->id,
-            'error' => $e->getMessage()
-        ]);
-
-        return redirect()->back()->with('error', 'Failed to reactivate: ' . $e->getMessage());
     }
-}
 
     /**
      * Show the form for creating a new resource.
@@ -268,7 +295,7 @@ public function reactivate(Request $request, Official $official)
             $query->whereIn('status', ['active', 'inactive']);
         })
         ->where('status', 'active')
-        ->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 
+        ->select('id', 'first_name', 'last_name', 'middle_name', 'suffix', 'age', 'gender', 
                  'birth_date', 'civil_status', 'contact_number', 'email', 
                  'address', 'photo_path', 'purok_id')
         ->with(['purok:id,name', 'household:id,household_number,address'])
@@ -304,7 +331,7 @@ public function reactivate(Request $request, Official $official)
                         'middle_name' => $user->resident->middle_name,
                         'suffix' => $user->resident->suffix,
                         'full_name' => trim($user->resident->first_name . ' ' . 
-                                            $user->resident->middle_name . ' ' . 
+                                            ($user->resident->middle_name ? $user->resident->middle_name . ' ' : '') . 
                                             $user->resident->last_name . ' ' . 
                                             $user->resident->suffix),
                     ] : null,
@@ -503,6 +530,7 @@ public function reactivate(Request $request, Official $official)
                     'first_name' => $official->resident->first_name,
                     'last_name' => $official->resident->last_name,
                     'middle_name' => $official->resident->middle_name,
+                    'suffix' => $official->resident->suffix,
                     'age' => $official->resident->age,
                     'gender' => $official->resident->gender,
                     'birth_date' => $official->resident->birth_date?->format('Y-m-d'),
@@ -550,7 +578,7 @@ public function reactivate(Request $request, Official $official)
 
         // Get all residents for selection
         $availableResidents = Resident::where('status', 'active')
-            ->select('id', 'first_name', 'last_name', 'middle_name', 'age', 'gender', 
+            ->select('id', 'first_name', 'last_name', 'middle_name', 'suffix', 'age', 'gender', 
                      'contact_number', 'email', 'address', 'photo_path')
             ->orderBy('last_name')
             ->get();
@@ -584,7 +612,7 @@ public function reactivate(Request $request, Official $official)
                         'middle_name' => $user->resident->middle_name,
                         'suffix' => $user->resident->suffix,
                         'full_name' => trim($user->resident->first_name . ' ' . 
-                                            $user->resident->middle_name . ' ' . 
+                                            ($user->resident->middle_name ? $user->resident->middle_name . ' ' : '') . 
                                             $user->resident->last_name . ' ' . 
                                             $user->resident->suffix),
                     ] : null,
@@ -981,7 +1009,7 @@ public function reactivate(Request $request, Official $official)
     {
         $officials = Official::with([
             'resident' => function ($query) {
-                $query->select('id', 'first_name', 'last_name', 'middle_name', 'photo_path');
+                $query->select('id', 'first_name', 'last_name', 'middle_name', 'suffix', 'photo_path');
             },
             'positionData',
             'committeeData'
@@ -1075,30 +1103,30 @@ public function reactivate(Request $request, Official $official)
         }
     }
 
-  /**
- * Bulk update status - ONE METHOD FOR ALL BULK STATUS CHANGES
- */
-public function bulkUpdateStatus(Request $request)
-{
-    $request->validate([
-        'ids' => 'required|array',
-        'ids.*' => 'exists:officials,id',
-        'status' => 'required|in:active,inactive,former,current',
-    ]);
-
-    $status = $request->status;
-    
-    if ($status === 'current') {
-        Official::whereIn('id', $request->ids)->update([
-            'is_current' => true,
-            'status' => 'active'
+    /**
+     * Bulk update status - ONE METHOD FOR ALL BULK STATUS CHANGES
+     */
+    public function bulkUpdateStatus(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:officials,id',
+            'status' => 'required|in:active,inactive,former,current',
         ]);
-    } else {
-        Official::whereIn('id', $request->ids)->update(['status' => $status]);
-    }
 
-    return redirect()->back()->with('success', 'Status updated successfully');
-}
+        $status = $request->status;
+        
+        if ($status === 'current') {
+            Official::whereIn('id', $request->ids)->update([
+                'is_current' => true,
+                'status' => 'active'
+            ]);
+        } else {
+            Official::whereIn('id', $request->ids)->update(['status' => $status]);
+        }
+
+        return redirect()->back()->with('success', 'Status updated successfully');
+    }
 
     /**
      * Export officials
@@ -1111,7 +1139,7 @@ public function bulkUpdateStatus(Request $request)
             'committeeData'
         ]);
 
-        if ($request->has('status') && $request->status !== 'all') {
+        if ($request->filled('status') && $request->status !== 'all') {
             if ($request->status === 'current') {
                 $query->current();
             } else {
@@ -1119,7 +1147,7 @@ public function bulkUpdateStatus(Request $request)
             }
         }
 
-        if ($request->has('position') && $request->position !== 'all') {
+        if ($request->filled('position') && $request->position !== 'all') {
             $position = Position::where('code', $request->position)->first();
             if ($position) {
                 $query->where('position_id', $position->id);
@@ -1134,11 +1162,11 @@ public function bulkUpdateStatus(Request $request)
         foreach ($officials as $official) {
             $csv .= implode(',', [
                 $official->id,
-                '"' . $official->resident->full_name . '"',
+                '"' . ($official->resident->full_name ?? 'N/A') . '"',
                 $official->positionData ? $official->positionData->name : 'N/A',
                 $official->committeeData ? $official->committeeData->name : 'N/A',
-                $official->term_start->format('Y-m-d'),
-                $official->term_end->format('Y-m-d'),
+                $official->term_start?->format('Y-m-d') ?? 'N/A',
+                $official->term_end?->format('Y-m-d') ?? 'N/A',
                 ucfirst($official->status),
                 $official->contact_number ?? 'N/A',
                 $official->email ?? 'N/A',

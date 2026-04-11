@@ -60,6 +60,8 @@ export interface PayerDetails {
 }
 
 export interface ClearanceRequest {
+    amount_paid: number;
+    discount_amount: number;
     id: number;
     reference_number: string;
     clearance_number?: string;
@@ -124,6 +126,7 @@ export interface ClearanceRequest {
 }
 
 export interface FeeDetails {
+    fee_type_name: string | undefined;
     id: number;
     fee_code: string;
     or_number?: string;
@@ -224,6 +227,7 @@ export interface Payment {
     formatted_date: string;
     period_covered?: string;
     payment_method: string;
+    discount_percentage?: number; 
     payment_method_display: string;
     payment_method_details: {
         name: string;

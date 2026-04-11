@@ -1,5 +1,5 @@
 // resources/js/Pages/Admin/Puroks/components/demographics-details-card.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Demographics } from '@/types/admin/puroks/purok';
@@ -9,40 +9,109 @@ interface Props {
 }
 
 export const DemographicsDetailsCard = ({ demographics }: Props) => {
+    // Safely extract demographics with default values
+    const safeDemographics = useMemo(() => {
+        if (!demographics) {
+            return {
+                gender: { male: 0, female: 0, other: 0 },
+                ageGroups: { '0-17': 0, '18-30': 0, '31-59': 0, '60+': 0 },
+                civilStatus: { single: 0, married: 0, widowed: 0, divorced: 0 },
+                occupation: { employed: 0, unemployed: 0, student: 0, retired: 0 },
+                education: { none: 0, elementary: 0, highSchool: 0, college: 0, postgraduate: 0 }
+            };
+        }
+        
+        return {
+            gender: {
+                male: demographics.gender?.male ?? 0,
+                female: demographics.gender?.female ?? 0,
+                other: demographics.gender?.other ?? 0
+            },
+            ageGroups: {
+                '0-17': demographics.ageGroups?.['0-17'] ?? 0,
+                '18-30': demographics.ageGroups?.['18-30'] ?? 0,
+                '31-59': demographics.ageGroups?.['31-59'] ?? 0,
+                '60+': demographics.ageGroups?.['60+'] ?? 0
+            },
+            civilStatus: {
+                single: demographics.civilStatus?.single ?? 0,
+                married: demographics.civilStatus?.married ?? 0,
+                widowed: demographics.civilStatus?.widowed ?? 0,
+                divorced: demographics.civilStatus?.divorced ?? 0
+            },
+            occupation: {
+                employed: demographics.occupation?.employed ?? 0,
+                unemployed: demographics.occupation?.unemployed ?? 0,
+                student: demographics.occupation?.student ?? 0,
+                retired: demographics.occupation?.retired ?? 0
+            },
+            education: {
+                none: demographics.education?.none ?? 0,
+                elementary: demographics.education?.elementary ?? 0,
+                highSchool: demographics.education?.highSchool ?? 0,
+                college: demographics.education?.college ?? 0,
+                postgraduate: demographics.education?.postgraduate ?? 0
+            }
+        };
+    }, [demographics]);
+
+    const { gender, ageGroups, civilStatus, occupation, education } = safeDemographics;
+
     // Calculate totals
-    const total = (demographics.gender.male || 0) + (demographics.gender.female || 0) + (demographics.gender.other || 0);
+    const total = (gender.male || 0) + (gender.female || 0) + (gender.other || 0);
     
     // Calculate male to female ratio
-    const maleToFemaleRatio = demographics.gender.female > 0 
-        ? (demographics.gender.male / demographics.gender.female).toFixed(2)
-        : demographics.gender.male > 0 ? '∞' : 'N/A';
+    const maleToFemaleRatio = gender.female > 0 
+        ? (gender.male / gender.female).toFixed(2)
+        : gender.male > 0 ? '∞' : 'N/A';
     
     // Calculate age group totals for summary
-    const children = demographics.ageGroups['0-17'] || 0;
-    const youngAdults = demographics.ageGroups['18-30'] || 0;
-    const adults = demographics.ageGroups['31-59'] || 0;
-    const seniors = demographics.ageGroups['60+'] || 0;
+    const children = ageGroups['0-17'] || 0;
+    const youngAdults = ageGroups['18-30'] || 0;
+    const adults = ageGroups['31-59'] || 0;
+    const seniors = ageGroups['60+'] || 0;
     const adultsTotal = youngAdults + adults; // 18-59 age group
     
     // Calculate civil status percentages
-    const civilStatusTotal = (demographics.civilStatus.single || 0) + 
-                            (demographics.civilStatus.married || 0) + 
-                            (demographics.civilStatus.widowed || 0) + 
-                            (demographics.civilStatus.divorced || 0);
+    const civilStatusTotal = (civilStatus.single || 0) + 
+                            (civilStatus.married || 0) + 
+                            (civilStatus.widowed || 0) + 
+                            (civilStatus.divorced || 0);
     
     // Calculate occupation percentages
-    const occupationTotal = (demographics.occupation.employed || 0) + 
-                           (demographics.occupation.unemployed || 0) + 
-                           (demographics.occupation.student || 0) + 
-                           (demographics.occupation.retired || 0);
+    const occupationTotal = (occupation.employed || 0) + 
+                           (occupation.unemployed || 0) + 
+                           (occupation.student || 0) + 
+                           (occupation.retired || 0);
     
     // Calculate education percentages
-    const educationTotal = (demographics.education.elementary || 0) + 
-                          (demographics.education.highSchool || 0) + 
-                          (demographics.education.college || 0) + 
-                          (demographics.education.postgraduate || 0) + 
-                          (demographics.education.none || 0);
-    
+    const educationTotal = (education.elementary || 0) + 
+                          (education.highSchool || 0) + 
+                          (education.college || 0) + 
+                          (education.postgraduate || 0) + 
+                          (education.none || 0);
+
+    // Check if there's any data to display
+    const hasData = total > 0 || civilStatusTotal > 0 || occupationTotal > 0 || educationTotal > 0;
+
+    if (!hasData) {
+        return (
+            <Card className="dark:bg-gray-900">
+                <CardHeader>
+                    <CardTitle className="dark:text-gray-100">Detailed Demographics</CardTitle>
+                    <CardDescription className="dark:text-gray-400">
+                        Comprehensive demographic breakdown of residents
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                        No demographic data available
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <Card className="dark:bg-gray-900">
             <CardHeader>
@@ -58,24 +127,24 @@ export const DemographicsDetailsCard = ({ demographics }: Props) => {
                         <h4 className="text-sm font-medium mb-3 dark:text-gray-300">Gender Distribution</h4>
                         <div className="grid grid-cols-3 gap-4 text-center">
                             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{demographics.gender.male}</p>
+                                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{gender.male || 0}</p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Male</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                    {total > 0 ? ((demographics.gender.male / total) * 100).toFixed(1) : 0}%
+                                    {total > 0 ? ((gender.male / total) * 100).toFixed(1) : 0}%
                                 </p>
                             </div>
                             <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded-lg">
-                                <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{demographics.gender.female}</p>
+                                <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{gender.female || 0}</p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Female</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                    {total > 0 ? ((demographics.gender.female / total) * 100).toFixed(1) : 0}%
+                                    {total > 0 ? ((gender.female / total) * 100).toFixed(1) : 0}%
                                 </p>
                             </div>
                             <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{demographics.gender.other || 0}</p>
+                                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{gender.other || 0}</p>
                                 <p className="text-xs text-gray-600 dark:text-gray-400">Other</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                    {total > 0 ? (((demographics.gender.other || 0) / total) * 100).toFixed(1) : 0}%
+                                    {total > 0 ? (((gender.other || 0) / total) * 100).toFixed(1) : 0}%
                                 </p>
                             </div>
                         </div>
@@ -146,19 +215,19 @@ export const DemographicsDetailsCard = ({ demographics }: Props) => {
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
                                 <span className="text-sm dark:text-gray-300">Single</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.single}</span>
+                                <span className="font-medium dark:text-gray-200">{civilStatus.single || 0}</span>
                             </div>
                             <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
                                 <span className="text-sm dark:text-gray-300">Married</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.married}</span>
+                                <span className="font-medium dark:text-gray-200">{civilStatus.married || 0}</span>
                             </div>
                             <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
                                 <span className="text-sm dark:text-gray-300">Widowed</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.widowed}</span>
+                                <span className="font-medium dark:text-gray-200">{civilStatus.widowed || 0}</span>
                             </div>
                             <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
                                 <span className="text-sm dark:text-gray-300">Divorced</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.civilStatus.divorced}</span>
+                                <span className="font-medium dark:text-gray-200">{civilStatus.divorced || 0}</span>
                             </div>
                         </div>
                         {civilStatusTotal > 0 && (
@@ -176,19 +245,19 @@ export const DemographicsDetailsCard = ({ demographics }: Props) => {
                         <div className="space-y-2">
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">Employed</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.occupation.employed}</span>
+                                <span className="font-medium dark:text-gray-200">{occupation.employed || 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">Unemployed</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.occupation.unemployed}</span>
+                                <span className="font-medium dark:text-gray-200">{occupation.unemployed || 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">Student</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.occupation.student}</span>
+                                <span className="font-medium dark:text-gray-200">{occupation.student || 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">Retired</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.occupation.retired}</span>
+                                <span className="font-medium dark:text-gray-200">{occupation.retired || 0}</span>
                             </div>
                         </div>
                         {occupationTotal > 0 && (
@@ -206,23 +275,23 @@ export const DemographicsDetailsCard = ({ demographics }: Props) => {
                         <div className="space-y-2">
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">No Formal Education</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.education.none}</span>
+                                <span className="font-medium dark:text-gray-200">{education.none || 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">Elementary</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.education.elementary}</span>
+                                <span className="font-medium dark:text-gray-200">{education.elementary || 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">High School</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.education.highSchool}</span>
+                                <span className="font-medium dark:text-gray-200">{education.highSchool || 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">College</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.education.college}</span>
+                                <span className="font-medium dark:text-gray-200">{education.college || 0}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-sm dark:text-gray-300">Post Graduate</span>
-                                <span className="font-medium dark:text-gray-200">{demographics.education.postgraduate}</span>
+                                <span className="font-medium dark:text-gray-200">{education.postgraduate || 0}</span>
                             </div>
                         </div>
                         {educationTotal > 0 && (

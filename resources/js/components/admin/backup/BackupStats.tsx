@@ -8,15 +8,15 @@ import {
   Lock 
 } from 'lucide-react';
 import { formatDate, formatBytes, getDiskHealthColor } from '@/admin-utils/formatters';
-import { DiskSpaceInfo, Stats } from '@/types/backup';
+import type { DiskSpaceInfo, BackupStats } from '@/types/admin/backup/backup';
 
 interface BackupStatsProps {
   diskSpace: DiskSpaceInfo;
   lastBackup: string | null;
-  stats: Stats;
+  stats: BackupStats;
 }
 
-export default function BackupStats({ diskSpace, lastBackup, stats }: BackupStatsProps) {
+export default function BackupStatsComponent({ diskSpace, lastBackup, stats }: BackupStatsProps) {
   // Safe stats with fallbacks
   const safeStats = {
     total: stats?.total || 0,
@@ -51,7 +51,6 @@ export default function BackupStats({ diskSpace, lastBackup, stats }: BackupStat
         valueClassName={getDiskHealthColor(safeDiskSpace.used_percentage)}
         icon={<HardDriveIcon className="h-4 w-4 text-green-500" />}
         description={`${safeDiskSpace.used} of ${safeDiskSpace.total} used`}
-        progress={safeDiskSpace.used_percentage}
         footer={`${safeDiskSpace.free} free`}
       />
       
@@ -61,13 +60,12 @@ export default function BackupStats({ diskSpace, lastBackup, stats }: BackupStat
         icon={<Clock className="h-4 w-4 text-purple-500" />}
         description={lastBackup ? 'Most recent backup' : 'No backups created yet'}
         footer={lastBackup ? `${safeStats.recent} recent backup${safeStats.recent !== 1 ? 's' : ''}` : undefined}
-        footerClassName="text-green-600 dark:text-green-400"
       />
       
       <StatCard
         title="Data Protection"
         value={safeStats.protected > 0 ? 'Protected' : 'Unprotected'}
-        valueClassName={safeStats.protected > 0 ? 'text-green-600' : 'text-amber-600'}
+        valueClassName={safeStats.protected > 0 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}
         icon={<ShieldCheck className="h-4 w-4 text-amber-500" />}
         description={`${safeStats.protected} protected backup${safeStats.protected !== 1 ? 's' : ''}`}
         footer={safeStats.protected > 0 ? (
@@ -76,7 +74,6 @@ export default function BackupStats({ diskSpace, lastBackup, stats }: BackupStat
             Safe from accidental deletion
           </div>
         ) : undefined}
-        footerClassName="text-green-600 dark:text-green-400"
       />
     </div>
   );

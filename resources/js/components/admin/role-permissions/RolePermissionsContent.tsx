@@ -1,12 +1,18 @@
-// components/admin/role-permissions/RolePermissionsContent.tsx
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Key } from 'lucide-react';
+import { Key, ArrowUpDown } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
 import { Pagination } from '@/components/adminui/pagination';
@@ -48,7 +54,7 @@ interface RolePermissionsContentProps {
     onRevokePermission: (permission: RolePermission) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onCopySelectedData: () => void;
-    onBulkOperation: (operation: BulkOperation) => void; // Change from string to BulkOperation
+    onBulkOperation: (operation: BulkOperation) => void;
     setShowBulkRevokeDialog: (show: boolean) => void;
     filtersState: FilterState;
     isPerformingBulkAction: boolean;
@@ -57,6 +63,11 @@ interface RolePermissionsContentProps {
     windowWidth: number;
     expandedPermission: number | null;
     togglePermissionExpansion: (id: number) => void;
+    // Sort dropdown props
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function RolePermissionsContent({
@@ -89,7 +100,11 @@ export default function RolePermissionsContent({
     selectionStats,
     windowWidth,
     expandedPermission,
-    togglePermissionExpansion
+    togglePermissionExpansion,
+    sortBy = 'granted_at',
+    sortOrder = 'desc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'granted_at-desc'
 }: RolePermissionsContentProps) {
     
     // Add viewMode state for toggling between table and grid views
@@ -159,6 +174,33 @@ export default function RolePermissionsContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && onSortChange && getCurrentSortValue && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="permission_name-asc">Permission (A to Z)</SelectItem>
+                                        <SelectItem value="permission_name-desc">Permission (Z to A)</SelectItem>
+                                        <SelectItem value="role_name-asc">Role (A to Z)</SelectItem>
+                                        <SelectItem value="role_name-desc">Role (Z to A)</SelectItem>
+                                        <SelectItem value="module-asc">Module (A to Z)</SelectItem>
+                                        <SelectItem value="module-desc">Module (Z to A)</SelectItem>
+                                        <SelectItem value="granter-asc">Assigned By (A to Z)</SelectItem>
+                                        <SelectItem value="granter-desc">Assigned By (Z to A)</SelectItem>
+                                        <SelectItem value="granted_at-asc">Assigned (Oldest first)</SelectItem>
+                                        <SelectItem value="granted_at-desc">Assigned (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && permissions.length > 0 && (
                             <div className="flex items-center gap-2">
@@ -244,9 +286,8 @@ export default function RolePermissionsContent({
                                     onSelectAllOnPage={onSelectAllOnPage}
                                     isSelectAll={isSelectAll}
                                     windowWidth={windowWidth}
-                                    // Remove these lines if not needed:
-                                    // expandedPermission={expandedPermission}
-                                    // togglePermissionExpansion={togglePermissionExpansion}
+                                    expandedPermission={expandedPermission}
+                                    togglePermissionExpansion={togglePermissionExpansion}
                                 />
                             ) : (
                                 // Grid View

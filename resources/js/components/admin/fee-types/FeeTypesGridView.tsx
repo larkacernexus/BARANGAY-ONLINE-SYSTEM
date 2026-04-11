@@ -37,28 +37,8 @@ import {
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
-interface FeeType {
-    id: number;
-    code: string;
-    name: string;
-    short_name: string;
-    description?: string;
-    base_amount: number | string | null;
-    amount_type: string;
-    frequency: string;
-    validity_days: number | null;
-    is_active: boolean;
-    is_mandatory: boolean;
-    auto_generate: boolean;
-    document_category_id: number | null;
-    document_category?: {
-        name: string;
-        icon?: string;
-        color?: string;
-    };
-    created_at: string;
-    updated_at: string;
-}
+// Import shared types
+import { FeeType, CategoryDetails } from '@/types/admin/fee-types/fee.types';
 
 interface FeeTypesGridViewProps {
     feeTypes: FeeType[];
@@ -72,11 +52,7 @@ interface FeeTypesGridViewProps {
     onDuplicate?: (feeType: FeeType) => void;
     onViewPhoto: (feeType: FeeType) => void;
     onCopyToClipboard: (text: string, label: string) => void;
-    getCategoryDetails: (feeType: FeeType) => {
-        name: string;
-        icon: React.ReactNode;
-        color: string;
-    };
+    getCategoryDetails: (feeType: FeeType) => CategoryDetails;
     formatCurrency: (amount: any) => string;
     formatDate: (dateString: string) => string;
 }
@@ -159,80 +135,80 @@ export default function FeeTypesGridView({
                                             <MoreVertical className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.fee-types.show', feeType.id)} className="flex items-center cursor-pointer">
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            <span>View Details</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.fee-types.edit', feeType.id)} className="flex items-center cursor-pointer">
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            <span>Edit Fee Type</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
+                                    <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('admin.fee-types.show', feeType.id)} className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100">
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                <span>View Details</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('admin.fee-types.edit', feeType.id)} className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100">
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                <span>Edit Fee Type</span>
+                                            </Link>
+                                        </DropdownMenuItem>
 
-                                                    {onDuplicate && (
-                                                        <DropdownMenuItem 
-                                                            onClick={() => onDuplicate(feeType)}
-                                                            className="flex items-center cursor-pointer"
-                                                        >
-                                                            <Copy className="mr-2 h-4 w-4" />
-                                                            <span>Duplicate</span>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    
-                                                    <DropdownMenuSeparator />
-                                                    
-                                                    <DropdownMenuItem 
-                                                        onClick={() => onCopyToClipboard(feeType.code || '', 'Fee Type Code')}
-                                                        className="flex items-center cursor-pointer"
-                                                    >
-                                                        <Clipboard className="mr-2 h-4 w-4" />
-                                                        <span>Copy Code</span>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.fees.index', { fee_type: feeType.id })} className="flex items-center cursor-pointer">
-                                                            <DollarSign className="mr-2 h-4 w-4" />
-                                                            <span>View Fees</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
+                                        {onDuplicate && (
+                                            <DropdownMenuItem 
+                                                onClick={() => onDuplicate(feeType)}
+                                                className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100"
+                                            >
+                                                <Copy className="mr-2 h-4 w-4" />
+                                                <span>Duplicate</span>
+                                            </DropdownMenuItem>
+                                        )}
+                                        
+                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                        
+                                        <DropdownMenuItem 
+                                            onClick={() => onCopyToClipboard(feeType.code || '', 'Fee Type Code')}
+                                            className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100"
+                                        >
+                                            <Clipboard className="mr-2 h-4 w-4" />
+                                            <span>Copy Code</span>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('admin.fees.index', { fee_type: feeType.id })} className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100">
+                                                <DollarSign className="mr-2 h-4 w-4" />
+                                                <span>View Fees</span>
+                                            </Link>
+                                        </DropdownMenuItem>
 
-                                                    {isBulkMode && (
+                                        {isBulkMode && (
+                                            <>
+                                                <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                                <DropdownMenuItem 
+                                                    onClick={() => onItemSelect(feeType.id)}
+                                                    className="flex items-center cursor-pointer dark:text-gray-300 dark:hover:text-gray-100"
+                                                >
+                                                    {isSelected ? (
                                                         <>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem 
-                                                                onClick={() => onItemSelect(feeType.id)}
-                                                                className="flex items-center cursor-pointer"
-                                                            >
-                                                                {isSelected ? (
-                                                                    <>
-                                                                        <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
-                                                                        <span className="text-green-600">Deselect</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <Square className="mr-2 h-4 w-4" />
-                                                                        <span>Select for Bulk</span>
-                                                                    </>
-                                                                )}
-                                                            </DropdownMenuItem>
+                                                            <CheckSquare className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
+                                                            <span className="text-green-600 dark:text-green-400">Deselect</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Square className="mr-2 h-4 w-4" />
+                                                            <span>Select for Bulk</span>
                                                         </>
                                                     )}
-                                                    
-                                                    <DropdownMenuSeparator />
-                                                    
-                                                    <DropdownMenuItem 
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50"
-                                                        onClick={() => onDelete(feeType)}
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        <span>Delete Fee Type</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                        
+                                        <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                        
+                                        <DropdownMenuItem 
+                                            className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-900/20"
+                                            onClick={() => onDelete(feeType)}
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            <span>Delete Fee Type</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
 
@@ -300,7 +276,7 @@ export default function FeeTypesGridView({
 
                             {/* Badges */}
                             <div className="flex flex-wrap gap-1 mb-4">
-                                <Badge variant="outline" className={`${categoryDetails.color} dark:border-gray-700 dark:text-gray-300`}>
+                                <Badge variant="outline" className={`${categoryDetails.bgColor} ${categoryDetails.textColor} ${categoryDetails.borderColor}`}>
                                     <span className="flex items-center gap-1">
                                         {categoryDetails.icon}
                                         {categoryDetails.name}

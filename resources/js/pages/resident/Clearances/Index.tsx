@@ -1,6 +1,7 @@
-// /Pages/resident/MyClearances.tsx
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Head, router, usePage, Link } from '@inertiajs/react';
+// pages/resident/MyClearances.tsx (Fixed Type Issues)
+
+import { useState, useEffect, useMemo } from 'react';
+import { Head, usePage, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle, FileText, Clock, DollarSign, Loader2, CheckCircle, FileCheck, XCircle, Plus } from 'lucide-react';
 
 // Reusable Components
-import { CustomTabs } from '@/components/residentui/CustomTabs';
 import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
 import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
 import { ModernPagination } from '@/components/residentui/modern-pagination';
@@ -16,31 +16,43 @@ import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-ove
 import { ModernSelectionBanner } from '@/components/residentui/modern-selection-banner';
 
 // Clearance-specific components
-import { CLEARANCE_TABS, getClearanceStatsCards } from '@/components/residentui/clearances/constants';
-import { formatDate, formatCurrency, getClearanceTypeDisplay, getStatusCount, copyToClipboard, printClearancesList, exportClearancesToCSV } from '@/components/residentui/clearances/clearance-utils';
+import { ClearanceTabs, CLEARANCE_TABS_CONFIG } from '@/components/portal/clearance/index/clearance-tabs';
+import { 
+    formatDate as baseFormatDate, 
+    formatCurrency as baseFormatCurrency, 
+    getClearanceTypeDisplay, 
+    copyToClipboard, 
+    printClearancesList, 
+    exportClearancesToCSV 
+} from '@/components/residentui/clearances/clearance-utils';
 import { ModernClearanceCard } from '@/components/residentui/clearances/modern-clearance-card';
 import { ModernClearanceGridCard } from '@/components/residentui/clearances/modern-clearance-grid-card';
+import { ModernClearanceMobileListView } from '@/components/residentui/clearances/modern-clearance-mobile-list-view';
 import { ModernClearanceFilters } from '@/components/residentui/clearances/modern-clearance-filters';
 import { ModernClearanceTable } from '@/components/residentui/clearances/modern-clearance-table';
-import { CollapsibleStats } from '@/components/residentui/CollapsibleStats';
+import { CollapsibleStats } from '@/components/residentui/clearances/CollapsibleStats';
 import { DesktopStats } from '@/components/portal/clearance/index/DesktopStats';
 import { HeaderSection } from '@/components/portal/clearance/index/HeaderSection';
 import { TabHeader } from '@/components/portal/clearance/index/TabHeader';
 import { FilterModalContent } from '@/components/portal/clearance/index/FilterModalContent';
 
 // Types
-import type { ClearanceRequest, Household, ClearanceStats, ClearanceFilters } from '@/types/portal/clearances/clearance.types';
+import type { ClearanceRequest, Household, ClearanceStats } from '@/types/portal/clearances/clearance.types';
+
+// Wrapper functions with proper type handling
+const formatDate = (date: string | null | undefined, isMobile: boolean = false): string => {
+    if (!date) return '—';
+    return baseFormatDate(date, isMobile);
+};
+
+const formatCurrency = (amount: number | string | undefined | null): string => {
+    if (amount === undefined || amount === null) return '₱0.00';
+    return baseFormatCurrency(amount);
+};
 
 interface PageProps extends Record<string, any> {
     clearances?: {
         data: ClearanceRequest[];
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
-        from: number;
-        to: number;
-        links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     stats?: ClearanceStats;
     availableYears?: number[];
@@ -48,30 +60,18 @@ interface PageProps extends Record<string, any> {
     householdResidents?: Array<{ id: number; first_name: string; last_name: string }>;
     currentResident?: { id: number; first_name: string; last_name: string };
     household?: Household;
-    filters?: ClearanceFilters;
     error?: string;
 }
 
-// Type for status filter - can be string or specific status type
-type StatusFilterValue = string | 'pending' | 'pending_payment' | 'processing' | 'approved' | 'issued' | 'rejected' | 'cancelled' | 'all';
-type UrgencyFilterValue = string | 'normal' | 'rush' | 'express' | 'all';
+// Type for status filter
+type StatusFilterValue = 'pending' | 'pending_payment' | 'processing' | 'approved' | 'issued' | 'rejected' | 'cancelled' | 'all';
+type UrgencyFilterValue = 'normal' | 'rush' | 'express' | 'all';
 
 export default function MyClearances() {
-    const page = usePage<PageProps>();
-    const pageProps = page.props;
+    const { props } = usePage<PageProps>();
     
-    const clearances = pageProps.clearances || {
-        data: [],
-        current_page: 1,
-        last_page: 1,
-        per_page: 15,
-        total: 0,
-        from: 0,
-        to: 0,
-        links: [],
-    };
-    
-    const stats = pageProps.stats || {
+    const allClearances = props.clearances?.data || [];
+    const stats = props.stats || {
         total_clearances: 0,
         pending_clearances: 0,
         pending_payment_clearances: 0,
@@ -87,19 +87,21 @@ export default function MyClearances() {
         current_year_issued: 0,
     };
     
-    const availableYears = pageProps.availableYears || [];
-    const availableClearanceTypes = pageProps.availableClearanceTypes || [];
-    const householdResidents = pageProps.householdResidents || [];
-    const currentResident = pageProps.currentResident || { id: 0, first_name: '', last_name: '' };
-    const household = pageProps.household || { id: 0, household_number: '', head_of_family: '' };
-    const filters = pageProps.filters || {};
+    const availableYears = props.availableYears || [];
+    const availableClearanceTypes = props.availableClearanceTypes || [];
+    const householdResidents = props.householdResidents || [];
+    const currentResident = props.currentResident || { id: 0, first_name: '', last_name: '' };
+    const household = props.household || { id: 0, household_number: '', head_of_family: '' };
     
-    const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(filters.status || 'all');
-    const [clearanceTypeFilter, setClearanceTypeFilter] = useState(filters.clearance_type || 'all');
-    const [residentFilter, setResidentFilter] = useState(filters.resident || 'all');
-    const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilterValue>(filters.urgency || 'all');
-    const [yearFilter, setYearFilter] = useState(filters.year || 'all');
+    // Client-side filter state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all');
+    const [clearanceTypeFilter, setClearanceTypeFilter] = useState('all');
+    const [residentFilter, setResidentFilter] = useState('all');
+    const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilterValue>('all');
+    const [yearFilter, setYearFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [showStats, setShowStats] = useState(true);
@@ -108,9 +110,6 @@ export default function MyClearances() {
     const [isExporting, setIsExporting] = useState(false);
     const [selectMode, setSelectMode] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    
-    const hasInitialized = useRef(false);
-    const searchTimeout = useRef<NodeJS.Timeout | null>(null);
     
     // Check if mobile on mount and resize
     useEffect(() => {
@@ -127,132 +126,157 @@ export default function MyClearances() {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
     
-    // Initialize filters from props
-    useEffect(() => {
-        if (!hasInitialized.current) {
-            setSearch(filters.search || '');
-            setStatusFilter(filters.status || 'all');
-            setClearanceTypeFilter(filters.clearance_type || 'all');
-            setResidentFilter(filters.resident || 'all');
-            setUrgencyFilter(filters.urgency || 'all');
-            setYearFilter(filters.year || 'all');
-            hasInitialized.current = true;
-        }
-    }, [filters]);
-    
-    // Search debounce
-    useEffect(() => {
-        if (!hasInitialized.current) return;
-        if (search === '' && !filters.search) return;
-        if (search === filters.search) return;
+    // Filter clearances client-side
+    const filteredClearances = useMemo(() => {
+        let filtered = [...allClearances];
         
-        if (searchTimeout.current) {
-            clearTimeout(searchTimeout.current);
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(clearance => clearance.status === statusFilter);
         }
         
-        searchTimeout.current = setTimeout(() => {
-            updateFilters({ 
-                search: search.trim(),
-                page: '1'
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(clearance => 
+                clearance.reference_number?.toLowerCase().includes(query) ||
+                clearance.purpose?.toLowerCase().includes(query) ||
+                clearance.clearance_type_name?.toLowerCase().includes(query)
+            );
+        }
+        
+        if (clearanceTypeFilter !== 'all') {
+            filtered = filtered.filter(clearance => 
+                clearance.clearance_type_id?.toString() === clearanceTypeFilter
+            );
+        }
+        
+        if (residentFilter !== 'all') {
+            filtered = filtered.filter(clearance => 
+                clearance.resident_id?.toString() === residentFilter
+            );
+        }
+        
+        if (urgencyFilter !== 'all') {
+            filtered = filtered.filter(clearance => 
+                clearance.urgency === urgencyFilter
+            );
+        }
+        
+        if (yearFilter !== 'all') {
+            filtered = filtered.filter(clearance => {
+                if (!clearance.created_at) return false;
+                try {
+                    const clearanceYear = new Date(clearance.created_at).getFullYear().toString();
+                    return clearanceYear === yearFilter;
+                } catch {
+                    return false;
+                }
             });
-        }, 800);
-        
-        return () => {
-            if (searchTimeout.current) {
-                clearTimeout(searchTimeout.current);
-            }
-        };
-    }, [search]);
-    
-    const updateFilters = (newFilters: Record<string, string>) => {
-        setLoading(true);
-        
-        const updatedFilters = {
-            ...filters,
-            ...newFilters,
-        };
-        
-        const cleanFilters: Record<string, string> = {};
-        
-        Object.entries(updatedFilters).forEach(([key, value]) => {
-            if (key === 'page' && value === '1') return;
-            if (value && value !== '' && value !== 'all' && value !== undefined) {
-                cleanFilters[key] = String(value);
-            }
-        });
-        
-        router.get('/portal/my-clearances', cleanFilters, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
-    };
-    
-    const handleTabChange = (tab: string) => {
-        setStatusFilter(tab as StatusFilterValue);
-        
-        if (tab === 'all') {
-            updateFilters({ status: '', page: '1' });
-        } else {
-            updateFilters({ status: tab, page: '1' });
         }
         
-        if (isMobile) setShowMobileFilters(false);
+        filtered.sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return dateB - dateA;
+        });
+        
+        return filtered;
+    }, [allClearances, statusFilter, searchQuery, clearanceTypeFilter, residentFilter, urgencyFilter, yearFilter]);
+    
+    // Pre-calculate tab counts from filtered data
+    const tabCounts = useMemo(() => {
+        if (!filteredClearances) {
+            return {
+                all: 0,
+                pending: 0,
+                pending_payment: 0,
+                processing: 0,
+                approved: 0,
+                issued: 0,
+                rejected: 0,
+                cancelled: 0,
+            };
+        }
+        
+        return {
+            all: filteredClearances.length,
+            pending: filteredClearances.filter(c => c.status === 'pending').length,
+            pending_payment: filteredClearances.filter(c => c.status === 'pending_payment').length,
+            processing: filteredClearances.filter(c => c.status === 'processing').length,
+            approved: filteredClearances.filter(c => c.status === 'approved').length,
+            issued: filteredClearances.filter(c => c.status === 'issued').length,
+            rejected: filteredClearances.filter(c => c.status === 'rejected').length,
+            cancelled: filteredClearances.filter(c => c.status === 'cancelled').length,
+        };
+    }, [filteredClearances]);
+    
+    // Get status count function for CollapsibleStats
+    const getStatusCountForStats = (status: string | number): number => {
+        const statusStr = String(status);
+        return tabCounts[statusStr as keyof typeof tabCounts] || 0;
     };
     
-    const handleClearanceTypeChange = (type: string) => {
-        setClearanceTypeFilter(type);
-        updateFilters({ clearance_type: type === 'all' ? '' : type, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
+    // Pagination
+    const itemsPerPage = 15;
+    const totalPages = Math.ceil(filteredClearances.length / itemsPerPage);
+    const paginatedClearances = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        return filteredClearances.slice(start, end);
+    }, [filteredClearances, currentPage]);
+    
+    // Reset to first page when filters change
+    const handleFilterChange = (filterType: string, value: string) => {
+        setCurrentPage(1);
+        
+        switch (filterType) {
+            case 'status':
+                setStatusFilter(value as StatusFilterValue);
+                break;
+            case 'search':
+                setSearchQuery(value);
+                break;
+            case 'clearanceType':
+                setClearanceTypeFilter(value);
+                break;
+            case 'resident':
+                setResidentFilter(value);
+                break;
+            case 'urgency':
+                setUrgencyFilter(value as UrgencyFilterValue);
+                break;
+            case 'year':
+                setYearFilter(value);
+                break;
+        }
+        
+        setSelectedClearances([]);
+        setSelectMode(false);
     };
     
-    const handleResidentChange = (resident: string) => {
-        setResidentFilter(resident);
-        updateFilters({ resident: resident === 'all' ? '' : resident, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-    };
+    const hasActiveFilters = statusFilter !== 'all' || 
+                            searchQuery !== '' || 
+                            clearanceTypeFilter !== 'all' || 
+                            residentFilter !== 'all' || 
+                            urgencyFilter !== 'all' || 
+                            yearFilter !== 'all';
     
-    const handleUrgencyChange = (urgency: string) => {
-        setUrgencyFilter(urgency as UrgencyFilterValue);
-        updateFilters({ urgency: urgency === 'all' ? '' : urgency, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-    };
-    
-    const handleYearChange = (year: string) => {
-        setYearFilter(year);
-        updateFilters({ year: year === 'all' ? '' : year, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-    };
-    
-    const handleClearFilters = () => {
-        setSearch('');
+    const clearFilters = () => {
         setStatusFilter('all');
+        setSearchQuery('');
         setClearanceTypeFilter('all');
         setResidentFilter('all');
         setUrgencyFilter('all');
         setYearFilter('all');
-        
-        router.get('/portal/my-clearances', {}, {
-            preserveState: true,
-            preserveScroll: true,
-            onFinish: () => setLoading(false),
-        });
+        setCurrentPage(1);
         
         if (isMobile) setShowMobileFilters(false);
+        setSelectedClearances([]);
+        setSelectMode(false);
     };
     
-    const handleSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (searchTimeout.current) {
-            clearTimeout(searchTimeout.current);
-        }
-        updateFilters({ search: search.trim(), page: '1' });
-    };
-    
-    const handleSearchClear = () => {
-        setSearch('');
-        updateFilters({ search: '', page: '1' });
+    const handleTabChange = (tab: string) => {
+        handleFilterChange('status', tab);
+        if (isMobile) setShowMobileFilters(false);
     };
     
     const toggleSelectClearance = (id: number) => {
@@ -262,11 +286,10 @@ export default function MyClearances() {
     };
     
     const selectAllClearances = () => {
-        const currentClearances = clearances.data;
-        if (selectedClearances.length === currentClearances.length && currentClearances.length > 0) {
+        if (selectedClearances.length === paginatedClearances.length && paginatedClearances.length > 0) {
             setSelectedClearances([]);
         } else {
-            setSelectedClearances(currentClearances.map(c => c.id));
+            setSelectedClearances(paginatedClearances.map(c => c.id));
         }
     };
     
@@ -288,27 +311,44 @@ export default function MyClearances() {
     };
     
     const handleViewDetails = (id: number) => {
-        router.visit(`/portal/my-clearances/${id}`);
+        window.location.href = `/portal/my-clearances/${id}`;
     };
     
-    const handleDownloadClearance = (clearance: any) => {
+    const handleDownloadClearance = (clearance: ClearanceRequest) => {
         toast.info('Download functionality would be implemented here');
     };
     
-    const handleGenerateReport = (clearance: any) => {
+    const handleGenerateReport = (clearance: ClearanceRequest) => {
         const reportWindow = window.open('', '_blank');
         if (reportWindow) {
             reportWindow.document.write(`
-                <h1>Clearance Request Details: ${clearance.reference_number}</h1>
-                <p><strong>Type:</strong> ${getClearanceTypeDisplay(clearance.clearance_type)}</p>
-                <p><strong>Purpose:</strong> ${clearance.purpose}</p>
-                <p><strong>Fee:</strong> ${formatCurrency(clearance.fee_amount)}</p>
-                <p><strong>Status:</strong> ${clearance.status}</p>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Clearance Request: ${clearance.reference_number}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h1 { color: #333; }
+                        .detail { margin: 10px 0; }
+                        .label { font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Clearance Request Details</h1>
+                    <div class="detail"><span class="label">Reference Number:</span> ${clearance.reference_number}</div>
+                    <div class="detail"><span class="label">Type:</span> ${getClearanceTypeDisplay(clearance.clearance_type)}</div>
+                    <div class="detail"><span class="label">Purpose:</span> ${clearance.purpose || 'N/A'}</div>
+                    <div class="detail"><span class="label">Fee:</span> ${formatCurrency(clearance.fee_amount)}</div>
+                    <div class="detail"><span class="label">Status:</span> ${clearance.status}</div>
+                    <div class="detail"><span class="label">Request Date:</span> ${formatDate(clearance.created_at, false)}</div>
+                </body>
+                </html>
             `);
+            reportWindow.document.close();
         }
     };
     
-    const handleReportIssue = (clearance: any) => {
+    const handleReportIssue = (clearance: ClearanceRequest) => {
         toast.info('Report issue feature would open a form');
     };
     
@@ -316,17 +356,9 @@ export default function MyClearances() {
         copyToClipboard(ref, `Copied: ${ref}`);
     };
     
-    const getCurrentTabClearances = () => clearances.data;
-    
-    const hasActiveFilters = useMemo(() => {
-        return Object.entries(filters).some(([key, value]) => 
-            key !== 'page' && value && value !== '' && value !== 'all'
-        );
-    }, [filters]);
-    
     const handlePrint = () => {
         printClearancesList(
-            clearances.data,
+            filteredClearances,
             statusFilter,
             household,
             stats,
@@ -338,7 +370,7 @@ export default function MyClearances() {
     
     const handleExport = () => {
         exportClearancesToCSV(
-            clearances.data,
+            filteredClearances,
             statusFilter,
             (date: string) => formatDate(date, false),
             formatCurrency,
@@ -352,14 +384,14 @@ export default function MyClearances() {
         const summary = `My Clearance Requests Summary:\n\n` +
             `Household: ${household?.household_number || 'N/A'}\n` +
             `Head of Family: ${household?.head_of_family || 'N/A'}\n\n` +
-            `Total Requests: ${clearances.data.length}\n` +
-            `Pending: ${clearances.data.filter(c => c.status === 'pending').length}\n` +
-            `Pending Payment: ${clearances.data.filter(c => c.status === 'pending_payment').length}\n` +
-            `Processing: ${clearances.data.filter(c => c.status === 'processing').length}\n` +
-            `Approved: ${clearances.data.filter(c => c.status === 'approved').length}\n` +
-            `Issued: ${clearances.data.filter(c => c.status === 'issued').length}\n` +
-            `Rejected: ${clearances.data.filter(c => c.status === 'rejected').length}\n` +
-            `Cancelled: ${clearances.data.filter(c => c.status === 'cancelled').length}\n\n` +
+            `Total Requests: ${filteredClearances.length}\n` +
+            `Pending: ${tabCounts.pending}\n` +
+            `Pending Payment: ${tabCounts.pending_payment}\n` +
+            `Processing: ${tabCounts.processing}\n` +
+            `Approved: ${tabCounts.approved}\n` +
+            `Issued: ${tabCounts.issued}\n` +
+            `Rejected: ${tabCounts.rejected}\n` +
+            `Cancelled: ${tabCounts.cancelled}\n\n` +
             `Total Fees: ${formatCurrency(stats.total_fees)}\n` +
             `Total Paid: ${formatCurrency(stats.total_paid)}\n` +
             `Balance Due: ${formatCurrency(stats.total_balance)}\n\n` +
@@ -375,14 +407,14 @@ Hello,
 
 Here's a summary of my clearance requests:
 
-Total Requests: ${clearances.data.length}
-- Pending: ${clearances.data.filter(c => c.status === 'pending').length}
-- Pending Payment: ${clearances.data.filter(c => c.status === 'pending_payment').length}
-- Processing: ${clearances.data.filter(c => c.status === 'processing').length}
-- Approved: ${clearances.data.filter(c => c.status === 'approved').length}
-- Issued: ${clearances.data.filter(c => c.status === 'issued').length}
-- Rejected: ${clearances.data.filter(c => c.status === 'rejected').length}
-- Cancelled: ${clearances.data.filter(c => c.status === 'cancelled').length}
+Total Requests: ${filteredClearances.length}
+- Pending: ${tabCounts.pending}
+- Pending Payment: ${tabCounts.pending_payment}
+- Processing: ${tabCounts.processing}
+- Approved: ${tabCounts.approved}
+- Issued: ${tabCounts.issued}
+- Rejected: ${tabCounts.rejected}
+- Cancelled: ${tabCounts.cancelled}
 
 Total Fees: ${formatCurrency(stats.total_fees)}
 Total Paid: ${formatCurrency(stats.total_paid)}
@@ -398,151 +430,22 @@ ${currentResident?.first_name} ${currentResident?.last_name}
         window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     };
     
-    const handlePageChange = (page: number) => {
-        updateFilters({ page: page.toString() });
+    const getResidentName = (residentId?: number): string => {
+        if (!residentId) return 'N/A';
+        const resident = householdResidents.find(r => r.id === residentId);
+        if (resident) {
+            return `${resident.first_name} ${resident.last_name}`;
+        }
+        return currentResident ? `${currentResident.first_name} ${currentResident.last_name}` : 'Unknown';
     };
     
-    const renderTabContent = () => {
-        const currentClearances = getCurrentTabClearances();
-        const tabHasData = currentClearances.length > 0;
-        
-        const displayStatus = statusFilter && statusFilter !== 'all' 
-            ? statusFilter.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-            : 'All';
-        
-        const emptyStateStatus = statusFilter === 'all' ? 'clearance requests' : (statusFilter || '').replace(/_/g, ' ');
-        
-        return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
-                <CardContent className="p-4 md:p-6">
-                    <ModernSelectionBanner
-                        selectedCount={selectedClearances.length}
-                        totalCount={currentClearances.length}
-                        onSelectAll={selectAllClearances}
-                        onDeselectAll={() => setSelectedClearances([])}
-                        onCancel={() => {
-                            setSelectMode(false);
-                            setSelectedClearances([]);
-                        }}
-                        onDelete={handleDeleteSelected}
-                        deleteLabel="Delete Selected"
-                    />
-                    
-                    <TabHeader
-                        displayStatus={displayStatus}
-                        count={currentClearances.length}
-                        selectMode={selectMode}
-                        selectedCount={selectedClearances.length}
-                        hasFilters={clearanceTypeFilter !== 'all' || residentFilter !== 'all' || urgencyFilter !== 'all' || yearFilter !== 'all' || !!search}
-                        viewMode={viewMode}
-                        setViewMode={setViewMode}
-                        onToggleSelectMode={toggleSelectMode}
-                        tabHasData={tabHasData}
-                    />
-                    
-                    {!tabHasData ? (
-                        <ModernEmptyState
-                            status={statusFilter || 'all'}
-                            hasFilters={hasActiveFilters}
-                            onClearFilters={handleClearFilters}
-                            icon={statusFilter === 'all' ? FileText : 
-                                  statusFilter === 'pending' ? Clock :
-                                  statusFilter === 'pending_payment' ? DollarSign :
-                                  statusFilter === 'processing' ? Loader2 :
-                                  statusFilter === 'approved' ? CheckCircle :
-                                  statusFilter === 'issued' ? FileCheck :
-                                  statusFilter === 'rejected' || statusFilter === 'cancelled' ? XCircle : FileText}
-                        />
-                    ) : (
-                        <>
-                            {viewMode === 'grid' && (
-                                <>
-                                    {isMobile && (
-                                        <div className="pb-4">
-                                            {currentClearances.map((clearance) => (
-                                                <ModernClearanceCard
-                                                    key={clearance.id}
-                                                    clearance={clearance}
-                                                    selectMode={selectMode}
-                                                    selectedClearances={selectedClearances}
-                                                    toggleSelectClearance={toggleSelectClearance}
-                                                    getClearanceTypeDisplay={getClearanceTypeDisplay}
-                                                    formatDate={(date) => formatDate(date, isMobile)}
-                                                    formatCurrency={formatCurrency}
-                                                    currentResident={currentResident}
-                                                    onCopyReference={handleCopyReference}
-                                                    onViewDetails={handleViewDetails}
-                                                    onDownloadClearance={handleDownloadClearance}
-                                                    onGenerateReport={handleGenerateReport}
-                                                    onReportIssue={handleReportIssue}
-                                                    isMobile={isMobile}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                    
-                                    {!isMobile && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {currentClearances.map((clearance) => (
-                                                <ModernClearanceGridCard
-                                                    key={clearance.id}
-                                                    clearance={clearance}
-                                                    selectMode={selectMode}
-                                                    selectedClearances={selectedClearances}
-                                                    toggleSelectClearance={toggleSelectClearance}
-                                                    getClearanceTypeDisplay={getClearanceTypeDisplay}
-                                                    formatDate={(date) => formatDate(date, isMobile)}
-                                                    formatCurrency={formatCurrency}
-                                                    currentResident={currentResident}
-                                                    onCopyReference={handleCopyReference}
-                                                    onViewDetails={handleViewDetails}
-                                                    onDownloadClearance={handleDownloadClearance}
-                                                    onGenerateReport={handleGenerateReport}
-                                                    onReportIssue={handleReportIssue}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                            
-                            {viewMode === 'list' && (
-                                <ModernClearanceTable
-                                    clearances={currentClearances}
-                                    selectMode={selectMode}
-                                    selectedClearances={selectedClearances}
-                                    toggleSelectClearance={toggleSelectClearance}
-                                    selectAllClearances={selectAllClearances}
-                                    getClearanceTypeDisplay={getClearanceTypeDisplay}
-                                    formatDate={(date) => formatDate(date, isMobile)}
-                                    formatCurrency={formatCurrency}
-                                    currentResident={currentResident}
-                                    onCopyReference={handleCopyReference}
-                                    onViewDetails={handleViewDetails}
-                                    onDownloadClearance={handleDownloadClearance}
-                                    onGenerateReport={handleGenerateReport}
-                                    onReportIssue={handleReportIssue}
-                                />
-                            )}
-                            
-                            {clearances.last_page > 1 && (
-                                <div className="mt-6">
-                                    <ModernPagination
-                                        currentPage={clearances.current_page}
-                                        lastPage={clearances.last_page}
-                                        onPageChange={handlePageChange}
-                                        loading={loading}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-        );
-    };
+    const tabHasData = paginatedClearances.length > 0;
+    const displayStatus = statusFilter && statusFilter !== 'all' 
+        ? statusFilter.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+        : 'All';
     
-    if (pageProps.error) {
+    // Error state
+    if (props.error) {
         return (
             <ResidentLayout
                 breadcrumbs={[
@@ -559,7 +462,7 @@ ${currentResident?.first_name} ${currentResident?.last_name}
                             </div>
                             <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                {pageProps.error}
+                                {props.error}
                             </p>
                             <Button 
                                 onClick={() => window.location.href = '/dashboard'}
@@ -575,143 +478,278 @@ ${currentResident?.first_name} ${currentResident?.last_name}
     }
     
     return (
-        <>
+        <ResidentLayout
+            breadcrumbs={[
+                { title: 'Dashboard', href: '/portal/dashboard' },
+                { title: 'My Clearances', href: '/portal/my-clearances' }
+            ]}
+        >
             <Head title="My Clearances" />
             
-            <ResidentLayout
-                breadcrumbs={[
-                    { title: 'Dashboard', href: '/portal/dashboard' },
-                    { title: 'My Clearances', href: '/portal/my-clearances' }
-                ]}
-            >
-                <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
-                    <HeaderSection
-                        isMobile={isMobile}
-                        statsTotal={stats.total_clearances}
-                        householdNumber={household?.household_number}
-                        headOfFamily={household?.head_of_family}
-                        showStats={showStats}
-                        setShowStats={setShowStats}
-                        hasActiveFilters={hasActiveFilters}
-                        setShowMobileFilters={setShowMobileFilters}
-                        onPrint={handlePrint}
-                        onExport={handleExport}
-                        isExporting={isExporting}
-                    />
-                    
-                    {/* Stats Section */}
-                    {showStats && (
-                        <div className="animate-slide-down">
-                              <CollapsibleStats
-                                    showStats={showStats}
-                                    setShowStats={setShowStats}
-                                    statusFilter={statusFilter}
-                                    stats={stats}
-                                    fees={{ data: [] }} // Pass empty array or actual fees data
-                                    getStatusCount={getStatusCount}
-                                    formatCurrency={formatCurrency}
-                                />
-                            <DesktopStats
-                                stats={stats}
-                                formatCurrency={formatCurrency}
-                            />
-                        </div>
-                    )}
-                    
-                    {/* Mobile Filter Modal */}
-                    <ModernFilterModal
-                        isOpen={showMobileFilters}
-                        onClose={() => setShowMobileFilters(false)}
-                        title="Filter Clearance Requests"
-                        description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
-                        search={search}
-                        onSearchChange={setSearch}
-                        onSearchSubmit={handleSearchSubmit}
-                        onSearchClear={handleSearchClear}
-                        loading={loading}
-                        hasActiveFilters={hasActiveFilters}
-                        onClearFilters={handleClearFilters}
-                    >
-                        <FilterModalContent
-                            clearanceTypeFilter={clearanceTypeFilter}
-                            onClearanceTypeChange={handleClearanceTypeChange}
-                            residentFilter={residentFilter}
-                            onResidentChange={handleResidentChange}
-                            urgencyFilter={urgencyFilter}
-                            onUrgencyChange={handleUrgencyChange}
-                            yearFilter={yearFilter}
-                            onYearChange={handleYearChange}
-                            loading={loading}
-                            availableClearanceTypes={availableClearanceTypes}
-                            householdResidents={householdResidents}
-                            availableYears={availableYears}
-                            currentResidentId={currentResident?.id}
-                        />
-                    </ModernFilterModal>
-                    
-                    {/* Desktop Filters */}
-                    {!isMobile && (
-                        <ModernClearanceFilters
-                            search={search}
-                            setSearch={setSearch}
-                            handleSearchSubmit={handleSearchSubmit}
-                            handleSearchClear={handleSearchClear}
-                            clearanceTypeFilter={clearanceTypeFilter}
-                            handleClearanceTypeChange={handleClearanceTypeChange}
-                            residentFilter={residentFilter}
-                            handleResidentChange={handleResidentChange}
-                            urgencyFilter={urgencyFilter}
-                            handleUrgencyChange={handleUrgencyChange}
-                            yearFilter={yearFilter}
-                            handleYearChange={handleYearChange}
-                            loading={loading}
-                            availableClearanceTypes={availableClearanceTypes}
-                            householdResidents={householdResidents}
-                            availableYears={availableYears}
-                            printClearances={handlePrint}
-                            exportToCSV={handleExport}
-                            isExporting={isExporting}
-                            hasActiveFilters={hasActiveFilters}
-                            handleClearFilters={handleClearFilters}
-                            onCopySummary={handleCopySummary}
-                            onEmailSummary={handleEmailSummary}
-                            currentResident={currentResident}
-                        />
-                    )}
-                    
-                    {/* Custom Tabs Section */}
-                    <div className="mt-4">
-                        <CustomTabs
-                            key="clearance-tabs"
-                            statusFilter={statusFilter || 'all'}
-                            handleTabChange={handleTabChange}
-                            getStatusCount={(status) => getStatusCount(stats, status)}
-                            tabsConfig={CLEARANCE_TABS}
-                        />
-                        
-                        <div className="mt-4">
-                            {renderTabContent()}
-                        </div>
-                    </div>
-                </div>
+            <div className="space-y-4 md:space-y-6 pb-28 md:pb-6">
+                <HeaderSection
+                    isMobile={isMobile}
+                    statsTotal={filteredClearances.length}
+                    householdNumber={household?.household_number}
+                    headOfFamily={household?.head_of_family}
+                    showStats={showStats}
+                    setShowStats={setShowStats}
+                    hasActiveFilters={hasActiveFilters}
+                    setShowMobileFilters={setShowMobileFilters}
+                    onPrint={handlePrint}
+                    onExport={handleExport}
+                    isExporting={isExporting}
+                />
                 
-                {/* Mobile FAB */}
-                {isMobile && !showMobileFilters && (
-                    <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
-                        <Link href="/portal/my-clearances/request">
-                            <Button 
-                                size="lg" 
-                                className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-                            >
-                                <Plus className="h-6 w-6" />
-                            </Button>
-                        </Link>
+                {/* Stats Section */}
+                {showStats && (
+                    <div className="animate-slide-down">
+                       <CollapsibleStats
+                            showStats={showStats}
+                            setShowStats={setShowStats}
+                            stats={stats}
+                            formatCurrency={formatCurrency}
+                        />
+                        <DesktopStats
+                            stats={stats}
+                            formatCurrency={formatCurrency}
+                        />
                     </div>
                 )}
                 
-                {/* Loading Overlay */}
-                <ModernLoadingOverlay loading={loading} message="Loading clearance requests..." />
-            </ResidentLayout>
-        </>
+                {/* Mobile Filter Modal */}
+                <ModernFilterModal
+                    isOpen={showMobileFilters}
+                    onClose={() => setShowMobileFilters(false)}
+                    title="Filter Clearance Requests"
+                    description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
+                    search={searchQuery}
+                    onSearchChange={(value) => setSearchQuery(value)}
+                    onSearchSubmit={(e) => { 
+                        e.preventDefault(); 
+                        handleFilterChange('search', searchQuery);
+                        setShowMobileFilters(false);
+                    }}
+                    onSearchClear={() => handleFilterChange('search', '')}
+                    loading={loading}
+                    hasActiveFilters={hasActiveFilters}
+                    onClearFilters={clearFilters}
+                >
+                    <FilterModalContent
+                        clearanceTypeFilter={clearanceTypeFilter}
+                        onClearanceTypeChange={(type) => handleFilterChange('clearanceType', type)}
+                        residentFilter={residentFilter}
+                        onResidentChange={(resident) => handleFilterChange('resident', resident)}
+                        urgencyFilter={urgencyFilter}
+                        onUrgencyChange={(urgency) => handleFilterChange('urgency', urgency)}
+                        yearFilter={yearFilter}
+                        onYearChange={(year) => handleFilterChange('year', year)}
+                        loading={loading}
+                        availableClearanceTypes={availableClearanceTypes}
+                        householdResidents={householdResidents}
+                        availableYears={availableYears}
+                        currentResidentId={currentResident?.id}
+                    />
+                </ModernFilterModal>
+                
+                {/* Desktop Filters */}
+                {!isMobile && (
+                    <ModernClearanceFilters
+                        search={searchQuery}
+                        setSearch={(value) => handleFilterChange('search', value)}
+                        handleSearchSubmit={(e) => { e.preventDefault(); }}
+                        handleSearchClear={() => handleFilterChange('search', '')}
+                        clearanceTypeFilter={clearanceTypeFilter}
+                        handleClearanceTypeChange={(type) => handleFilterChange('clearanceType', type)}
+                        residentFilter={residentFilter}
+                        handleResidentChange={(resident) => handleFilterChange('resident', resident)}
+                        urgencyFilter={urgencyFilter}
+                        handleUrgencyChange={(urgency) => handleFilterChange('urgency', urgency)}
+                        yearFilter={yearFilter}
+                        handleYearChange={(year) => handleFilterChange('year', year)}
+                        loading={loading}
+                        availableClearanceTypes={availableClearanceTypes}
+                        householdResidents={householdResidents}
+                        availableYears={availableYears}
+                        printClearances={handlePrint}
+                        exportToCSV={handleExport}
+                        isExporting={isExporting}
+                        hasActiveFilters={hasActiveFilters}
+                        handleClearFilters={clearFilters}
+                        onCopySummary={handleCopySummary}
+                        onEmailSummary={handleEmailSummary}
+                        currentResident={currentResident}
+                    />
+                )}
+                
+                {/* Custom Tabs Section */}
+                <div className="mt-4">
+                    <ClearanceTabs
+                        statusFilter={statusFilter || 'all'}
+                        handleTabChange={handleTabChange}
+                        tabCounts={tabCounts}
+                        tabsConfig={CLEARANCE_TABS_CONFIG}
+                    />
+                    
+                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 mt-4">
+                        <CardContent className="p-4 md:p-6">
+                            {selectMode && tabHasData && (
+                                <ModernSelectionBanner
+                                    selectedCount={selectedClearances.length}
+                                    totalCount={paginatedClearances.length}
+                                    onSelectAll={selectAllClearances}
+                                    onDeselectAll={() => setSelectedClearances([])}
+                                    onCancel={() => {
+                                        setSelectMode(false);
+                                        setSelectedClearances([]);
+                                    }}
+                                    onDelete={handleDeleteSelected}
+                                    deleteLabel="Delete Selected"
+                                />
+                            )}
+                            
+                            <TabHeader
+                                displayStatus={displayStatus}
+                                count={paginatedClearances.length}
+                                selectMode={selectMode}
+                                selectedCount={selectedClearances.length}
+                                hasFilters={hasActiveFilters}
+                                viewMode={viewMode}
+                                setViewMode={setViewMode}
+                                onToggleSelectMode={toggleSelectMode}
+                                tabHasData={tabHasData}
+                            />
+                            
+                            {!tabHasData ? (
+                                <ModernEmptyState
+                                    status={statusFilter || 'all'}
+                                    hasFilters={hasActiveFilters}
+                                    onClearFilters={clearFilters}
+                                    icon={statusFilter === 'all' ? FileText : 
+                                          statusFilter === 'pending' ? Clock :
+                                          statusFilter === 'pending_payment' ? DollarSign :
+                                          statusFilter === 'processing' ? Loader2 :
+                                          statusFilter === 'approved' ? CheckCircle :
+                                          statusFilter === 'issued' ? FileCheck :
+                                          statusFilter === 'rejected' || statusFilter === 'cancelled' ? XCircle : FileText}
+                                />
+                            ) : (
+                                // Mobile-specific rendering
+                                isMobile ? (
+                                    viewMode === 'grid' ? (
+                                        <div className="pb-4 space-y-3">
+                                            {paginatedClearances.map((clearance) => (
+                                                <ModernClearanceCard
+                                                    key={clearance.id}
+                                                    clearance={clearance}
+                                                    selectMode={selectMode}
+                                                    selectedClearances={selectedClearances}
+                                                    toggleSelectClearance={toggleSelectClearance}
+                                                    getClearanceTypeDisplay={getClearanceTypeDisplay}
+                                                    formatDate={(date) => formatDate(date, true)}
+                                                    formatCurrency={formatCurrency}
+                                                    currentResident={currentResident}
+                                                    onCopyReference={handleCopyReference}
+                                                    onViewDetails={handleViewDetails}
+                                                    onDownloadClearance={handleDownloadClearance}
+                                                    onGenerateReport={handleGenerateReport}
+                                                    onReportIssue={handleReportIssue}
+                                                    isMobile={true}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <ModernClearanceMobileListView
+                                            clearances={paginatedClearances}
+                                            selectMode={selectMode}
+                                            selectedClearances={selectedClearances}
+                                            toggleSelectClearance={toggleSelectClearance}
+                                            getClearanceTypeDisplay={getClearanceTypeDisplay}
+                                            getResidentName={getResidentName}
+                                            formatDate={(date) => formatDate(date, true)}
+                                            formatCurrency={formatCurrency}
+                                            onCopyReference={handleCopyReference}
+                                            onViewDetails={handleViewDetails}
+                                            onDownloadClearance={handleDownloadClearance}
+                                            onGenerateReport={handleGenerateReport}
+                                            onReportIssue={handleReportIssue}
+                                        />
+                                    )
+                                ) : (
+                                    // Desktop rendering
+                                    viewMode === 'grid' ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {paginatedClearances.map((clearance) => (
+                                                <ModernClearanceGridCard
+                                                    key={clearance.id}
+                                                    clearance={clearance}
+                                                    selectMode={selectMode}
+                                                    selectedClearances={selectedClearances}
+                                                    toggleSelectClearance={toggleSelectClearance}
+                                                    getClearanceTypeDisplay={getClearanceTypeDisplay}
+                                                    formatDate={(date) => formatDate(date, false)}
+                                                    formatCurrency={formatCurrency}
+                                                    currentResident={currentResident}
+                                                    onCopyReference={handleCopyReference}
+                                                    onViewDetails={handleViewDetails}
+                                                    onDownloadClearance={handleDownloadClearance}
+                                                    onGenerateReport={handleGenerateReport}
+                                                    onReportIssue={handleReportIssue}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <ModernClearanceTable
+                                            clearances={paginatedClearances}
+                                            selectMode={selectMode}
+                                            selectedClearances={selectedClearances}
+                                            toggleSelectClearance={toggleSelectClearance}
+                                            selectAllClearances={selectAllClearances}
+                                            getClearanceTypeDisplay={getClearanceTypeDisplay}
+                                            formatDate={(date) => formatDate(date, false)}
+                                            formatCurrency={formatCurrency}
+                                            currentResident={currentResident}
+                                            onCopyReference={handleCopyReference}
+                                            onViewDetails={handleViewDetails}
+                                            onDownloadClearance={handleDownloadClearance}
+                                            onGenerateReport={handleGenerateReport}
+                                            onReportIssue={handleReportIssue}
+                                        />
+                                    )
+                                )
+                            )}
+                            
+                            {totalPages > 1 && (
+                                <div className="mt-6">
+                                    <ModernPagination
+                                        currentPage={currentPage}
+                                        lastPage={totalPages}
+                                        onPageChange={(page: number) => setCurrentPage(page)}
+                                        loading={loading}
+                                    />
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+            
+            {/* Mobile FAB */}
+            {isMobile && !showMobileFilters && (
+                <div className="fixed bottom-20 right-6 z-50 animate-scale-in">
+                    <Link href="/portal/my-clearances/request">
+                        <Button 
+                            size="lg" 
+                            className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                        >
+                            <Plus className="h-6 w-6" />
+                        </Button>
+                    </Link>
+                </div>
+            )}
+            
+            {/* Loading Overlay */}
+            <ModernLoadingOverlay loading={loading} message="Loading clearance requests..." />
+        </ResidentLayout>
     );
 }

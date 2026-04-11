@@ -106,12 +106,16 @@ export const ResidentDocumentsTab = ({
             default:
                 // Check if expiring soon
                 if (expiryDate) {
-                    const daysUntilExpiry = Math.ceil((new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-                    if (daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
-                        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            Expires in {daysUntilExpiry} days
-                        </Badge>;
+                    try {
+                        const daysUntilExpiry = Math.ceil((new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
+                        if (daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
+                            return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                Expires in {daysUntilExpiry} days
+                            </Badge>;
+                        }
+                    } catch {
+                        // Invalid date, just show active
                     }
                 }
                 return <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
@@ -156,6 +160,23 @@ export const ResidentDocumentsTab = ({
             rejected: documents.filter(d => d.status === 'rejected').length
         };
     }, [documents, totalDocuments, activeDocuments, expiredDocuments]);
+
+    // Safe route function that checks if route exists and handles parameters correctly
+    const safeRoute = (name: string, params?: Record<string, any> | number) => {
+        try {
+            // Handle case where params is a number (ID) instead of an object
+            let routeParams: Record<string, any> | undefined;
+            if (typeof params === 'number') {
+                routeParams = { id: params };
+            } else {
+                routeParams = params;
+            }
+            return route(name, routeParams);
+        } catch {
+            console.warn(`Route '${name}' not found`);
+            return '#';
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -211,9 +232,9 @@ export const ResidentDocumentsTab = ({
             {/* Documents List */}
             <Card className="dark:bg-gray-900">
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
                         <CardTitle className="dark:text-gray-100">Resident Documents</CardTitle>
-                        <Link href={route('admin.resident-documents.create', { household_id: householdId })}>
+                        <Link href={safeRoute('admin.resident-documents.create', { household_id: householdId })}>
                             <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
                                 <Plus className="h-4 w-4 mr-2" />
                                 Upload Document
@@ -254,7 +275,7 @@ export const ResidentDocumentsTab = ({
                                 {searchQuery ? 'No documents match your search.' : 'This household has no documents yet.'}
                             </p>
                             {!searchQuery && (
-                                <Link href={route('admin.resident-documents.create', { household_id: householdId })}>
+                                <Link href={safeRoute('admin.resident-documents.create', { household_id: householdId })}>
                                     <Button className="mt-4">
                                         <Plus className="h-4 w-4 mr-2" />
                                         Upload First Document
@@ -264,109 +285,115 @@ export const ResidentDocumentsTab = ({
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {filteredDocuments.map((doc) => (
-                                <div key={doc.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
-                                    <div className="flex items-start gap-4">
-                                        {/* File Icon */}
-                                        <div className="flex-shrink-0">
-                                            {getFileIcon(doc.file_extension)}
-                                        </div>
+                            {filteredDocuments.map((doc) => {
+                                // Create safe route URLs
+                                const residentShowUrl = safeRoute('admin.residents.show', doc.resident_id);
+                                const docShowUrl = safeRoute('admin.resident-documents.show', doc.id);
+                                
+                                return (
+                                    <div key={doc.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow dark:border-gray-700">
+                                        <div className="flex flex-col md:flex-row items-start gap-4">
+                                            {/* File Icon */}
+                                            <div className="flex-shrink-0">
+                                                {getFileIcon(doc.file_extension)}
+                                            </div>
 
-                                        {/* Document Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between flex-wrap gap-2">
-                                                <div>
-                                                    <h3 className="font-semibold dark:text-gray-100">
-                                                        {doc.document_type || 'Document'}
-                                                        {doc.document_number && ` - ${doc.document_number}`}
-                                                    </h3>
-                                                    {doc.description && (
-                                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                            {doc.description}
-                                                        </p>
+                                            {/* Document Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-2">
+                                                    <div>
+                                                        <h3 className="font-semibold dark:text-gray-100">
+                                                            {doc.document_type || 'Document'}
+                                                            {doc.document_number && ` - ${doc.document_number}`}
+                                                        </h3>
+                                                        {doc.description && (
+                                                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                                                {doc.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    {getStatusBadge(doc.status, doc.expiry_date)}
+                                                </div>
+
+                                                <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-500 dark:text-gray-400">
+                                                    <div className="flex items-center gap-1">
+                                                        <User className="h-3 w-3" />
+                                                        <Link 
+                                                            href={residentShowUrl}
+                                                            className="hover:underline hover:text-blue-600"
+                                                        >
+                                                            {getResidentName(doc)}
+                                                        </Link>
+                                                    </div>
+                                                    {doc.reference_number && (
+                                                        <div className="flex items-center gap-1">
+                                                            <Tag className="h-3 w-3" />
+                                                            <span>Ref: {doc.reference_number}</span>
+                                                        </div>
+                                                    )}
+                                                    {doc.issue_date && (
+                                                        <div className="flex items-center gap-1">
+                                                            <Calendar className="h-3 w-3" />
+                                                            <span>Issued: {formatDate(doc.issue_date)}</span>
+                                                        </div>
+                                                    )}
+                                                    {doc.expiry_date && (
+                                                        <div className="flex items-center gap-1">
+                                                            <Calendar className="h-3 w-3" />
+                                                            <span>Expires: {formatDate(doc.expiry_date)}</span>
+                                                        </div>
+                                                    )}
+                                                    {doc.file_size_human && (
+                                                        <div className="flex items-center gap-1">
+                                                            <FileText className="h-3 w-3" />
+                                                            <span>{doc.file_size_human}</span>
+                                                        </div>
                                                     )}
                                                 </div>
-                                                {getStatusBadge(doc.status, doc.expiry_date)}
-                                            </div>
 
-                                            <div className="flex flex-wrap gap-4 mt-3 text-sm text-gray-500 dark:text-gray-400">
-                                                <div className="flex items-center gap-1">
-                                                    <User className="h-3 w-3" />
-                                                    <Link 
-                                                        href={route('admin.residents.show', doc.resident_id)} 
-                                                        className="hover:underline hover:text-blue-600"
-                                                    >
-                                                        {getResidentName(doc)}
-                                                    </Link>
-                                                </div>
-                                                {doc.reference_number && (
-                                                    <div className="flex items-center gap-1">
-                                                        <Tag className="h-3 w-3" />
-                                                        <span>Ref: {doc.reference_number}</span>
+                                                {/* Tags */}
+                                                {doc.tags && doc.tags.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 mt-3">
+                                                        {doc.tags.map((tag, index) => (
+                                                            <Badge key={index} variant="secondary" className="text-xs">
+                                                                {tag}
+                                                            </Badge>
+                                                        ))}
                                                     </div>
                                                 )}
-                                                {doc.issue_date && (
-                                                    <div className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        <span>Issued: {formatDate(doc.issue_date)}</span>
-                                                    </div>
-                                                )}
-                                                {doc.expiry_date && (
-                                                    <div className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        <span>Expires: {formatDate(doc.expiry_date)}</span>
-                                                    </div>
-                                                )}
-                                                {doc.file_size_human && (
-                                                    <div className="flex items-center gap-1">
-                                                        <FileText className="h-3 w-3" />
-                                                        <span>{doc.file_size_human}</span>
+
+                                                {/* Stats */}
+                                                {(doc.view_count !== undefined || doc.download_count !== undefined) && (
+                                                    <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
+                                                        {doc.view_count !== undefined && <span>{doc.view_count} views</span>}
+                                                        {doc.download_count !== undefined && <span>{doc.download_count} downloads</span>}
+                                                        <span>Uploaded {formatDate(doc.created_at)}</span>
                                                     </div>
                                                 )}
                                             </div>
 
-                                            {/* Tags */}
-                                            {doc.tags && doc.tags.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mt-3">
-                                                    {doc.tags.map((tag, index) => (
-                                                        <Badge key={index} variant="secondary" className="text-xs">
-                                                            {tag}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Stats */}
-                                            {(doc.view_count !== undefined || doc.download_count !== undefined) && (
-                                                <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
-                                                    {doc.view_count !== undefined && <span>{doc.view_count} views</span>}
-                                                    {doc.download_count !== undefined && <span>{doc.download_count} downloads</span>}
-                                                    <span>Uploaded {formatDate(doc.created_at)}</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Actions */}
-                                        <div className="flex items-center gap-2">
-                                            <Link href={route('admin.resident-documents.show', doc.id)}>
-                                                <Button variant="ghost" size="sm" title="View Document">
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                            {doc.file_path && (
-                                                <Button variant="ghost" size="sm" title="Download Document">
-                                                    <Download className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                            <Link href={route('admin.residents.show', doc.resident_id)}>
-                                                <Button variant="ghost" size="sm" title="View Resident Profile">
-                                                    <ExternalLink className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-2">
+                                                <Link href={docShowUrl}>
+                                                    <Button variant="ghost" size="sm" title="View Document">
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                </Link>
+                                                {doc.file_path && (
+                                                    <Button variant="ghost" size="sm" title="Download Document">
+                                                        <Download className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                <Link href={residentShowUrl}>
+                                                    <Button variant="ghost" size="sm" title="View Resident Profile">
+                                                        <ExternalLink className="h-4 w-4" />
+                                                    </Button>
+                                                </Link>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </CardContent>

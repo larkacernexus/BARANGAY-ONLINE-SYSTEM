@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import { ClearanceDocument } from '@/types/admin/clearances/clearance-types'; // Change this import
+import { ClearanceDocument } from '@/types/admin/clearances/clearance'; // Change this import
 
 export function useDocumentViewer(documents: ClearanceDocument[] = []) { // Change the type here
     const [viewedDocument, setViewedDocument] = useState<ClearanceDocument | null>(null); // Change here

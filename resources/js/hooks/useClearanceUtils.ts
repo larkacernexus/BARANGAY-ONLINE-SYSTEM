@@ -1,5 +1,5 @@
 import React from 'react';
-import { ClearanceRequest, ClearanceDocument, StatusVariant, UrgencyVariant } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest, ClearanceDocument, StatusVariant, UrgencyVariant } from '@/types/admin/clearances/clearance';
 import {
     Clock,
     CheckCircle,

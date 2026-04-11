@@ -1,11 +1,16 @@
-// components/admin/forms/FormsContent.tsx
-
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     FileText, 
     Download, 
@@ -18,7 +23,8 @@ import {
     Archive,
     ArchiveRestore,
     Folder,
-    Building
+    Building,
+    ArrowUpDown
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -33,7 +39,7 @@ import { Form, Filters, BulkOperation } from '@/types/admin/forms/forms.types';
 
 interface FormsContentProps {
     forms: Form[];
-    stats?: any;  // Stats is passed but not used in this component
+    stats?: any;
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -66,11 +72,15 @@ interface FormsContentProps {
     selectionStats?: any;
     categories?: string[];
     agencies?: string[];
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function FormsContent({
     forms,
-    stats,  // Keep but don't use if not needed
+    stats,
     isBulkMode,
     setIsBulkMode,
     isSelectAll,
@@ -102,7 +112,11 @@ export default function FormsContent({
     selectionMode,
     selectionStats,
     categories = [],
-    agencies = []
+    agencies = [],
+    sortBy = 'created_at',
+    sortOrder = 'desc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'created_at-desc'
 }: FormsContentProps) {
     
     // Bulk action items configuration
@@ -243,6 +257,39 @@ export default function FormsContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="title-asc">Title (A to Z)</SelectItem>
+                                        <SelectItem value="title-desc">Title (Z to A)</SelectItem>
+                                        <SelectItem value="category-asc">Category (A to Z)</SelectItem>
+                                        <SelectItem value="category-desc">Category (Z to A)</SelectItem>
+                                        <SelectItem value="issuing_agency-asc">Agency (A to Z)</SelectItem>
+                                        <SelectItem value="issuing_agency-desc">Agency (Z to A)</SelectItem>
+                                        <SelectItem value="download_count-asc">Downloads (Low to High)</SelectItem>
+                                        <SelectItem value="download_count-desc">Downloads (High to Low)</SelectItem>
+                                        <SelectItem value="file_size-asc">File Size (Small to Large)</SelectItem>
+                                        <SelectItem value="file_size-desc">File Size (Large to Small)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="is_featured-asc">Featured (No to Yes)</SelectItem>
+                                        <SelectItem value="is_featured-desc">Featured (Yes to No)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && forms.length > 0 && (
                             <div className="flex items-center gap-2">

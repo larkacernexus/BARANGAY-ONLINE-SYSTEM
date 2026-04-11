@@ -2,7 +2,7 @@ import { RefObject } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer, X } from 'lucide-react';
-import { ClearanceRequest } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance';
 
 interface PrintPreviewModalProps {
     showPrintPreview: boolean;

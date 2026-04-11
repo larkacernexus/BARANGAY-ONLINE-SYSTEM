@@ -1,11 +1,16 @@
-// resources/js/components/admin/puroks/PuroksContent.tsx
-
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     MapPin, 
     Download, 
@@ -33,7 +38,8 @@ import {
     Phone,
     Shield,
     ChevronUp,
-    ChevronDown
+    ChevronDown,
+    ArrowUpDown
 } from 'lucide-react';
 
 import { Link } from '@inertiajs/react';
@@ -45,7 +51,7 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import PuroksTableView from '@/components/admin/puroks/PuroksTableView';
 import PuroksGridView from '@/components/admin/puroks/PuroksGridView';
 import PuroksBulkActions from '@/components/admin/puroks/PuroksBulkActions';
-import { Purok, PurokFilters, BulkOperation } from '@/types/admin/puroks/purok'; // ← Import BulkOperation
+import { Purok, PurokFilters, BulkOperation } from '@/types/admin/puroks/purok';
 import { purokUtils } from '@/admin-utils/purok-utils';
 
 interface PuroksContentProps {
@@ -71,7 +77,7 @@ interface PuroksContentProps {
     onClearSelection: () => void;
     onDelete: (purok: Purok) => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: BulkOperation) => void; // ← CHANGE: Use BulkOperation type
+    onBulkOperation: (operation: BulkOperation) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
@@ -79,6 +85,10 @@ interface PuroksContentProps {
     isPerformingBulkAction: boolean;
     selectionMode: 'page' | 'filtered' | 'all';
     selectionStats?: any;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function PuroksContent({
@@ -111,7 +121,11 @@ export default function PuroksContent({
     filtersState,
     isPerformingBulkAction,
     selectionMode,
-    selectionStats = {}
+    selectionStats = {},
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc'
 }: PuroksContentProps) {
     
     // Bulk action items configuration
@@ -247,6 +261,35 @@ export default function PuroksContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="total_households-asc">Households (Low to High)</SelectItem>
+                                        <SelectItem value="total_households-desc">Households (High to Low)</SelectItem>
+                                        <SelectItem value="total_residents-asc">Residents (Low to High)</SelectItem>
+                                        <SelectItem value="total_residents-desc">Residents (High to Low)</SelectItem>
+                                        <SelectItem value="leader_name-asc">Leader (A to Z)</SelectItem>
+                                        <SelectItem value="leader_name-desc">Leader (Z to A)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && puroks.length > 0 && (
                             <div className="flex items-center gap-2">

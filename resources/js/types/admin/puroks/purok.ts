@@ -67,6 +67,14 @@ export interface Household {
 }
 
 export interface Resident {
+    full_name: string;
+    photo_path(photo_path: any): unknown;
+    place_of_birth: string | number | boolean | null | undefined;
+    is_voter: any;
+    religion: string | number | boolean | null | undefined;
+    address: string | number | boolean | null | undefined;
+    education: string | number | boolean | null | undefined;
+    remarks: any;
     id: number;
     household_id: number;
     first_name: string;
@@ -100,6 +108,8 @@ export interface PaginatedData<T = Household | Resident> {
 }
 
 export interface PurokFilters {
+    population_range: any;
+    household_range: any;
     search?: string;
     status?: string;
     sort_by?: 'name' | 'total_households' | 'total_residents' | 'created_at' | 'status' | 'leader_name';
@@ -210,7 +220,9 @@ export const defaultPurokStats: PurokStats = {
 export const defaultPurokFilters: PurokFilters = {
     status: 'all',
     sort_by: 'name',
-    sort_order: 'asc'
+    sort_order: 'asc',
+    population_range: undefined,
+    household_range: undefined
 };
 
 export interface PaginationData {

@@ -609,25 +609,25 @@ public function create(Request $request)
                             case 'senior':
                                 if ($fee->feeType->has_senior_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->senior_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->senior_percentage ?? $discount['percentage'];
                                 }
                                 break;
                             case 'pwd':
                                 if ($fee->feeType->has_pwd_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->pwd_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->pwd_percentage ?? $discount['percentage'];
                                 }
                                 break;
                             case 'solo_parent':
                                 if ($fee->feeType->has_solo_parent_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->solo_parent_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->solo_parent_percentage ?? $discount['percentage'];
                                 }
                                 break;
                             case 'indigent':
                                 if ($fee->feeType->has_indigent_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->indigent_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->indigent_percentage ?? $discount['percentage'];
                                 }
                                 break;
                         }
@@ -809,13 +809,13 @@ public function create(Request $request)
                 'fee_type_name' => $fee->feeType->name ?? 'Unknown',
                 'fee_type_category' => $fee->feeType->category ?? 'other',
                 'fee_type_has_senior_discount' => $fee->feeType->has_senior_discount ?? false,
-                'fee_type_senior_discount_percentage' => $fee->feeType->senior_discount_percentage ?? 0,
+                'fee_type_senior_percentage' => $fee->feeType->senior_percentage ?? 0,
                 'fee_type_has_pwd_discount' => $fee->feeType->has_pwd_discount ?? false,
-                'fee_type_pwd_discount_percentage' => $fee->feeType->pwd_discount_percentage ?? 0,
+                'fee_type_pwd_percentage' => $fee->feeType->pwd_percentage ?? 0,
                 'fee_type_has_solo_parent_discount' => $fee->feeType->has_solo_parent_discount ?? false,
-                'fee_type_solo_parent_discount_percentage' => $fee->feeType->solo_parent_discount_percentage ?? 0,
+                'fee_type_solo_parent_percentage' => $fee->feeType->solo_parent_percentage ?? 0,
                 'fee_type_has_indigent_discount' => $fee->feeType->has_indigent_discount ?? false,
-                'fee_type_indigent_discount_percentage' => $fee->feeType->indigent_discount_percentage ?? 0,
+                'fee_type_indigent_percentage' => $fee->feeType->indigent_percentage ?? 0,
                 'applicableDiscounts' => $applicableDiscounts,
                 'canApplyDiscount' => $canApplyDiscount,
                 'category' => $fee->feeType->category ?? 'other',
@@ -865,25 +865,25 @@ public function create(Request $request)
                         case 'senior':
                             if ($request->clearanceType->has_senior_discount) {
                                 $isDiscountApplicable = true;
-                                $applicablePercentage = $request->clearanceType->senior_discount_percentage ?? $discount['percentage'];
+                                $applicablePercentage = $request->clearanceType->senior_percentage ?? $discount['percentage'];
                             }
                             break;
                         case 'pwd':
                             if ($request->clearanceType->has_pwd_discount) {
                                 $isDiscountApplicable = true;
-                                $applicablePercentage = $request->clearanceType->pwd_discount_percentage ?? $discount['percentage'];
+                                $applicablePercentage = $request->clearanceType->pwd_percentage ?? $discount['percentage'];
                             }
                             break;
                         case 'solo_parent':
                             if ($request->clearanceType->has_solo_parent_discount) {
                                 $isDiscountApplicable = true;
-                                $applicablePercentage = $request->clearanceType->solo_parent_discount_percentage ?? $discount['percentage'];
+                                $applicablePercentage = $request->clearanceType->solo_parent_percentage ?? $discount['percentage'];
                             }
                             break;
                         case 'indigent':
                             if ($request->clearanceType->has_indigent_discount) {
                                 $isDiscountApplicable = true;
-                                $applicablePercentage = $request->clearanceType->indigent_discount_percentage ?? $discount['percentage'];
+                                $applicablePercentage = $request->clearanceType->indigent_percentage ?? $discount['percentage'];
                             }
                             break;
                     }
@@ -953,13 +953,13 @@ public function create(Request $request)
                     'formatted_fee' => '₱' . number_format($request->clearanceType->fee, 2),
                     'validity_days' => $request->clearanceType->validity_days,
                     'has_senior_discount' => $request->clearanceType->has_senior_discount ?? false,
-                    'senior_discount_percentage' => $request->clearanceType->senior_discount_percentage ?? 0,
+                    'senior_percentage' => $request->clearanceType->senior_percentage ?? 0,
                     'has_pwd_discount' => $request->clearanceType->has_pwd_discount ?? false,
-                    'pwd_discount_percentage' => $request->clearanceType->pwd_discount_percentage ?? 0,
+                    'pwd_percentage' => $request->clearanceType->pwd_percentage ?? 0,
                     'has_solo_parent_discount' => $request->clearanceType->has_solo_parent_discount ?? false,
-                    'solo_parent_discount_percentage' => $request->clearanceType->solo_parent_discount_percentage ?? 0,
+                    'solo_parent_percentage' => $request->clearanceType->solo_parent_percentage ?? 0,
                     'has_indigent_discount' => $request->clearanceType->has_indigent_discount ?? false,
-                    'indigent_discount_percentage' => $request->clearanceType->indigent_discount_percentage ?? 0,
+                    'indigent_percentage' => $request->clearanceType->indigent_percentage ?? 0,
                 ] : null,
                 'resident' => $request->resident ? [
                     'id' => $request->resident->id,
@@ -1009,13 +1009,13 @@ public function create(Request $request)
                 'category' => $feeType->category,
                 'frequency' => $feeType->frequency,
                 'has_senior_discount' => (bool) $feeType->has_senior_discount,
-                'senior_discount_percentage' => floatval($feeType->senior_discount_percentage ?? 0),
+                'senior_percentage' => floatval($feeType->senior_percentage ?? 0),
                 'has_pwd_discount' => (bool) $feeType->has_pwd_discount,
-                'pwd_discount_percentage' => floatval($feeType->pwd_discount_percentage ?? 0),
+                'pwd_percentage' => floatval($feeType->pwd_percentage ?? 0),
                 'has_solo_parent_discount' => (bool) $feeType->has_solo_parent_discount,
-                'solo_parent_discount_percentage' => floatval($feeType->solo_parent_discount_percentage ?? 0),
+                'solo_parent_percentage' => floatval($feeType->solo_parent_percentage ?? 0),
                 'has_indigent_discount' => (bool) $feeType->has_indigent_discount,
-                'indigent_discount_percentage' => floatval($feeType->indigent_discount_percentage ?? 0),
+                'indigent_percentage' => floatval($feeType->indigent_percentage ?? 0),
                 'has_surcharge' => (bool) $feeType->has_surcharge,
                 'surcharge_rate' => floatval($feeType->surcharge_percentage ?? 0),
                 'surcharge_fixed' => floatval($feeType->surcharge_fixed ?? 0),
@@ -1175,13 +1175,13 @@ public function create(Request $request)
                 'business_info' => null,
                 'is_household_head' => false,
                 'fee_type_has_senior_discount' => $clearanceRequest->clearanceType->has_senior_discount ?? false,
-                'fee_type_senior_discount_percentage' => $clearanceRequest->clearanceType->senior_discount_percentage ?? 0,
+                'fee_type_senior_percentage' => $clearanceRequest->clearanceType->senior_percentage ?? 0,
                 'fee_type_has_pwd_discount' => $clearanceRequest->clearanceType->has_pwd_discount ?? false,
-                'fee_type_pwd_discount_percentage' => $clearanceRequest->clearanceType->pwd_discount_percentage ?? 0,
+                'fee_type_pwd_percentage' => $clearanceRequest->clearanceType->pwd_percentage ?? 0,
                 'fee_type_has_solo_parent_discount' => $clearanceRequest->clearanceType->has_solo_parent_discount ?? false,
-                'fee_type_solo_parent_discount_percentage' => $clearanceRequest->clearanceType->solo_parent_discount_percentage ?? 0,
+                'fee_type_solo_parent_percentage' => $clearanceRequest->clearanceType->solo_parent_percentage ?? 0,
                 'fee_type_has_indigent_discount' => $clearanceRequest->clearanceType->has_indigent_discount ?? false,
-                'fee_type_indigent_discount_percentage' => $clearanceRequest->clearanceType->indigent_discount_percentage ?? 0,
+                'fee_type_indigent_percentage' => $clearanceRequest->clearanceType->indigent_percentage ?? 0,
             ];
             
             // Set this as the selected fee details
@@ -1256,25 +1256,25 @@ public function create(Request $request)
                             case 'senior':
                                 if ($fee->feeType->has_senior_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->senior_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->senior_percentage ?? $discount['percentage'];
                                 }
                                 break;
                             case 'pwd':
                                 if ($fee->feeType->has_pwd_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->pwd_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->pwd_percentage ?? $discount['percentage'];
                                 }
                                 break;
                             case 'solo_parent':
                                 if ($fee->feeType->has_solo_parent_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->solo_parent_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->solo_parent_percentage ?? $discount['percentage'];
                                 }
                                 break;
                             case 'indigent':
                                 if ($fee->feeType->has_indigent_discount) {
                                     $isDiscountApplicable = true;
-                                    $applicablePercentage = $fee->feeType->indigent_discount_percentage ?? $discount['percentage'];
+                                    $applicablePercentage = $fee->feeType->indigent_percentage ?? $discount['percentage'];
                                 }
                                 break;
                         }
@@ -1457,13 +1457,13 @@ public function create(Request $request)
                 'business_info' => $businessInfo,
                 'is_household_head' => $isHouseholdHead,
                 'fee_type_has_senior_discount' => $fee->feeType->has_senior_discount ?? false,
-                'fee_type_senior_discount_percentage' => $fee->feeType->senior_discount_percentage ?? 0,
+                'fee_type_senior_percentage' => $fee->feeType->senior_percentage ?? 0,
                 'fee_type_has_pwd_discount' => $fee->feeType->has_pwd_discount ?? false,
-                'fee_type_pwd_discount_percentage' => $fee->feeType->pwd_discount_percentage ?? 0,
+                'fee_type_pwd_percentage' => $fee->feeType->pwd_percentage ?? 0,
                 'fee_type_has_solo_parent_discount' => $fee->feeType->has_solo_parent_discount ?? false,
-                'fee_type_solo_parent_discount_percentage' => $fee->feeType->solo_parent_discount_percentage ?? 0,
+                'fee_type_solo_parent_percentage' => $fee->feeType->solo_parent_percentage ?? 0,
                 'fee_type_has_indigent_discount' => $fee->feeType->has_indigent_discount ?? false,
-                'fee_type_indigent_discount_percentage' => $fee->feeType->indigent_discount_percentage ?? 0,
+                'fee_type_indigent_percentage' => $fee->feeType->indigent_percentage ?? 0,
             ];
             
             Log::debug('PAYMENT_CREATE: Selected fee details prepared', [
@@ -1514,13 +1514,13 @@ public function create(Request $request)
                 'purpose_options' => $purposeOptions,
                 'requirements' => $requirements,
                 'has_senior_discount' => (bool) ($type->has_senior_discount ?? false),
-                'senior_discount_percentage' => floatval($type->senior_discount_percentage ?? 0),
+                'senior_percentage' => floatval($type->senior_percentage ?? 0),
                 'has_pwd_discount' => (bool) ($type->has_pwd_discount ?? false),
-                'pwd_discount_percentage' => floatval($type->pwd_discount_percentage ?? 0),
+                'pwd_percentage' => floatval($type->pwd_percentage ?? 0),
                 'has_solo_parent_discount' => (bool) ($type->has_solo_parent_discount ?? false),
-                'solo_parent_discount_percentage' => floatval($type->solo_parent_discount_percentage ?? 0),
+                'solo_parent_percentage' => floatval($type->solo_parent_percentage ?? 0),
                 'has_indigent_discount' => (bool) ($type->has_indigent_discount ?? false),
-                'indigent_discount_percentage' => floatval($type->indigent_discount_percentage ?? 0),
+                'indigent_percentage' => floatval($type->indigent_percentage ?? 0),
             ];
         });
 
@@ -1659,13 +1659,13 @@ public function create(Request $request)
                 'validity_days' => $clearanceRequest->clearanceType->validity_days,
                 'requirements' => $clearanceRequest->clearanceType->requirements ?? [],
                 'has_senior_discount' => $clearanceRequest->clearanceType->has_senior_discount ?? false,
-                'senior_discount_percentage' => $clearanceRequest->clearanceType->senior_discount_percentage ?? 0,
+                'senior_percentage' => $clearanceRequest->clearanceType->senior_percentage ?? 0,
                 'has_pwd_discount' => $clearanceRequest->clearanceType->has_pwd_discount ?? false,
-                'pwd_discount_percentage' => $clearanceRequest->clearanceType->pwd_discount_percentage ?? 0,
+                'pwd_percentage' => $clearanceRequest->clearanceType->pwd_percentage ?? 0,
                 'has_solo_parent_discount' => $clearanceRequest->clearanceType->has_solo_parent_discount ?? false,
-                'solo_parent_discount_percentage' => $clearanceRequest->clearanceType->solo_parent_discount_percentage ?? 0,
+                'solo_parent_percentage' => $clearanceRequest->clearanceType->solo_parent_percentage ?? 0,
                 'has_indigent_discount' => $clearanceRequest->clearanceType->has_indigent_discount ?? false,
-                'indigent_discount_percentage' => $clearanceRequest->clearanceType->indigent_discount_percentage ?? 0,
+                'indigent_percentage' => $clearanceRequest->clearanceType->indigent_percentage ?? 0,
             ] : null,
             'resident' => $clearanceRequest->resident ? [
                 'id' => $clearanceRequest->resident->id,

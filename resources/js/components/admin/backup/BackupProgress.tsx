@@ -2,8 +2,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { X, Clock } from 'lucide-react';
-import { BackupProgress } from '@/types/backup';
-import { PROGRESS_ICONS, PROGRESS_COLORS, PROGRESS_MESSAGES } from '@/utils/backupUtils';
+import { BackupProgress } from '@/types/admin/backup/backup';
+import { PROGRESS_ICONS, PROGRESS_COLORS, PROGRESS_MESSAGES } from '@/admin-utils/backupUtils';
 
 interface BackupProgressProps {
   progress: BackupProgress;
@@ -12,6 +12,13 @@ interface BackupProgressProps {
 
 export default function BackupProgressComponent({ progress, onClose }: BackupProgressProps) {
   const ProgressIcon = PROGRESS_ICONS[progress.status];
+  
+  // Check if the backup is in progress (not completed or failed)
+  const isInProgress = progress.status === 'pending';
+  
+  // Also check if there's a compressing flag or step
+  const isCompressing = progress.currentStep?.toLowerCase().includes('compress') || 
+                        progress.message?.toLowerCase().includes('compress');
 
   return (
     <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-4">
@@ -54,7 +61,7 @@ export default function BackupProgressComponent({ progress, onClose }: BackupPro
               size="sm"
               className="h-6 w-6 p-0"
               onClick={onClose}
-              disabled={progress.status === 'processing' || progress.status === 'compressing'}
+              disabled={isInProgress || isCompressing}
             >
               <X className="h-3 w-3" />
             </Button>

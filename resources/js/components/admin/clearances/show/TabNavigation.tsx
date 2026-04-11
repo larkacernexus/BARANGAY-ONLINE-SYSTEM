@@ -1,5 +1,5 @@
 import { FileText, File, DollarSign, History } from 'lucide-react';
-import { ClearanceRequest } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest } from '@/types/admin/clearances/clearance';
 
 interface TabNavigationProps {
     activeTab: 'details' | 'documents' | 'payment' | 'history';

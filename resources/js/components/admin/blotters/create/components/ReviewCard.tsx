@@ -2,7 +2,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Eye, AlertCircle, AlertTriangle, Info, CheckCircle } from 'lucide-react';
-import { IncidentType, Resident } from './BlotterTypes';
+import { IncidentType, Resident } from '@/types/admin/blotters/blotter';
 import { JSX } from 'react';
 
 interface ReviewCardProps {

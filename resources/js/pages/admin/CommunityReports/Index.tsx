@@ -1,5 +1,3 @@
-// resources/js/Pages/Admin/CommunityReports/Index.tsx
-
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -171,6 +169,18 @@ export default function CommunityReportsIndex({
         await handleBulkOperation(operation as BulkOperation, customData);
     };
 
+    // Handle sort change from dropdown
+    const handleSortChange = (value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    };
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = () => {
+        return `${sortBy}-${sortOrder}`;
+    };
+
     return (
         <AppLayout
             title="Community Reports Management"
@@ -260,6 +270,8 @@ export default function CommunityReportsIndex({
                         searchInputRef={searchInputRef}
                         selectionRef={selectionRef}
                         windowWidth={windowWidth}
+                        // onSortChange={handleSortChange}
+                        // getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Quick Filters */}
@@ -330,6 +342,16 @@ export default function CommunityReportsIndex({
                         setShowBulkAssignDialog={setShowBulkAssignDialog}
                         selectionStats={selectionStats}
                         selectionMode={selectionMode}
+                        onSelectAllFiltered={handleSelectAllFiltered}
+                        onSelectAll={handleSelectAll}
+                        onClearSelection={() => {
+                            // Clear selection logic
+                            selectedReports.forEach(id => handleItemSelect(id));
+                        }}
+                        sortBy={sortBy}
+                        // sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
                     
                     {/* Additional Information */}

@@ -1,11 +1,16 @@
-// resources/js/components/admin/privileges/PrivilegesContent.tsx
-
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     Award,
     Download,
@@ -25,7 +30,8 @@ import {
     IdCard,
     UserPlus,
     ChevronUp,
-    ChevronDown
+    ChevronDown,
+    ArrowUpDown
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -84,6 +90,10 @@ interface PrivilegesContentProps {
         delete: boolean;
         assign: boolean;
     };
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function PrivilegesContent({
@@ -120,7 +130,11 @@ export default function PrivilegesContent({
     selectionMode,
     selectionStats,
     discountTypes,
-    can
+    can,
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc'
 }: PrivilegesContentProps) {
     
     // Bulk action items configuration
@@ -235,6 +249,39 @@ export default function PrivilegesContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="code-asc">Code (A to Z)</SelectItem>
+                                        <SelectItem value="code-desc">Code (Z to A)</SelectItem>
+                                        <SelectItem value="discount_type-asc">Discount Type (A to Z)</SelectItem>
+                                        <SelectItem value="discount_type-desc">Discount Type (Z to A)</SelectItem>
+                                        <SelectItem value="default_discount_percentage-asc">Discount % (Low to High)</SelectItem>
+                                        <SelectItem value="default_discount_percentage-desc">Discount % (High to Low)</SelectItem>
+                                        <SelectItem value="residents_count-asc">Assignments (Low to High)</SelectItem>
+                                        <SelectItem value="residents_count-desc">Assignments (High to Low)</SelectItem>
+                                        <SelectItem value="active_residents_count-asc">Active (Low to High)</SelectItem>
+                                        <SelectItem value="active_residents_count-desc">Active (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && privileges.length > 0 && (
                             <div className="flex items-center gap-2">

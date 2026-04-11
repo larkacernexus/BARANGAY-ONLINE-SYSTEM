@@ -1,14 +1,14 @@
 // components/admin/document-types/DocumentTypesFilters.tsx
 
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Download, FilterX, Search, X, AlertCircle } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Download, FilterX, Search, X, Filter } from 'lucide-react';
 import { route } from 'ziggy-js';
 import { RefObject } from 'react';
 
-// Import types
 import type { CategoryOption, FilterState } from '@/types/admin/document-types/document-types';
 
 interface DocumentTypesFiltersProps {
@@ -42,26 +42,17 @@ export default function DocumentTypesFilters({
     categories,
     isLoading = false
 }: DocumentTypesFiltersProps) {
-    
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+    // Convert hasActiveFilters to boolean
+    const activeFilters = typeof hasActiveFilters === 'string' 
+        ? hasActiveFilters === 'true' || hasActiveFilters === '1'
+        : Boolean(hasActiveFilters);
+
     const getCategoryName = (categoryId: string) => {
         if (categoryId === 'all') return '';
         const category = categories.find(c => c.id.toString() === categoryId);
         return category?.name || categoryId;
-    };
-
-    // Handler for status change
-    const handleStatusChange = (value: string) => {
-        updateFilter('status', value);
-    };
-
-    // Handler for category change
-    const handleCategoryChange = (value: string) => {
-        updateFilter('category', value);
-    };
-
-    // Handler for required change
-    const handleRequiredChange = (value: string) => {
-        updateFilter('required', value);
     };
 
     return (
@@ -86,58 +77,61 @@ export default function DocumentTypesFilters({
                                     size="sm"
                                     className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                                     onClick={() => setSearch('')}
-                                    disabled={isLoading}
                                 >
                                     <X className="h-3 w-3" />
                                 </Button>
                             )}
                         </div>
                         <div className="flex gap-2">
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button 
-                                        variant="outline" 
-                                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        onClick={() => {
-                                            const exportUrl = route('document-types.export', {
-                                                search: search || undefined,
-                                                status: filtersState.status !== 'all' ? filtersState.status : undefined,
-                                                category: filtersState.category !== 'all' ? filtersState.category : undefined,
-                                                required: filtersState.required !== 'all' ? filtersState.required : undefined,
-                                            });
-                                            window.open(exportUrl, '_blank');
-                                        }}
-                                        disabled={totalItems === 0 || isLoading}
-                                    >
-                                        <Download className="h-4 w-4 mr-2" />
-                                        <span className="hidden sm:inline">Export</span>
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-200">
-                                    <p>Export filtered results</p>
-                                </TooltipContent>
-                            </Tooltip>
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                disabled={isLoading}
+                            >
+                                <Filter className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">
+                                    {showAdvancedFilters ? 'Hide Filters' : 'More Filters'}
+                                </span>
+                                <span className="sm:hidden">
+                                    {showAdvancedFilters ? 'Hide' : 'Filters'}
+                                </span>
+                            </Button>
+                            <Button 
+                                variant="outline"
+                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                onClick={() => {
+                                    const exportUrl = route('document-types.export', {
+                                        search: search || undefined,
+                                        status: filtersState.status !== 'all' ? filtersState.status : undefined,
+                                        category: filtersState.category !== 'all' ? filtersState.category : undefined,
+                                        required: filtersState.required !== 'all' ? filtersState.required : undefined,
+                                    });
+                                    window.open(exportUrl, '_blank');
+                                }}
+                                disabled={totalItems === 0 || isLoading}
+                            >
+                                <Download className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">Export</span>
+                            </Button>
                         </div>
                     </div>
 
-                    {/* Results and Clear Filters */}
+                    {/* Active Filters Info and Clear Button */}
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                             Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} document types
                             {search && ` matching "${search}"`}
-                            {filtersState.status !== 'all' && ` • Status: ${filtersState.status}`}
-                            {filtersState.category !== 'all' && ` • Category: ${getCategoryName(filtersState.category)}`}
-                            {filtersState.required !== 'all' && ` • Requirement: ${filtersState.required}`}
                         </div>
                         
                         <div className="flex items-center gap-3">
-                            {hasActiveFilters && (
+                            {activeFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleClearFilters}
                                     disabled={isLoading}
-                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 h-8"
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
                                 >
                                     <FilterX className="h-3.5 w-3.5 mr-1" />
                                     Clear Filters
@@ -146,84 +140,124 @@ export default function DocumentTypesFilters({
                         </div>
                     </div>
 
-                    {/* Active Filters Summary */}
-                    {hasActiveFilters && (
-                        <div className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                            <span className="flex-1">
-                                Active filters applied.
-                                {search && ` Search: "${search}"`}
-                                {filtersState.status !== 'all' && ` Status: ${filtersState.status}`}
-                                {filtersState.category !== 'all' && ` Category: ${getCategoryName(filtersState.category)}`}
-                                {filtersState.required !== 'all' && ` Requirement: ${filtersState.required}`}
-                            </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearFilters}
-                                disabled={isLoading}
-                                className="text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 h-7 px-2"
-                            >
-                                Clear all
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* Filters */}
-                    <div className="flex flex-wrap gap-2 sm:gap-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Status:</span>
+                    {/* Basic Filters */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Status</Label>
                             <select
-                                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.status}
-                                onChange={(e) => handleStatusChange(e.target.value)}
+                                onChange={(e) => updateFilter('status', e.target.value)}
                                 disabled={isLoading}
                             >
-                                <option value="all" className="bg-white dark:bg-gray-900">All Status</option>
-                                <option value="active" className="bg-white dark:bg-gray-900">Active</option>
-                                <option value="inactive" className="bg-white dark:bg-gray-900">Inactive</option>
+                                <option value="all">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Category:</span>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Category</Label>
                             <select
-                                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.category}
-                                onChange={(e) => handleCategoryChange(e.target.value)}
+                                onChange={(e) => updateFilter('category', e.target.value)}
                                 disabled={isLoading}
                             >
-                                <option value="all" className="bg-white dark:bg-gray-900">All Categories</option>
+                                <option value="all">All Categories</option>
                                 {categories.map(category => (
-                                    <option key={category.id} value={category.id} className="bg-white dark:bg-gray-900">
+                                    <option key={category.id} value={category.id}>
                                         {category.name}
                                     </option>
                                 ))}
                             </select>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">Requirement:</span>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400">Requirement</Label>
                             <select
-                                className="border rounded px-2 py-1 text-sm w-28 sm:w-auto bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
                                 value={filtersState.required}
-                                onChange={(e) => handleRequiredChange(e.target.value)}
+                                onChange={(e) => updateFilter('required', e.target.value)}
                                 disabled={isLoading}
                             >
-                                <option value="all" className="bg-white dark:bg-gray-900">All Types</option>
-                                <option value="required" className="bg-white dark:bg-gray-900">Required</option>
-                                <option value="optional" className="bg-white dark:bg-gray-900">Optional</option>
+                                <option value="all">All Types</option>
+                                <option value="required">Required</option>
+                                <option value="optional">Optional</option>
                             </select>
                         </div>
                     </div>
 
-                    {/* Loading indicator */}
-                    {isLoading && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">
-                            Updating...
+                    {/* Advanced Filters */}
+                    {showAdvancedFilters && (
+                        <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Advanced Filters</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* Quick Actions */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Actions</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                updateFilter('status', 'active');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Active Only
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                updateFilter('required', 'required');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Required Only
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                updateFilter('category', 'all');
+                                                updateFilter('status', 'all');
+                                                updateFilter('required', 'all');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Reset Filters
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Information */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Information</Label>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                                        <p>• Required documents must be submitted</p>
+                                        <p>• Categories help organize document types</p>
+                                        <p>• Inactive types won't appear in selections</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
+                
+                {/* Loading indicator */}
+                {isLoading && (
+                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 animate-pulse">
+                        Updating...
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

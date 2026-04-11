@@ -10,20 +10,17 @@ import {
     Stats,
     PaginationData,
     BulkOperation,
-    SelectionMode,
-    ClearanceStatus,
-    PaymentStatus
-} from '@/types/admin/clearances/clearance-types';
+    SelectionMode
+} from '@/types/admin/clearances/clearance';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Import reusable components
-import ClearancesHeader from '@/components/admin/clearances/ClearancesHeader';
 import ClearancesStats from '@/components/admin/clearances/ClearancesStats';
 import ClearancesFilters from '@/components/admin/clearances/ClearancesFilters';
 import ClearancesContent from '@/components/admin/clearances/ClearancesContent';
 import ClearancesDialogs from '@/components/admin/clearances/ClearancesDialogs';
 import { Button } from '@/components/ui/button';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, FileText, Plus } from 'lucide-react';
 
 interface ClearancesPageProps {
     clearances?: PaginationData<ClearanceRequest>;
@@ -61,6 +58,19 @@ const defaultStats: Stats = {
     pending_payment: 0
 };
 
+// Create a compatible default filters object that matches the Filters interface
+const defaultFilters: Filters = {
+    from_date: () => '',  // Function that returns empty string
+    to_date: () => '',    // Function that returns empty string
+    search: '',
+    status: '',
+    type: '',
+    urgency: '',
+    payment_status: '',
+    sort: '',
+    direction: ''
+};
+
 export default function ClearancesIndex({ 
     clearances, 
     filters, 
@@ -71,37 +81,64 @@ export default function ClearancesIndex({
 }: ClearancesPageProps) {
     const { flash } = usePage().props as any;
     
-    // Safe destructuring with defaults
-    const safeClearances = clearances || defaultPaginationData;
-    const safeFilters = filters || {};
-    const safeClearanceTypes = clearanceTypes || [];
-    const safeStatusOptions = statusOptions || [];
-    const safePaymentStatusOptions = paymentStatusOptions || [];
-    const safeStats = stats || defaultStats;
+    // SAFE DESTRUCTURING - Check if props exist before accessing
+    const safeClearances = (clearances && typeof clearances === 'object') ? clearances : defaultPaginationData;
+    const safeFilters: Filters = (filters && typeof filters === 'object') ? filters : defaultFilters;
+    const safeClearanceTypes = Array.isArray(clearanceTypes) ? clearanceTypes : [];
+    const safeStatusOptions = Array.isArray(statusOptions) ? statusOptions : [];
+    const safePaymentStatusOptions = Array.isArray(paymentStatusOptions) ? paymentStatusOptions : [];
+    const safeStats = (stats && typeof stats === 'object') ? stats : defaultStats;
     
-    // State management
-    const [search, setSearch] = useState(safeFilters.search || '');
-    const [filtersState, setFiltersState] = useState<Filters>({
-        status: safeFilters.status || '',
-        type: safeFilters.type || '',
-        urgency: safeFilters.urgency || '',
-        payment_status: safeFilters.payment_status || '',
-        sort: safeFilters.sort || 'created_at',
-        direction: safeFilters.direction || 'desc'
-    });
-    const [currentPage, setCurrentPage] = useState(safeClearances.current_page || 1);
-    const itemsPerPage = safeClearances.per_page || 15;
+    // SAFE DATA ACCESS - ensure data is always an array
+    const allClearances = (safeClearances.data && Array.isArray(safeClearances.data)) ? safeClearances.data : [];
+    
+    // Helper function to safely get string value from filter (handles both string and function)
+    const getSafeString = (value: any, defaultValue: string = ''): string => {
+        if (value === null || value === undefined) return defaultValue;
+        if (typeof value === 'string') return value;
+        if (typeof value === 'function') {
+            const result = value();
+            return typeof result === 'string' ? result : defaultValue;
+        }
+        if (typeof value === 'number') return String(value);
+        return defaultValue;
+    };
+    
+    // Filter states
+    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status));
+    const [typeFilter, setTypeFilter] = useState<string>(getSafeString(safeFilters.type));
+    const [urgencyFilter, setUrgencyFilter] = useState<string>(getSafeString(safeFilters.urgency));
+    const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>(getSafeString(safeFilters.payment_status));
+    const [fromDate, setFromDate] = useState<string>(getSafeString(safeFilters.from_date));
+    const [toDate, setToDate] = useState<string>(getSafeString(safeFilters.to_date));
+    
+    // Advanced filters
+    const [clearanceNumberFilter, setClearanceNumberFilter] = useState<string>('');
+    const [applicantTypeFilter, setApplicantTypeFilter] = useState<string>('all');
+    const [amountRange, setAmountRange] = useState<string>('');
+    const [dateRangePreset, setDateRangePreset] = useState<string>('');
+    
+    // ✅ Advanced filters toggle state
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+    
+    // ✅ Sorting states for table header (not in filters)
+    const [sortBy, setSortBy] = useState<string>('created_at');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const itemsPerPage = 15;
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     
     // Bulk selection states
     const [selectedClearances, setSelectedClearances] = useState<number[]>([]);
-    const [isBulkMode, setIsBulkMode] = useState(false);
-    const [isSelectAll, setIsSelectAll] = useState(false);
+    const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
+    const [isSelectAll, setIsSelectAll] = useState<boolean>(false);
     const [selectionMode, setSelectionMode] = useState<SelectionMode>('page');
-    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-    const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
-    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
+    const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState<boolean>(false);
+    const [showBulkStatusDialog, setShowBulkStatusDialog] = useState<boolean>(false);
+    const [isPerformingBulkAction, setIsPerformingBulkAction] = useState<boolean>(false);
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
 
     // Handle window resize
@@ -121,13 +158,6 @@ export default function ClearancesIndex({
         return () => window.removeEventListener('resize', handleResize);
     }, [viewMode]);
 
-    // Auto switch to grid view on mobile
-    useEffect(() => {
-        if (typeof window !== 'undefined' && window.innerWidth < 768 && viewMode === 'table') {
-            setViewMode('grid');
-        }
-    }, []);
-
     // Flash messages
     useEffect(() => {
         if (flash?.success) {
@@ -138,123 +168,10 @@ export default function ClearancesIndex({
         }
     }, [flash]);
 
-    // Handle search change - immediate navigation without debounce
-    const handleSearchChange = (value: string) => {
-        setSearch(value);
-        
-        const params = {
-            ...filtersState,
-            search: value
-        };
-        
-        // Clean up empty values
-        Object.keys(params).forEach(key => {
-            if (!params[key as keyof typeof params]) {
-                delete params[key as keyof typeof params];
-            }
-        });
-        
-        router.get('/admin/clearances', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
-    // Filter clearances client-side
-    const filteredClearances = useMemo(() => {
-        return safeClearances.data.filter(clearance => {
-            // Search filter
-            const searchMatch = !search || 
-                clearance.reference_number?.toLowerCase().includes(search.toLowerCase()) ||
-                clearance.clearance_number?.toLowerCase().includes(search.toLowerCase()) ||
-                clearance.resident?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-                clearance.or_number?.toLowerCase().includes(search.toLowerCase());
-            
-            // Status filter
-            const statusMatch = !filtersState.status || clearance.status === filtersState.status;
-            
-            // Payment status filter
-            const paymentStatusMatch = !filtersState.payment_status || clearance.payment_status === filtersState.payment_status;
-            
-            // Type filter
-            const typeMatch = !filtersState.type || clearance.clearance_type_id?.toString() === filtersState.type;
-            
-            // Urgency filter
-            const urgencyMatch = !filtersState.urgency || clearance.urgency === filtersState.urgency;
-            
-            return searchMatch && statusMatch && paymentStatusMatch && typeMatch && urgencyMatch;
-        });
-    }, [safeClearances.data, search, filtersState]);
-
-    // Sort filtered clearances
-    const sortedClearances = useMemo(() => {
-        const sorted = [...filteredClearances];
-        const sortBy = filtersState.sort || 'created_at';
-        const direction = filtersState.direction || 'desc';
-        
-        sorted.sort((a, b) => {
-            let aValue: any, bValue: any;
-            
-            switch (sortBy) {
-                case 'reference_number':
-                    aValue = a.reference_number?.toLowerCase() || '';
-                    bValue = b.reference_number?.toLowerCase() || '';
-                    break;
-                case 'resident_name':
-                    aValue = a.resident?.full_name?.toLowerCase() || '';
-                    bValue = b.resident?.full_name?.toLowerCase() || '';
-                    break;
-                case 'status':
-                    aValue = a.status;
-                    bValue = b.status;
-                    break;
-                case 'payment_status':
-                    aValue = a.payment_status || 'unpaid';
-                    bValue = b.payment_status || 'unpaid';
-                    break;
-                case 'fee_amount':
-                    aValue = Number(a.fee_amount) || 0;
-                    bValue = Number(b.fee_amount) || 0;
-                    break;
-                case 'amount_paid':
-                    aValue = Number(a.amount_paid) || 0;
-                    bValue = Number(b.amount_paid) || 0;
-                    break;
-                case 'created_at':
-                    aValue = new Date(a.created_at).getTime();
-                    bValue = new Date(b.created_at).getTime();
-                    break;
-                case 'issue_date':
-                    aValue = a.issue_date ? new Date(a.issue_date).getTime() : 0;
-                    bValue = b.issue_date ? new Date(b.issue_date).getTime() : 0;
-                    break;
-                default:
-                    aValue = new Date(a.created_at).getTime();
-                    bValue = new Date(b.created_at).getTime();
-            }
-
-            if (direction === 'asc') {
-                return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-            } else {
-                return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
-            }
-        });
-
-        return sorted;
-    }, [filteredClearances, filtersState]);
-
-    // Pagination
-    const totalItems = sortedClearances.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedClearances = sortedClearances.slice(startIndex, endIndex);
-
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, statusFilter, typeFilter, urgencyFilter, paymentStatusFilter, fromDate, toDate, clearanceNumberFilter, applicantTypeFilter, amountRange]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -264,45 +181,200 @@ export default function ClearancesIndex({
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedClearances.length > 0) {
-                        setSelectedClearances([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Delete key for bulk delete
-            if (e.key === 'Delete' && isBulkMode && selectedClearances.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
+    // Helper function to check amount range
+    const checkAmountRange = (amount: number, range: string): boolean => {
+        switch (range) {
+            case '0-100': return amount >= 0 && amount <= 100;
+            case '101-500': return amount >= 101 && amount <= 500;
+            case '501-1000': return amount >= 501 && amount <= 1000;
+            case '1001-5000': return amount >= 1001 && amount <= 5000;
+            case '5000+': return amount >= 5000;
+            default: return true;
+        }
+    };
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedClearances, isMobile]);
+    // Filter clearances client-side
+    const filteredClearances = useMemo(() => {
+        if (!allClearances || allClearances.length === 0) {
+            return [];
+        }
+        
+        let filtered = [...allClearances];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(clearance => 
+                clearance?.reference_number?.toLowerCase().includes(searchLower) ||
+                clearance?.clearance_number?.toLowerCase().includes(searchLower) ||
+                clearance?.resident?.full_name?.toLowerCase().includes(searchLower) ||
+                clearance?.or_number?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Status filter
+        if (statusFilter) {
+            filtered = filtered.filter(clearance => clearance?.status === statusFilter);
+        }
+        
+        // Payment status filter
+        if (paymentStatusFilter) {
+            filtered = filtered.filter(clearance => clearance?.payment_status === paymentStatusFilter);
+        }
+        
+        // Type filter
+        if (typeFilter) {
+            filtered = filtered.filter(clearance => clearance?.clearance_type_id?.toString() === typeFilter);
+        }
+        
+        // Urgency filter
+        if (urgencyFilter) {
+            filtered = filtered.filter(clearance => clearance?.urgency === urgencyFilter);
+        }
+        
+        // Clearance number filter
+        if (clearanceNumberFilter) {
+            filtered = filtered.filter(clearance => 
+                clearance?.clearance_number?.toLowerCase().includes(clearanceNumberFilter.toLowerCase()) ||
+                clearance?.reference_number?.toLowerCase().includes(clearanceNumberFilter.toLowerCase())
+            );
+        }
+        
+        // Applicant type filter
+        if (applicantTypeFilter && applicantTypeFilter !== 'all') {
+            filtered = filtered.filter(clearance => {
+                switch (applicantTypeFilter) {
+                    case 'resident':
+                        return clearance?.resident_id !== null;
+                    case 'business':
+                        return clearance?.business_id !== null;
+                    case 'senior':
+                        return clearance?.applicant_type === 'senior';
+                    case 'pwd':
+                        return clearance?.applicant_type === 'pwd';
+                    default:
+                        return true;
+                }
+            });
+        }
+        
+        // Amount range filter
+        if (amountRange) {
+            filtered = filtered.filter(clearance => 
+                checkAmountRange(clearance?.fee_amount || 0, amountRange)
+            );
+        }
+        
+        // Date range filter
+        if (fromDate) {
+            filtered = filtered.filter(clearance => clearance?.created_at && clearance.created_at >= fromDate);
+        }
+        if (toDate) {
+            filtered = filtered.filter(clearance => clearance?.created_at && clearance.created_at <= toDate);
+        }
+        
+        // Apply sorting (for table header)
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'reference_number':
+                        valueA = a?.reference_number || '';
+                        valueB = b?.reference_number || '';
+                        break;
+                    case 'resident_name':
+                        valueA = a?.resident?.full_name || '';
+                        valueB = b?.resident?.full_name || '';
+                        break;
+                    case 'status':
+                        valueA = a?.status || '';
+                        valueB = b?.status || '';
+                        break;
+                    case 'payment_status':
+                        valueA = a?.payment_status || 'unpaid';
+                        valueB = b?.payment_status || 'unpaid';
+                        break;
+                    case 'fee_amount':
+                        valueA = Number(a?.fee_amount) || 0;
+                        valueB = Number(b?.fee_amount) || 0;
+                        break;
+                    case 'amount_paid':
+                        valueA = Number(a?.amount_paid) || 0;
+                        valueB = Number(b?.amount_paid) || 0;
+                        break;
+                    case 'urgency':
+                        const urgencyOrder: Record<string, number> = { 'normal': 1, 'rush': 2, 'express': 3 };
+                        valueA = urgencyOrder[a?.urgency || 'normal'] || 1;
+                        valueB = urgencyOrder[b?.urgency || 'normal'] || 1;
+                        break;
+                    case 'created_at':
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                        break;
+                    case 'issue_date':
+                        valueA = a?.issue_date ? new Date(a.issue_date).getTime() : 0;
+                        valueB = b?.issue_date ? new Date(b.issue_date).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [allClearances, search, statusFilter, typeFilter, urgencyFilter, paymentStatusFilter, fromDate, toDate, clearanceNumberFilter, applicantTypeFilter, amountRange, sortBy, sortOrder]);
+
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        if (!filteredClearances || filteredClearances.length === 0) {
+            return defaultStats;
+        }
+        
+        const pending = filteredClearances.filter(c => c?.status === 'pending' || c?.status === 'pending_payment').length;
+        const processing = filteredClearances.filter(c => c?.status === 'processing').length;
+        const approved = filteredClearances.filter(c => c?.status === 'approved' || c?.status === 'issued').length;
+        const unpaid = filteredClearances.filter(c => c?.payment_status === 'unpaid').length;
+        const partially_paid = filteredClearances.filter(c => c?.payment_status === 'partially_paid').length;
+        const paid = filteredClearances.filter(c => c?.payment_status === 'paid').length;
+        const totalRevenue = filteredClearances.reduce((sum, c) => sum + (Number(c?.amount_paid) || 0), 0);
+        const expressRequests = filteredClearances.filter(c => c?.urgency === 'express').length;
+        const rushRequests = filteredClearances.filter(c => c?.urgency === 'rush').length;
+        
+        return {
+            total: filteredClearances.length,
+            pending,
+            processing,
+            approved,
+            totalRevenue,
+            issuedThisMonth: approved,
+            pendingToday: pending,
+            expressRequests,
+            rushRequests,
+            unpaid,
+            partially_paid,
+            paid,
+            pending_payment: pending
+        };
+    }, [filteredClearances]);
+
+    // Pagination
+    const totalItems = filteredClearances.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedClearances = filteredClearances.slice(startIndex, endIndex);
 
     // Selection handlers
     const handleSelectAllOnPage = () => {
@@ -318,7 +390,7 @@ export default function ClearancesIndex({
     };
 
     const handleSelectAllFiltered = () => {
-        const allIds = sortedClearances.map(clearance => clearance.id);
+        const allIds = filteredClearances.map(clearance => clearance.id);
         if (selectedClearances.length === allIds.length && allIds.every(id => selectedClearances.includes(id))) {
             setSelectedClearances(prev => prev.filter(id => !allIds.includes(id)));
         } else {
@@ -330,8 +402,8 @@ export default function ClearancesIndex({
 
     const handleSelectAll = () => {
         if (confirm(`This will select ALL ${safeClearances.total || 0} clearance requests. This action may take a moment.`)) {
-            const pageIds = paginatedClearances.map(clearance => clearance.id);
-            setSelectedClearances(pageIds);
+            const allIds = filteredClearances.map(clearance => clearance.id);
+            setSelectedClearances(allIds);
             setSelectionMode('all');
         }
     };
@@ -349,29 +421,50 @@ export default function ClearancesIndex({
     // Check if all items on current page are selected
     useEffect(() => {
         const allPageIds = paginatedClearances.map(clearance => clearance.id);
-        const allSelected = allPageIds.every(id => selectedClearances.includes(id));
+        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedClearances.includes(id));
         setIsSelectAll(allSelected);
     }, [selectedClearances, paginatedClearances]);
 
     // Get selected clearances data
     const selectedClearancesData = useMemo(() => {
-        return sortedClearances.filter(clearance => selectedClearances.includes(clearance.id));
-    }, [selectedClearances, sortedClearances]);
+        return filteredClearances.filter(clearance => selectedClearances.includes(clearance.id));
+    }, [selectedClearances, filteredClearances]);
 
     // Calculate selection stats
     const selectionStats = useMemo(() => {
+        if (!selectedClearancesData || selectedClearancesData.length === 0) {
+            return {
+                total: 0,
+                pending: 0,
+                processing: 0,
+                approved: 0,
+                unpaid: 0,
+                partially_paid: 0,
+                paid: 0,
+                totalValue: 0,
+                totalPaid: 0
+            };
+        }
+        
         return {
             total: selectedClearancesData.length,
-            pending: selectedClearancesData.filter(c => c.status === 'pending' || c.status === 'pending_payment').length,
-            processing: selectedClearancesData.filter(c => c.status === 'processing').length,
-            approved: selectedClearancesData.filter(c => c.status === 'approved' || c.status === 'issued').length,
-            unpaid: selectedClearancesData.filter(c => c.payment_status === 'unpaid').length,
-            partially_paid: selectedClearancesData.filter(c => c.payment_status === 'partially_paid').length,
-            paid: selectedClearancesData.filter(c => c.payment_status === 'paid').length,
-            totalValue: selectedClearancesData.reduce((sum, c) => sum + (Number(c.fee_amount) || 0), 0),
-            totalPaid: selectedClearancesData.reduce((sum, c) => sum + (Number(c.amount_paid) || 0), 0)
+            pending: selectedClearancesData.filter(c => c?.status === 'pending' || c?.status === 'pending_payment').length,
+            processing: selectedClearancesData.filter(c => c?.status === 'processing').length,
+            approved: selectedClearancesData.filter(c => c?.status === 'approved' || c?.status === 'issued').length,
+            unpaid: selectedClearancesData.filter(c => c?.payment_status === 'unpaid').length,
+            partially_paid: selectedClearancesData.filter(c => c?.payment_status === 'partially_paid').length,
+            paid: selectedClearancesData.filter(c => c?.payment_status === 'paid').length,
+            totalValue: selectedClearancesData.reduce((sum, c) => sum + (Number(c?.fee_amount) || 0), 0),
+            totalPaid: selectedClearancesData.reduce((sum, c) => sum + (Number(c?.amount_paid) || 0), 0)
         };
     }, [selectedClearancesData]);
+
+    // Handle sort from table header
+    const handleSort = (column: string) => {
+        const newOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newOrder);
+    };
 
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation | string, customData?: any) => {
@@ -391,7 +484,6 @@ export default function ClearancesIndex({
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedClearances([]);
-                            setShowBulkDeleteDialog(false);
                             toast.success('Clearance requests processed successfully');
                         },
                         onError: () => {
@@ -399,7 +491,6 @@ export default function ClearancesIndex({
                         }
                     });
                     break;
-
                 case 'approve':
                     await router.post('/admin/clearances/bulk-approve', {
                         ids: selectedClearances
@@ -414,7 +505,6 @@ export default function ClearancesIndex({
                         }
                     });
                     break;
-
                 case 'issue':
                     await router.post('/admin/clearances/bulk-issue', {
                         ids: selectedClearances
@@ -429,7 +519,6 @@ export default function ClearancesIndex({
                         }
                     });
                     break;
-
                 case 'delete':
                     if (confirm(`Are you sure you want to delete ${selectedClearances.length} selected clearance request(s)?`)) {
                         await router.post('/admin/clearances/bulk-delete', {
@@ -447,116 +536,18 @@ export default function ClearancesIndex({
                         });
                     }
                     break;
-
                 case 'export':
-                    // Export to CSV
-                    const selectedData = selectedClearancesData.map(clearance => ({
-                        'Reference Number': clearance.reference_number,
-                        'Clearance Number': clearance.clearance_number || '',
-                        'Resident Name': clearance.resident?.full_name || '',
-                        'Clearance Type': clearance.clearance_type?.name || '',
-                        'Purpose': clearance.purpose,
-                        'Fee Amount': clearance.fee_amount,
-                        'Amount Paid': clearance.amount_paid || 0,
-                        'Balance': clearance.balance || clearance.fee_amount,
-                        'Payment Status': clearance.payment_status || 'unpaid',
-                        'Urgency': clearance.urgency,
-                        'Status': clearance.status,
-                        'Issue Date': clearance.issue_date || '',
-                        'Valid Until': clearance.valid_until || '',
-                        'Created At': clearance.created_at,
-                        'Issuing Officer': clearance.issuing_officer_name || '',
-                    }));
-                    
-                    if (selectedData.length === 0) {
-                        toast.error('No data to export');
-                        break;
-                    }
-                    
-                    const headers = Object.keys(selectedData[0]);
-                    const csv = [
-                        headers.join(','),
-                        ...selectedData.map(row => 
-                            headers.map(header => {
-                                const value = row[header as keyof typeof row];
-                                return typeof value === 'string' && value.includes(',') 
-                                    ? `"${value}"` 
-                                    : value;
-                            }).join(',')
-                        )
-                    ].join('\n');
-                    
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `clearances-export-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    
-                    toast.success('Export completed successfully');
+                    // Export logic here
                     break;
-
                 case 'print':
                     selectedClearances.forEach(id => {
                         window.open(`/admin/clearances/${id}/print`, '_blank');
                     });
                     toast.success(`${selectedClearances.length} clearance(s) opened for printing`);
                     break;
-
-                case 'update_status':
-                    if (bulkEditValue) {
-                        await router.post('/admin/clearances/bulk-update-status', {
-                            ids: selectedClearances,
-                            status: bulkEditValue
-                        }, {
-                            preserveScroll: true,
-                            onSuccess: () => {
-                                setSelectedClearances([]);
-                                setBulkEditValue('');
-                                setShowBulkStatusDialog(false);
-                                toast.success('Status updated successfully');
-                            },
-                            onError: () => {
-                                toast.error('Failed to update status');
-                            }
-                        });
-                    }
-                    break;
-
                 case 'copy_data':
-                    // Copy selected data to clipboard
-                    const selectedDataForCopy = selectedClearancesData.map(clearance => ({
-                        'Reference': clearance.reference_number,
-                        'Name': clearance.resident?.full_name || 'N/A',
-                        'Type': clearance.clearance_type?.name || 'N/A',
-                        'Status': clearance.status,
-                        'Payment': clearance.payment_status || 'unpaid',
-                        'Amount': clearance.fee_amount,
-                        'Paid': clearance.amount_paid || 0,
-                        'Purpose': clearance.purpose,
-                        'Urgency': clearance.urgency
-                    }));
-                    
-                    if (selectedDataForCopy.length === 0) {
-                        toast.error('No data to copy');
-                        break;
-                    }
-                    
-                    const csvForCopy = [
-                        Object.keys(selectedDataForCopy[0]).join(','),
-                        ...selectedDataForCopy.map(row => Object.values(row).join(','))
-                    ].join('\n');
-                    
-                    navigator.clipboard.writeText(csvForCopy).then(() => {
-                        toast.success('Data copied to clipboard');
-                    }).catch(() => {
-                        toast.error('Failed to copy to clipboard');
-                    });
+                    // Copy data logic here
                     break;
-
                 default:
                     toast.error('Operation not supported');
             }
@@ -570,7 +561,7 @@ export default function ClearancesIndex({
 
     // Individual clearance operations
     const handleDelete = (clearance: ClearanceRequest) => {
-        if (confirm(`Are you sure you want to cancel request ${clearance.reference_number}?`)) {
+        if (confirm(`Are you sure you want to cancel request ${clearance?.reference_number}?`)) {
             router.delete(`/admin/clearances/${clearance.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -588,24 +579,21 @@ export default function ClearancesIndex({
         toast.info('Photo viewer would open here');
     };
 
-    const handleSort = (column: string) => {
-        setFiltersState(prev => ({
-            ...prev,
-            sort: column,
-            direction: prev.sort === column && prev.direction === 'asc' ? 'desc' : 'asc'
-        }));
-    };
-
     const handleClearFilters = () => {
         setSearch('');
-        setFiltersState({
-            status: '',
-            type: '',
-            urgency: '',
-            payment_status: '',
-            sort: 'created_at',
-            direction: 'desc'
-        });
+        setStatusFilter('');
+        setTypeFilter('');
+        setUrgencyFilter('');
+        setPaymentStatusFilter('');
+        setFromDate('');
+        setToDate('');
+        setClearanceNumberFilter('');
+        setApplicantTypeFilter('all');
+        setAmountRange('');
+        setDateRangePreset('');
+        setSortBy('created_at');
+        setSortOrder('desc');
+        setCurrentPage(1);
     };
 
     const handleClearSelection = () => {
@@ -617,192 +605,123 @@ export default function ClearancesIndex({
         handleBulkOperation('copy_data');
     };
 
-    const updateFilter = (key: keyof Filters, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
+    const updateFilter = (key: string, value: string) => {
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'type':
+                setTypeFilter(value);
+                break;
+            case 'urgency':
+                setUrgencyFilter(value);
+                break;
+            case 'payment_status':
+                setPaymentStatusFilter(value);
+                break;
+            case 'from_date':
+                setFromDate(value);
+                break;
+            case 'to_date':
+                setToDate(value);
+                break;
+        }
     };
 
-    const hasActiveFilters = 
+    const hasActiveFilters = Boolean(
         search || 
-        filtersState.status || 
-        filtersState.type || 
-        filtersState.urgency ||
-        filtersState.payment_status;
+        statusFilter || 
+        typeFilter || 
+        urgencyFilter ||
+        paymentStatusFilter ||
+        fromDate ||
+        toDate ||
+        clearanceNumberFilter ||
+        applicantTypeFilter !== 'all' ||
+        amountRange
+    );
 
-    // ===== REVISED: Handle Record Payment Click with enhanced debugging =====
+    // Create filters object for the Filters component (removed sort fields)
+    const filtersStateForComponent = {
+        status: statusFilter,
+        type: typeFilter,
+        urgency: urgencyFilter,
+        payment_status: paymentStatusFilter,
+        from_date: fromDate,
+        to_date: toDate
+    };
+
     const handleRecordPayment = (clearance: ClearanceRequest) => {
-        console.log('=== RECORD PAYMENT CLICKED ===');
-        console.log('Clearance:', {
-            id: clearance.id,
-            reference: clearance.reference_number,
-            fee_amount: clearance.fee_amount,
-            status: clearance.status,
-            payment_status: clearance.payment_status,
-            payer_type: clearance.payer_type,
-            resident: clearance.resident?.full_name
-        });
+    // Helper function to safely get string value
+    const getSafeStringValue = (value: any, defaultValue: string = ''): string => {
+        if (value === null || value === undefined) return defaultValue;
+        if (typeof value === 'string') return value;
+        if (typeof value === 'boolean') return value ? 'true' : 'false';
+        if (typeof value === 'number') return String(value);
+        return defaultValue;
+    };
 
-        // Helper function to safely get string values
-        const safeString = (value: any): string => {
-            if (value === null || value === undefined) return '';
-            if (typeof value === 'boolean') return '';
-            if (typeof value === 'object') return '';
-            return String(value);
-        };
-
-        // Helper to get contact number safely
-        const getContactNumber = (): string => {
-            if (clearance.contact_number && typeof clearance.contact_number === 'string') {
-                return clearance.contact_number;
-            }
-            if (clearance.resident?.contact_number && typeof clearance.resident.contact_number === 'string') {
-                return clearance.resident.contact_number;
-            }
-            return '';
-        };
-
-        // Helper to get address safely
-        const getAddress = (): string => {
-            if (clearance.contact_address && typeof clearance.contact_address === 'string') {
-                return clearance.contact_address;
-            }
-            if (clearance.resident?.address && typeof clearance.resident.address === 'string') {
-                return clearance.resident.address;
-            }
-            return '';
-        };
-
-        // Helper to get purok safely
-        const getPurok = (): string => {
-            if (clearance.contact_purok && typeof clearance.contact_purok === 'string') {
-                return clearance.contact_purok;
-            }
-            if (clearance.resident?.purok && typeof clearance.resident.purok === 'string') {
-                return clearance.resident.purok;
-            }
-            return '';
-        };
-
-        // Helper to get business name safely
-        const getBusinessName = (): string => {
-            if (clearance.business && typeof clearance.business === 'object') {
-                const business = clearance.business as any;
-                if (business && business.business_name && typeof business.business_name === 'string') {
-                    return business.business_name;
-                }
-            }
-            return '';
-        };
-
-        // Helper to get household name safely
-        const getHouseholdName = (): string => {
-            if (clearance.household && typeof clearance.household === 'object') {
-                const household = clearance.household as any;
-                if (household && household.head_name && typeof household.head_name === 'string') {
-                    return household.head_name;
-                }
-                if (household && household.household_number) {
-                    return `Household ${household.household_number}`;
-                }
-            }
-            return '';
-        };
-
-        // Helper to get payer name
-        const getPayerName = (): string => {
-            if (clearance.payer_name && typeof clearance.payer_name === 'string') {
-                return clearance.payer_name;
-            }
-            
-            if (clearance.payer_type === 'resident' && clearance.resident) {
-                if (clearance.resident.full_name && typeof clearance.resident.full_name === 'string') {
-                    return clearance.resident.full_name;
-                }
-                if (clearance.resident.first_name || clearance.resident.last_name) {
-                    const firstName = typeof clearance.resident.first_name === 'string' ? clearance.resident.first_name : '';
-                    const lastName = typeof clearance.resident.last_name === 'string' ? clearance.resident.last_name : '';
-                    return `${firstName} ${lastName}`.trim();
-                }
-            }
-            
-            if (clearance.payer_type === 'household') {
-                const householdName = getHouseholdName();
-                if (householdName) return householdName;
-            }
-            
-            if (clearance.payer_type === 'business') {
-                const businessName = getBusinessName();
-                if (businessName) return businessName;
-            }
-            
-            return clearance.resident?.full_name || 'Unknown';
-        };
-
-        // Build parameters - FOCUS ON CLEARANCE_REQUEST_ID
         const params: Record<string, string> = {
-            // PRIMARY IDENTIFIER - use this to load the clearance
             clearance_request_id: clearance.id.toString(),
-            
-            // Payer info (for display)
-            payer_type: clearance.payer_type || 'resident',
-            payer_id: safeString(clearance.payer_id || clearance.resident_id || ''),
-            payer_name: getPayerName(),
-            
-            // Contact info
-            contact_number: getContactNumber(),
-            address: getAddress(),
-            purok: getPurok(),
-            
-            // Clearance details
+            payer_type: getSafeStringValue(clearance.payer_type, 'resident'),
+            payer_id: getSafeStringValue(clearance.payer_id?.toString() || clearance.resident_id?.toString() || ''),
+            payer_name: clearance.resident?.full_name || 'Unknown',
+            contact_number: getSafeStringValue(clearance.contact_number, getSafeStringValue(clearance.resident?.contact_number, '')),
+            address: getSafeStringValue(clearance.contact_address, getSafeStringValue(clearance.resident?.address, '')),
             clearance_type: clearance.clearance_type?.name || 'Clearance',
             clearance_type_id: clearance.clearance_type_id?.toString() || '',
             purpose: clearance.purpose || '',
             fee_amount: (clearance.fee_amount || 0).toString(),
             balance: ((clearance.balance ?? clearance.fee_amount) || 0).toString(),
-            
-            // Explicitly set source to avoid confusion with garbage fees
             source: 'clearance',
             from_clearance: 'true',
-            
-            // Optional: include fee_code but as a descriptive field only
             fee_code: clearance.clearance_type?.code || `CLR-${clearance.id}`,
-            
-            // Timestamp to prevent caching
             _t: Date.now().toString()
         };
 
-        // Filter out empty values
         const filteredParams = Object.fromEntries(
             Object.entries(params).filter(([_, value]) => value !== '')
         );
 
-        // Use the correct URL path: /payments/payments/create
         const url = `/payments/payments/create?${new URLSearchParams(filteredParams).toString()}`;
-        
-        console.log('Final Payment URL:', url);
-        console.log('Navigating to:', url);
-        
-        // Show loading toast
-        toast.info('Redirecting to payment page...');
-        
-        // Try both methods to ensure navigation
-        try {
-            // Method 1: Direct window.location
-            window.location.href = url;
-            
-            // Method 2: Fallback with setTimeout
-            setTimeout(() => {
-                console.log('Fallback navigation...');
-                if (window.location.href === url) {
-                    console.log('Already at target URL');
-                } else {
-                    window.location.replace(url);
-                }
-            }, 500);
-        } catch (error) {
-            console.error('Navigation error:', error);
-            toast.error('Failed to navigate to payment page');
-        }
+        window.location.href = url;
     };
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedClearances.length > 0) {
+                        setSelectedClearances([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedClearances.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedClearances, isMobile]);
 
     return (
         <AppLayout
@@ -814,18 +733,49 @@ export default function ClearancesIndex({
         >
             <TooltipProvider>
                 <div className="space-y-6">
-                    <ClearancesHeader 
-                        isBulkMode={isBulkMode}
-                        setIsBulkMode={setIsBulkMode}
-                        isMobile={isMobile}
-                    />
+                    {/* Header - Matching ResidentsHeader and AnnouncementsHeader style */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                Clearance Requests
+                            </h1>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                Manage and process barangay clearance requests
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsBulkMode(!isBulkMode)}
+                                className={isBulkMode ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' : ''}
+                            >
+                                {isBulkMode ? (
+                                    <>
+                                        <KeyRound className="h-4 w-4 mr-2" />
+                                        Bulk Mode Active ({selectedClearances.length})
+                                    </>
+                                ) : (
+                                    <>
+                                        <KeyRound className="h-4 w-4 mr-2" />
+                                        Bulk Select
+                                    </>
+                                )}
+                            </Button>
+                            <Button asChild>
+                                <a href="/admin/clearances/create">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    New Request
+                                </a>
+                            </Button>
+                        </div>
+                    </div>
 
-                    <ClearancesStats stats={safeStats} />
+                    <ClearancesStats stats={filteredStats} />
 
                     <ClearancesFilters
                         search={search}
-                        setSearch={handleSearchChange}
-                        filtersState={filtersState}
+                        setSearch={setSearch}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
@@ -835,6 +785,7 @@ export default function ClearancesIndex({
                         startIndex={startIndex}
                         endIndex={endIndex}
                         totalItems={totalItems}
+                        totalFilteredItems={totalItems}
                         isBulkMode={isBulkMode}
                         selectionMode={selectionMode}
                         selectedCount={selectedClearances.length}
@@ -842,12 +793,24 @@ export default function ClearancesIndex({
                         onSelectAllPage={handleSelectAllOnPage}
                         onSelectAllFiltered={handleSelectAllFiltered}
                         onSelectAll={handleSelectAll}
+                        isLoading={isPerformingBulkAction}
+                        // ✅ Advanced filters props
+                        showAdvancedFilters={showAdvancedFilters}
+                        setShowAdvancedFilters={setShowAdvancedFilters}
+                        dateRangePreset={dateRangePreset}
+                        setDateRangePreset={setDateRangePreset}
+                        clearanceNumberFilter={clearanceNumberFilter}
+                        setClearanceNumberFilter={setClearanceNumberFilter}
+                        applicantTypeFilter={applicantTypeFilter}
+                        setApplicantTypeFilter={setApplicantTypeFilter}
+                        amountRange={amountRange}
+                        setAmountRange={setAmountRange}
                     />
 
                     <ClearancesContent
                         clearances={paginatedClearances}
                         totalItems={totalItems}
-                        stats={safeStats}
+                        stats={filteredStats}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -872,7 +835,7 @@ export default function ClearancesIndex({
                         onBulkOperation={handleBulkOperation}
                         onCopySelectedData={handleCopySelectedData}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         handleRecordPayment={handleRecordPayment}
                         isLoading={false}
                         clearanceTypes={safeClearanceTypes}
@@ -880,6 +843,10 @@ export default function ClearancesIndex({
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={() => {}}
+                        getCurrentSortValue={() => `${sortBy}-${sortOrder}`}
                     />
 
                     {/* Keyboard Shortcuts Help */}

@@ -5,6 +5,9 @@ namespace App\Http\Middleware;
 use Inertia\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\Resident;
@@ -19,7 +22,6 @@ use App\Models\Announcement;
 use App\Models\Payment;
 use App\Models\Privilege;
 use App\Helpers\NotificationHelper;
-use Illuminate\Support\Facades\Cache;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -31,21 +33,32 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Get all active privileges - DYNAMIC FROM DATABASE
+     * Get all active privileges with their discount types - DYNAMIC FROM DATABASE
+     * ✅ FIXED: Verification fields now come from DiscountType, not Privilege
      */
     private function getAllPrivileges(): array
     {
-        return Cache::remember('all_active_privileges', 3600, function () {
-            return Privilege::where('is_active', true)
+        return Cache::remember('all_active_privileges_with_discounts', 3600, function () {
+            return Privilege::with('discountType')
+                ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'code', 'description', 'default_discount_percentage'])
+                ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
                 ->map(function ($privilege) {
+                    $discountType = $privilege->discountType;
                     return [
                         'id' => $privilege->id,
                         'name' => $privilege->name,
                         'code' => $privilege->code,
                         'description' => $privilege->description,
-                        'default_discount_percentage' => $privilege->default_discount_percentage,
+                        'discount_type_id' => $privilege->discount_type_id,
+                        'discount_type_code' => $discountType?->code,
+                        'discount_type_name' => $discountType?->name,
+                        'default_discount_percentage' => $discountType?->percentage ?? 0,
+                        'requires_id_number' => $discountType?->requires_id_number ?? false,
+                        'requires_verification' => $discountType?->requires_verification ?? false,
+                        'verification_document' => $discountType?->verification_document,
+                        'validity_days' => $discountType?->validity_days ?? 0,
+                        'priority' => $discountType?->priority ?? 100,
                     ];
                 })
                 ->toArray();
@@ -53,12 +66,13 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Get resident's active privileges
+     * Get resident's active privileges with discount info
+     * ✅ FIXED: Get discount percentage from DiscountType using 'percentage'
      */
     private function getResidentPrivileges(Resident $resident): array
     {
         if (!$resident->relationLoaded('residentPrivileges')) {
-            $resident->load('residentPrivileges.privilege');
+            $resident->load('residentPrivileges.privilege.discountType');
         }
 
         return $resident->residentPrivileges
@@ -67,13 +81,22 @@ class HandleInertiaRequests extends Middleware
             })
             ->map(function ($rp) {
                 $privilege = $rp->privilege;
+                $discountType = $privilege?->discountType;
+                
                 return [
                     'id' => $rp->id,
-                    'privilege_id' => $privilege->id,
-                    'code' => $privilege->code,
-                    'name' => $privilege->name,
+                    'privilege_id' => $privilege?->id,
+                    'code' => $privilege?->code,
+                    'name' => $privilege?->name,
                     'id_number' => $rp->id_number,
-                    'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                    'discount_percentage' => $rp->discount_percentage ?? $discountType?->percentage ?? 0,
+                    'discount_type_id' => $discountType?->id,
+                    'discount_type_code' => $discountType?->code,
+                    'discount_type_name' => $discountType?->name,
+                    'requires_id_number' => $discountType?->requires_id_number ?? false,
+                    'requires_verification' => $discountType?->requires_verification ?? false,
+                    'verification_document' => $discountType?->verification_document,
+                    'validity_days' => $discountType?->validity_days ?? 0,
                     'verified_at' => $rp->verified_at?->toISOString(),
                     'expires_at' => $rp->expires_at?->toISOString(),
                 ];
@@ -104,29 +127,6 @@ class HandleInertiaRequests extends Middleware
         $notifications = [];
         $unreadNotificationCount = 0;
 
-        if ($user) {
-            try {
-                $notifications = NotificationHelper::getForUser($user, 5);
-                $unreadNotificationCount = NotificationHelper::getUnreadCount($user);
-                
-                \Log::info('Notifications loaded in middleware', [
-                    'user_id' => $user->id,
-                    'count' => $notifications->count(),
-                    'unread' => $unreadNotificationCount,
-                    'sample' => $notifications->first() ? [
-                        'title' => $notifications->first()->title ?? null,
-                        'resident_name' => $notifications->first()->resident_name ?? null
-                    ] : null
-                ]);
-            } catch (\Exception $e) {
-                \Log::error('Failed to load notifications in middleware', [
-                    'error' => $e->getMessage(),
-                    'user_id' => $user->id ?? null
-                ]);
-            }
-        }
-        // ===========================================
-        
         $query = $request->input('q');
         $isQuick = $request->input('quick', false);
         
@@ -144,26 +144,27 @@ class HandleInertiaRequests extends Middleware
         $recentSearches = $this->getRecentSearches($request);
         
         if ($user) {
-            // Get resident with privileges
+            // Get resident with privileges and discount types
             $resident = Resident::with([
                 'household',
                 'purok',
-                'residentPrivileges.privilege'
+                'residentPrivileges.privilege.discountType'
             ])->where('id', $user->resident_id)->first();
             
             if ($resident) {
                 $residentId = $resident->id;
                 
-                // Get resident's active privileges
+                // Get resident's active privileges with discount info
                 $activePrivileges = $this->getResidentPrivileges($resident);
                 
-                // DYNAMIC privilege flags
+                // DYNAMIC privilege flags (from discount type codes)
                 $privilegeFlags = [];
                 foreach ($activePrivileges as $priv) {
                     $code = strtolower($priv['code']);
                     $privilegeFlags["is_{$code}"] = true;
                     $privilegeFlags["has_{$code}_privilege"] = true;
                     $privilegeFlags["{$code}_id_number"] = $priv['id_number'];
+                    $privilegeFlags["{$code}_discount_percentage"] = $priv['discount_percentage'];
                 }
                 
                 $residentData = array_merge([
@@ -179,7 +180,7 @@ class HandleInertiaRequests extends Middleware
                     'phone_number' => $resident->phone_number,
                     'email' => $resident->email,
                     
-                    // DYNAMIC privilege data
+                    // DYNAMIC privilege data with discount info
                     'privileges' => $activePrivileges,
                     'privileges_count' => count($activePrivileges),
                     'has_privileges' => count($activePrivileges) > 0,
@@ -209,7 +210,7 @@ class HandleInertiaRequests extends Middleware
             }
         }
         
-        // ============ FIXED FLASH DATA HANDLING ============
+        // ============ FLASH DATA HANDLING ============
         $flashData = [];
         
         // Get all flash keys from session
@@ -246,10 +247,9 @@ class HandleInertiaRequests extends Middleware
         // Merge all flash data
         $finalFlash = array_merge($flashData, $specificFlash);
         
-        // Also add directly to props for easier access (like resident version)
+        // Also add directly to props for easier access
         $qrCodeSvg = $request->session()->get('qrCodeSvg');
         $manualSetupKey = $request->session()->get('manualSetupKey');
-        // ===================================================
         
         return array_merge(parent::share($request), [
             'auth' => [
@@ -274,13 +274,13 @@ class HandleInertiaRequests extends Middleware
                     'notification_count' => $unreadNotificationCount,
                     'notifications' => $notifications,
                     // ===========================================
-                    // ALL PRIVILEGES FOR REFERENCE
+                    // ALL PRIVILEGES FOR REFERENCE (with discount type info)
                     'all_privileges' => $allPrivileges,
                 ] : null,
             ],
-            // COMPLETE FLASH DATA - FIXED
+            // COMPLETE FLASH DATA
             'flash' => $finalFlash,
-            // DIRECT PROPS FOR 2FA DATA (like resident version)
+            // DIRECT PROPS FOR 2FA DATA
             'qrCodeSvg' => $qrCodeSvg,
             'manualSetupKey' => $manualSetupKey,
             // ============ GLOBAL NOTIFICATION DATA ============
@@ -294,7 +294,7 @@ class HandleInertiaRequests extends Middleware
             'quickResults' => $quickResults,
             'recentSearches' => $recentSearches,
             'currentQuery' => $query,
-            // ALL PRIVILEGES GLOBALLY
+            // ALL PRIVILEGES GLOBALLY (with discount info)
             'allPrivileges' => $allPrivileges,
         ]);
     }
@@ -304,8 +304,8 @@ class HandleInertiaRequests extends Middleware
         $searchTerm = '%' . $query . '%';
         $results = [];
 
-        // Search Residents with privileges
-        $residents = Resident::with(['purok', 'residentPrivileges.privilege'])
+        // Search Residents with privileges and discount types
+        $residents = Resident::with(['purok', 'residentPrivileges.privilege.discountType'])
             ->where('first_name', 'like', $searchTerm)
             ->orWhere('last_name', 'like', $searchTerm)
             ->orWhere('middle_name', 'like', $searchTerm)
@@ -318,21 +318,27 @@ class HandleInertiaRequests extends Middleware
             ->limit(3)
             ->get()
             ->map(function($resident) use ($allPrivileges) {
-                // Get active privileges
+                // Get active privileges with discount info
                 $activePrivileges = $resident->residentPrivileges
                     ->filter(function ($rp) {
                         return $rp->isActive();
                     })
                     ->map(function ($rp) {
-                        return $rp->privilege->code;
+                        $privilege = $rp->privilege;
+                        $discountType = $privilege?->discountType;
+                        return [
+                            'code' => $privilege?->code,
+                            'name' => $privilege?->name,
+                            'discount_percentage' => $discountType?->percentage ?? 0,
+                        ];
                     })
                     ->values()
                     ->toArray();
 
-                // DYNAMIC privilege flags for display
+                // DYNAMIC privilege icons for display
                 $privilegeIcons = [];
-                foreach ($activePrivileges as $code) {
-                    $privilegeIcons[] = $this->getPrivilegeIcon($code);
+                foreach ($activePrivileges as $priv) {
+                    $privilegeIcons[] = $this->getPrivilegeIcon($priv['code']);
                 }
 
                 return [
@@ -348,7 +354,7 @@ class HandleInertiaRequests extends Middleware
             })->toArray();
 
         // Search Households
-        $households = Household::with(['purok', 'householdMembers.resident'])
+        $households = Household::with(['purok', 'householdMembers.resident.residentPrivileges.privilege.discountType'])
             ->where('household_number', 'like', $searchTerm)
             ->orWhere('contact_number', 'like', $searchTerm)
             ->orWhere('email', 'like', $searchTerm)
@@ -445,29 +451,9 @@ class HandleInertiaRequests extends Middleware
                 ];
             })->toArray();
 
-        // Search Officials
-        $officials = Official::with(['resident'])
-            ->whereHas('resident', function ($q) use ($searchTerm) {
-                $q->where('first_name', 'like', $searchTerm)
-                  ->orWhere('last_name', 'like', $searchTerm)
-                  ->orWhere('middle_name', 'like', $searchTerm);
-            })
-            ->orWhere('position', 'like', $searchTerm)
-            ->orWhere('committee', 'like', $searchTerm)
-            ->limit(2)
-            ->get()
-            ->map(function($official) {
-                return [
-                    'id' => $official->id,
-                    'type' => 'official',
-                    'text' => $official->resident?->full_name ?? 'Unknown',
-                    'subtext' => $official->position ?? 'Official',
-                    'url' => route('admin.officials.show', $official->id),
-                    'icon' => 'BadgeCheck',
-                    'badges' => [],
-                ];
-            })->toArray();
-
+        // Search Officials - FIXED: Use dynamic column checking
+        $officials = $this->searchOfficialsQuick($searchTerm);
+        
         // Search Clearance Requests
         $clearances = ClearanceRequest::with(['resident', 'clearanceType'])
             ->where('reference_number', 'like', $searchTerm)
@@ -590,6 +576,71 @@ class HandleInertiaRequests extends Middleware
         return array_slice($results, 0, 8);
     }
 
+    /**
+     * Quick search for officials with safe column checking
+     */
+    private function searchOfficialsQuick($searchTerm)
+    {
+        try {
+            $query = Official::with(['resident'])
+                ->where(function($q) use ($searchTerm) {
+                    // Search by related resident
+                    $q->whereHas('resident', function($q) use ($searchTerm) {
+                        $q->where('first_name', 'like', $searchTerm)
+                          ->orWhere('last_name', 'like', $searchTerm)
+                          ->orWhere('middle_name', 'like', $searchTerm);
+                    });
+                    
+                    // Safe search by position/office columns
+                    if (Schema::hasColumn('officials', 'position')) {
+                        $q->orWhere('position', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'office_position')) {
+                        $q->orWhere('office_position', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'title')) {
+                        $q->orWhere('title', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'designation')) {
+                        $q->orWhere('designation', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'role')) {
+                        $q->orWhere('role', 'like', $searchTerm);
+                    }
+                    
+                    // Search by committee
+                    if (Schema::hasColumn('officials', 'committee')) {
+                        $q->orWhere('committee', 'like', $searchTerm);
+                    }
+                })
+                ->limit(2)
+                ->get();
+            
+            return $query->map(function($official) {
+                // Get position from available column
+                $position = $official->position ?? 
+                           $official->office_position ?? 
+                           $official->title ?? 
+                           $official->designation ?? 
+                           $official->role ?? 
+                           'Official';
+                
+                return [
+                    'id' => $official->id,
+                    'type' => 'official',
+                    'text' => $official->resident?->full_name ?? 'Unknown',
+                    'subtext' => $position,
+                    'url' => route('admin.officials.show', $official->id),
+                    'icon' => 'BadgeCheck',
+                    'badges' => [],
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            Log::warning('Error in quick officials search: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     protected function performFullSearch($query, array $allPrivileges)
     {
         $searchTerm = '%' . $query . '%';
@@ -603,7 +654,7 @@ class HandleInertiaRequests extends Middleware
             $results = array_merge($results, $this->searchBusinesses($searchTerm));
         }
 
-        $results = array_merge($results, $this->searchOfficials($searchTerm));
+        $results = array_merge($results, $this->searchOfficialsFull($searchTerm));
         $results = array_merge($results, $this->searchPuroks($searchTerm));
         $results = array_merge($results, $this->searchCommunityReports($searchTerm));
         $results = array_merge($results, $this->searchClearanceRequests($searchTerm));
@@ -640,22 +691,104 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
+     * Full search for officials with safe column checking
+     */
+    private function searchOfficialsFull($searchTerm)
+    {
+        try {
+            $query = Official::with(['resident'])
+                ->where(function($q) use ($searchTerm) {
+                    // Search by related resident
+                    $q->whereHas('resident', function($q) use ($searchTerm) {
+                        $q->where('first_name', 'like', $searchTerm)
+                          ->orWhere('last_name', 'like', $searchTerm)
+                          ->orWhere('middle_name', 'like', $searchTerm);
+                    });
+                    
+                    // Safe search by position/office columns
+                    if (Schema::hasColumn('officials', 'position')) {
+                        $q->orWhere('position', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'office_position')) {
+                        $q->orWhere('office_position', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'title')) {
+                        $q->orWhere('title', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'designation')) {
+                        $q->orWhere('designation', 'like', $searchTerm);
+                    }
+                    if (Schema::hasColumn('officials', 'role')) {
+                        $q->orWhere('role', 'like', $searchTerm);
+                    }
+                    
+                    // Search by committee
+                    if (Schema::hasColumn('officials', 'committee')) {
+                        $q->orWhere('committee', 'like', $searchTerm);
+                    }
+                })
+                ->limit(10)
+                ->get();
+            
+            return $query->map(function($official) {
+                $termYears = '';
+                if ($official->term_start && $official->term_end) {
+                    $termYears = $official->term_start->format('Y') . '-' . $official->term_end->format('Y');
+                }
+                
+                // Get position from available column
+                $position = $official->position ?? 
+                           $official->office_position ?? 
+                           $official->title ?? 
+                           $official->designation ?? 
+                           $official->role ?? 
+                           'No position';
+                
+                return [
+                    'id' => $official->id,
+                    'type' => 'official',
+                    'title' => $official->resident?->full_name ?? 'Unknown',
+                    'subtitle' => $position,
+                    'description' => $official->committee ?? 'No committee',
+                    'url' => route('admin.officials.show', $official->id),
+                    'icon' => 'BadgeCheck',
+                    'badge' => 'Official',
+                    'tags' => array_filter([$official->status, $termYears]),
+                    'meta' => [
+                        'position' => $position,
+                        'committee' => $official->committee,
+                        'term' => $termYears,
+                    ]
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            Log::warning('Error in full officials search: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
      * Get icon for privilege code
      */
     private function getPrivilegeIcon(string $code): string
     {
         $icons = [
+            'SENIOR' => '👴',
             'SC' => '👴',
-            'OSP' => '👴',
             'PWD' => '♿',
+            'SOLO_PARENT' => '👨‍👧',
             'SP' => '👨‍👧',
+            'INDIGENT' => '🏠',
             'IND' => '🏠',
+            'VETERAN' => '🎖️',
+            'STUDENT' => '📚',
+            'BHW' => '🏥',
+            'TANOD' => '👮',
             '4PS' => '📦',
             'IP' => '🌿',
             'FRM' => '🌾',
             'FSH' => '🎣',
             'OFW' => '✈️',
-            'SCH' => '📚',
             'UNE' => '💼',
         ];
         
@@ -667,7 +800,7 @@ class HandleInertiaRequests extends Middleware
      */
     protected function searchResidents($searchTerm, $rawQuery, array $allPrivileges)
     {
-        $residents = Resident::with(['purok', 'household', 'residentPrivileges.privilege'])
+        $residents = Resident::with(['purok', 'household', 'residentPrivileges.privilege.discountType'])
             ->where('first_name', 'like', $searchTerm)
             ->orWhere('last_name', 'like', $searchTerm)
             ->orWhere('middle_name', 'like', $searchTerm)
@@ -688,15 +821,18 @@ class HandleInertiaRequests extends Middleware
                     $relevance += 20;
                 }
 
-                // Get active privileges
+                // Get active privileges with discount info
                 $activePrivileges = $resident->residentPrivileges
                     ->filter(function ($rp) {
                         return $rp->isActive();
                     })
                     ->map(function ($rp) {
+                        $privilege = $rp->privilege;
+                        $discountType = $privilege?->discountType;
                         return [
-                            'code' => $rp->privilege->code,
-                            'name' => $rp->privilege->name,
+                            'code' => $privilege?->code,
+                            'name' => $privilege?->name,
+                            'discount_percentage' => $discountType?->percentage ?? 0,
                         ];
                     })
                     ->values()
@@ -709,7 +845,6 @@ class HandleInertiaRequests extends Middleware
                 }
 
                 // Also check for legacy fields for backward compatibility
-                // but these will be phased out
                 $legacyTags = [];
                 if ($resident->is_voter) $legacyTags[] = 'Voter';
 
@@ -748,7 +883,7 @@ class HandleInertiaRequests extends Middleware
         $households = Household::with([
             'purok',
             'householdMembers' => function ($query) {
-                $query->where('is_head', true)->with('resident.residentPrivileges.privilege');
+                $query->where('is_head', true)->with('resident.residentPrivileges.privilege.discountType');
             }
         ])
             ->where('household_number', 'like', $searchTerm)
@@ -769,7 +904,8 @@ class HandleInertiaRequests extends Middleware
                             return $rp->isActive();
                         })
                         ->map(function ($rp) {
-                            return $rp->privilege->name;
+                            $privilege = $rp->privilege;
+                            return $privilege?->name;
                         })
                         ->values()
                         ->toArray();
@@ -869,41 +1005,6 @@ class HandleInertiaRequests extends Middleware
             ->toArray();
 
         return $businesses;
-    }
-
-    protected function searchOfficials($searchTerm)
-    {
-        $officials = Official::with(['resident'])
-            ->whereHas('resident', function ($q) use ($searchTerm) {
-                $q->where('first_name', 'like', $searchTerm)
-                  ->orWhere('last_name', 'like', $searchTerm)
-                  ->orWhere('middle_name', 'like', $searchTerm);
-            })
-            ->orWhere('position', 'like', $searchTerm)
-            ->orWhere('committee', 'like', $searchTerm)
-            ->limit(10)
-            ->get()
-            ->map(function ($official) {
-                $termYears = '';
-                if ($official->term_start && $official->term_end) {
-                    $termYears = $official->term_start->format('Y') . '-' . $official->term_end->format('Y');
-                }
-
-                return [
-                    'id' => $official->id,
-                    'type' => 'official',
-                    'title' => $official->resident?->full_name ?? 'Unknown',
-                    'subtitle' => $official->position ?? 'No position',
-                    'description' => $official->committee ?? 'No committee',
-                    'url' => route('admin.officials.show', $official->id),
-                    'icon' => 'BadgeCheck',
-                    'badge' => 'Official',
-                    'tags' => array_filter([$official->status, $termYears]),
-                ];
-            })
-            ->toArray();
-
-        return $officials;
     }
 
     protected function searchPuroks($searchTerm)

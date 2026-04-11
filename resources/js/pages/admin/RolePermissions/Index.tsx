@@ -1,4 +1,3 @@
-// pages/RolePermissions.tsx
 import { router, usePage } from '@inertiajs/react';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -36,7 +35,56 @@ import RolePermissionsFilters from '@/components/admin/role-permissions/RolePerm
 import RolePermissionsContent from '@/components/admin/role-permissions/RolePermissionsContent';
 import RolePermissionsDialogs from '@/components/admin/role-permissions/RolePermissionsDialogs';
 
-// Custom hooks for better organization
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
+// Helper to get granter name safely
+const getGranterName = (permission: RolePermission): string => {
+    if (permission?.granter?.name) {
+        return permission.granter.name;
+    }
+    if (permission?.granted_by_name) {
+        return permission.granted_by_name;
+    }
+    return 'System';
+};
+
+// Helper to get granted date safely
+const getGrantedDate = (permission: RolePermission): string => {
+    if (permission?.granted_at) {
+        return formatDate(permission.granted_at);
+    }
+    if (permission?.created_at) {
+        return formatDate(permission.created_at);
+    }
+    return 'N/A';
+};
+
+// Helper to get permission name safely
+const getPermissionName = (permission: RolePermission): string => {
+    return permission?.permission?.name || permission?.permission_name || 'Unknown';
+};
+
+// Helper to get permission display name safely
+const getPermissionDisplayName = (permission: RolePermission): string => {
+    return permission?.permission?.display_name || permission?.permission_name || 'Unknown';
+};
+
+// Helper to get permission module safely
+const getPermissionModule = (permission: RolePermission): string => {
+    return permission?.permission?.module || permission?.module || 'General';
+};
+
+// Helper to get role name safely
+const getRoleName = (permission: RolePermission): string => {
+    return permission?.role?.name || permission?.role_name || 'Unknown';
+};
+
 const useWindowResize = () => {
     const [windowWidth, setWindowWidth] = useState<number>(
         typeof window !== 'undefined' ? window.innerWidth : 1024
@@ -62,143 +110,83 @@ const useWindowResize = () => {
     return { windowWidth, isMobile };
 };
 
-const useKeyboardShortcuts = (
-    isBulkMode: boolean,
-    selectedPermissions: number[],
-    setIsBulkMode: (value: boolean) => void,
-    setSelectedPermissions: React.Dispatch<React.SetStateAction<number[]>>,
-    setShowBulkRevokeDialog: (value: boolean) => void,
-    searchInputRef: React.RefObject<HTMLInputElement | null>, // Allow null
-    isMobile: boolean,
-    handleSelectAllOnPage: () => void,
-    handleSelectAllFiltered: () => void
-) => {
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            // Escape key
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedPermissions.length > 0) {
-                        setSelectedPermissions([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            // Ctrl/Cmd + F to focus search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                if (searchInputRef.current) {
-                    searchInputRef.current.focus();
-                }
-            }
-            // Delete key for bulk delete
-            if (e.key === 'Delete' && isBulkMode && selectedPermissions.length > 0) {
-                e.preventDefault();
-                setShowBulkRevokeDialog(true);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedPermissions, isMobile, setIsBulkMode, setSelectedPermissions, 
-        setShowBulkRevokeDialog, searchInputRef, handleSelectAllOnPage, handleSelectAllFiltered]);
+// ✅ Helper function to check date range
+const checkDateRange = (grantedAt: string | null, range: string): boolean => {
+    if (!grantedAt && range) return false;
+    if (!grantedAt) return true;
+    
+    const date = new Date(grantedAt);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    switch (range) {
+        case 'today': return diffDays === 0;
+        case 'yesterday': return diffDays === 1;
+        case 'this_week': return diffDays <= 7;
+        case 'last_week': return diffDays > 7 && diffDays <= 14;
+        case 'this_month': return diffDays <= 30;
+        case 'last_month': return diffDays > 30 && diffDays <= 60;
+        case 'this_quarter': return diffDays <= 90;
+        case 'this_year': return diffDays <= 365;
+        default: return true;
+    }
 };
 
-const useSelectionHandlers = (
-    currentPagePermissions: RolePermission[],
-    normalizedData: { data: RolePermission[]; meta: any },
-    selectedPermissions: number[],
-    setSelectedPermissions: React.Dispatch<React.SetStateAction<number[]>>,
-    setSelectionMode: React.Dispatch<React.SetStateAction<SelectionMode>>
-) => {
-    const handleSelectAllOnPage = useCallback(() => {
-        const pageIds = currentPagePermissions.map((permission: RolePermission) => permission.id);
-        setSelectedPermissions((prev: number[]) => {
-            const allSelected = pageIds.every((id: number) => prev.includes(id));
-            if (allSelected) {
-                return prev.filter((id: number) => !pageIds.includes(id));
-            } else {
-                return [...new Set([...prev, ...pageIds])];
-            }
-        });
-        setSelectionMode('page');
-    }, [currentPagePermissions, setSelectedPermissions, setSelectionMode]);
-
-    const handleSelectAllFiltered = useCallback(() => {
-        const allIds = normalizedData.data.map((permission: RolePermission) => permission.id);
-        setSelectedPermissions((prev: number[]) => {
-            const allSelected = allIds.every((id: number) => prev.includes(id));
-            if (allSelected) {
-                return prev.filter((id: number) => !allIds.includes(id));
-            } else {
-                return [...new Set([...prev, ...allIds])];
-            }
-        });
-        setSelectionMode('filtered');
-    }, [normalizedData.data, setSelectedPermissions, setSelectionMode]);
-
-    const handleSelectAll = useCallback(() => {
-        if (confirm(`This will select ALL ${normalizedData.meta.total || 0} permissions. This action may take a moment.`)) {
-            const pageIds = currentPagePermissions.map((permission: RolePermission) => permission.id);
-            setSelectedPermissions(pageIds);
-            setSelectionMode('all');
-        }
-    }, [currentPagePermissions, normalizedData.meta.total, setSelectedPermissions, setSelectionMode]);
-
-    const handleItemSelect = useCallback((id: number) => {
-        setSelectedPermissions((prev: number[]) => {
-            if (prev.includes(id)) {
-                return prev.filter((itemId: number) => itemId !== id);
-            } else {
-                return [...prev, id];
-            }
-        });
-    }, [setSelectedPermissions]);
-
-    return {
-        handleSelectAllOnPage,
-        handleSelectAllFiltered,
-        handleSelectAll,
-        handleItemSelect
-    };
+// ✅ Helper function to check roles count range
+const checkRolesCountRange = (permission: RolePermission, range: string): boolean => {
+    const rolesCount = permission?.roles_count || permission?.permission?.roles_count || 0;
+    
+    switch (range) {
+        case '0': return rolesCount === 0;
+        case '1': return rolesCount === 1;
+        case '2-5': return rolesCount >= 2 && rolesCount <= 5;
+        case '6-10': return rolesCount >= 6 && rolesCount <= 10;
+        case '10+': return rolesCount >= 10;
+        default: return true;
+    }
 };
 
 export default function RolePermissions() {
     const { props } = usePage<RolePermissionProps>();
     const { role_permissions, filters: initialFilters, roles, modules, granters } = props;
     
-    // State management
-    const [search, setSearch] = useState(initialFilters?.search || '');
-    const [filtersState, setFiltersState] = useState<FilterState>({
-        search: initialFilters?.search || '',
-        role: initialFilters?.role || 'all',
-        module: initialFilters?.module || 'all',
-        granter: initialFilters?.granter || 'all',
-        sort: initialFilters?.sort || 'granted_at',
-        order: initialFilters?.order || 'desc'
-    });
+    // Safe data extraction
+    const allPermissions = role_permissions?.data || [];
+    const safeRoles = roles || [];
+    const safeModules = modules || [];
+    const safeGranters = granters || [];
+    
+    // ✅ Safe filters extraction with proper typing
+    const safeFilters = (initialFilters || {}) as {
+        search?: string;
+        role?: string;
+        module?: string;
+        granter?: string;
+        date_range?: string;
+        roles_count_range?: string;
+        sort_by?: string;
+        sort_order?: string;
+    };
+    
+    // ✅ Filter states - client-side only
+    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+    const [roleFilter, setRoleFilter] = useState<string>(getSafeString(safeFilters.role, 'all'));
+    const [moduleFilter, setModuleFilter] = useState<string>(getSafeString(safeFilters.module, 'all'));
+    const [granterFilter, setGranterFilter] = useState<string>(getSafeString(safeFilters.granter, 'all'));
+    const [dateRangePreset, setDateRangePreset] = useState<string>(getSafeString(safeFilters.date_range, ''));
+    const [rolesCountRange, setRolesCountRange] = useState<string>(getSafeString(safeFilters.roles_count_range, ''));
+    
+    // ✅ Separate sort states for table header
+    const [sortBy, setSortBy] = useState<string>('granted_at');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
     
     // Custom hooks
     const { windowWidth, isMobile } = useWindowResize();
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     
     // Bulk selection states
     const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
@@ -213,47 +201,10 @@ export default function RolePermissions() {
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Safe data normalization
-    const normalizedData = useMemo(() => {
-        return safeNormalizeData(role_permissions);
-    }, [role_permissions]);
-
-    // Get current page permissions
-    const currentPagePermissions = useMemo(() => {
-        return normalizedData.data;
-    }, [normalizedData.data]);
-
-    // Selection handlers
-    const {
-        handleSelectAllOnPage,
-        handleSelectAllFiltered,
-        handleSelectAll,
-        handleItemSelect
-    } = useSelectionHandlers(
-        currentPagePermissions,
-        normalizedData,
-        selectedPermissions,
-        setSelectedPermissions,
-        setSelectionMode
-    );
-
-    // Keyboard shortcuts
-    useKeyboardShortcuts(
-        isBulkMode,
-        selectedPermissions,
-        setIsBulkMode,
-        setSelectedPermissions,
-        setShowBulkRevokeDialog,
-        searchInputRef,
-        isMobile,
-        handleSelectAllOnPage,
-        handleSelectAllFiltered
-    );
-
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, roleFilter, moduleFilter, granterFilter, dateRangePreset, rolesCountRange]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -263,22 +214,182 @@ export default function RolePermissions() {
         }
     }, [isBulkMode]);
 
+    // Filter permissions client-side
+    const filteredPermissions = useMemo(() => {
+        if (!allPermissions || allPermissions.length === 0) {
+            return [];
+        }
+        
+        let filtered = [...allPermissions];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(permission =>
+                getPermissionName(permission).toLowerCase().includes(searchLower) ||
+                getPermissionDisplayName(permission).toLowerCase().includes(searchLower) ||
+                getRoleName(permission).toLowerCase().includes(searchLower) ||
+                getGranterName(permission).toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Role filter
+        if (roleFilter && roleFilter !== 'all') {
+            filtered = filtered.filter(permission => permission?.role_id?.toString() === roleFilter);
+        }
+        
+        // Module filter
+        if (moduleFilter && moduleFilter !== 'all') {
+            filtered = filtered.filter(permission => getPermissionModule(permission) === moduleFilter);
+        }
+        
+        // Granter filter
+        if (granterFilter && granterFilter !== 'all') {
+            filtered = filtered.filter(permission => permission?.granter_id?.toString() === granterFilter);
+        }
+        
+        // ✅ Date range filter
+        if (dateRangePreset) {
+            filtered = filtered.filter(permission => 
+                checkDateRange(permission?.granted_at || permission?.created_at, dateRangePreset)
+            );
+        }
+        
+        // ✅ Roles count range filter
+        if (rolesCountRange) {
+            filtered = filtered.filter(permission => checkRolesCountRange(permission, rolesCountRange));
+        }
+        
+        // ✅ Apply sorting (for table header)
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'permission_name':
+                        valueA = getPermissionName(a);
+                        valueB = getPermissionName(b);
+                        break;
+                    case 'role_name':
+                        valueA = getRoleName(a);
+                        valueB = getRoleName(b);
+                        break;
+                    case 'module':
+                        valueA = getPermissionModule(a);
+                        valueB = getPermissionModule(b);
+                        break;
+                    case 'granter':
+                        valueA = getGranterName(a);
+                        valueB = getGranterName(b);
+                        break;
+                    case 'granted_at':
+                        valueA = a?.granted_at ? new Date(a.granted_at).getTime() : (a?.created_at ? new Date(a.created_at).getTime() : 0);
+                        valueB = b?.granted_at ? new Date(b.granted_at).getTime() : (b?.created_at ? new Date(b.created_at).getTime() : 0);
+                        break;
+                    default:
+                        valueA = a?.granted_at ? new Date(a.granted_at).getTime() : (a?.created_at ? new Date(a.created_at).getTime() : 0);
+                        valueB = b?.granted_at ? new Date(b.granted_at).getTime() : (b?.created_at ? new Date(b.created_at).getTime() : 0);
+                }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [allPermissions, search, roleFilter, moduleFilter, granterFilter, dateRangePreset, rolesCountRange, sortBy, sortOrder]);
+
+    // Pagination
+    const totalItems = filteredPermissions.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedPermissions = filteredPermissions.slice(startIndex, endIndex);
+
+    // Selection handlers
+    const handleSelectAllOnPage = useCallback(() => {
+        const pageIds = paginatedPermissions.map(permission => permission.id);
+        if (isSelectAll) {
+            setSelectedPermissions(prev => prev.filter(id => !pageIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedPermissions, ...pageIds])];
+            setSelectedPermissions(newSelected);
+        }
+        setIsSelectAll(!isSelectAll);
+        setSelectionMode('page');
+    }, [paginatedPermissions, isSelectAll, selectedPermissions]);
+
+    const handleSelectAllFiltered = useCallback(() => {
+        const allIds = filteredPermissions.map(permission => permission.id);
+        if (selectedPermissions.length === allIds.length && allIds.every(id => selectedPermissions.includes(id))) {
+            setSelectedPermissions(prev => prev.filter(id => !allIds.includes(id)));
+        } else {
+            const newSelected = [...new Set([...selectedPermissions, ...allIds])];
+            setSelectedPermissions(newSelected);
+            setSelectionMode('filtered');
+        }
+    }, [filteredPermissions, selectedPermissions]);
+
+    const handleSelectAll = useCallback(() => {
+        if (confirm(`This will select ALL ${totalItems} permissions. This action may take a moment.`)) {
+            const allIds = filteredPermissions.map(permission => permission.id);
+            setSelectedPermissions(allIds);
+            setSelectionMode('all');
+        }
+    }, [filteredPermissions, totalItems]);
+
+    const handleItemSelect = useCallback((id: number) => {
+        setSelectedPermissions(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(itemId => itemId !== id);
+            } else {
+                return [...prev, id];
+            }
+        });
+    }, []);
+
     // Check if all items on current page are selected
     useEffect(() => {
-        const allPageIds = currentPagePermissions.map((permission: RolePermission) => permission.id);
-        const allSelected = allPageIds.length > 0 && allPageIds.every((id: number) => selectedPermissions.includes(id));
+        const allPageIds = paginatedPermissions.map(permission => permission.id);
+        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedPermissions.includes(id));
         setIsSelectAll(allSelected);
-    }, [selectedPermissions, currentPagePermissions]);
+    }, [selectedPermissions, paginatedPermissions]);
 
     // Get selected permissions data
     const selectedPermissionsData = useMemo(() => {
-        return normalizedData.data.filter((permission: RolePermission) => selectedPermissions.includes(permission.id));
-    }, [selectedPermissions, normalizedData.data]);
+        return filteredPermissions.filter(permission => selectedPermissions.includes(permission.id));
+    }, [selectedPermissions, filteredPermissions]);
 
     // Calculate selection stats
     const selectionStats = useMemo(() => {
         return getSelectionStats(selectedPermissionsData);
     }, [selectedPermissionsData]);
+
+    // ✅ Handle sort from table header
+    const handleSort = useCallback((column: string) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    }, [sortBy, sortOrder]);
+
+    // Handle sort change from dropdown
+    const handleSortChange = useCallback((value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    }, []);
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = useCallback((): string => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
 
     // Bulk operations
     const handleBulkOperation = useCallback(async (operation: BulkOperation) => {
@@ -306,20 +417,7 @@ export default function RolePermissions() {
                     break;
 
                 case 'bulk_revoke':
-                    await router.post('/admin/role-permissions/bulk-revoke', {
-                        permission_ids: selectedPermissions,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            toast.success(`${selectedPermissions.length} permissions revoked successfully`);
-                            setSelectedPermissions([]);
-                            setShowBulkRevokeDialog(false);
-                        },
-                        onError: (errors) => {
-                            console.error('Bulk revoke error:', errors);
-                            toast.error('Failed to revoke permissions');
-                        }
-                    });
+                    setShowBulkRevokeDialog(true);
                     break;
 
                 case 'generate_report':
@@ -338,6 +436,32 @@ export default function RolePermissions() {
             setIsPerformingBulkAction(false);
         }
     }, [selectedPermissions, selectedPermissionsData]);
+
+    const confirmBulkRevoke = useCallback(async () => {
+        setIsPerformingBulkAction(true);
+        
+        try {
+            await router.post('/admin/role-permissions/bulk-revoke', {
+                permission_ids: selectedPermissions,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`${selectedPermissions.length} permissions revoked successfully`);
+                    setSelectedPermissions([]);
+                    setShowBulkRevokeDialog(false);
+                },
+                onError: (errors) => {
+                    console.error('Bulk revoke error:', errors);
+                    toast.error('Failed to revoke permissions');
+                }
+            });
+        } catch (error) {
+            console.error('Bulk revoke error:', error);
+            toast.error('An error occurred during the operation.');
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    }, [selectedPermissions]);
 
     // Copy selected data to clipboard
     const handleCopySelectedData = useCallback(() => {
@@ -384,25 +508,16 @@ export default function RolePermissions() {
         });
     }, []);
 
-    const handleSort = useCallback((column: string) => {
-        setFiltersState(prev => ({
-            ...prev,
-            sort: column,
-            order: prev.sort === column && prev.order === 'asc' ? 'desc' : 'asc'
-        }));
-    }, []);
-
     const handleClearFilters = useCallback(() => {
         setSearch('');
-        setFiltersState({
-            search: '',
-            role: 'all',
-            module: 'all',
-            granter: 'all',
-            sort: 'granted_at',
-            order: 'desc'
-        });
-        router.get('/admin/role-permissions');
+        setRoleFilter('all');
+        setModuleFilter('all');
+        setGranterFilter('all');
+        setDateRangePreset('');
+        setRolesCountRange('');
+        setSortBy('granted_at');
+        setSortOrder('desc');
+        setCurrentPage(1);
     }, []);
 
     const handleClearSelection = useCallback(() => {
@@ -411,43 +526,110 @@ export default function RolePermissions() {
     }, []);
 
     const updateFilter = useCallback((key: keyof FilterState, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
+        switch (key) {
+            case 'role':
+                setRoleFilter(value);
+                break;
+            case 'module':
+                setModuleFilter(value);
+                break;
+            case 'granter':
+                setGranterFilter(value);
+                break;
+            case 'date_range':
+                setDateRangePreset(value);
+                break;
+            case 'roles_count_range':
+                setRolesCountRange(value);
+                break;
+        }
     }, []);
 
     const handlePageChange = useCallback((page: number) => {
         setCurrentPage(page);
-        router.get(`/admin/role-permissions?page=${page}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
     const handleExport = useCallback(() => {
-        const queryParams = new URLSearchParams();
-        if (search) queryParams.append('search', search);
-        if (filtersState.role !== 'all') queryParams.append('role', filtersState.role);
-        if (filtersState.module !== 'all') queryParams.append('module', filtersState.module);
-        if (filtersState.granter !== 'all') queryParams.append('granter', filtersState.granter);
-        window.location.href = `/admin/role-permissions/export?${queryParams.toString()}`;
-    }, [search, filtersState.role, filtersState.module, filtersState.granter]);
+        handleBulkOperation('export');
+    }, [handleBulkOperation]);
 
-    const hasActiveFilters = useMemo(() => 
-       !! search || 
-        filtersState.role !== 'all' || 
-        filtersState.module !== 'all' ||
-        filtersState.granter !== 'all',
-        [search, filtersState.role, filtersState.module, filtersState.granter]
-    );
+const hasActiveFilters = useMemo(() => 
+    !!(search || 
+        roleFilter !== 'all' || 
+        moduleFilter !== 'all' ||
+        granterFilter !== 'all' ||
+        dateRangePreset ||
+        rolesCountRange),
+    [search, roleFilter, moduleFilter, granterFilter, dateRangePreset, rolesCountRange]
+);
 
-    // Pagination data
-    const {
-        total: totalItems,
-        last_page: totalPages,
-        current_page: currentPageNum,
-        per_page: itemsPerPage,
-        from: startIndex,
-        to: endIndex
-    } = normalizedData.meta;
+    // Create normalized data structure for compatibility
+    const normalizedData = {
+        data: paginatedPermissions,
+        meta: {
+            total: totalItems,
+            last_page: totalPages,
+            current_page: currentPage,
+            per_page: itemsPerPage,
+            from: startIndex + 1,
+            to: endIndex
+        }
+    };
+
+    // ✅ Create filters object for the Filters component (removed sort fields)
+    const filtersStateForComponent: FilterState = {
+        role: roleFilter,
+        module: moduleFilter,
+        granter: granterFilter,
+        date_range: dateRangePreset,
+        roles_count_range: rolesCountRange,
+        search: search,
+        sort: sortBy,
+        order: sortOrder
+    };
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedPermissions.length > 0) {
+                        setSelectedPermissions([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                if (searchInputRef.current) {
+                    searchInputRef.current.focus();
+                }
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedPermissions.length > 0) {
+                e.preventDefault();
+                setShowBulkRevokeDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedPermissions, isMobile]);
 
     return (
         <AdminLayout
@@ -466,40 +648,46 @@ export default function RolePermissions() {
                     />
 
                     <RolePermissionsStats 
-                        permissions={normalizedData.data}
+                        permissions={filteredPermissions}
                         totalItems={totalItems}
                     />
 
                     <RolePermissionsFilters
                         search={search}
                         setSearch={setSearch}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
-                        roles={roles || []}
-                        modules={modules || []}
-                        granters={granters || []}
+                        roles={safeRoles}
+                        modules={safeModules}
+                        granters={safeGranters}
                         isMobile={isMobile}
                         totalItems={totalItems}
-                        startIndex={startIndex}
+                        startIndex={startIndex + 1}
                         endIndex={endIndex}
                         searchInputRef={searchInputRef}
                         handleExport={handleExport}
-                        handleSort={handleSort}
+                        isLoading={isPerformingBulkAction}
+                        dateRangePreset={dateRangePreset}
+                        setDateRangePreset={setDateRangePreset}
+                        rolesCountRange={rolesCountRange}
+                        setRolesCountRange={setRolesCountRange}
                     />
 
                     <RolePermissionsContent
-                        permissions={normalizedData.data}
+                        permissions={paginatedPermissions}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
                         selectedPermissions={selectedPermissions}
+                        // viewMode={viewMode}
+                        // setViewMode={setViewMode}
                         isMobile={isMobile}
                         hasActiveFilters={hasActiveFilters}
-                        currentPage={currentPageNum}
+                        currentPage={currentPage}
                         totalPages={totalPages}
                         totalItems={totalItems}
                         itemsPerPage={itemsPerPage}
@@ -515,13 +703,19 @@ export default function RolePermissions() {
                         onCopySelectedData={handleCopySelectedData}
                         onBulkOperation={handleBulkOperation}
                         setShowBulkRevokeDialog={setShowBulkRevokeDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
-                        windowWidth={windowWidth} expandedPermission={null} togglePermissionExpansion={function (id: number): void {
-                            throw new Error('Function not implemented.');
-                        } }                    />
+                        windowWidth={windowWidth}
+                        expandedPermission={null}
+                        togglePermissionExpansion={() => {}}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        // onSort={handleSort}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
+                    />
                 </div>
             </TooltipProvider>
 
@@ -532,7 +726,7 @@ export default function RolePermissions() {
                 setShowRevokeDialog={setShowRevokeDialog}
                 isPerformingBulkAction={isPerformingBulkAction}
                 selectedPermissions={selectedPermissions}
-                handleBulkOperation={handleBulkOperation}
+                handleBulkOperation={confirmBulkRevoke}
                 confirmRevoke={confirmRevoke}
                 selectionStats={selectionStats}
             />

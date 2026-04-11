@@ -20,19 +20,33 @@ class ResidentDashboardController extends Controller
 {
     /**
      * Get all active privileges - DYNAMIC FROM DATABASE
+     * FIXED: Uses discountType relationship instead of default_discount_percentage column
      */
     private function getAllPrivileges(): array
     {
         return Cache::remember('all_active_privileges', 3600, function () {
-            return Privilege::where('is_active', true)
+            return Privilege::with('discountType') // Eager load discount type
+                ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'code', 'description'])
+                ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
                 ->map(function ($privilege) {
                     return [
                         'id' => $privilege->id,
                         'name' => $privilege->name,
                         'code' => $privilege->code,
                         'description' => $privilege->description,
+                        'discount_type_id' => $privilege->discount_type_id,
+                        'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
+                        'discount_type' => $privilege->discountType ? [
+                            'id' => $privilege->discountType->id,
+                            'code' => $privilege->discountType->code,
+                            'name' => $privilege->discountType->name,
+                            'percentage' => (float) $privilege->discountType->percentage,
+                            'requires_id_number' => (bool) $privilege->discountType->requires_id_number,
+                            'requires_verification' => (bool) $privilege->discountType->requires_verification,
+                            'verification_document' => $privilege->discountType->verification_document,
+                            'validity_days' => $privilege->discountType->validity_days,
+                        ] : null,
                     ];
                 })
                 ->toArray();
@@ -41,11 +55,12 @@ class ResidentDashboardController extends Controller
 
     /**
      * Get resident's active privileges - DYNAMIC
+     * FIXED: Uses discountType relationship for percentage
      */
     private function getResidentPrivileges(Resident $resident): array
     {
         if (!$resident->relationLoaded('residentPrivileges')) {
-            $resident->load('residentPrivileges.privilege');
+            $resident->load('residentPrivileges.privilege.discountType');
         }
 
         return $resident->residentPrivileges
@@ -54,18 +69,54 @@ class ResidentDashboardController extends Controller
             })
             ->map(function ($rp) {
                 $privilege = $rp->privilege;
+                $discountPercentage = $rp->discount_percentage 
+                    ?? $privilege->discountType?->percentage 
+                    ?? 0;
+                
                 return [
                     'id' => $rp->id,
                     'privilege_id' => $privilege->id,
                     'code' => $privilege->code,
                     'name' => $privilege->name,
                     'id_number' => $rp->id_number,
+                    'discount_percentage' => (float) $discountPercentage,
                     'verified_at' => $rp->verified_at?->toISOString(),
                     'expires_at' => $rp->expires_at?->toISOString(),
+                    'status' => $this->getPrivilegeStatus($rp),
+                    'discount_type' => $privilege->discountType ? [
+                        'id' => $privilege->discountType->id,
+                        'code' => $privilege->discountType->code,
+                        'name' => $privilege->discountType->name,
+                        'percentage' => (float) $privilege->discountType->percentage,
+                    ] : null,
                 ];
             })
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Get privilege status based on expiry
+     */
+    private function getPrivilegeStatus($residentPrivilege): string
+    {
+        if (!$residentPrivilege->verified_at) {
+            return 'pending';
+        }
+        
+        if ($residentPrivilege->expires_at) {
+            $daysUntilExpiry = Carbon::now()->diffInDays($residentPrivilege->expires_at, false);
+            
+            if ($daysUntilExpiry <= 0) {
+                return 'expired';
+            }
+            
+            if ($daysUntilExpiry <= 30) {
+                return 'expiring_soon';
+            }
+        }
+        
+        return 'active';
     }
 
     public function residentdashboard()
@@ -83,7 +134,7 @@ class ResidentDashboardController extends Controller
         
         // Load privileges
         if (!$resident->relationLoaded('residentPrivileges')) {
-            $resident->load('residentPrivileges.privilege');
+            $resident->load('residentPrivileges.privilege.discountType');
         }
         
         $household = null;
@@ -91,7 +142,7 @@ class ResidentDashboardController extends Controller
         $householdResidentIds = [$resident->id];
         
         if ($user->household_id) {
-            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege'])->find($user->household_id);
+            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege.discountType'])->find($user->household_id);
         }
         
         if ($household) {
@@ -222,7 +273,7 @@ class ResidentDashboardController extends Controller
                 ->take(5)
                 ->get()
                 ->map(function ($payment) use ($allPrivileges) {
-                    $payerResident = Resident::with(['residentPrivileges.privilege'])->find($payment->payer_id);
+                    $payerResident = Resident::with(['residentPrivileges.privilege.discountType'])->find($payment->payer_id);
                     
                     return [
                         'id' => 'payment-' . $payment->id,
@@ -243,7 +294,7 @@ class ResidentDashboardController extends Controller
                 ->take(5)
                 ->get()
                 ->map(function ($clearance) use ($allPrivileges) {
-                    $applicantResident = Resident::with(['residentPrivileges.privilege'])->find($clearance->resident_id);
+                    $applicantResident = Resident::with(['residentPrivileges.privilege.discountType'])->find($clearance->resident_id);
                     
                     return [
                         'id' => 'clearance-' . $clearance->id,
@@ -281,7 +332,8 @@ class ResidentDashboardController extends Controller
                 ->take(8)
                 ->get()
                 ->map(function ($payment) use ($allPrivileges) {
-                    $payerResident = Resident::with(['residentPrivileges.privilege'])->find($payment->payer_id);
+                    $payerResident = Resident::with(['residentPrivileges.privilege.discountType'])->find($payment->payer_id);
+                    $activePrivileges = $payerResident ? $this->getResidentPrivileges($payerResident) : [];
                     
                     return [
                         'id' => $payment->id,
@@ -295,8 +347,8 @@ class ResidentDashboardController extends Controller
                         'payer_name' => $payerResident ? $payerResident->first_name . ' ' . $payerResident->last_name : 'Household Member',
                         'payer_id' => $payment->payer_id,
                         'is_current_user' => $payerResident && $payerResident->user && $payerResident->user->id === Auth::id(),
-                        'privileges' => $payerResident ? $this->getResidentPrivileges($payerResident) : [],
-                        'has_privileges' => $payerResident && $payerResident->residentPrivileges->filter(fn($rp) => $rp->isActive())->count() > 0,
+                        'privileges' => $activePrivileges,
+                        'has_privileges' => count($activePrivileges) > 0,
                     ];
                 })
                 ->toArray();
@@ -327,13 +379,14 @@ class ResidentDashboardController extends Controller
     {
         try {
             return ClearanceRequest::whereIn('resident_id', $householdResidentIds)
-                ->with(['clearanceType', 'documents', 'resident.residentPrivileges.privilege'])
+                ->with(['clearanceType', 'documents', 'resident.residentPrivileges.privilege.discountType'])
                 ->whereIn('status', ['pending', 'processing', 'under_review', 'pending_payment'])
                 ->orderBy('created_at', 'desc')
                 ->take(8)
                 ->get()
                 ->map(function ($clearance) use ($allPrivileges) {
                     $applicantResident = $clearance->resident;
+                    $activePrivileges = $applicantResident ? $this->getResidentPrivileges($applicantResident) : [];
                     
                     return [
                         'id' => $clearance->id,
@@ -347,8 +400,8 @@ class ResidentDashboardController extends Controller
                         'applicant_name' => $applicantResident ? $applicantResident->first_name . ' ' . $applicantResident->last_name : 'Household Member',
                         'applicant_id' => $clearance->resident_id,
                         'is_current_user' => $applicantResident && $applicantResident->user && $applicantResident->user->id === Auth::id(),
-                        'privileges' => $applicantResident ? $this->getResidentPrivileges($applicantResident) : [],
-                        'has_privileges' => $applicantResident && $applicantResident->residentPrivileges->filter(fn($rp) => $rp->isActive())->count() > 0,
+                        'privileges' => $activePrivileges,
+                        'has_privileges' => count($activePrivileges) > 0,
                     ];
                 })
                 ->toArray();
@@ -454,7 +507,7 @@ class ResidentDashboardController extends Controller
         }
 
         if ($household) {
-            $household->load(['householdMembers.resident.residentPrivileges.privilege']);
+            $household->load(['householdMembers.resident.residentPrivileges.privilege.discountType']);
             
             $data['household_number'] = $household->household_number;
             $data['zone'] = $household->zone;
@@ -594,7 +647,7 @@ class ResidentDashboardController extends Controller
         $resident = $user->resident;
         
         if (!$resident->relationLoaded('residentPrivileges')) {
-            $resident->load('residentPrivileges.privilege');
+            $resident->load('residentPrivileges.privilege.discountType');
         }
         
         $activePrivileges = $this->getResidentPrivileges($resident);
@@ -632,7 +685,7 @@ class ResidentDashboardController extends Controller
         }
 
         if ($user->household_id) {
-            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege'])->find($user->household_id);
+            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege.discountType'])->find($user->household_id);
             
             if ($household) {
                 $data['household'] = [

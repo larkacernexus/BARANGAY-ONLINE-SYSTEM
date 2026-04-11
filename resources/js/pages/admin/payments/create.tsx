@@ -1,4 +1,4 @@
-// resources/js/components/admin/Payments/Create.tsx
+// resources/js/pages/admin/Payments/Create.tsx
 
 import AppLayout from '@/layouts/admin-app-layout';
 import { usePage } from '@inertiajs/react';
@@ -6,12 +6,11 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 
 // Import child components
 import { ProgressIndicator } from '@/components/admin/payment/ProgressIndicator';
-import { PayerSelectionStep } from '@/components/admin/payment/PayerSelectionStep';
+import { PayerSelectionStepWrapper } from '@/components/admin/payment/PayerSelectionStepWrapper';
 import { AddFeesStep } from '@/components/admin/payment/AddFeesStep';
 import { PaymentDetailsStep } from '@/components/admin/payment/PaymentDetailsStep';
 
 // Import local components
-import Header from '@/components/admin/payment/paymentCreate/components/Header';
 import ProcessingLoader from '@/components/admin/payment/paymentCreate/components/ProcessingLoader';
 import DiscountSelectionModal from '@/components/admin/payment/paymentCreate/components/DiscountSelectionModal';
 import VerificationModal from '@/components/admin/payment/paymentCreate/components/VerificationModal';
@@ -29,32 +28,88 @@ import {
     FeeType,
     PaymentItem,
     DiscountRule
-} from '@/components/admin/payment/paymentCreate/types';
+} from '@/types/admin/payments/payments';
 import { 
     generateORNumber, 
-    parseAmount, 
-    getOutstandingFeeBalance, 
-    getAmountPaid, 
-    getTotalOriginalAmount,
-    calculateMonthsLate, 
-    isValidDate, 
     convertBackendFeeToOutstandingFee,
     getResidentDiscounts,
     checkIfDiscountAllowed,
-    getDiscountPercentageForFeeType 
+    getDiscountPercentageForFeeType,
+    formatCurrency,
+    parseAmount
 } from '@/components/admin/payment/paymentCreate/utils';
 import { useFormSubmission } from '@/components/admin/payment/paymentCreate/hooks/useFormSubmission';
 import { useFeeCalculations } from '@/components/admin/payment/paymentCreate/hooks/useFeeCalculations';
-import { usePayerHandlers } from '@/components/admin/payment/paymentCreate/components/PayerHandlers';
-import { useFeeHandlers } from '@/components/admin/payment/paymentCreate/components/FeeHandlers';
-import { useClearanceHandlers } from '@/components/admin/payment/paymentCreate/components/ClearanceHandlers';
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+const getPhotoUrl = (photoPath: string | null | undefined): string | null => {
+    if (!photoPath) return null;
+    if (photoPath.startsWith('http')) return photoPath;
+    if (photoPath.startsWith('/storage')) return photoPath;
+    return `/storage/${photoPath}`;
+};
+
+const getInitialPayerSource = (pre_filled_data: any): 'residents' | 'households' | 'businesses' | 'clearance' | 'fees' => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasFeeId = urlParams.has('fee_id') || !!pre_filled_data?.fee_id;
+    const hasClearanceId = urlParams.has('clearance_request_id') || !!pre_filled_data?.clearance_request_id;
+    
+    if (hasFeeId) return 'fees';
+    if (hasClearanceId) return 'clearance';
+    if (pre_filled_data?.payer_type === 'business') return 'businesses';
+    
+    return 'residents';
+};
+
+const createInitialFormData = (pre_filled_data: any, clearance_request: any): PaymentFormData => ({
+    payer_type: pre_filled_data?.payer_type || '',
+    payer_id: pre_filled_data?.payer_id || '',
+    payer_name: pre_filled_data?.payer_name || '',
+    contact_number: pre_filled_data?.contact_number || '',
+    address: pre_filled_data?.address || '',
+    household_number: pre_filled_data?.household_number || '',
+    purok: pre_filled_data?.purok || '',
+    photo_path: null,
+    photo_url: null,
+    items: [],
+    payment_date: new Date().toISOString().split('T')[0],
+    period_covered: '',
+    or_number: generateORNumber(),
+    payment_method: 'cash',
+    reference_number: '',
+    subtotal: 0,
+    surcharge: 0,
+    penalty: 0,
+    discount: 0,
+    discount_code: '',
+    discount_id: undefined,
+    discount_type: '',
+    total_amount: 0,
+    amount_paid: 0,
+    purpose: pre_filled_data?.clearance_request_id ? (clearance_request?.purpose || 'Clearance Fee') : '',
+    remarks: '',
+    is_cleared: false,
+    clearance_type: pre_filled_data?.clearance_type || '',
+    clearance_type_id: pre_filled_data?.clearance_type_id || '',
+    clearance_code: pre_filled_data?.clearance_code || '',
+    validity_date: '',
+    collection_type: 'manual',
+    clearance_request_id: pre_filled_data?.clearance_request_id || undefined,
+});
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 
 export default function CreatePayment() {
     const { 
-        residents, 
-        households, 
+        residents = [], 
+        households = [], 
         businesses = [],
-        fees,
+        fees = [],
         feeTypes = [],
         discountRules = [],
         discountTypes = {}, 
@@ -69,56 +124,11 @@ export default function CreatePayment() {
         payerClearanceRequests: initialPayerClearanceRequests = []
     } = usePage<PageProps>().props;
     
-    // ========== DEBUG LOGS ==========
-    console.log('🔍 ========== CREATE COMPONENT MOUNTED ==========');
-    console.log('🔍 Timestamp:', new Date().toISOString());
-    console.log('🔍 Initial props:', {
-        residentsCount: residents?.length || 0,
-        householdsCount: households?.length || 0,
-        businessesCount: businesses?.length || 0,
-        clearanceRequestsCount: clearance_requests?.length || 0,
-        initialPayerClearanceRequestsCount: initialPayerClearanceRequests?.length || 0,
-        pre_filled_data,
-        clearance_request: clearance_request ? 'exists' : null,
-    });
-
-    // Log all clearance requests to see their structure
-    if (clearance_requests && clearance_requests.length > 0) {
-        console.log('📋 ALL CLEARANCE REQUESTS FROM SERVER:');
-        clearance_requests.forEach((cr, index) => {
-            console.log(`  [${index}] ID: ${cr.id}, Resident: ${cr.resident_id}, Payer: ${cr.payer_type}:${cr.payer_id}, Ref: ${cr.reference_number}, Amount: ${cr.fee_amount}, Status: ${cr.status}`);
-        });
-    } else {
-        console.log('❌ No clearance requests from server');
-    }
-    
     // ========== STATE DECLARATIONS ==========
     const [step, setStep] = useState<number>(1);
     const [selectedPayer, setSelectedPayer] = useState<Resident | Household | Business | ClearanceRequest | BackendFee | OutstandingFee | null>(null);
-    
-    // State for clearance requests of the selected payer
-    const [payerClearanceRequests, setPayerClearanceRequests] = useState<ClearanceRequest[]>(
-        initialPayerClearanceRequests || []
-    );
-    
-    const [payerSource, setPayerSource] = useState<'residents' | 'households' | 'businesses' | 'clearance' | 'fees'>(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const hasFeeId = urlParams.has('fee_id') || !!pre_filled_data?.fee_id;
-        const hasClearanceId = urlParams.has('clearance_request_id') || !!pre_filled_data?.clearance_request_id;
-        
-        if (hasFeeId) {
-            return 'fees';
-        }
-        if (hasClearanceId) {
-            return 'clearance';
-        }
-        
-        if (pre_filled_data?.payer_type === 'business') {
-            return 'businesses';
-        }
-        
-        return 'residents';
-    });
+    const [payerClearanceRequests, setPayerClearanceRequests] = useState<ClearanceRequest[]>(initialPayerClearanceRequests || []);
+    const [payerSource, setPayerSource] = useState<'residents' | 'households' | 'businesses' | 'clearance' | 'fees'>(() => getInitialPayerSource(pre_filled_data));
     
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [selectedOutstandingFee, setSelectedOutstandingFee] = useState<OutstandingFee | null>(null);
@@ -136,98 +146,41 @@ export default function CreatePayment() {
     const [isProcessingFee, setIsProcessingFee] = useState<boolean>(false);
     const [payerOutstandingFees, setPayerOutstandingFees] = useState<OutstandingFee[]>([]);
     const [isLoadingClearances, setIsLoadingClearances] = useState<boolean>(false);
-    const [functionCallCount, setFunctionCallCount] = useState<number>(0);
     
+    // Refs for cleanup and preventing duplicate operations
     const hasInitializedRef = useRef(false);
     const feePaymentProcessedRef = useRef(false);
     const processedClearanceIdsRef = useRef<Set<number>>(new Set());
-    const handleClearanceRequestDirectlyRef = useRef<Function | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
     
-    // Track component mounts and updates
-    useEffect(() => {
-        console.log('🔄 Component mounted/updated - step:', step);
-    }, [step]);
-    
-    useEffect(() => {
-        console.log('📋 initialPayerClearanceRequests changed:', {
-            count: initialPayerClearanceRequests?.length,
-            data: initialPayerClearanceRequests
-        });
-        if (initialPayerClearanceRequests && initialPayerClearanceRequests.length > 0) {
-            setPayerClearanceRequests(initialPayerClearanceRequests);
-        }
-    }, [initialPayerClearanceRequests]);
-    
-    // ========== MEMOIZED VALUES ==========
-    const outstandingFeesForTab = useMemo(() => {
-        if (!fees || !Array.isArray(fees)) return [];
-        return fees.map(fee => convertBackendFeeToOutstandingFee(fee as BackendFee, feeTypes));
-    }, [fees, feeTypes]);
-
     // ========== INITIAL FORM DATA ==========
-    const initialFormData: PaymentFormData = {
-        payer_type: pre_filled_data?.payer_type || '',
-        payer_id: pre_filled_data?.payer_id || '',
-        payer_name: pre_filled_data?.payer_name || '',
-        contact_number: pre_filled_data?.contact_number || '',
-        address: pre_filled_data?.address || '',
-        household_number: pre_filled_data?.household_number || '',
-        purok: pre_filled_data?.purok || '',
-        
-        items: [],
-        
-        payment_date: new Date().toISOString().split('T')[0],
-        period_covered: '',
-        or_number: generateORNumber(),
-        payment_method: 'cash',
-        reference_number: '',
-        
-        subtotal: 0,
-        surcharge: 0,
-        penalty: 0,
-        discount: 0,
-        discount_code: '',
-        discount_id: undefined,
-        discount_type: '',
-        total_amount: 0,
-        
-        purpose: pre_filled_data?.clearance_request_id ? (clearance_request?.purpose || 'Clearance Fee') : '',
-        remarks: '',
-        is_cleared: false,
-        clearance_type: pre_filled_data?.clearance_type || '',
-        clearance_type_id: pre_filled_data?.clearance_type_id || '',
-        clearance_code: pre_filled_data?.clearance_code || '',
-        validity_date: '',
-        collection_type: 'manual',
-        clearance_request_id: pre_filled_data?.clearance_request_id || undefined,
-    };
-
+    const initialFormData = useMemo(() => createInitialFormData(pre_filled_data, clearance_request), [pre_filled_data, clearance_request]);
+    
     // ========== HOOKS ==========
     const { data, setData, submit, processing, submissionErrors } = useFormSubmission(initialFormData, false, resetForm);
-    
-    console.log('🔍 Form data:', data);
     
     // ========== COMPUTED VALUES ==========
     const selectedResidentFromData = useMemo(() => {
         if (!data.payer_type || !data.payer_id) return null;
-        if (data.payer_type === 'resident' && residents) {
-            return residents.find((r: any) => r.id == data.payer_id) || null;
+        if (data.payer_type === 'resident' && residents?.length) {
+            return residents.find((r: Resident) => r.id == data.payer_id) || null;
         }
         return null;
     }, [data.payer_type, data.payer_id, residents]);
 
     const selectedHouseholdFromData = useMemo(() => {
         if (!data.payer_type || !data.payer_id) return null;
-        if (data.payer_type === 'household' && households) {
-            return households.find((h: any) => h.id == data.payer_id) || null;
+        if (data.payer_type === 'household' && households?.length) {
+            return households.find((h: Household) => h.id == data.payer_id) || null;
         }
         return null;
     }, [data.payer_type, data.payer_id, households]);
 
     const selectedBusinessFromData = useMemo(() => {
         if (!data.payer_type || !data.payer_id) return null;
-        if (data.payer_type === 'business' && businesses) {
-            return businesses.find((b: any) => b.id == data.payer_id) || null;
+        if (data.payer_type === 'business' && businesses?.length) {
+            return businesses.find((b: Business) => b.id == data.payer_id) || null;
         }
         return null;
     }, [data.payer_type, data.payer_id, businesses]);
@@ -246,69 +199,81 @@ export default function CreatePayment() {
 
     const finalSelectedResident = useMemo(() => {
         if (selectedResidentFromData) return selectedResidentFromData;
-        if (isSelectedPayerResident && selectedPayer) return selectedPayer as any;
-        if (data.payer_type === 'resident' && data.payer_id && residents) {
-            return residents.find((r: any) => r.id == data.payer_id) || null;
+        if (isSelectedPayerResident && selectedPayer) return selectedPayer as Resident;
+        if (data.payer_type === 'resident' && data.payer_id && residents?.length) {
+            return residents.find((r: Resident) => r.id == data.payer_id) || null;
         }
         return null;
     }, [selectedResidentFromData, isSelectedPayerResident, selectedPayer, data.payer_type, data.payer_id, residents]);
 
     const finalSelectedHousehold = useMemo(() => {
         if (selectedHouseholdFromData) return selectedHouseholdFromData;
-        if (isSelectedPayerHousehold && selectedPayer) return selectedPayer as any;
-        if (data.payer_type === 'household' && data.payer_id && households) {
-            return households.find((h: any) => h.id == data.payer_id) || null;
+        if (isSelectedPayerHousehold && selectedPayer) return selectedPayer as Household;
+        if (data.payer_type === 'household' && data.payer_id && households?.length) {
+            return households.find((h: Household) => h.id == data.payer_id) || null;
         }
         return null;
     }, [selectedHouseholdFromData, isSelectedPayerHousehold, selectedPayer, data.payer_type, data.payer_id, households]);
 
     const finalSelectedBusiness = useMemo(() => {
         if (selectedBusinessFromData) return selectedBusinessFromData;
-        if (isSelectedPayerBusiness && selectedPayer) return selectedPayer as any;
-        if (data.payer_type === 'business' && data.payer_id && businesses) {
-            return businesses.find((b: any) => b.id == data.payer_id) || null;
+        if (isSelectedPayerBusiness && selectedPayer) return selectedPayer as Business;
+        if (data.payer_type === 'business' && data.payer_id && businesses?.length) {
+            return businesses.find((b: Business) => b.id == data.payer_id) || null;
         }
         return null;
     }, [selectedBusinessFromData, isSelectedPayerBusiness, selectedPayer, data.payer_type, data.payer_id, businesses]);
 
+    // ✅ FIX: Computed values for current payer (to pass to VerificationModal)
+    const currentPayerId = useMemo(() => {
+        if (data.payer_id) return data.payer_id;
+        if (finalSelectedResident) return finalSelectedResident.id;
+        if (finalSelectedHousehold) return finalSelectedHousehold.id;
+        if (finalSelectedBusiness) return finalSelectedBusiness.id;
+        return null;
+    }, [data.payer_id, finalSelectedResident, finalSelectedHousehold, finalSelectedBusiness]);
+
+    const currentPayerType = useMemo(() => {
+        if (data.payer_type) return data.payer_type;
+        if (finalSelectedResident) return 'resident';
+        if (finalSelectedHousehold) return 'household';
+        if (finalSelectedBusiness) return 'business';
+        return '';
+    }, [data.payer_type, finalSelectedResident, finalSelectedHousehold, finalSelectedBusiness]);
+
+    // ========== MEMOIZED VALUES ==========
+    const convertFee = useCallback((fee: BackendFee): OutstandingFee => {
+        return convertBackendFeeToOutstandingFee(fee, feeTypes);
+    }, [feeTypes]);
+
+    const outstandingFeesForTab = useMemo(() => {
+        console.log('🔍 Converting fees to OutstandingFee format...');
+        console.log('📊 Raw fees from backend:', fees);
+        console.log('📊 Raw fees count:', fees?.length);
+        
+        if (!fees?.length) {
+            console.log('❌ No fees received from backend!');
+            return [];
+        }
+        
+        const converted = fees.map(convertFee);
+        console.log('✅ Converted fees count:', converted.length);
+        console.log('📊 Converted fees by status:', converted.reduce((acc: any, fee) => {
+            acc[fee.status] = (acc[fee.status] || 0) + 1;
+            return acc;
+        }, {}));
+        console.log('📊 Sample converted fee:', converted[0]);
+        
+        return converted;
+    }, [fees, convertFee]);
+
     const { updateItems, clearItems, applyDiscount, removeDiscount } = useFeeCalculations({
         setData,
         data,
-        discountRules
+        discountRules: discountRules || []
     });
 
-    const paymentItems = useMemo(() => {
-        return data.items || [];
-    }, [data.items]);
-
-    // ========== LOGGING EFFECTS ==========
-    useEffect(() => {
-        console.log('📊 Payment items updated:', {
-            count: data.items?.length || 0,
-            items: data.items?.map(item => ({
-                id: item.id,
-                fee_name: item.fee_name,
-                has_clearance_id: !!item.metadata?.clearance_request_id,
-                clearance_id: item.metadata?.clearance_request_id,
-                category: item.category
-            })),
-            total: data.total_amount,
-            discount: data.discount,
-            discountCode: data.discount_code
-        });
-    }, [data.items, data.discount, data.discount_code]);
-
-    useEffect(() => {
-        console.log('📋 Payer clearance requests updated:', {
-            count: payerClearanceRequests.length,
-            requests: payerClearanceRequests.map(cr => ({
-                id: cr.id,
-                reference: cr.reference_number,
-                amount: cr.fee_amount,
-                status: cr.status
-            }))
-        });
-    }, [payerClearanceRequests]);
+    const paymentItems = useMemo(() => data.items || [], [data.items]);
 
     const isClearancePayment = useMemo(() => {
         if (pre_filled_data?.fee_id) return false;
@@ -316,80 +281,15 @@ export default function CreatePayment() {
         if (!!data.clearance_request_id || !!pre_filled_data?.clearance_request_id) return true;
         if (payerSource === 'clearance') return true;
         if (clearance_request) return true;
-        if (paymentItems.some(item => item.metadata?.is_clearance_fee === true || item.metadata?.clearance_request_id)) return true;
+        if (paymentItems.some((item: PaymentItem) => item.metadata?.is_clearance_fee === true || item.metadata?.clearance_request_id)) return true;
         return false;
     }, [pre_filled_data, payerSource, data.clearance_request_id, clearance_request, paymentItems]);
-
-    // ========== DISCOUNT HANDLERS ==========
-    const handleDiscountCodeChange = (code: string) => {
-        if (code === 'no_discount' || !code) {
-            removeDiscount();
-            setSelectedDiscountCode('');
-            setPendingDiscountCode('');
-            return;
-        }
-        
-        const selectedRule = discountRules.find(r => r.code === code);
-        
-        if (!selectedRule) {
-            alert(`Discount rule "${code}" not found. Please refresh the page.`);
-            return;
-        }
-        
-        const totalBaseAmount = data.subtotal + data.surcharge + data.penalty;
-        if (selectedRule.minimum_purchase_amount && totalBaseAmount < selectedRule.minimum_purchase_amount) {
-            alert(`This discount requires a minimum purchase of ₱${selectedRule.minimum_purchase_amount.toFixed(2)}`);
-            return;
-        }
-        
-        if (selectedRule.requires_verification) {
-            setPendingDiscountCode(code);
-            setVerificationIdNumber('');
-            setVerificationRemarks('');
-            setShowVerificationModal(true);
-            return;
-        }
-        
-        applyDiscount(code);
-        setSelectedDiscountCode(code);
-    };
-
-    const handleVerificationSubmit = () => {
-        if (!verificationIdNumber) {
-            alert('Please enter ID number for verification');
-            return;
-        }
-        
-        applyDiscount(pendingDiscountCode);
-        setSelectedDiscountCode(pendingDiscountCode);
-        
-        if (typeof setData === 'function') {
-            if (setData.length === 2) {
-                setData('verification_id_number', verificationIdNumber);
-                setData('verification_remarks', verificationRemarks);
-            } else {
-                setData((prev: PaymentFormData) => ({
-                    ...prev,
-                    verification_id_number: verificationIdNumber,
-                    verification_remarks: verificationRemarks
-                }));
-            }
-        }
-        
-        setShowVerificationModal(false);
-        setPendingDiscountCode('');
-        setVerificationIdNumber('');
-        setVerificationRemarks('');
-    };
-
-    const formatCurrency = (amount: number): string => {
-        return `₱${amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
-    };
-
-    const checkDiscountEligibilityForFees = useCallback((fees: OutstandingFee[], resident: Resident): OutstandingFee[] => {
+    
+    // ========== HELPER FUNCTIONS ==========
+    const checkDiscountEligibilityForFees = useCallback((feesList: OutstandingFee[], resident: Resident): OutstandingFee[] => {
         const residentDiscounts = getResidentDiscounts(resident);
         
-        return fees.map(fee => {
+        return feesList.map(fee => {
             const applicableDiscounts: any[] = [];
             
             if (residentDiscounts.length > 0) {
@@ -417,29 +317,27 @@ export default function CreatePayment() {
         });
     }, []);
 
-    // ========== FETCH CLEARANCE REQUESTS WITH DEBUGGING ==========
+    // ========== CLEANUP FUNCTION ==========
+    const cleanup = useCallback(() => {
+        timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+        timeoutsRef.current = [];
+        
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+    }, []);
+
+    // ========== FETCH CLEARANCE REQUESTS ==========
     const fetchClearanceRequestsForPayer = useCallback(async (payerType: string, payerId: string | number) => {
-        const callCount = functionCallCount + 1;
-        setFunctionCallCount(callCount);
+        if (!payerId || !payerType) return;
         
-        console.log('🔍 ========== FETCH_CLEARANCE_REQUESTS_FOR_PAYER CALL #' + callCount + ' ==========');
-        console.log('📋 Call stack:', new Error().stack);
-        console.log('📋 Parameters:', { 
-            payerType, 
-            payerId, 
-            payerIdType: typeof payerId,
-            timestamp: new Date().toISOString()
-        });
-        
-        if (!payerId || !payerType) {
-            console.log('❌ Invalid parameters, returning early');
-            return;
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
         }
         
-        console.log('📋 Available clearance_requests from props:', {
-            count: clearance_requests?.length || 0,
-            type: Array.isArray(clearance_requests) ? 'array' : typeof clearance_requests
-        });
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
         
         setIsLoadingClearances(true);
         
@@ -453,63 +351,33 @@ export default function CreatePayment() {
                 normalizedPayerType = 'business';
             }
             
-            console.log('📋 Normalized payer type:', normalizedPayerType);
-            
             let matchingClearances: ClearanceRequest[] = [];
             
             if (normalizedPayerType === 'resident') {
-                console.log('🔍 Checking for resident clearance requests with ID:', payerId);
-                
                 matchingClearances = clearance_requests.filter((cr: ClearanceRequest) => {
                     const matchesPayer = cr.payer_type === 'resident' && cr.payer_id == payerId;
                     const matchesResidentId = cr.resident_id == payerId;
                     const isPayable = cr.can_be_paid !== false && !cr.already_paid;
-                    const hasValidAmount = parseFloat(String(cr.fee_amount)) > 0;
+                    const hasValidAmount = parseAmount(cr.fee_amount) > 0;
                     
-                    const matches = (matchesPayer || matchesResidentId) && isPayable && hasValidAmount;
-                    
-                    if (matches) {
-                        console.log(`✅ Resident match found:`, {
-                            id: cr.id,
-                            matchesPayer,
-                            matchesResidentId,
-                            isPayable,
-                            hasValidAmount
-                        });
-                    }
-                    
-                    return matches;
+                    return (matchesPayer || matchesResidentId) && isPayable && hasValidAmount;
                 });
             } else if (normalizedPayerType === 'household') {
-                const household = households.find((h: any) => h.id == payerId);
+                const household = households.find((h: Household) => h.id == payerId);
                 
-                if (household && household.members) {
+                if (household?.members) {
                     const residentIds = household.members
                         .map((m: any) => m.resident_id)
                         .filter(Boolean);
-                    
-                    console.log('📋 Resident IDs in household:', residentIds);
                     
                     if (residentIds.length > 0) {
                         matchingClearances = clearance_requests.filter((cr: ClearanceRequest) => {
                             const matchesPayer = cr.payer_type === 'resident' && residentIds.some(id => id == cr.payer_id);
                             const matchesResidentId = residentIds.some(id => id == cr.resident_id);
                             const isPayable = cr.can_be_paid !== false && !cr.already_paid;
-                            const hasValidAmount = parseFloat(String(cr.fee_amount)) > 0;
+                            const hasValidAmount = parseAmount(cr.fee_amount) > 0;
                             
-                            const matches = (matchesPayer || matchesResidentId) && isPayable && hasValidAmount;
-                            
-                            if (matches) {
-                                console.log(`✅ Household member match found:`, {
-                                    id: cr.id,
-                                    matchesPayer,
-                                    matchesResidentId,
-                                    isPayable,
-                                    hasValidAmount
-                                });
-                            }
-                            
-                            return matches;
+                            return (matchesPayer || matchesResidentId) && isPayable && hasValidAmount;
                         });
                     }
                 }
@@ -517,7 +385,7 @@ export default function CreatePayment() {
                 const businessMatches = clearance_requests.filter((cr: ClearanceRequest) => {
                     const matchesPayer = cr.payer_type === 'business' && cr.payer_id == payerId;
                     const isPayable = cr.can_be_paid !== false && !cr.already_paid;
-                    const hasValidAmount = parseFloat(String(cr.fee_amount)) > 0;
+                    const hasValidAmount = parseAmount(cr.fee_amount) > 0;
                     
                     return matchesPayer && isPayable && hasValidAmount;
                 });
@@ -525,14 +393,14 @@ export default function CreatePayment() {
                 if (businessMatches.length > 0) {
                     matchingClearances = businessMatches;
                 } else {
-                    const business = businesses.find((b: any) => b.id == payerId);
+                    const business = businesses.find((b: Business) => b.id == payerId);
                     
-                    if (business && business.owner_id) {
+                    if (business?.owner_id) {
                         matchingClearances = clearance_requests.filter((cr: ClearanceRequest) => {
                             const matchesPayer = cr.payer_type === 'resident' && cr.payer_id == business.owner_id;
                             const matchesResidentId = cr.resident_id == business.owner_id;
                             const isPayable = cr.can_be_paid !== false && !cr.already_paid;
-                            const hasValidAmount = parseFloat(String(cr.fee_amount)) > 0;
+                            const hasValidAmount = parseAmount(cr.fee_amount) > 0;
                             
                             return (matchesPayer || matchesResidentId) && isPayable && hasValidAmount;
                         });
@@ -540,396 +408,457 @@ export default function CreatePayment() {
                 }
             }
             
-            console.log(`✅ Found ${matchingClearances.length} clearance requests:`, 
-                matchingClearances.map(cr => ({
-                    id: cr.id,
-                    reference: cr.reference_number,
-                    amount: cr.fee_amount
-                }))
-            );
+            if (abortController.signal.aborted) return;
             
             setPayerClearanceRequests(matchingClearances);
             
         } catch (error) {
-            console.error('❌ Error fetching clearance requests:', error);
-            setPayerClearanceRequests([]);
+            if (error instanceof Error && error.name !== 'AbortError') {
+                console.error('Error fetching clearance requests:', error);
+                setPayerClearanceRequests([]);
+            }
         } finally {
-            setIsLoadingClearances(false);
-            console.log('🔍 ========== FETCH_CLEARANCE_REQUESTS_FOR_PAYER END ==========');
+            if (abortController === abortControllerRef.current) {
+                setIsLoadingClearances(false);
+                abortControllerRef.current = null;
+            }
         }
-    }, [clearance_requests, households, businesses, functionCallCount]);
+    }, [clearance_requests, households, businesses]);
 
-    // ========== FIXED: Handle payer selection ==========
-    const handlePayerSelected = useCallback((payer: any, type: string) => {
-        console.log('👤 ========== PAYER SELECTED ==========');
-        console.log('👤 Timestamp:', new Date().toISOString());
-        console.log('👤 Payer:', { 
-            id: payer.id, 
-            idType: typeof payer.id,
-            name: payer.name, 
-            type 
-        });
+    // ========== HANDLE PAYER SELECTION ==========
+    const handlePayerSelected = useCallback((payer: Resident | Household | Business, type: string) => {
+        console.log('🎯 ========== HANDLE PAYER SELECTED ==========');
+        console.log('📊 Payer type:', type);
+        console.log('📊 Payer:', payer);
+        console.log('📊 Payer ID:', payer.id);
         
-        setSelectedPayer(payer);
+        let photoPath = null;
+        let photoUrl = null;
         
         if (type === 'resident') {
-            console.log('👤 Setting resident data for ID:', payer.id);
-            setData((prev: PaymentFormData) => ({
-                ...prev,
-                payer_type: 'resident',
-                payer_id: payer.id,
-                payer_name: payer.name,
-                contact_number: payer.contact_number || '',
-                address: payer.address || '',
-                household_number: payer.household_number || '',
-                purok: payer.purok || '',
-            }));
-            
-            const residentFees = outstandingFeesForTab.filter(f => 
-                f.payer_type === 'App\\Models\\Resident' && 
-                f.payer_id == payer.id &&
-                parseFloat(f.balance) > 0
-            );
-            console.log('👤 Resident fees found:', residentFees.length);
-            setPayerOutstandingFees(residentFees);
-            
-            // ALWAYS fetch clearance requests when a resident is selected
-            console.log('👤 FETCHING clearance requests for resident:', payer.id);
-            fetchClearanceRequestsForPayer('resident', payer.id);
-            
-        } else if (type === 'household') {
-            console.log('👤 Setting household data for ID:', payer.id);
-            setData((prev: PaymentFormData) => ({
-                ...prev,
-                payer_type: 'household',
-                payer_id: payer.id,
-                payer_name: payer.head_name || `Household ${payer.household_number}`,
-                contact_number: payer.contact_number || '',
-                address: payer.address || '',
-                household_number: payer.household_number || '',
-                purok: payer.purok || '',
-            }));
-            
-            const householdFees = outstandingFeesForTab.filter(f => 
-                f.payer_type === 'App\\Models\\Household' && 
-                f.payer_id == payer.id &&
-                parseFloat(f.balance) > 0
-            );
-            console.log('👤 Household fees found:', householdFees.length);
-            setPayerOutstandingFees(householdFees);
-            
-            console.log('👤 FETCHING clearance requests for household:', payer.id);
-            fetchClearanceRequestsForPayer('household', payer.id);
-            
-        } else if (type === 'business') {
-            console.log('👤 Setting business data for ID:', payer.id);
-            setData((prev: PaymentFormData) => ({
-                ...prev,
-                payer_type: 'business',
-                payer_id: payer.id,
-                payer_name: payer.business_name,
-                contact_number: payer.contact_number || '',
-                address: payer.address || '',
-                household_number: '',
-                purok: payer.purok || '',
-            }));
-            
-            const businessFees = outstandingFeesForTab.filter(f => 
-                f.payer_type === 'App\\Models\\Business' && 
-                f.payer_id == payer.id &&
-                parseFloat(f.balance) > 0
-            );
-            console.log('👤 Business fees found:', businessFees.length);
-            setPayerOutstandingFees(businessFees);
-            
-            console.log('👤 FETCHING clearance requests for business:', payer.id);
-            fetchClearanceRequestsForPayer('business', payer.id);
+            const resident = payer as Resident;
+            photoPath = resident.photo_path || null;
+            photoUrl = getPhotoUrl(resident.photo_path);
         }
         
-        console.log('👤 Moving to step 2...');
-        setTimeout(() => setStep(2), 100);
-        
-    }, [setData, outstandingFeesForTab, fetchClearanceRequestsForPayer]);
-
-    // ========== INITIALIZE HANDLERS ==========
-    const payerHandlers = usePayerHandlers({
-        data,
-        setData,
-        setSelectedPayer,
-        setPayerSource,
-        setPayerOutstandingFees,
-        setPayerClearanceRequests,
-        outstandingFeesForTab,
-        clearanceTypes,
-        clearanceTypesDetails,
-        clearance_requests: clearance_requests || [],
-        clearance_request,
-        checkDiscountEligibilityForFees,
-        fetchClearanceRequestsForPayer
-    });
-
-    const feeHandlers = useFeeHandlers({
-        data,
-        setData,
-        updateItems,
-        paymentItems,
-        userModifiedPurpose,
-        setUserModifiedPurpose,
-        feeTypes,
-        setSelectedOutstandingFee,
-        setShowDiscountSelection,
-        setShowLateSettings,
-        setIsLatePayment,
-        setMonthsLate,
-        setSelectedDiscount,
-        onDiscountApplied: (discountedAmount) => {
-            console.log('💰 Discount applied with amount:', discountedAmount);
-            // Force update the amount paid field
-            setTimeout(() => {
-                const amountInput = document.querySelector('input[placeholder="0.00"], input.pl-8') as HTMLInputElement;
-                if (amountInput) {
-                    amountInput.value = discountedAmount.toFixed(2);
-                    amountInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    amountInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }, 100);
-        }
-    });
-
-    const clearanceHandlers = useClearanceHandlers({
-        data,
-        setData,
-        setSelectedPayer,
-        setPayerSource,
-        setPayerOutstandingFees,
-        setPayerClearanceRequests,
-        outstandingFeesForTab,
-        clearanceTypes,
-        clearanceTypesDetails,
-        checkDiscountEligibilityForFees,
-        fetchClearanceRequestsForPayer
-    });
-
-    useEffect(() => {
-        handleClearanceRequestDirectlyRef.current = clearanceHandlers.handleClearanceRequestDirectly;
-    }, [clearanceHandlers.handleClearanceRequestDirectly]);
-
-    // ========== REF HANDLERS ==========
-    const handleResidentPayerWithFeeRef = useRef<Function | null>(null);
-    const handleOutstandingFeePayerRef = useRef<Function | null>(null);
-    const handleBusinessPayerRef = useRef<Function | null>(null);
-
-    useEffect(() => {
-        handleResidentPayerWithFeeRef.current = async (resident: Resident, fee: OutstandingFee) => {
-            console.log('👤 REF: handleResidentPayerWithFee called', { resident, fee });
-            
-            const residentOutstandingFees = fees
-                .filter((f: any) => 
-                    f.payer_type === 'resident' && 
-                    f.payer_id == resident.id &&
-                    f.balance > 0
-                )
-                .map((f: any) => convertBackendFeeToOutstandingFee(f as BackendFee, feeTypes));
-            
-            const feesWithDiscountInfo = checkDiscountEligibilityForFees(residentOutstandingFees, resident);
-            setPayerOutstandingFees(feesWithDiscountInfo);
-            
-            // Always fetch clearance requests
-            console.log('📋 (Ref) FETCHING clearance requests for resident:', resident.id);
-            await fetchClearanceRequestsForPayer('resident', resident.id);
-            
-            const updatedData = {
-                ...data,
-                payer_type: 'resident',
-                payer_id: resident.id,
-                payer_name: resident.name,
-                contact_number: resident.contact_number || '',
-                address: resident.address || '',
-                household_number: resident.household_number || '',
-                purok: resident.purok || '',
-                items: [],
-                subtotal: 0,
-                total_amount: 0,
-                clearance_request_id: undefined,
-                clearance_type: '',
-                clearance_type_id: '',
-                clearance_code: '',
-                is_cleared: false,
-            };
-            
-            setData(updatedData);
-            setSelectedPayer(resident);
-            setPayerSource('residents');
-            
-            const feeWithDiscount = feesWithDiscountInfo.find(f => f.id === fee.id) || fee;
-            
-            if (feeWithDiscount.applicableDiscounts && feeWithDiscount.applicableDiscounts.length > 0) {
-                setSelectedOutstandingFee(feeWithDiscount);
-                setShowDiscountSelection(true);
-            } else {
-                feeHandlers.handleAddOutstandingFeeDirectly(feeWithDiscount);
-            }
-        };
-
-        handleOutstandingFeePayerRef.current = (outstandingFee: OutstandingFee) => {
-            payerHandlers.handleOutstandingFeePayer(outstandingFee);
-        };
-
-        handleBusinessPayerRef.current = (business: Business, fee: OutstandingFee) => {
-            console.log('👤 REF: handleBusinessPayer called', { business, fee });
-            
-            const businessOutstandingFees = outstandingFeesForTab.filter(f => 
-                f.payer_type === 'business' && 
-                f.payer_id == business.id &&
-                parseFloat(f.balance) > 0
-            );
-            
-            setPayerOutstandingFees(businessOutstandingFees);
-            
-            console.log('📋 (Ref) FETCHING clearance requests for business:', business.id);
-            fetchClearanceRequestsForPayer('business', business.id);
-            
-            const updatedData = {
-                ...data,
-                payer_type: 'business',
-                payer_id: business.id,
-                payer_name: business.business_name,
-                contact_number: business.contact_number || '',
-                address: business.address || '',
-                purok: business.purok || '',
-                household_number: '',
-                items: [],
-                subtotal: 0,
-                total_amount: 0,
-                clearance_request_id: undefined,
-            };
-            
-            setData(updatedData);
-            setSelectedPayer(business);
-            setPayerSource('businesses');
-            
-            feeHandlers.handleAddOutstandingFeeDirectly(fee);
-        };
-    }, [data, setData, fees, feeTypes, feeHandlers, checkDiscountEligibilityForFees, payerHandlers, outstandingFeesForTab, fetchClearanceRequestsForPayer]);
-
-    const handleResidentPayerWithFee = useCallback(async (resident: Resident, fee: OutstandingFee) => {
-        if (handleResidentPayerWithFeeRef.current) {
-            return handleResidentPayerWithFeeRef.current(resident, fee);
-        }
-    }, []);
-
-    const handleOutstandingFeePayer = useCallback((outstandingFee: OutstandingFee) => {
-        if (handleOutstandingFeePayerRef.current) {
-            return handleOutstandingFeePayerRef.current(outstandingFee);
-        }
-    }, []);
-
-    const handleBusinessPayerWithFee = useCallback((business: Business, fee: OutstandingFee) => {
-        if (handleBusinessPayerRef.current) {
-            return handleBusinessPayerRef.current(business, fee);
-        }
-    }, []);
-
-    const handleFeeBasedPayment = useCallback(async () => {
-        if (!pre_filled_data?.fee_id) return;
-        
-        console.log('💰 handleFeeBasedPayment called', { pre_filled_data });
-        
-        setPayerSource('fees');
-        
-        setData((prev: PaymentFormData) => ({
-            ...prev,
+        const updates = {
+            payer_type: type === 'resident' ? 'resident' : type === 'household' ? 'household' : 'business',
+            payer_id: payer.id,
+            payer_name: type === 'business' ? (payer as Business).business_name : (payer as Resident).name || `Household ${(payer as Household).household_number}`,
+            contact_number: payer.contact_number || '',
+            address: payer.address || '',
+            household_number: type === 'household' ? (payer as Household).household_number : '',
+            purok: payer.purok || '',
+            photo_path: photoPath,
+            photo_url: photoUrl,
+            items: [],
+            subtotal: 0,
+            total_amount: 0,
             clearance_request_id: undefined,
             clearance_type: '',
             clearance_type_id: '',
             clearance_code: '',
             is_cleared: false,
-            validity_date: '',
-        }));
+        };
         
-        setIsProcessingFee(true);
+        setData((prev: any) => ({ ...prev, ...updates }));
+        setSelectedPayer(payer);
         
-        if (selected_fee_details) {
-            // Fee handling code...
-        } else {
-            const feeToPay = outstandingFeesForTab.find(fee => 
-                fee.id == pre_filled_data.fee_id
-            );
+        let feesList: OutstandingFee[] = [];
+        const targetId = payer.id;
+        
+        console.log('📊 Total outstandingFeesForTab count:', outstandingFeesForTab.length);
+        
+        let expectedPayerTypes: string[] = [];
+        if (type === 'resident') {
+            expectedPayerTypes = ['App\\Models\\Resident', 'App\Models\Resident', 'resident'];
+        } else if (type === 'household') {
+            expectedPayerTypes = ['App\\Models\\Household', 'App\Models\Household', 'household'];
+        } else if (type === 'business') {
+            expectedPayerTypes = ['App\\Models\\Business', 'App\Models\Business', 'business'];
+        }
+        
+        feesList = outstandingFeesForTab.filter(f => {
+            const payerIdMatches = f.payer_id == targetId;
+            const payerTypeMatches = expectedPayerTypes.some(pt => f.payer_type === pt);
+            const hasBalance = parseAmount(f.balance) > 0;
+            const isPending = f.status === 'pending' || f.status === 'pending_payment';
+            const isNotPaid = f.status !== 'paid';
             
-            if (!feeToPay) {
-                setIsProcessingFee(false);
+            return payerIdMatches && payerTypeMatches && isNotPaid && (hasBalance || isPending);
+        });
+        
+        console.log(`✅ Found ${feesList.length} fees for ${type} ${targetId}`);
+        
+        setPayerOutstandingFees(feesList);
+        fetchClearanceRequestsForPayer(type, targetId);
+        setStep(2);
+    }, [setData, outstandingFeesForTab, fetchClearanceRequestsForPayer]);
+
+    // ========== DEBUG: Monitor payerOutstandingFees changes ==========
+    useEffect(() => {
+        console.log('🔍 Create.tsx - payerOutstandingFees updated:', {
+            count: payerOutstandingFees.length,
+        });
+    }, [payerOutstandingFees]);
+
+    // ========== DEBUG: Check props on mount ==========
+    useEffect(() => {
+        console.log('🔍 ========== CREATE.TSX MOUNT DEBUG ==========');
+        console.log('📊 fees prop from backend:', fees);
+        console.log('📊 fees count:', fees?.length);
+        console.log('📊 pre_filled_data:', pre_filled_data);
+    }, []);
+
+    // ========== HANDLE ADD CLEARANCE REQUEST ==========
+    const handleAddClearanceRequest = useCallback((clearanceRequest: ClearanceRequest) => {
+        const isAlreadyAdded = data.items?.some(
+            (item: PaymentItem) => item.metadata?.clearance_request_id === clearanceRequest.id
+        );
+        
+        if (isAlreadyAdded) {
+            alert('This clearance request is already added to the payment.');
+            return;
+        }
+        
+        const clearanceTypeName = clearanceRequest.clearance_type?.name || clearanceRequest.purpose || 'Barangay Clearance';
+        const feeAmount = parseAmount(clearanceRequest.fee_amount);
+        
+        const newItem: PaymentItem = {
+            id: Date.now() + Math.random(),
+            fee_id: `clearance-${clearanceRequest.id}`,
+            fee_name: clearanceTypeName,
+            fee_code: clearanceRequest.reference_number || `CLR-${clearanceRequest.id}`,
+            base_amount: feeAmount,
+            surcharge: 0,
+            penalty: 0,
+            discount: 0,
+            total_amount: feeAmount,
+            category: 'clearance',
+            period_covered: '',
+            months_late: 0,
+            metadata: {
+                is_clearance_fee: true,
+                clearance_request_id: clearanceRequest.id,
+                clearance_type_id: clearanceRequest.clearance_type_id,
+                clearance_type_code: clearanceRequest.clearance_type?.code,
+                clearance_type_name: clearanceTypeName,
+                reference_number: clearanceRequest.reference_number,
+                purpose: clearanceRequest.purpose,
+                specific_purpose: clearanceRequest.specific_purpose
+            }
+        };
+        
+        const updatedItems = [...(data.items || []), newItem];
+        const newSubtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
+        const newTotal = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+        
+        const hasExistingClearance = data.items?.some((item: PaymentItem) => item.metadata?.is_clearance_fee);
+        
+        setData((prev: PaymentFormData) => {
+            let primaryClearanceId = prev.clearance_request_id;
+            let primaryClearanceTypeId = prev.clearance_type_id;
+            let primaryClearanceCode = prev.clearance_code;
+            
+            if (!hasExistingClearance) {
+                primaryClearanceId = clearanceRequest.id;
+                primaryClearanceTypeId = clearanceRequest.clearance_type_id;
+                primaryClearanceCode = clearanceRequest.clearance_type?.code || '';
+            }
+            
+            return {
+                ...prev,
+                items: updatedItems,
+                subtotal: parseFloat(newSubtotal.toFixed(2)),
+                total_amount: parseFloat(newTotal.toFixed(2)),
+                clearance_request_id: primaryClearanceId,
+                clearance_type_id: primaryClearanceTypeId,
+                clearance_code: primaryClearanceCode,
+                purpose: !userModifiedPurpose 
+                    ? (updatedItems.length === 1 
+                        ? (clearanceRequest.purpose || clearanceTypeName)
+                        : `${updatedItems.length} items selected`)
+                    : prev.purpose
+            };
+        });
+        
+        setPayerClearanceRequests(prev => prev.filter(cr => cr.id !== clearanceRequest.id));
+        
+    }, [data.items, setData, userModifiedPurpose]);
+
+    // ========== DISCOUNT HANDLERS ==========
+    const handleDiscountCodeChange = useCallback((code: string) => {
+        if (code === 'no_discount' || !code) {
+            removeDiscount();
+            setSelectedDiscountCode('');
+            setPendingDiscountCode('');
+            return;
+        }
+        
+        const selectedRule = discountRules?.find(r => r.code === code);
+        
+        if (!selectedRule) {
+            alert(`Discount rule "${code}" not found. Please refresh the page.`);
+            return;
+        }
+        
+        const totalBaseAmount = data.subtotal + data.surcharge + data.penalty;
+        const minPurchase = selectedRule.minimum_purchase_amount || 0;
+        
+        if (minPurchase > 0 && totalBaseAmount < minPurchase) {
+            alert(`This discount requires a minimum purchase of ${formatCurrency(minPurchase)}`);
+            return;
+        }
+        
+        if (selectedRule.requires_verification) {
+            // ✅ Check if we have payer information
+            if (!currentPayerId) {
+                alert('Please select a payer first before applying this discount.');
                 return;
             }
             
-            if (feeToPay.payer_type === 'resident' && feeToPay.payer_id) {
-                const resident = residents.find(r => r.id == feeToPay.payer_id);
-                if (resident) {
-                    await handleResidentPayerWithFee(resident, feeToPay);
-                } else {
-                    handleOutstandingFeePayer(feeToPay);
+            setPendingDiscountCode(code);
+            setVerificationIdNumber('');
+            setVerificationRemarks('');
+            setShowVerificationModal(true);
+            return;
+        }
+        
+        applyDiscount(code);
+        setSelectedDiscountCode(code);
+    }, [discountRules, data.subtotal, data.surcharge, data.penalty, currentPayerId, applyDiscount, removeDiscount]);
+
+  const handleVerificationSubmit = useCallback((verificationData: {
+    idNumber: string;
+    remarks: string;
+    isValid: boolean;
+    privilegeId?: number;
+    privilegeData?: any;
+    discountTypeId?: number;
+    discountTypeCode?: string;
+    discountPercentage?: number;
+}) => {
+    if (!verificationData.isValid) {
+        alert('Invalid verification. Please try again.');
+        return;
+    }
+    
+    // Apply the discount with the verified data
+    applyDiscount(pendingDiscountCode);
+    setSelectedDiscountCode(pendingDiscountCode);
+    
+    // Store verification data in the form
+    if (typeof setData === 'function') {
+        if (setData.length === 2) {
+            setData('verification_id_number', verificationData.idNumber);
+            setData('verification_remarks', verificationData.remarks);
+            setData('verified_privilege_id', verificationData.privilegeId);
+            setData('verified_discount_type_id', verificationData.discountTypeId);
+            setData('verified_percentage', verificationData.discountPercentage);
+        } else {
+            setData((prev: PaymentFormData) => ({
+                ...prev,
+                verification_id_number: verificationData.idNumber,
+                verification_remarks: verificationData.remarks,
+                verified_privilege_id: verificationData.privilegeId,
+                verified_discount_type_id: verificationData.discountTypeId,
+                verified_percentage: verificationData.discountPercentage,
+            }));
+        }
+    }
+    
+    setShowVerificationModal(false);
+    setPendingDiscountCode('');
+    setVerificationIdNumber('');
+    setVerificationRemarks('');
+}, [pendingDiscountCode, applyDiscount, setData]);
+    // ========== HANDLE OUTSTANDING FEE DIRECTLY ==========
+    const handleOutstandingFeeDirectly = useCallback((fee: OutstandingFee) => {
+        const balance = parseAmount(fee.balance);
+        
+        const newItem: PaymentItem = {
+            id: Date.now(),
+            fee_id: String(fee.id),
+            fee_name: fee.fee_name,
+            fee_code: fee.fee_code || '',
+            base_amount: balance,
+            surcharge: 0,
+            penalty: 0,
+            discount: 0,
+            total_amount: balance,
+            category: fee.category || 'fee',
+            period_covered: fee.period_covered || '',
+            months_late: fee.months_late || 0,
+        };
+        
+        const updatedItems = [...(data.items || []), newItem];
+        const newSubtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
+        const newTotal = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+        
+        setData((prev: PaymentFormData) => ({
+            ...prev,
+            items: updatedItems,
+            subtotal: parseFloat(newSubtotal.toFixed(2)),
+            total_amount: parseFloat(newTotal.toFixed(2)),
+        }));
+    }, [data.items, setData]);
+
+    // ========== INITIALIZATION EFFECT ==========
+    useEffect(() => {
+        if (hasInitializedRef.current) return;
+        
+        let timeoutId: NodeJS.Timeout;
+        
+        const initializePayment = async () => {
+            if (pre_filled_data?.fee_id && !feePaymentProcessedRef.current) {
+                timeoutId = setTimeout(async () => {
+                    hasInitializedRef.current = true;
+                    
+                    setPayerSource('fees');
+                    setData((prev: PaymentFormData) => ({
+                        ...prev,
+                        clearance_request_id: undefined,
+                        clearance_type: '',
+                        clearance_type_id: '',
+                        clearance_code: '',
+                        is_cleared: false,
+                        validity_date: '',
+                    }));
+                    
+                    setIsProcessingFee(true);
+                    
+                    try {
+                        const feeToPay = outstandingFeesForTab.find(fee => fee.id == pre_filled_data.fee_id);
+                        
+                        if (feeToPay) {
+                            const payerType = feeToPay.payer_type;
+                            const payerId = feeToPay.payer_id;
+                            
+                            if (payerType === 'App\\Models\\Resident' && payerId) {
+                                const resident = residents.find(r => r.id == payerId);
+                                if (resident) {
+                                    handlePayerSelected(resident, 'resident');
+                                    setTimeout(() => handleOutstandingFeeDirectly(feeToPay), 200);
+                                } else {
+                                    handleOutstandingFeeDirectly(feeToPay);
+                                }
+                            } else if (payerType === 'App\\Models\\Household' && payerId) {
+                                const household = households.find(h => h.id == payerId);
+                                if (household) {
+                                    handlePayerSelected(household, 'household');
+                                    setTimeout(() => handleOutstandingFeeDirectly(feeToPay), 200);
+                                } else {
+                                    handleOutstandingFeeDirectly(feeToPay);
+                                }
+                            } else if (payerType === 'App\\Models\\Business' && payerId) {
+                                const business = businesses.find(b => b.id == payerId);
+                                if (business) {
+                                    handlePayerSelected(business, 'business');
+                                    setTimeout(() => handleOutstandingFeeDirectly(feeToPay), 200);
+                                } else {
+                                    handleOutstandingFeeDirectly(feeToPay);
+                                }
+                            } else {
+                                handleOutstandingFeeDirectly(feeToPay);
+                            }
+                            
+                            if (pre_filled_data?.payer_type && pre_filled_data?.payer_id) {
+                                let expectedTypes: string[] = [];
+                                if (pre_filled_data.payer_type === 'resident') {
+                                    expectedTypes = ['App\\Models\\Resident', 'App\Models\Resident', 'resident'];
+                                } else if (pre_filled_data.payer_type === 'household') {
+                                    expectedTypes = ['App\\Models\\Household', 'App\Models\Household', 'household'];
+                                } else if (pre_filled_data.payer_type === 'business') {
+                                    expectedTypes = ['App\\Models\\Business', 'App\Models\Business', 'business'];
+                                }
+                                
+                                let payerFees = outstandingFeesForTab.filter(f => {
+                                    const payerIdMatches = f.payer_id == pre_filled_data.payer_id;
+                                    const payerTypeMatches = expectedTypes.some(pt => f.payer_type === pt);
+                                    const hasBalance = parseAmount(f.balance) > 0;
+                                    const isPending = f.status === 'pending' || f.status === 'pending_payment';
+                                    const isNotPaid = f.status !== 'paid';
+                                    
+                                    return payerIdMatches && payerTypeMatches && isNotPaid && (hasBalance || isPending);
+                                });
+                                setPayerOutstandingFees(payerFees);
+                                await fetchClearanceRequestsForPayer(pre_filled_data.payer_type, pre_filled_data.payer_id);
+                            }
+                        }
+                        
+                        setTimeout(() => {
+                            setStep(2);
+                            setIsProcessingFee(false);
+                            feePaymentProcessedRef.current = true;
+                        }, 300);
+                        
+                    } catch (error) {
+                        console.error('Error in fee-based payment:', error);
+                        setIsProcessingFee(false);
+                    }
+                }, 100);
+            } else if (clearance_request) {
+                if (processedClearanceIdsRef.current.has(clearance_request.id)) {
+                    hasInitializedRef.current = true;
+                    return;
                 }
-            } else if (feeToPay.payer_type === 'household' && feeToPay.payer_id) {
-                const household = households.find(h => h.id == feeToPay.payer_id);
-                if (household) {
-                    payerHandlers.handleHouseholdPayer(household);
-                    setTimeout(() => {
-                        feeHandlers.handleOutstandingFeeClick(feeToPay);
-                    }, 200);
-                } else {
-                    handleOutstandingFeePayer(feeToPay);
+                
+                hasInitializedRef.current = true;
+                setPayerSource('clearance');
+                setSelectedPayer(clearance_request);
+                
+                const mockPayer = {
+                    id: clearance_request.resident_id,
+                    name: clearance_request.resident?.name || 'Unknown',
+                    contact_number: clearance_request.resident?.contact_number || '',
+                    address: clearance_request.resident?.address || '',
+                    purok: clearance_request.resident?.purok || '',
+                    household_number: clearance_request.resident?.household_number || '',
+                    photo_path: clearance_request.resident?.photo_path || null,
+                };
+                
+                handlePayerSelected(mockPayer as Resident, 'resident');
+                processedClearanceIdsRef.current.add(clearance_request.id);
+            } else if (pre_filled_data?.payer_id && pre_filled_data?.payer_type) {
+                hasInitializedRef.current = true;
+                
+                const { payer_type, payer_id } = pre_filled_data;
+                
+                if (payer_type === 'resident') {
+                    const payer = residents.find(r => r.id == payer_id);
+                    if (payer) {
+                        setSelectedPayer(payer);
+                        handlePayerSelected(payer, 'resident');
+                        setPayerSource('residents');
+                    }
+                } else if (payer_type === 'household') {
+                    const payer = households.find(h => h.id == payer_id);
+                    if (payer) {
+                        setSelectedPayer(payer);
+                        handlePayerSelected(payer, 'household');
+                        setPayerSource('households');
+                    }
+                } else if (payer_type === 'business') {
+                    const payer = businesses.find(b => b.id == payer_id);
+                    if (payer) {
+                        setSelectedPayer(payer);
+                        handlePayerSelected(payer, 'business');
+                        setPayerSource('businesses');
+                    }
                 }
-            } else if (feeToPay.payer_type === 'business' && feeToPay.payer_id) {
-                const business = businesses.find(b => b.id == feeToPay.payer_id);
-                if (business) {
-                    payerHandlers.handleBusinessPayer(business);
-                    setTimeout(() => {
-                        feeHandlers.handleOutstandingFeeClick(feeToPay);
-                    }, 200);
-                } else {
-                    handleOutstandingFeePayer(feeToPay);
-                }
+                
+                setTimeout(() => setStep(2), 100);
             } else {
-                handleOutstandingFeePayer(feeToPay);
+                hasInitializedRef.current = true;
             }
-        }
+        };
         
-        if (pre_filled_data?.payer_type && pre_filled_data?.payer_id) {
-            const payerFees = outstandingFeesForTab.filter(f => 
-                f.payer_type === pre_filled_data.payer_type && 
-                f.payer_id == pre_filled_data.payer_id &&
-                parseFloat(f.balance) > 0
-            );
-            
-            setPayerOutstandingFees(payerFees);
-            
-            console.log('📋 (FeePayment) FETCHING clearance requests for payer:', pre_filled_data.payer_type, pre_filled_data.payer_id);
-            await fetchClearanceRequestsForPayer(
-                pre_filled_data.payer_type, 
-                pre_filled_data.payer_id
-            );
-        }
+        initializePayment();
         
-        setTimeout(() => {
-            setStep(2);
-            setIsProcessingFee(false);
-            feePaymentProcessedRef.current = true;
-        }, 300);
-        
-    }, [
-        pre_filled_data, 
-        selected_fee_details, 
-        outstandingFeesForTab, 
-        residents, 
-        households, 
-        businesses,
-        feeTypes, 
-        payerHandlers, 
-        feeHandlers, 
-        handleResidentPayerWithFee, 
-        handleOutstandingFeePayer,
-        fetchClearanceRequestsForPayer,
-        setData
-    ]);
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [pre_filled_data, clearance_request, residents, households, businesses, outstandingFeesForTab, handlePayerSelected, handleOutstandingFeeDirectly, fetchClearanceRequestsForPayer, setData]);
 
     // ========== SESSION STORAGE HANDLING ==========
     useEffect(() => {
@@ -940,7 +869,6 @@ export default function CreatePayment() {
                 const clearanceData = JSON.parse(pendingClearancePayment);
                 
                 if (processedClearanceIdsRef.current.has(clearanceData.clearance_request_id)) {
-                    console.log('🔄 Clearance already processed, skipping:', clearanceData.clearance_request_id);
                     sessionStorage.removeItem('pending_clearance_payment');
                     return;
                 }
@@ -961,18 +889,14 @@ export default function CreatePayment() {
                         name: clearanceData.clearance_type_name || 'Clearance Fee',
                         code: 'BRGY_CLEARANCE',
                         fee: clearanceData.amount,
-                        formatted_fee: '₱' + parseFloat(clearanceData.amount).toFixed(2),
+                        formatted_fee: formatCurrency(parseAmount(clearanceData.amount)),
                         validity_days: 30,
                         processing_days: 3,
                         description: '',
-                        has_senior_discount: false,
-                        senior_discount_percentage: 0,
-                        has_pwd_discount: false,
-                        pwd_discount_percentage: 0,
-                        has_solo_parent_discount: false,
-                        solo_parent_discount_percentage: 0,
-                        has_indigent_discount: false,
-                        indigent_discount_percentage: 0,
+                        requires_payment: true,
+                        requires_approval: false,
+                        is_online_only: false,
+                        is_discountable: true,
                     },
                     resident: {
                         id: clearanceData.resident_id,
@@ -981,114 +905,51 @@ export default function CreatePayment() {
                         address: '',
                         purok: '',
                         household_number: '',
+                        photo_path: clearanceData.resident_photo_path || null,
+                        photo_url: undefined
                     }
                 };
                 
-                if (handleClearanceRequestDirectlyRef.current) {
-                    handleClearanceRequestDirectlyRef.current(mockClearanceRequest, residents);
-                    processedClearanceIdsRef.current.add(clearanceData.clearance_request_id);
+                if (!mockClearanceRequest.resident) {
+                    console.error('Resident data is missing in clearance request');
+                    return;
                 }
+
+                const mockPayer = {
+                    id: mockClearanceRequest.resident_id,
+                    name: mockClearanceRequest.resident.name,
+                    contact_number: mockClearanceRequest.resident.contact_number || '',
+                    address: mockClearanceRequest.resident.address || '',
+                    purok: mockClearanceRequest.resident.purok || '',
+                    household_number: mockClearanceRequest.resident.household_number || '',
+                    photo_path: mockClearanceRequest.resident.photo_path || null,
+                };
                 
+                handlePayerSelected(mockPayer as Resident, 'resident');
                 setPayerSource('clearance');
+                processedClearanceIdsRef.current.add(clearanceData.clearance_request_id);
                 sessionStorage.removeItem('pending_clearance_payment');
                 
             } catch (error) {
                 console.error('Error parsing pending clearance payment:', error);
                 sessionStorage.removeItem('pending_clearance_payment');
             }
-        } else if (clearance_request) {
-            if (processedClearanceIdsRef.current.has(clearance_request.id)) {
-                console.log('🔄 Clearance request already processed, skipping:', clearance_request.id);
-                return;
-            }
-            
-            if (handleClearanceRequestDirectlyRef.current) {
-                handleClearanceRequestDirectlyRef.current(clearance_request, residents);
-                processedClearanceIdsRef.current.add(clearance_request.id);
-            }
-            
-            setPayerSource('clearance');
         }
         
         return () => {
             processedClearanceIdsRef.current.clear();
         };
-    }, [clearance_request, residents]);
+    }, [clearance_request, handlePayerSelected]);
 
-    // ========== MAIN INITIALIZATION EFFECT ==========
+    // ========== CLEANUP ON UNMOUNT ==========
     useEffect(() => {
-        if (hasInitializedRef.current) {
-            return;
-        }
-        
-        console.log('🔄 Main initialization effect running...');
-        
-        if (pre_filled_data?.fee_id && !feePaymentProcessedRef.current) {
-            console.log('🔄 Initializing with fee payment');
-            setPayerSource('fees');
-            
-            setTimeout(() => {
-                hasInitializedRef.current = true;
-                handleFeeBasedPayment();
-            }, 100);
-        }
-        else if (clearance_request) {
-            console.log('🔄 Initializing with clearance request');
-            
-            if (processedClearanceIdsRef.current.has(clearance_request.id)) {
-                hasInitializedRef.current = true;
-                return;
-            }
-            
-            hasInitializedRef.current = true;
-            setPayerSource('clearance');
-            
-            if (handleClearanceRequestDirectlyRef.current) {
-                handleClearanceRequestDirectlyRef.current(clearance_request, residents);
-                processedClearanceIdsRef.current.add(clearance_request.id);
-            }
-            
-            setSelectedPayer(clearance_request);
-        }
-        else if (pre_filled_data?.payer_id && pre_filled_data?.payer_type) {
-            console.log('🔄 Initializing with pre-filled payer');
-            hasInitializedRef.current = true;
-            
-            if (pre_filled_data.payer_type === 'resident') {
-                const payer = residents.find(r => r.id == pre_filled_data.payer_id);
-                if (payer) {
-                    setSelectedPayer(payer);
-                    payerHandlers.handleResidentPayer(payer);
-                    setPayerSource('residents');
-                }
-            } else if (pre_filled_data.payer_type === 'household') {
-                const payer = households.find(h => h.id == pre_filled_data.payer_id);
-                if (payer) {
-                    setSelectedPayer(payer);
-                    payerHandlers.handleHouseholdPayer(payer);
-                    setPayerSource('households');
-                }
-            } else if (pre_filled_data.payer_type === 'business') {
-                const payer = businesses.find(b => b.id == pre_filled_data.payer_id);
-                if (payer) {
-                    setSelectedPayer(payer);
-                    payerHandlers.handleBusinessPayer(payer);
-                    setPayerSource('businesses');
-                }
-            }
-            
-            setTimeout(() => {
-                setStep(2);
-            }, 100);
-        } else {
-            console.log('🔄 No pre-filled data, normal initialization');
-            hasInitializedRef.current = true;
-        }
-        
-    }, [pre_filled_data, clearance_request, residents, households, businesses, payerHandlers, handleFeeBasedPayment]);
+        return () => {
+            cleanup();
+        };
+    }, [cleanup]);
 
     // ========== HANDLER FUNCTIONS ==========
-    const handleStepClick = (stepNumber: number) => {
+    const handleStepClick = useCallback((stepNumber: number) => {
         if (stepNumber === 1) {
             setStep(1);
         } else if (stepNumber === 2) {
@@ -1104,195 +965,73 @@ export default function CreatePayment() {
             }
             setStep(3);
         }
-    };
+    }, [data.payer_id, data.payer_name, paymentItems.length]);
 
-    const handleSelectPayer = (payer: Resident | Household | Business | ClearanceRequest | BackendFee | OutstandingFee) => {
-        setSelectedPayer(payer);
-        
-        if (payerSource === 'residents') {
-            payerHandlers.handleResidentPayer(payer as Resident);
-        } else if (payerSource === 'households') {
-            payerHandlers.handleHouseholdPayer(payer as Household);
-        } else if (payerSource === 'businesses') {
-            payerHandlers.handleBusinessPayer(payer as Business);
-        } else if (payerSource === 'clearance') {
-            payerHandlers.handleClearanceTabPayer(payer as ClearanceRequest, residents);
-        } else if (payerSource === 'fees') {
-            if ('total_amount' in payer && typeof payer.total_amount === 'number') {
-                payerHandlers.handleBackendFeePayer(payer as BackendFee);
-            } else {
-                payerHandlers.handleOutstandingFeePayer(payer as OutstandingFee);
-            }
-        }
-        
-        setTimeout(() => {
-            setStep(2);
-        }, 100);
-    };
+    const handleSelectPayer = useCallback((payer: any, type: string) => {
+        handlePayerSelected(payer, type);
+    }, [handlePayerSelected]);
 
-    const handleAddOutstandingFeeWithLateSettings = (): void => {
+    const handleAddOutstandingFeeWithLateSettings = useCallback((): void => {
         if (!selectedOutstandingFee) return;
         
-        feeHandlers.handleAddOutstandingFeeDirectly(selectedOutstandingFee);
+        handleOutstandingFeeDirectly(selectedOutstandingFee);
         setSelectedOutstandingFee(null);
         setShowLateSettings(false);
         setIsLatePayment(false);
         setMonthsLate(1);
-    };
+    }, [selectedOutstandingFee, handleOutstandingFeeDirectly]);
 
-    const handleCancelLateSettings = (): void => {
+    const handleCancelLateSettings = useCallback((): void => {
         setSelectedOutstandingFee(null);
         setShowLateSettings(false);
         setIsLatePayment(false);
         setMonthsLate(1);
-    };
+    }, []);
 
-    // ========== FIXED: handleAddClearanceRequest - NOW HANDLES MULTIPLE CLEARANCES CORRECTLY ==========
-    const handleAddClearanceRequest = useCallback((clearanceRequest: ClearanceRequest) => {
-        console.log('📋 Adding clearance request to payment:', clearanceRequest);
-        
-        // Check if this clearance request is already added
-        if (data.items?.some(item => 
-            item.metadata?.clearance_request_id === clearanceRequest.id
-        )) {
-            alert('This clearance request is already added to the payment.');
-            return;
-        }
-        
-        // Get clearance type name from various sources
-        const clearanceTypeName = 
-            clearanceRequest.clearance_type?.name || 
-            clearanceRequest.purpose || 
-            'Barangay Clearance';
-        
-        // Create new payment item with ALL metadata fields
-        const newItem: PaymentItem = {
-            id: Date.now() + Math.random(), // Ensure truly unique ID
-            fee_id: `clearance-${clearanceRequest.id}`,
-            fee_name: clearanceTypeName,
-            fee_code: clearanceRequest.reference_number || `CLR-${clearanceRequest.id}`,
-            base_amount: parseFloat(String(clearanceRequest.fee_amount)),
-            surcharge: 0,
-            penalty: 0,
-            discount: 0,
-            total_amount: parseFloat(String(clearanceRequest.fee_amount)),
-            category: 'clearance',
-            period_covered: '',
-            months_late: 0,
-            metadata: {
-                is_clearance_fee: true,
-                clearance_request_id: clearanceRequest.id,
-                clearance_type_id: clearanceRequest.clearance_type_id,
-                clearance_type_code: clearanceRequest.clearance_type?.code,
-                clearance_type_name: clearanceTypeName, // CRITICAL: This is what PaymentDetailsStep looks for
-                reference_number: clearanceRequest.reference_number,
-                purpose: clearanceRequest.purpose,
-                specific_purpose: clearanceRequest.specific_purpose
-            }
-        };
-        
-        console.log('✅ Created clearance item with metadata:', newItem.metadata);
-        
-        // Update items - append to existing items
-        const updatedItems = [...(data.items || []), newItem];
-        
-        // Calculate new totals
-        const newSubtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
-        const newTotal = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
-        
-        // Update form data - IMPORTANT: Don't override clearance_request_id if multiple clearances
-        // We'll store the first one as the primary, but all will be in items
-        const hasExistingClearance = data.items?.some(item => item.metadata?.is_clearance_fee);
-        
-        setData((prev: PaymentFormData) => {
-            console.log('📝 Updating form data with new clearance item');
-            
-            // Determine what to set as primary clearance_request_id
-            let primaryClearanceId = prev.clearance_request_id;
-            let primaryClearanceTypeId = prev.clearance_type_id;
-            let primaryClearanceCode = prev.clearance_code;
-            
-            // If this is the first clearance, set it as primary
-            if (!hasExistingClearance) {
-                primaryClearanceId = clearanceRequest.id;
-                primaryClearanceTypeId = clearanceRequest.clearance_type_id;
-                primaryClearanceCode = clearanceRequest.clearance_type?.code || '';
-            }
-            
-            return {
-                ...prev,
-                items: updatedItems,
-                subtotal: parseFloat(newSubtotal.toFixed(2)),
-                total_amount: parseFloat(newTotal.toFixed(2)),
-                clearance_request_id: primaryClearanceId, // Don't override if multiple
-                clearance_type_id: primaryClearanceTypeId,
-                clearance_code: primaryClearanceCode,
-                // Update the purpose if not modified by user
-                purpose: !userModifiedPurpose 
-                    ? (updatedItems.length === 1 
-                        ? (clearanceRequest.purpose || clearanceTypeName)
-                        : `${updatedItems.length} items selected`)
-                    : prev.purpose
-            };
-        });
-        
-        // Remove from available list
-        setPayerClearanceRequests(prev => {
-            console.log('📝 Removing clearance from available list, previous count:', prev.length);
-            const filtered = prev.filter(cr => cr.id !== clearanceRequest.id);
-            console.log('📝 New available clearance count:', filtered.length);
-            return filtered;
-        });
-        
-        // Force a re-render to update the UI
-        setTimeout(() => {
-            console.log('✅ Clearance request added - updated items count:', updatedItems.length);
-            console.log('📊 Current payment items:', updatedItems.map(item => ({
-                name: item.fee_name,
-                isClearance: item.metadata?.is_clearance_fee,
-                clearanceTypeName: item.metadata?.clearance_type_name,
-                id: item.id
-            })));
-        }, 100);
-        
-    }, [data.items, setData, userModifiedPurpose]);
-
-    const handlePurposeChange = (value: string): void => {
+    const handlePurposeChange = useCallback((value: string): void => {
         setData('purpose', value);
-        if (value !== feeHandlers.generatePurposeFromItems(paymentItems)) {
+        if (value !== generatePurposeFromItems(paymentItems)) {
             setUserModifiedPurpose(true);
         }
-    };
+    }, [setData, paymentItems]);
 
-    const handlePeriodCoveredChange = (value: string): void => {
+    const generatePurposeFromItems = useCallback((items: PaymentItem[]): string => {
+        if (items.length === 0) return '';
+        if (items.length === 1) return items[0].fee_name;
+        return `${items.length} items selected`;
+    }, []);
+
+    const handlePeriodCoveredChange = useCallback((value: string): void => {
         setData('period_covered', value);
         
         if (!userModifiedPurpose && paymentItems.length > 0) {
-            const newPurpose = feeHandlers.generatePurposeFromItems(paymentItems);
+            const newPurpose = generatePurposeFromItems(paymentItems);
             setData('purpose', newPurpose);
         }
-    };
+    }, [setData, userModifiedPurpose, paymentItems, generatePurposeFromItems]);
 
-    const handleClearanceTypeChange = (value: string): void => {
+    const handleClearanceTypeChange = useCallback((value: string): void => {
         const clearanceTypeDetail = clearanceTypesDetails.find(
-            type => type.code === value
+            (type: any) => type.code === value
         );
         
         if (clearanceTypeDetail) {
-            const updatedData = {
-                ...data,
-                clearance_type: clearanceTypeDetail.code,
-                clearance_type_id: clearanceTypeDetail.id,
-                clearance_code: clearanceTypeDetail.code,
-            };
+            setData((prev: PaymentFormData) => {
+                const updatedData = {
+                    ...prev,
+                    clearance_type: clearanceTypeDetail.code,
+                    clearance_type_id: clearanceTypeDetail.id,
+                    clearance_code: clearanceTypeDetail.code,
+                };
+                
+                if (!userModifiedPurpose) {
+                    updatedData.purpose = clearanceTypes[value] || value;
+                }
+                
+                return updatedData;
+            });
             
-            if (!userModifiedPurpose) {
-                updatedData.purpose = clearanceTypes[value] || value;
-            }
-            
-            setData(updatedData);
-            
-            const updatedItems = paymentItems.map(item => {
+            const updatedItems = paymentItems.map((item: PaymentItem) => {
                 if (item.metadata?.is_clearance_fee === true) {
                     return {
                         ...item,
@@ -1306,32 +1045,38 @@ export default function CreatePayment() {
                 return item;
             });
             
-            if (updatedItems.some(item => item.metadata?.is_clearance_fee === true)) {
+            if (updatedItems.some((item: PaymentItem) => item.metadata?.is_clearance_fee === true)) {
                 updateItems(updatedItems);
             }
         } else {
-            const updatedData = {
-                ...data,
-                clearance_type: value,
-                clearance_type_id: '',
-                clearance_code: value,
-            };
-            
-            if (!userModifiedPurpose && value) {
-                updatedData.purpose = clearanceTypes[value] || value;
-            }
-            
-            setData(updatedData);
+            setData((prev: PaymentFormData) => {
+                const updatedData = {
+                    ...prev,
+                    clearance_type: value,
+                    clearance_type_id: '',
+                    clearance_code: value,
+                };
+                
+                if (!userModifiedPurpose && value) {
+                    updatedData.purpose = clearanceTypes[value] || value;
+                }
+                
+                return updatedData;
+            });
         }
-    };
+    }, [clearanceTypesDetails, clearanceTypes, userModifiedPurpose, paymentItems, updateItems, setData]);
 
-    const getClearanceTypeName = (code: string): string => {
+    const getClearanceTypeName = useCallback((code: string): string => {
         if (!code) return '';
         return clearanceTypes[code] || code;
-    };
+    }, [clearanceTypes]);
 
+    // ========== RESET FORM ==========
     function resetForm() {
-        const resetData = {
+        cleanup();
+        
+        setData((prev: PaymentFormData) => ({
+            ...prev,
             payer_type: '',
             payer_id: '',
             payer_name: '',
@@ -1339,6 +1084,8 @@ export default function CreatePayment() {
             address: '',
             household_number: '',
             purok: '',
+            photo_path: null,
+            photo_url: null,
             items: [],
             payment_date: new Date().toISOString().split('T')[0],
             period_covered: '',
@@ -1362,11 +1109,7 @@ export default function CreatePayment() {
             validity_date: '',
             collection_type: 'manual',
             clearance_request_id: undefined,
-            verification_id_number: '',
-            verification_remarks: '',
-        };
-        
-        setData(resetData);
+        }));
         
         setSelectedPayer(null);
         setPayerOutstandingFees([]);
@@ -1382,12 +1125,11 @@ export default function CreatePayment() {
         setSelectedDiscount('');
         setSelectedDiscountCode('');
         setIsProcessingFee(false);
-        setFunctionCallCount(0);
         hasInitializedRef.current = false;
         feePaymentProcessedRef.current = false;
         processedClearanceIdsRef.current.clear();
     }
-
+    
     // ========== RENDER ==========
     return (
         <AppLayout
@@ -1399,21 +1141,12 @@ export default function CreatePayment() {
             ]}
         >
             <div className="space-y-6">
-                {/* Header */}
-                <Header
-                    isClearancePayment={isClearancePayment}
-                    pre_filled_data={pre_filled_data}
-                    clearance_request={clearance_request}
-                    selected_fee_details={selected_fee_details}
-                    processing={processing}
+                <ProgressIndicator 
+                    step={step} 
+                    onStepClick={handleStepClick} 
                     paymentItemsCount={paymentItems.length}
-                    payerSource={payerSource}
                 />
 
-                {/* Progress Indicator */}
-                <ProgressIndicator step={step} onStepClick={handleStepClick} />
-
-                {/* Processing Loader */}
                 <ProcessingLoader
                     isProcessingFee={isProcessingFee}
                     step={step}
@@ -1421,7 +1154,6 @@ export default function CreatePayment() {
                     selected_fee_details={selected_fee_details}
                 />
 
-                {/* Discount Selection Modal */}
                 <DiscountSelectionModal
                     showDiscountSelection={showDiscountSelection}
                     selectedOutstandingFee={selectedOutstandingFee}
@@ -1429,12 +1161,12 @@ export default function CreatePayment() {
                     setSelectedDiscount={setSelectedDiscount}
                     setShowDiscountSelection={setShowDiscountSelection}
                     setSelectedOutstandingFee={setSelectedOutstandingFee}
-                    handleAddOutstandingFeeDirectly={feeHandlers.handleAddOutstandingFeeDirectly}
-                    handleAddOutstandingFeeWithDiscount={feeHandlers.handleAddOutstandingFeeWithDiscount}
+                    handleAddOutstandingFeeDirectly={handleOutstandingFeeDirectly}
+                    handleAddOutstandingFeeWithDiscount={(fee, discount) => {
+                        handleOutstandingFeeDirectly(fee);
+                    }}
                     data={data}
-                    onDiscountApplied={(discountedAmount) => {
-                        console.log('💰 Discount applied with amount:', discountedAmount);
-                        // Force update the amount paid field
+                    onDiscountApplied={(discountedAmount: number) => {
                         setTimeout(() => {
                             const amountInput = document.querySelector('input[placeholder="0.00"], input.pl-8') as HTMLInputElement;
                             if (amountInput) {
@@ -1447,8 +1179,8 @@ export default function CreatePayment() {
                     setData={setData}
                 />
 
-                {/* Verification Modal */}
-                <VerificationModal
+                {/* ✅ FIXED: Added payerId and payerType props */}
+               <VerificationModal
                     show={showVerificationModal}
                     onClose={() => {
                         setShowVerificationModal(false);
@@ -1457,17 +1189,20 @@ export default function CreatePayment() {
                         setVerificationRemarks('');
                     }}
                     onSubmit={handleVerificationSubmit}
-                    discountRule={discountRules.find(r => r.code === pendingDiscountCode)}
+                    discountRule={discountRules?.find(r => r.code === pendingDiscountCode)}
                     idNumber={verificationIdNumber}
                     onIdNumberChange={setVerificationIdNumber}
                     remarks={verificationRemarks}
                     onRemarksChange={setVerificationRemarks}
+                    payerId={currentPayerId}
+                    payerType={currentPayerType}
+                    discountCode={pendingDiscountCode}
+                    isLoading={processing}
                 />
 
                 <form id="paymentForm" onSubmit={submit}>
-                    {/* Step 1: Select Payer */}
                     {step === 1 && !isProcessingFee && (
-                        <PayerSelectionStep
+                        <PayerSelectionStepWrapper
                             residents={residents}
                             households={households}
                             businesses={businesses}
@@ -1478,7 +1213,7 @@ export default function CreatePayment() {
                             searchQuery={searchQuery}
                             setSearchQuery={setSearchQuery}
                             handleSelectPayer={handleSelectPayer}
-                            handleManualPayer={payerHandlers.handleManualPayer}
+                            handleManualPayer={(payer: any) => handleSelectPayer(payer, 'resident')}
                             preSelectedPayerId={pre_filled_data?.payer_id}
                             preSelectedPayerType={pre_filled_data?.payer_type}
                             isClearancePayment={isClearancePayment}
@@ -1486,14 +1221,19 @@ export default function CreatePayment() {
                             clearanceTypes={clearanceTypes}
                             preFilledData={pre_filled_data}
                             selectedFeeDetails={selected_fee_details}
+                            handleAddClearanceRequest={handleAddClearanceRequest}
+                            handleOutstandingFeeDirectly={handleOutstandingFeeDirectly}
+                            residentsList={residents}
+                            householdsList={households}
+                            businessesList={businesses}
                         />
                     )}
 
-                    {/* Step 2: Add Fees */}
                     {step === 2 && (
                         <AddFeesStep
                             key="add-fees-step"
                             data={data}
+                            setData={setData}
                             setStep={setStep}
                             selectedFee={selectedOutstandingFee}
                             showLateSettings={showLateSettings}
@@ -1501,12 +1241,22 @@ export default function CreatePayment() {
                             setIsLatePayment={setIsLatePayment}
                             monthsLate={monthsLate}
                             setMonthsLate={setMonthsLate}
-                            onFeeClick={feeHandlers.handleOutstandingFeeClick}
+                            onFeeClick={handleOutstandingFeeDirectly}
                             onAddWithLateSettings={handleAddOutstandingFeeWithLateSettings}
                             onCancelLateSettings={handleCancelLateSettings}
-                            onDirectAddFee={feeHandlers.handleAddOutstandingFeeDirectly}
+                            onDirectAddFee={handleOutstandingFeeDirectly}
                             paymentItems={paymentItems}
-                            removePaymentItem={feeHandlers.removePaymentItem}
+                            removePaymentItem={(id) => {
+                                const updatedItems = paymentItems.filter((item: PaymentItem) => item.id !== id);
+                                const newSubtotal = updatedItems.reduce((sum, item) => sum + (item.base_amount || 0), 0);
+                                const newTotal = updatedItems.reduce((sum, item) => sum + (item.total_amount || 0), 0);
+                                setData((prev: PaymentFormData) => ({
+                                    ...prev,
+                                    items: updatedItems,
+                                    subtotal: parseFloat(newSubtotal.toFixed(2)),
+                                    total_amount: parseFloat(newTotal.toFixed(2)),
+                                }));
+                            }}
                             payerOutstandingFees={payerOutstandingFees}
                             payerClearanceRequests={payerClearanceRequests}
                             onAddClearanceRequest={handleAddClearanceRequest}
@@ -1521,7 +1271,6 @@ export default function CreatePayment() {
                         />
                     )}
 
-                    {/* Step 3: Payment Details */}
                     {step === 3 && (
                         <PaymentDetailsStep
                             data={data}
@@ -1530,7 +1279,7 @@ export default function CreatePayment() {
                             paymentItems={paymentItems}
                             selectedDiscountCode={data.discount_code || ''}
                             discountTypes={discountTypes}
-                            discountRules={discountRules}
+                            discountRules={discountRules || []}
                             discountCodeToIdMap={discountCodeToIdMap}
                             handleDiscountCodeChange={handleDiscountCodeChange}
                             processing={processing}
@@ -1538,7 +1287,7 @@ export default function CreatePayment() {
                             handlePeriodCoveredChange={handlePeriodCoveredChange}
                             userModifiedPurpose={userModifiedPurpose}
                             setUserModifiedPurpose={setUserModifiedPurpose}
-                            generatePurpose={() => feeHandlers.generatePurposeFromItems(paymentItems)}
+                            generatePurpose={() => generatePurposeFromItems(paymentItems)}
                             selectedResident={finalSelectedResident}
                             selectedHousehold={finalSelectedHousehold}
                             selectedBusiness={finalSelectedBusiness}

@@ -1,4 +1,5 @@
 // resources/js/Pages/Admin/Forms/Show.tsx
+
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
@@ -38,7 +39,6 @@ import { FormDetailsCard } from '@/components/admin/forms/show/components/form-d
 import { FormPreviewCard } from '@/components/admin/forms/show/components/form-preview-card';
 import { StatisticsCard } from '@/components/admin/forms/show/components/statistics-card';
 import { RelatedFormsCard } from '@/components/admin/forms/show/components/related-forms-card';
-
 
 // ==================== HELPER FUNCTIONS ====================
 export const formatFileSize = (bytes: number): string => {
@@ -129,7 +129,7 @@ export default function FormsShow({ form, related_forms = [], download_stats, vi
                         <p className="text-gray-600 dark:text-gray-400">Loading form details...</p>
                         <Button
                             variant="outline"
-                            onClick={() => router.get(route('forms.index'))}
+                            onClick={() => router.get(route('admin.forms.index'))}
                             className="dark:border-gray-600 dark:text-gray-300"
                         >
                             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -173,30 +173,30 @@ export default function FormsShow({ form, related_forms = [], download_stats, vi
 
     const handleDelete = () => {
         setIsDeleting(true);
-        router.delete(route('forms.destroy', form.id), {
+        router.delete(route('admin.forms.destroy', form.id), {
             preserveScroll: false,
             onFinish: () => setIsDeleting(false),
         });
     };
 
     const handleToggleStatus = () => {
-        router.post(route('forms.toggle-status', form.id), {}, {
+        router.post(route('admin.forms.toggle-status', form.id), {}, {
             preserveScroll: true,
         });
     };
 
     const handleToggleFeatured = () => {
-        router.post(route('forms.toggle-featured', form.id), {}, {
+        router.post(route('admin.forms.toggle-featured', form.id), {}, {
             preserveScroll: true,
         });
     };
 
     const handleDownload = () => {
-        window.open(route('forms.download', form.id), '_blank');
+        window.open(route('admin.forms.download', form.id), '_blank');
     };
 
     const handleCopyLink = () => {
-        const link = route('forms.download', form.id);
+        const link = route('admin.forms.download', form.id);
         navigator.clipboard.writeText(link).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
@@ -211,7 +211,7 @@ Agency: ${form.issuing_agency}
 Description: ${form.description}
 Views: ${form.view_count}
 Downloads: ${form.download_count}
-Download Link: ${route('forms.download', form.id)}
+Download Link: ${route('admin.forms.download', form.id)}
         `.trim();
         
         navigator.clipboard.writeText(details);
@@ -317,16 +317,11 @@ Download Link: ${route('forms.download', form.id)}
                         <div className="grid gap-6 lg:grid-cols-3">
                             {/* Left Column - Form Details & Preview */}
                             <div className="lg:col-span-2 space-y-6">
-                                {/* Form Details Card */}
+                                {/* Form Details Card - Fixed: removed extra props */}
                                 {activeTab === 'details' && (
                                     <FormDetailsCard
                                         form={form}
                                         onDownload={handleDownload}
-                                        getFileIcon={getFileIcon}
-                                        getFileTypeIcon={getFileTypeIcon}
-                                        getCategoryColor={getCategoryColor}
-                                        getAgencyIcon={getAgencyIcon}
-                                        formatFileSize={formatFileSize}
                                     />
                                 )}
 

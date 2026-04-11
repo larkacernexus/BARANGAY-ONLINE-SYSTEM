@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Calendar, Clock, CheckCircle } from 'lucide-react';
-import { CommunityReport } from './types';
+import { CommunityReport } from '@/types/admin/reports/community-report';
 
 interface TimelineCardProps {
     report: CommunityReport;

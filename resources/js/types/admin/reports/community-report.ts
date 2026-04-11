@@ -127,7 +127,36 @@ export interface CommunityReportFormData {
     assigned_to: number | null;
 }
 
+export interface StaffMember {
+    id: number; // user.id
+    user_id: number;
+    resident_id: number | null;
+    name: string;
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+    username: string | null;
+    position: string | null;
+    role: string | null;
+    purok: string | null;
+    address: string | null;
+    is_active: boolean;
+    initials: string;
+    avatar: string | null;
+}
+
+export interface StatusBanner {
+    color: string;
+    icon: React.ReactNode;
+    title: string;
+    message: string;
+}
+
 export interface CommunityReport {
+    acknowledged_at: any;
+    assignedTo: any;
+    previous_report: any;
     category: any;
     source: string;
     tags: boolean;
@@ -400,6 +429,10 @@ export interface SearchResult {
 
 // Activity Log Types
 export interface ActivityLog {
+    action: string;
+    user_name: string;
+    details: string;
+    ip_address: any;
     id: number;
     log_name: string;
     description: string;
@@ -547,6 +580,13 @@ export interface SelectionStats {
     recurring_issues: number;
     anonymous: number;
     with_attachments: number;
+}
+
+export interface FlashMessage {
+    success?: string;
+    error?: string;
+    warning?: string;
+    info?: string;
 }
 
 export type BulkOperation = 

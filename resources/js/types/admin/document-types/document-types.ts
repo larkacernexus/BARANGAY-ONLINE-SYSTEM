@@ -133,3 +133,11 @@ export interface StatisticItem {
     description: string;
     color: string;
 }
+
+export interface Statistic {
+    label: string;
+    value: string | number;
+    icon: React.ElementType;
+    description: string;
+    color: string;
+}

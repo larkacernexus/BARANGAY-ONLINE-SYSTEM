@@ -1,23 +1,21 @@
 // components/admin/roles/RolesStats.tsx
 import { StatCard } from '@/components/adminui/stats-grid';
-import { Shield, Users, Edit, Key } from 'lucide-react';
+import { Shield, Users, Edit, Key, TrendingUp } from 'lucide-react';
+import { RoleStats } from '@/types/admin/roles/roles';
 
 interface RolesStatsProps {
-    stats: {
-        total: number;
-        system: number;
-        custom: number;
-        users: number;
-    };
+    stats: RoleStats;
 }
 
 export default function RolesStats({ stats }: RolesStatsProps) {
     // Safe stats with fallbacks
     const safeStats = {
         total: stats?.total || 0,
-        system: stats?.system || 0,
-        custom: stats?.custom || 0,
-        users: stats?.users || 0
+        system: stats?.system_roles || 0,
+        custom: stats?.custom_roles || 0,
+        users: stats?.total_users || 0,
+        permissions: stats?.total_permissions || 0,
+        active: stats?.active_roles || 0
     };
 
     return (
@@ -41,7 +39,7 @@ export default function RolesStats({ stats }: RolesStatsProps) {
                 description="User-created custom roles"
             />
             <StatCard
-                title="Users with Roles"
+                title="Total Users"
                 value={safeStats.users.toLocaleString()}
                 icon={<Users className="h-4 w-4 text-amber-500" />}
                 description="Users assigned to roles"

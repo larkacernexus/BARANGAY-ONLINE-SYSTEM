@@ -3,7 +3,7 @@ import {
     Wifi, Database, HardDrive, Archive, FileText, 
     DownloadCloud, CreditCard, Activity, Globe 
 } from 'lucide-react';
-import type { SystemStatus as SystemStatusType } from '@/components/admin/dashboard/types/dashboard';
+import type { SystemStatus as SystemStatusType } from '@/types/admin/dashboard/dashboard';
 
 interface SystemStatusProps {
     statuses: SystemStatusType[];

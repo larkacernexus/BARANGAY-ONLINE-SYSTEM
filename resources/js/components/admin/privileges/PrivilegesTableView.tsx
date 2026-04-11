@@ -65,6 +65,8 @@ interface PrivilegesTableViewProps {
         delete: boolean;
         assign: boolean;
     };
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 }
 
 export default function PrivilegesTableView({
@@ -83,7 +85,9 @@ export default function PrivilegesTableView({
     selectionStats,
     getSortIcon,
     discountTypes,
-    can
+    can,
+    sortBy = 'name',
+    sortOrder = 'asc'
 }: PrivilegesTableViewProps) {
     const getTruncationLength = (type: 'name' | 'description' = 'name'): number => {
         if (typeof window === 'undefined') return 30;
@@ -121,10 +125,12 @@ export default function PrivilegesTableView({
         );
     };
 
+    // ✅ FIXED: Get requirement icons from discountType relationship
     const getRequirementIcons = (privilege: Privilege) => {
+        const discountType = privilege.discountType;
         return (
             <div className="flex gap-1">
-                {privilege.requires_verification && (
+                {discountType?.requires_verification && (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Shield className="h-3.5 w-3.5 text-purple-500 cursor-help" />
@@ -134,7 +140,7 @@ export default function PrivilegesTableView({
                         </TooltipContent>
                     </Tooltip>
                 )}
-                {privilege.requires_id_number && (
+                {discountType?.requires_id_number && (
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <IdCard className="h-3.5 w-3.5 text-blue-500 cursor-help" />
@@ -156,12 +162,24 @@ export default function PrivilegesTableView({
         });
     };
 
+    // ✅ FIXED: Get discount type name from discountType relationship
     const getDiscountTypeName = (privilege: Privilege) => {
-        if (privilege.discount_type) {
-            return privilege.discount_type.name;
+        return privilege?.discountType?.name || 'N/A';
+    };
+
+    // ✅ FIXED: Get discount percentage from discountType relationship
+    const getDiscountPercentage = (privilege: Privilege) => {
+        return privilege?.discountType?.percentage || 0;
+    };
+
+    // ✅ FIXED: Get validity from discountType relationship
+    const getValidity = (privilege: Privilege) => {
+        const days = privilege?.discountType?.validity_days;
+        if (days) {
+            const years = Math.floor(days / 365);
+            return `${years} year(s)`;
         }
-        const discountType = discountTypes.find(t => t.id === privilege.discount_type_id);
-        return discountType?.name || 'N/A';
+        return 'Lifetime';
     };
 
     return (
@@ -210,8 +228,14 @@ export default function PrivilegesTableView({
                                         <span className="ml-1">{getSortIcon('code')}</span>
                                     </div>
                                 </TableHead>
-                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
-                                    Discount Type
+                                <TableHead 
+                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    onClick={() => onSort('discount_type')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Discount Type
+                                        <span className="ml-1">{getSortIcon('discount_type')}</span>
+                                    </div>
                                 </TableHead>
                                 <TableHead 
                                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -227,11 +251,11 @@ export default function PrivilegesTableView({
                                 </TableHead>
                                 <TableHead 
                                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                                    onClick={() => onSort('is_active')}
+                                    onClick={() => onSort('status')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Status
-                                        <span className="ml-1">{getSortIcon('is_active')}</span>
+                                        <span className="ml-1">{getSortIcon('status')}</span>
                                     </div>
                                 </TableHead>
                                 <TableHead 
@@ -307,14 +331,17 @@ export default function PrivilegesTableView({
                                                 {privilege.code}
                                             </Badge>
                                         </TableCell>
+                                        {/* ✅ FIXED: Discount Type from relationship */}
                                         <TableCell className="px-4 py-3">
                                             {getDiscountTypeName(privilege)}
                                         </TableCell>
+                                        {/* ✅ FIXED: Discount % from relationship */}
                                         <TableCell className="px-4 py-3">
                                             <Badge className="bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400">
-                                                {privilege.default_discount_percentage}%
+                                                {getDiscountPercentage(privilege)}%
                                             </Badge>
                                         </TableCell>
+                                        {/* ✅ FIXED: Requirements from relationship */}
                                         <TableCell className="px-4 py-3">
                                             {getRequirementIcons(privilege)}
                                         </TableCell>
@@ -331,10 +358,11 @@ export default function PrivilegesTableView({
                                                 </div>
                                             </div>
                                         </TableCell>
+                                        {/* ✅ FIXED: Validity from relationship */}
                                         <TableCell className="px-4 py-3">
-                                            {privilege.validity_years ? (
+                                            {privilege?.discountType?.validity_days ? (
                                                 <Badge variant="outline">
-                                                    {privilege.validity_years} year(s)
+                                                    {getValidity(privilege)}
                                                 </Badge>
                                             ) : (
                                                 <div className="text-xs text-gray-400">Lifetime</div>

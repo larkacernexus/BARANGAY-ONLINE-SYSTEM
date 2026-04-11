@@ -24,7 +24,7 @@ import { useClearanceUtils } from '@/hooks/useClearanceUtils';
 import { usePrintClearance } from '@/hooks/usePrintClearance';
 
 // Import types
-import { ClearanceRequest, ActivityLog } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest, ActivityLog } from '@/types/admin/clearances/clearance';
 
 interface ShowClearanceProps {
     clearance: ClearanceRequest;

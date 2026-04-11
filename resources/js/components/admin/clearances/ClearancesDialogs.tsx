@@ -10,8 +10,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { StatusOption } from '@/types/clearances';
-
+import { StatusOption } from '@/types/admin/clearances/clearance';
 interface ClearancesDialogsProps {
     showBulkDeleteDialog: boolean;
     setShowBulkDeleteDialog: (value: boolean) => void;

@@ -37,8 +37,8 @@ interface UsersTableRowProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   getFullName: (user: User) => string;
-  truncateText: (text: string | null, maxLength?: number) => string;
-  truncateEmail: (email: string, maxLength?: number) => string;
+  truncateText: (text: any, maxLength?: number) => string;
+  truncateEmail: (email: any, maxLength?: number) => string;
   getStatusBadgeVariant: (status: string) => "default" | "secondary" | "destructive" | "outline";
   getStatusIcon: (status: string) => JSX.Element | null;
   getRoleBadgeVariant: (roleName: string | undefined) => "default" | "secondary" | "destructive" | "outline";
@@ -71,6 +71,22 @@ export default function UsersTableRow({
   const fullName = getFullName(user);
   const roleName = user.role?.name || 'N/A';
   const departmentName = user.department?.name || 'N/A';
+
+  // Safe text display with fallback for any type
+  const safeTruncate = (value: any, maxLength?: number): string => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return truncateText(value, maxLength);
+    if (typeof value === 'number') return truncateText(String(value), maxLength);
+    if (typeof value === 'boolean') return truncateText(String(value), maxLength);
+    if (typeof value === 'object') {
+      try {
+        return truncateText(JSON.stringify(value), maxLength);
+      } catch {
+        return truncateText(String(value), maxLength);
+      }
+    }
+    return truncateText(String(value), maxLength);
+  };
 
   const handleCopyToClipboard = (text: string, label: string) => {
     if (onCopyToClipboard) {
@@ -135,7 +151,7 @@ export default function UsersTableRow({
                 className="truncate"
                 data-full-text={fullName}
               >
-                {truncateText(fullName, 30)}
+                {safeTruncate(fullName, 30)}
               </div>
             </div>
             <div 
@@ -147,7 +163,7 @@ export default function UsersTableRow({
             </div>
             {user.username && (
               <div className="text-xs text-gray-400 truncate mt-1">
-                @{truncateText(user.username, 15)}
+                @{safeTruncate(user.username, 15)}
               </div>
             )}
           </div>
@@ -159,7 +175,7 @@ export default function UsersTableRow({
           className="truncate max-w-full"
           title={roleName}
         >
-          {truncateText(roleName, 20)}
+          {safeTruncate(roleName, 20)}
         </Badge>
         {user.two_factor_confirmed_at && (
           <div className="mt-1">
@@ -179,7 +195,7 @@ export default function UsersTableRow({
           className="text-sm truncate"
           title={departmentName}
         >
-          {truncateText(departmentName, 20)}
+          {safeTruncate(departmentName, 20)}
         </div>
       </TableCell>
       <TableCell className="px-4 py-3">
@@ -224,7 +240,7 @@ export default function UsersTableRow({
           </div>
           {user.position && (
             <div className="text-xs text-gray-400 dark:text-gray-500 truncate">
-              Position: {truncateText(user.position, 15)}
+              Position: {safeTruncate(user.position, 15)}
             </div>
           )}
         </div>

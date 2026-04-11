@@ -22,6 +22,7 @@ export interface Permission {
     is_active: boolean;
     created_at: string;
     updated_at: string;
+    roles_count: any;
 }
 
 export interface Granter {
@@ -32,12 +33,18 @@ export interface Granter {
 }
 
 export interface RolePermission {
+    granted_by_name: any;
+    created_at: any;
+    module: string | undefined;
+    roles_count: any;
+    granter_id: any;
     id: number;
     role_id: number;
     permission_id: number;
     granted_by: number;
     granted_at: string;
     expires_at?: string | null;
+    permission_display_name?: string; 
     
     // Optional properties from nested objects (for backward compatibility)
     permission_name?: string;
@@ -46,6 +53,7 @@ export interface RolePermission {
     role_type?: string;
     assigned_by_name?: string;
     assigned_by_email?: string;
+    is_active: any;
     
     // Nested objects
     role?: Role;
@@ -60,6 +68,8 @@ export interface FilterState {
     role: string;
     module: string;
     granter: string;
+    date_range: string;
+    roles_count_range: string;
     sort: string;
     order: 'asc' | 'desc';
 }
@@ -100,6 +110,8 @@ export interface RolePermissionCustomProps {
         meta: PaginationMeta;
     };
     filters?: {
+        date_range(date_range: any, arg1: string): string | (() => string);
+        roles_count_range(roles_count_range: any, arg1: string): string | (() => string);
         search?: string;
         role?: string;
         module?: string;

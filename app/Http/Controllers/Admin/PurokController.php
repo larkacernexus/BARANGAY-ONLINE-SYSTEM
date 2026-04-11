@@ -144,7 +144,7 @@ class PurokController extends Controller
             }])
             ->orderBy('household_number');
         
-        $households = $householdsQuery->paginate(10, ['*'], 'household_page')
+        $households = $householdsQuery->paginate(20, ['*'], 'household_page')
             ->withQueryString();
 
         // Load residents with pagination
@@ -152,7 +152,7 @@ class PurokController extends Controller
             ->orderBy('last_name')
             ->orderBy('first_name');
         
-        $residents = $residentsQuery->paginate(15, ['*'], 'resident_page')
+        $residents = $residentsQuery->paginate(20, ['*'], 'resident_page')
             ->withQueryString();
 
         // Get statistics for this purok
@@ -212,7 +212,6 @@ class PurokController extends Controller
                 'address' => $household->address,
                 'contact_number' => $household->contact_number,
                 'created_at' => $household->created_at,
-                // ADD COORDINATES FOR MAP
                 'latitude' => $household->latitude,
                 'longitude' => $household->longitude,
                 'head_of_household' => $headMember && $headMember->resident ? [

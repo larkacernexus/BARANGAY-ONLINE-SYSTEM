@@ -15,7 +15,7 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
-import { BulkOperation, BulkActionItem } from '@/types/portal/clearances/clearance.types';
+import { BulkOperation, BulkActionItem } from '@/types/admin/clearances/clearance';
 
 
 

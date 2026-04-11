@@ -289,8 +289,8 @@ export default function CommunityReportsFilters({
                         </div>
                     </div>
 
-                    {/* Basic Filters */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {/* Basic Filters - Removed Sort By */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
                         <div className="space-y-1">
                             <Label className="text-xs text-gray-500 dark:text-gray-400">Status</Label>
                             <select
@@ -370,35 +370,6 @@ export default function CommunityReportsFilters({
                                     </option>
                                 ))}
                             </select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Sort By</Label>
-                            <div className="flex gap-1">
-                                <select
-                                    className="flex-1 border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                >
-                                    <option value="created_at">Date Created</option>
-                                    <option value="report_number">Report ID</option>
-                                    <option value="title">Title</option>
-                                    <option value="incident_date">Incident Date</option>
-                                    <option value="priority">Priority</option>
-                                    <option value="urgency_level">Urgency</option>
-                                    <option value="status">Status</option>
-                                    <option value="impact_level">Impact Level</option>
-                                    <option value="estimated_affected_count">Affected Count</option>
-                                </select>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-9 w-9 p-0 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                                >
-                                    {sortOrder === 'asc' ? '↑' : '↓'}
-                                </Button>
-                            </div>
                         </div>
                     </div>
 

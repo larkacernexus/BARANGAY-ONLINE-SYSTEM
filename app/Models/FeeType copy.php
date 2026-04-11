@@ -19,13 +19,13 @@ class FeeType extends Model
         'computation_formula',
         'unit',
         'has_senior_discount',
-        'senior_discount_percentage',
+        'senior_percentage',
         'has_pwd_discount',
-        'pwd_discount_percentage',
+        'pwd_percentage',
         'has_solo_parent_discount',
-        'solo_parent_discount_percentage',
+        'solo_parent_percentage',
         'has_indigent_discount',
-        'indigent_discount_percentage',
+        'indigent_percentage',
         'has_surcharge',
         'surcharge_percentage',
         'surcharge_fixed',
@@ -50,10 +50,10 @@ class FeeType extends Model
 
     protected $casts = [
         'base_amount' => 'decimal:2',
-        'senior_discount_percentage' => 'decimal:2',
-        'pwd_discount_percentage' => 'decimal:2',
-        'solo_parent_discount_percentage' => 'decimal:2',
-        'indigent_discount_percentage' => 'decimal:2',
+        'senior_percentage' => 'decimal:2',
+        'pwd_percentage' => 'decimal:2',
+        'solo_parent_percentage' => 'decimal:2',
+        'indigent_percentage' => 'decimal:2',
         'surcharge_percentage' => 'decimal:2',
         'surcharge_fixed' => 'decimal:2',
         'penalty_percentage' => 'decimal:2',
@@ -209,19 +209,19 @@ class FeeType extends Model
     public function getDiscountPercentageForResident(Resident $resident): float
     {
         if ($resident->is_senior && $this->has_senior_discount) {
-            return $this->senior_discount_percentage ?? 0;
+            return $this->senior_percentage ?? 0;
         }
         
         if ($resident->is_pwd && $this->has_pwd_discount) {
-            return $this->pwd_discount_percentage ?? 0;
+            return $this->pwd_percentage ?? 0;
         }
         
         if ($resident->is_solo_parent && $this->has_solo_parent_discount) {
-            return $this->solo_parent_discount_percentage ?? 0;
+            return $this->solo_parent_percentage ?? 0;
         }
         
         if ($resident->is_indigent && $this->has_indigent_discount) {
-            return $this->indigent_discount_percentage ?? 0;
+            return $this->indigent_percentage ?? 0;
         }
         
         return 0;
@@ -254,28 +254,28 @@ class FeeType extends Model
         
         if ($this->has_senior_discount) {
             $discounts['senior'] = [
-                'percentage' => $this->senior_discount_percentage,
+                'percentage' => $this->senior_percentage,
                 'label' => 'Senior Citizen',
             ];
         }
         
         if ($this->has_pwd_discount) {
             $discounts['pwd'] = [
-                'percentage' => $this->pwd_discount_percentage,
+                'percentage' => $this->pwd_percentage,
                 'label' => 'Person with Disability',
             ];
         }
         
         if ($this->has_solo_parent_discount) {
             $discounts['solo_parent'] = [
-                'percentage' => $this->solo_parent_discount_percentage,
+                'percentage' => $this->solo_parent_percentage,
                 'label' => 'Solo Parent',
             ];
         }
         
         if ($this->has_indigent_discount) {
             $discounts['indigent'] = [
-                'percentage' => $this->indigent_discount_percentage,
+                'percentage' => $this->indigent_percentage,
                 'label' => 'Indigent',
             ];
         }

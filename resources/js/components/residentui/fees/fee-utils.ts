@@ -20,36 +20,66 @@ export const formatDate = (dateString: string, isMobile: boolean = false) => {
     }
 };
 
-export const formatCurrency = (amount: number) => {
-    return `₱${amount.toFixed(2)}`;
+// FIXED: Add safety checks for undefined/null values
+export const formatCurrency = (amount: number | string | undefined | null) => {
+    // Safety check for undefined, null, or empty values
+    if (amount === undefined || amount === null || amount === '') {
+        return '₱0.00';
+    }
+    
+    // Convert to number if it's a string
+    let numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    // Check if it's a valid number
+    if (isNaN(numericAmount) || !isFinite(numericAmount)) {
+        return '₱0.00';
+    }
+    
+    // Ensure we have a number with 2 decimal places
+    return `₱${numericAmount.toFixed(2)}`;
+};
+
+// Alternative version that handles different fee structures
+export const formatFeeAmount = (fee: any) => {
+    if (!fee) return '₱0.00';
+    
+    // Try to get amount from different possible field names
+    const amount = fee.total_amount ?? fee.amount ?? fee.base_amount ?? 0;
+    return formatCurrency(amount);
 };
 
 export const getCategoryDisplay = (feeType: any) => {
-    if (!feeType) return '';
-    return feeType.document_category?.name || feeType.category_display || feeType.category || 'Uncategorized';
+    if (!feeType) return 'Uncategorized';
+    return feeType.document_category?.name || feeType.category_display || feeType.category || feeType.name || 'Uncategorized';
 };
 
 export const getStatusCount = (stats: any, status: string, fees: any[] = []) => {
+    // Safety check for stats
+    if (!stats) {
+        if (status === 'all') return fees?.length || 0;
+        return fees?.filter(f => f?.status === status).length || 0;
+    }
+    
     switch(status) {
         case 'all': 
             return stats.total_fees || 0;
         case 'pending': 
             return stats.pending_fees || 0;
         case 'issued': 
-            return stats.issued_fees || fees.filter(f => f.status === 'issued').length;
+            return stats.issued_fees || fees?.filter(f => f?.status === 'issued').length || 0;
         case 'overdue': 
             return stats.overdue_fees || 0;
         case 'paid': 
             return stats.paid_fees || 0;
         case 'cancelled': 
-            return stats.cancelled_fees || fees.filter(f => f.status === 'cancelled').length;
+            return stats.cancelled_fees || fees?.filter(f => f?.status === 'cancelled').length || 0;
         default: 
             return 0;
     }
 };
 
 export const printFeesList = (fees: any[], statusFilter: string, formatDate: any, getCategoryDisplay: any, formatCurrency: any) => {
-    if (fees.length === 0) {
+    if (!fees || fees.length === 0) {
         toast.error('No fees to print');
         return;
     }
@@ -59,6 +89,12 @@ export const printFeesList = (fees: any[], statusFilter: string, formatDate: any
         toast.error('Please allow popups to print');
         return;
     }
+    
+    // Calculate total amount safely
+    const totalAmount = fees.reduce((sum, f) => {
+        const amount = f?.total_amount ?? f?.amount ?? f?.base_amount ?? 0;
+        return sum + (typeof amount === 'number' ? amount : 0);
+    }, 0);
     
     const printContent = `
         <!DOCTYPE html>
@@ -81,6 +117,8 @@ export const printFeesList = (fees: any[], statusFilter: string, formatDate: any
                 .badge-pending { background: #fef3c7; color: #92400e; }
                 .badge-paid { background: #d1fae5; color: #065f46; }
                 .badge-overdue { background: #fee2e2; color: #991b1b; }
+                .badge-issued { background: #dbeafe; color: #1e40af; }
+                .badge-cancelled { background: #f3f4f6; color: #374151; }
                 .footer { margin-top: 30px; text-align: center; color: #6b7280; font-size: 11px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
             </style>
         </head>
@@ -96,7 +134,7 @@ export const printFeesList = (fees: any[], statusFilter: string, formatDate: any
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">Total Amount</div>
-                        <div class="stat-value">${formatCurrency(fees.reduce((sum, f) => sum + f.total_amount, 0))}</div>
+                        <div class="stat-value">${formatCurrency(totalAmount)}</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-label">Status</div>
@@ -118,18 +156,22 @@ export const printFeesList = (fees: any[], statusFilter: string, formatDate: any
                         </tr>
                     </thead>
                     <tbody>
-                        ${fees.map(fee => `
-                            <tr>
-                                <td><strong>${fee.fee_code}</strong></td>
-                                <td>${fee.purpose}</td>
-                                <td>${getCategoryDisplay(fee.fee_type)}</td>
-                                <td>${formatDate(fee.issue_date)}</td>
-                                <td>${formatDate(fee.due_date)}</td>
-                                <td><span class="badge badge-${fee.status}">${fee.status.replace('_', ' ').toUpperCase()}</span></td>
-                                <td>${fee.formatted_total}</td>
-                                <td>${fee.formatted_balance}</td>
-                            </tr>
-                        `).join('')}
+                        ${fees.map(fee => {
+                            const amount = fee?.total_amount ?? fee?.amount ?? fee?.base_amount ?? 0;
+                            const balance = fee?.balance ?? fee?.amount_paid ? amount - (fee.amount_paid || 0) : amount;
+                            return `
+                                <tr>
+                                    <td><strong>${fee?.fee_code || 'N/A'}</strong></td>
+                                    <td>${fee?.purpose || fee?.description || 'N/A'}</td>
+                                    <td>${getCategoryDisplay(fee?.fee_type)}</td>
+                                    <td>${formatDate(fee?.issue_date || fee?.created_at)}</td>
+                                    <td>${formatDate(fee?.due_date)}</td>
+                                    <td><span class="badge badge-${fee?.status || 'pending'}">${(fee?.status || 'pending').replace('_', ' ').toUpperCase()}</span></td>
+                                    <td>${formatCurrency(amount)}</td>
+                                    <td>${formatCurrency(balance)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
                 
@@ -155,7 +197,7 @@ export const exportToCSV = (
     setIsExporting: (value: boolean) => void,
     toast: any
 ) => {
-    if (fees.length === 0) {
+    if (!fees || fees.length === 0) {
         toast.error('No fees to export');
         return;
     }
@@ -163,44 +205,57 @@ export const exportToCSV = (
     setIsExporting(true);
     
     setTimeout(() => {
-        const headers = ['Fee Code', 'OR Number', 'Purpose', 'Type', 'Issue Date', 'Due Date', 'Status', 'Base Amount', 'Surcharge', 'Penalty', 'Discount', 'Total Amount', 'Amount Paid', 'Balance'];
-        
-        const csvData = fees.map(fee => [
-            fee.fee_code,
-            fee.or_number || '',
-            `"${(fee.purpose || '').replace(/"/g, '""')}"`,
-            getCategoryDisplay(fee.fee_type),
-            formatDate(fee.issue_date),
-            formatDate(fee.due_date),
-            fee.status,
-            fee.base_amount,
-            fee.surcharge_amount,
-            fee.penalty_amount,
-            fee.discount_amount,
-            fee.total_amount,
-            fee.amount_paid,
-            fee.balance
-        ]);
-        
-        const csvContent = [
-            headers.join(','),
-            ...csvData.map(row => row.join(','))
-        ].join('\n');
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        
-        link.setAttribute('href', url);
-        link.setAttribute('download', `fees_${statusFilter}_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        setIsExporting(false);
-        toast.success('CSV file downloaded successfully');
+        try {
+            const headers = ['Fee Code', 'OR Number', 'Purpose', 'Type', 'Issue Date', 'Due Date', 'Status', 'Base Amount', 'Surcharge', 'Penalty', 'Discount', 'Total Amount', 'Amount Paid', 'Balance'];
+            
+            const csvData = fees.map(fee => {
+                // Safely get values with fallbacks
+                const totalAmount = fee?.total_amount ?? fee?.amount ?? fee?.base_amount ?? 0;
+                const amountPaid = fee?.amount_paid ?? 0;
+                const balance = fee?.balance ?? (totalAmount - amountPaid);
+                
+                return [
+                    fee?.fee_code || 'N/A',
+                    fee?.or_number || '',
+                    `"${(fee?.purpose || fee?.description || '').replace(/"/g, '""')}"`,
+                    getCategoryDisplay(fee?.fee_type),
+                    formatDate(fee?.issue_date || fee?.created_at),
+                    formatDate(fee?.due_date),
+                    fee?.status || 'pending',
+                    fee?.base_amount || 0,
+                    fee?.surcharge_amount || 0,
+                    fee?.penalty_amount || 0,
+                    fee?.discount_amount || 0,
+                    totalAmount,
+                    amountPaid,
+                    balance
+                ];
+            });
+            
+            const csvContent = [
+                headers.join(','),
+                ...csvData.map(row => row.join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `fees_${statusFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            setIsExporting(false);
+            toast.success('CSV file downloaded successfully');
+        } catch (error) {
+            console.error('Export error:', error);
+            toast.error('Failed to export CSV');
+            setIsExporting(false);
+        }
     }, 500);
 };

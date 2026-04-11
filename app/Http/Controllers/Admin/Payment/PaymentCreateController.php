@@ -13,15 +13,25 @@ use App\Models\DiscountRule;
 use App\Models\ClearanceRequest;
 use App\Models\ClearanceType;
 use App\Models\Privilege;
+use App\Models\DiscountType;
+use App\Services\SimpleDiscountService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Collection;
 use Carbon\Carbon;
 
 class PaymentCreateController extends BasePaymentController
 {
+    protected $discountService;
+
+    public function __construct(SimpleDiscountService $discountService)
+    {
+        $this->discountService = $discountService;
+    }
+
     /**
      * Show the form for creating a new payment.
      */
@@ -39,7 +49,7 @@ class PaymentCreateController extends BasePaymentController
             $preFilledData = $this->extractPreFilledData($request);
             Log::info('📋 Pre-filled data:', $preFilledData);
 
-            // Get ALL active privileges from database
+            // Get ALL active privileges from database with their discount types
             $allPrivileges = $this->getAllPrivileges();
             Log::info('🔑 Privileges loaded:', ['count' => count($allPrivileges)]);
 
@@ -222,26 +232,55 @@ class PaymentCreateController extends BasePaymentController
     }
 
     /**
-     * Get all active privileges
+     * Get all active privileges with their discount types
+     * ✅ FIXED: Get discount percentage from DiscountType, not Privilege
      */
-    private function getAllPrivileges(): array
+   private function getAllPrivileges(): array
+{
+    return Privilege::with('discountType')
+        ->where('is_active', true)
+        ->orderBy('name')
+        ->get()
+        ->map(function ($privilege) {
+            $discountType = $privilege->discountType;
+            return [
+                'id' => $privilege->id,
+                'name' => $privilege->name,
+                'code' => $privilege->code,
+                'description' => $privilege->description,
+                'discount_type_id' => $discountType?->id,
+                'discount_type_code' => $discountType?->code,
+                'discount_type_name' => $discountType?->name,
+                // ✅ FIXED: Use 'percentage' instead of 'default_percentage'
+                'default_discount_percentage' => $discountType?->percentage ?? 0,
+                // ✅ FIXED: Verification fields now come from DiscountType
+                'requires_id_number' => $discountType?->requires_id_number ?? false,
+                'requires_verification' => $discountType?->requires_verification ?? false,
+                'verification_document' => $discountType?->verification_document ?? null,
+                'validity_days' => $discountType?->validity_days ?? 0,
+                'priority' => $discountType?->priority ?? 100,
+            ];
+        })
+        ->toArray();
+}
+    /**
+     * Helper function to get photo URL
+     */
+    private function getPhotoUrl(?string $photoPath): ?string
     {
-        return Privilege::where('is_active', true)
-            ->orderBy('name')
-            ->get()
-            ->map(function ($privilege) {
-                return [
-                    'id' => $privilege->id,
-                    'name' => $privilege->name,
-                    'code' => $privilege->code,
-                    'description' => $privilege->description,
-                    'default_discount_percentage' => $privilege->default_discount_percentage,
-                    'requires_id_number' => $privilege->requires_id_number,
-                    'requires_verification' => $privilege->requires_verification,
-                    'validity_years' => $privilege->validity_years,
-                ];
-            })
-            ->toArray();
+        if (!$photoPath) {
+            return null;
+        }
+        
+        if (filter_var($photoPath, FILTER_VALIDATE_URL)) {
+            return $photoPath;
+        }
+        
+        if (str_starts_with($photoPath, '/storage')) {
+            return $photoPath;
+        }
+        
+        return Storage::url($photoPath);
     }
 
     /**
@@ -257,7 +296,6 @@ class PaymentCreateController extends BasePaymentController
                 $outstandingFees = Fee::where('payer_id', $business->id)
                     ->where('payer_type', 'App\\Models\\Business')
                     ->where('balance', '>', 0)
-                    ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
                     ->get();
 
                 $clearanceRequests = $this->getBusinessOwnerClearanceRequests($business, $allPrivileges);
@@ -347,7 +385,8 @@ class PaymentCreateController extends BasePaymentController
     }
 
     /**
-     * Get residents with complete data
+     * Get residents with complete data INCLUDING PHOTO_PATH
+     * ✅ FIXED: Get discount percentage from DiscountType through privilege
      */
     private function getResidents(array $allPrivileges): array
     {
@@ -357,7 +396,7 @@ class PaymentCreateController extends BasePaymentController
                     $query->with('resident');
                 },
                 'householdMember',
-                'residentPrivileges.privilege'
+                'residentPrivileges.privilege.discountType'
             ])
             ->orderBy('last_name')
             ->orderBy('first_name')
@@ -366,7 +405,6 @@ class PaymentCreateController extends BasePaymentController
                 $outstandingFees = Fee::where('payer_id', $resident->id)
                     ->where('payer_type', 'App\Models\Resident')
                     ->where('balance', '>', 0)
-                    ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
                     ->get();
 
                 $clearanceRequests = $this->getResidentClearanceRequests($resident, $allPrivileges);
@@ -374,27 +412,38 @@ class PaymentCreateController extends BasePaymentController
                 $householdInfo = $this->getResidentHouseholdInfo($resident, $allPrivileges);
                 $isHouseholdHead = $this->isResidentHouseholdHead($resident);
 
-                // Get active privileges
-                $activePrivileges = $resident->residentPrivileges
-                    ->filter(function ($rp) {
-                        return $rp->isActive();
-                    })
-                    ->map(function ($rp) use ($allPrivileges) {
-                        $privilege = $rp->privilege;
-                        return [
-                            'id' => $rp->id,
-                            'privilege_id' => $privilege->id,
-                            'name' => $privilege->name,
-                            'code' => $privilege->code,
-                            'id_number' => $rp->id_number,
-                            'verified_at' => $rp->verified_at?->format('Y-m-d'),
-                            'expires_at' => $rp->expires_at?->format('Y-m-d'),
-                            'is_active' => true,
-                            'discount_percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
-                        ];
-                    })
-                    ->values()
-                    ->toArray();
+                $photoUrl = $this->getPhotoUrl($resident->photo_path);
+
+              $activePrivileges = $resident->residentPrivileges
+                ->filter(function ($rp) {
+                    return $rp->isActive();
+                })
+                ->map(function ($rp) use ($allPrivileges) {
+                    $privilege = $rp->privilege;
+                    $discountType = $privilege?->discountType;
+                    return [
+                        'id' => $rp->id,
+                        'privilege_id' => $privilege?->id,
+                        'name' => $privilege?->name,
+                        'code' => $privilege?->code,
+                        'id_number' => $rp->id_number,
+                        'verified_at' => $rp->verified_at?->format('Y-m-d'),
+                        'expires_at' => $rp->expires_at?->format('Y-m-d'),
+                        'is_active' => true,
+                        // ✅ FIXED: Get percentage from DiscountType using 'percentage'
+                        'discount_percentage' => $rp->discount_percentage ?? $discountType?->percentage ?? 0,
+                        'discount_type_id' => $discountType?->id,
+                        'discount_type_code' => $discountType?->code,
+                        'discount_type_name' => $discountType?->name,
+                        // ✅ Added verification info from DiscountType
+                        'requires_id_number' => $discountType?->requires_id_number ?? false,
+                        'requires_verification' => $discountType?->requires_verification ?? false,
+                        'verification_document' => $discountType?->verification_document ?? null,
+                        'validity_days' => $discountType?->validity_days ?? 0,
+                    ];
+                })
+                ->values()
+                ->toArray();
 
                 $privilegeFlags = [];
                 $discountEligibilityList = [];
@@ -412,6 +461,7 @@ class PaymentCreateController extends BasePaymentController
                         'has_id' => !empty($priv['id_number']),
                         'privilege_code' => $priv['code'],
                         'expires_at' => $priv['expires_at'],
+                        'discount_type_code' => $priv['discount_type_code'],
                     ];
                 }
 
@@ -425,6 +475,8 @@ class PaymentCreateController extends BasePaymentController
                     'contact_number' => $resident->contact_number,
                     'email' => $resident->email,
                     'address' => $resident->address,
+                    'photo_path' => $resident->photo_path,
+                    'photo_url' => $photoUrl,
                     'birth_date' => $resident->birth_date?->format('Y-m-d'),
                     'age' => $resident->age,
                     'gender' => $resident->gender,
@@ -460,6 +512,7 @@ class PaymentCreateController extends BasePaymentController
 
     /**
      * Get resident's discount eligibility list
+     * ✅ FIXED: Get percentage from DiscountType through privilege
      */
     private function getResidentDiscountEligibility($resident, array $allPrivileges): array
     {
@@ -471,15 +524,17 @@ class PaymentCreateController extends BasePaymentController
             }
             
             $privilege = $rp->privilege;
+            $discountType = $privilege?->discountType;
             
             $eligibility[] = [
                 'type' => strtolower($privilege->code),
                 'label' => $privilege->name,
-                'percentage' => $rp->discount_percentage ?? $privilege->default_discount_percentage,
+                'percentage' => $rp->discount_percentage ?? $discountType?->default_percentage ?? 0,
                 'id_number' => $rp->id_number,
                 'has_id' => !empty($rp->id_number),
                 'privilege_code' => $privilege->code,
                 'expires_at' => $rp->expires_at?->format('Y-m-d'),
+                'discount_type_code' => $discountType?->code,
             ];
         }
         
@@ -583,7 +638,7 @@ class PaymentCreateController extends BasePaymentController
         return Household::with([
                 'purok',
                 'householdMembers' => function ($query) use ($allPrivileges) {
-                    $query->with(['resident.residentPrivileges.privilege']);
+                    $query->with(['resident.residentPrivileges.privilege.discountType']);
                 },
                 'user'
             ])
@@ -593,7 +648,6 @@ class PaymentCreateController extends BasePaymentController
                 $outstandingFees = Fee::where('payer_id', $household->id)
                     ->where('payer_type', 'App\Models\Household')
                     ->where('balance', '>', 0)
-                    ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
                     ->get();
 
                 $clearanceRequests = $this->getHouseholdClearanceRequests($household, $allPrivileges);
@@ -615,10 +669,12 @@ class PaymentCreateController extends BasePaymentController
                         })
                         ->map(function ($rp) {
                             $privilege = $rp->privilege;
+                            $discountType = $privilege?->discountType;
                             return [
-                                'code' => $privilege->code,
-                                'name' => $privilege->name,
+                                'code' => $privilege?->code,
+                                'name' => $privilege?->name,
                                 'id_number' => $rp->id_number,
+                                'discount_percentage' => $discountType?->default_percentage ?? 0,
                             ];
                         })
                         ->values()
@@ -660,6 +716,8 @@ class PaymentCreateController extends BasePaymentController
                         'age' => $headMember->resident->age,
                         'gender' => $headMember->resident->gender,
                         'relationship' => $headMember->relationship_to_head,
+                        'photo_path' => $headMember->resident->photo_path,
+                        'photo_url' => $this->getPhotoUrl($headMember->resident->photo_path),
                     ] : null,
                     'head_name' => $household->current_head_name,
                     'head_id' => $headMember->resident_id ?? null,
@@ -768,6 +826,8 @@ class PaymentCreateController extends BasePaymentController
                     'is_head' => $member->is_head,
                     'age' => $resident->age ?? null,
                     'gender' => $resident->gender ?? null,
+                    'photo_path' => $resident->photo_path ?? null,
+                    'photo_url' => $this->getPhotoUrl($resident->photo_path ?? null),
                     'privileges' => $activePrivileges,
                 ], $privilegeFlags);
             })
@@ -803,86 +863,103 @@ class PaymentCreateController extends BasePaymentController
     }
 
     /**
-     * Get all outstanding fees
+     * GET ALL OUTSTANDING FEES - Shows all fees that need payment
      */
     private function getAllOutstandingFees(array $allPrivileges): Collection
     {
-        return Fee::with([
+        $query = Fee::with([
                 'feeType',
                 'payer'
             ])
-            ->where('balance', '>', 0)
-            ->whereIn('status', ['pending', 'issued', 'partially_paid', 'overdue'])
+            ->where(function($query) {
+                $query->where('balance', '>', 0)
+                      ->orWhereIn('status', ['pending', 'pending_payment']);
+            })
+            ->where('status', '!=', 'paid')
             ->orderBy('due_date', 'asc')
-            ->orderBy('payer_name', 'asc')
-            ->get()
-            ->map(function ($fee) use ($allPrivileges) {
-                $applicableDiscounts = [];
-                $residentDetails = null;
-                $householdDetails = null;
-                $businessDetails = null;
+            ->orderBy('payer_name', 'asc');
 
-                if ($fee->payer_type === 'App\Models\Resident' && $fee->payer) {
-                    $applicableDiscounts = $this->getApplicableDiscountsForFee($fee, $allPrivileges);
-                    $residentDetails = $this->getResidentDetailsForFee($fee, $allPrivileges);
-                } elseif ($fee->payer_type === 'App\Models\Household' && $fee->payer) {
-                    $householdDetails = $this->getHouseholdDetailsForFee($fee, $allPrivileges);
-                } elseif ($fee->payer_type === 'App\Models\Business' && $fee->payer) {
-                    $businessDetails = $this->getBusinessDetailsForFee($fee);
-                }
+        Log::info('📊 Fee query SQL:', ['sql' => $query->toSql(), 'bindings' => $query->getBindings()]);
+        
+        $fees = $query->get();
+        
+        Log::info('📊 Fees found:', [
+            'total_count' => $fees->count(),
+            'status_breakdown' => $fees->groupBy('status')->map->count()->toArray(),
+            'balance_breakdown' => [
+                'balance_gt_zero' => $fees->filter(fn($f) => $f->balance > 0)->count(),
+                'balance_eq_zero' => $fees->filter(fn($f) => $f->balance == 0)->count(),
+            ],
+            'sample_ids' => $fees->pluck('id')->toArray(),
+        ]);
 
-                $discountFlags = [];
-                foreach ($allPrivileges as $privilege) {
-                    $code = strtolower($privilege['code']);
-                    $discountFlags["fee_type_has_{$code}_discount"] = false;
-                    $discountFlags["fee_type_{$code}_discount_percentage"] = 0;
-                }
+        return $fees->map(function ($fee) use ($allPrivileges) {
+            $applicableDiscounts = [];
+            $residentDetails = null;
+            $householdDetails = null;
+            $businessDetails = null;
 
-                return array_merge([
-                    'id' => $fee->id,
-                    'fee_type_id' => $fee->fee_type_id,
-                    'fee_code' => $fee->fee_code,
-                    'payer_type' => $fee->payer_type,
-                    'payer_id' => $fee->payer_id,
-                    'business_name' => $fee->business_name,
-                    'payer_name' => $fee->payer_name,
-                    'contact_number' => $fee->contact_number,
-                    'address' => $fee->address,
-                    'purok' => $fee->purok,
-                    'zone' => $fee->zone,
-                    'billing_period' => $fee->billing_period,
-                    'period_start' => $fee->period_start?->format('Y-m-d'),
-                    'period_end' => $fee->period_end?->format('Y-m-d'),
-                    'issue_date' => $fee->issue_date->format('Y-m-d'),
-                    'due_date' => $fee->due_date->format('Y-m-d'),
-                    'base_amount' => floatval($fee->base_amount),
-                    'surcharge_amount' => floatval($fee->surcharge_amount),
-                    'penalty_amount' => floatval($fee->penalty_amount),
-                    'discount_amount' => floatval($fee->discount_amount),
-                    'total_amount' => floatval($fee->total_amount),
-                    'status' => $fee->status,
-                    'amount_paid' => floatval($fee->amount_paid),
-                    'balance' => floatval($fee->balance),
-                    'fee_type_name' => $fee->feeType->name ?? 'Unknown',
-                    'fee_type_category' => $fee->feeType->category ?? 'other',
-                    'applicableDiscounts' => $applicableDiscounts,
-                    'canApplyDiscount' => count($applicableDiscounts) > 0,
-                    'resident_details' => $residentDetails,
-                    'household_details' => $householdDetails,
-                    'business_details' => $businessDetails,
-                    'fee_type' => $fee->feeType ? [
-                        'id' => $fee->feeType->id,
-                        'name' => $fee->feeType->name,
-                        'code' => $fee->feeType->code,
-                        'base_amount' => $fee->feeType->base_amount,
-                        'category' => $fee->feeType->category,
-                    ] : null,
-                ], $discountFlags);
-            });
+            if ($fee->payer_type === 'App\Models\Resident' && $fee->payer) {
+                $applicableDiscounts = $this->getApplicableDiscountsForFee($fee, $allPrivileges);
+                $residentDetails = $this->getResidentDetailsForFee($fee, $allPrivileges);
+            } elseif ($fee->payer_type === 'App\Models\Household' && $fee->payer) {
+                $householdDetails = $this->getHouseholdDetailsForFee($fee, $allPrivileges);
+            } elseif ($fee->payer_type === 'App\Models\Business' && $fee->payer) {
+                $businessDetails = $this->getBusinessDetailsForFee($fee);
+            }
+
+            $discountFlags = [];
+            foreach ($allPrivileges as $privilege) {
+                $code = strtolower($privilege['code']);
+                $discountFlags["fee_type_has_{$code}_discount"] = false;
+                $discountFlags["fee_type_{$code}_discount_percentage"] = $privilege['default_discount_percentage'] ?? 0;
+            }
+
+            return array_merge([
+                'id' => $fee->id,
+                'fee_type_id' => $fee->fee_type_id,
+                'fee_code' => $fee->fee_code,
+                'payer_type' => $fee->payer_type,
+                'payer_id' => $fee->payer_id,
+                'business_name' => $fee->business_name,
+                'payer_name' => $fee->payer_name,
+                'contact_number' => $fee->contact_number,
+                'address' => $fee->address,
+                'purok' => $fee->purok,
+                'zone' => $fee->zone,
+                'billing_period' => $fee->billing_period,
+                'period_start' => $fee->period_start?->format('Y-m-d'),
+                'period_end' => $fee->period_end?->format('Y-m-d'),
+                'issue_date' => $fee->issue_date->format('Y-m-d'),
+                'due_date' => $fee->due_date->format('Y-m-d'),
+                'base_amount' => floatval($fee->base_amount),
+                'surcharge_amount' => floatval($fee->surcharge_amount),
+                'penalty_amount' => floatval($fee->penalty_amount),
+                'discount_amount' => floatval($fee->discount_amount),
+                'total_amount' => floatval($fee->total_amount),
+                'status' => $fee->status,
+                'amount_paid' => floatval($fee->amount_paid),
+                'balance' => floatval($fee->balance),
+                'fee_type_name' => $fee->feeType->name ?? 'Unknown',
+                'fee_type_category' => $fee->feeType->category ?? 'other',
+                'applicableDiscounts' => $applicableDiscounts,
+                'canApplyDiscount' => count($applicableDiscounts) > 0,
+                'resident_details' => $residentDetails,
+                'household_details' => $householdDetails,
+                'business_details' => $businessDetails,
+                'fee_type' => $fee->feeType ? [
+                    'id' => $fee->feeType->id,
+                    'name' => $fee->feeType->name,
+                    'code' => $fee->feeType->code,
+                    'base_amount' => $fee->feeType->base_amount,
+                    'category' => $fee->feeType->category,
+                ] : null,
+            ], $discountFlags);
+        });
     }
 
     /**
-     * Get applicable discounts for fee
+     * Get applicable discounts for fee - REVISED to use SimpleDiscountService
      */
     private function getApplicableDiscountsForFee($fee, array $allPrivileges): array
     {
@@ -895,29 +972,20 @@ class PaymentCreateController extends BasePaymentController
         if ($fee->payer_type === 'App\Models\Resident' && $fee->payer) {
             $resident = $fee->payer;
             
-            foreach ($resident->residentPrivileges as $rp) {
-                if (!$rp->isActive()) {
-                    continue;
-                }
-                
-                $privilege = $rp->privilege;
-                
-                $hasDiscountField = "has_{$privilege->code}_discount";
-                $percentageField = "{$privilege->code}_discount_percentage";
-                
-                $isDiscountApplicable = $fee->feeType->$hasDiscountField ?? false;
-                $applicablePercentage = $fee->feeType->$percentageField ?? $rp->discount_percentage ?? $privilege->default_discount_percentage;
-
-                if ($isDiscountApplicable) {
-                    $applicableDiscounts[] = [
-                        'type' => strtolower($privilege->code),
-                        'label' => $privilege->name,
-                        'percentage' => $applicablePercentage,
-                        'id_number' => $rp->id_number,
-                        'has_id' => !empty($rp->id_number),
-                        'privilege_code' => $privilege->code,
-                    ];
-                }
+            // Use the discount service to get eligible discounts
+            $discountResult = $this->discountService->calculateDiscount($resident, $fee->total_amount, $fee->feeType);
+            
+            // Transform to frontend format
+            foreach ($discountResult['applied_discounts'] as $applied) {
+                $applicableDiscounts[] = [
+                    'type' => strtolower($applied['code']),
+                    'label' => $applied['name'],
+                    'percentage' => $applied['percentage'],
+                    'id_number' => $applied['id_number'] ?? null,
+                    'has_id' => !empty($applied['id_number']),
+                    'privilege_code' => $applied['code'],
+                    'discount_type_code' => $applied['code'],
+                ];
             }
         }
 
@@ -942,9 +1010,10 @@ class PaymentCreateController extends BasePaymentController
                 return $rp->isActive();
             })
             ->map(function ($rp) {
+                $privilege = $rp->privilege;
                 return [
-                    'code' => $rp->privilege->code,
-                    'name' => $rp->privilege->name,
+                    'code' => $privilege->code,
+                    'name' => $privilege->name,
                     'id_number' => $rp->id_number,
                 ];
             })
@@ -964,6 +1033,8 @@ class PaymentCreateController extends BasePaymentController
             'age' => $resident->age,
             'gender' => $resident->gender,
             'is_household_head' => $isHouseholdHead,
+            'photo_path' => $resident->photo_path,
+            'photo_url' => $this->getPhotoUrl($resident->photo_path),
             'privileges' => $activePrivileges,
         ], $privilegeFlags);
     }
@@ -1023,6 +1094,8 @@ class PaymentCreateController extends BasePaymentController
                 'id' => $headMember->resident_id,
                 'name' => $headMember->resident->full_name ?? 'Unknown',
                 'contact_number' => $headMember->resident->contact_number ?? null,
+                'photo_path' => $headMember->resident->photo_path ?? null,
+                'photo_url' => $this->getPhotoUrl($headMember->resident->photo_path ?? null),
             ] : null,
             'head_name' => $household->current_head_name,
             'head_id' => $headMember->resident_id ?? null,
@@ -1064,76 +1137,87 @@ class PaymentCreateController extends BasePaymentController
 
     /**
      * Get fee types
+     * ✅ FIXED: Use discount percentage from allPrivileges (which now comes from DiscountType)
      */
-    private function getFeeTypes(array $allPrivileges): Collection
-    {
-        return FeeType::where('is_active', true)
-            ->orderBy('sort_order', 'asc')
-            ->orderBy('name', 'asc')
-            ->get()
-            ->map(function ($feeType) use ($allPrivileges) {
-                $baseData = [
-                    'id' => $feeType->id,
-                    'name' => $feeType->name,
-                    'code' => $feeType->code,
-                    'description' => $feeType->description,
-                    'base_amount' => floatval($feeType->base_amount),
-                    'category' => $feeType->category,
-                    'frequency' => $feeType->frequency,
-                    'has_surcharge' => (bool) $feeType->has_surcharge,
-                    'surcharge_rate' => floatval($feeType->surcharge_percentage ?? 0),
-                    'surcharge_fixed' => floatval($feeType->surcharge_fixed ?? 0),
-                    'has_penalty' => (bool) $feeType->has_penalty,
-                    'penalty_rate' => floatval($feeType->penalty_percentage ?? 0),
-                    'penalty_fixed' => floatval($feeType->penalty_fixed ?? 0),
-                    'validity_days' => $feeType->validity_days,
-                    'applicable_to' => $feeType->applicable_to ? [$feeType->applicable_to] : [],
-                ];
-                
-                foreach ($allPrivileges as $privilege) {
-                    $code = $privilege['code'];
-                    $baseData["has_{$code}_discount"] = (bool) ($feeType->{"has_{$code}_discount"} ?? false);
-                    $baseData["{$code}_discount_percentage"] = (float) ($feeType->{"{$code}_discount_percentage"} ?? $privilege['default_discount_percentage'] ?? 0);
-                }
-                
-                return $baseData;
-            });
-    }
+  private function getFeeTypes(array $allPrivileges): Collection
+{
+    return FeeType::where('is_active', true)
+        ->orderBy('sort_order', 'asc')
+        ->orderBy('name', 'asc')
+        ->get()
+        ->map(function ($feeType) use ($allPrivileges) {
+            $baseData = [
+                'id' => $feeType->id,
+                'name' => $feeType->name,
+                'code' => $feeType->code,
+                'description' => $feeType->description,
+                'base_amount' => floatval($feeType->base_amount),
+                'category' => $feeType->category,
+                'frequency' => $feeType->frequency,
+                'has_surcharge' => (bool) $feeType->has_surcharge,
+                'surcharge_rate' => floatval($feeType->surcharge_percentage ?? 0),
+                'surcharge_fixed' => floatval($feeType->surcharge_fixed ?? 0),
+                'has_penalty' => (bool) $feeType->has_penalty,
+                'penalty_rate' => floatval($feeType->penalty_percentage ?? 0),
+                'penalty_fixed' => floatval($feeType->penalty_fixed ?? 0),
+                'validity_days' => $feeType->validity_days,
+                'applicable_to' => $feeType->applicable_to ? [$feeType->applicable_to] : [],
+            ];
+            
+            foreach ($allPrivileges as $privilege) {
+                $code = $privilege['code'];
+                $baseData["has_{$code}_discount"] = (bool) ($feeType->{"has_{$code}_discount"} ?? false);
+                // ✅ FIXED: Use 'default_discount_percentage' from allPrivileges (which now uses percentage)
+                $baseData["{$code}_discount_percentage"] = (float) ($feeType->{"{$code}_discount_percentage"} ?? $privilege['default_discount_percentage'] ?? 0);
+            }
+            
+            return $baseData;
+        });
+}
 
     /**
      * Get discount rules
      */
-    private function getDiscountRules(): Collection
-    {
-        return DiscountRule::active()
-            ->priorityOrder()
-            ->get()
-            ->map(function ($rule) {
-                return [
-                    'id' => $rule->id,
-                    'code' => $rule->code,
-                    'name' => $rule->name,
-                    'description' => $rule->description,
-                    'discount_type' => $rule->discount_type,
-                    'value_type' => $rule->value_type,
-                    'discount_value' => $rule->discount_value,
-                    'maximum_discount_amount' => $rule->maximum_discount_amount,
-                    'minimum_purchase_amount' => $rule->minimum_purchase_amount,
-                    'priority' => $rule->priority,
-                    'requires_verification' => $rule->requires_verification,
-                    'verification_document' => $rule->verification_document,
-                    'applicable_to' => $rule->applicable_to,
-                    'stackable' => $rule->stackable,
-                    'exclusive_with' => $rule->exclusive_with,
-                    'effective_date' => $rule->effective_date?->format('Y-m-d'),
-                    'expiry_date' => $rule->expiry_date?->format('Y-m-d'),
-                    'formatted_value' => $rule->formatted_value,
-                    'status' => $rule->status,
-                    'type_label' => $rule->type_label,
-                    'is_expired' => $rule->is_expired,
-                ];
-            });
-    }
+   private function getDiscountRules(): Collection
+{
+    return DiscountRule::active()
+        ->priorityOrder()
+        ->with('discountType') // Eager load discount type for verification info
+        ->get()
+        ->map(function ($rule) {
+            return [
+                'id' => $rule->id,
+                'code' => $rule->code,
+                'name' => $rule->name,
+                'description' => $rule->description,
+                'discount_type_id' => $rule->discount_type_id,
+                'value_type' => $rule->value_type,
+                'discount_value' => $rule->discount_value,
+                'maximum_discount_amount' => $rule->maximum_discount_amount,
+                'minimum_purchase_amount' => $rule->minimum_purchase_amount,
+                'priority' => $rule->priority,
+                // ✅ Keep for backward compatibility (will be null)
+                'requires_verification' => $rule->discountType?->requires_verification ?? false,
+                'verification_document' => $rule->discountType?->verification_document,
+                'applicable_to' => $rule->applicable_to,
+                'applicable_puroks' => $rule->applicable_puroks,
+                'stackable' => $rule->stackable,
+                'exclusive_with' => $rule->exclusive_with,
+                'effective_date' => $rule->effective_date?->format('Y-m-d'),
+                'expiry_date' => $rule->expiry_date?->format('Y-m-d'),
+                'formatted_value' => $rule->formatted_value,
+                'status' => $rule->status,
+                'type_label' => $rule->type_label,
+                'is_expired' => $rule->is_expired,
+                // ✅ New fields from DiscountType (source of truth)
+                'discount_type_requires_verification' => $rule->discountType?->requires_verification ?? false,
+                'discount_type_requires_id_number' => $rule->discountType?->requires_id_number ?? false,
+                'discount_type_verification_document' => $rule->discountType?->verification_document,
+                'discount_type_validity_days' => $rule->discountType?->validity_days,
+                'discount_type_percentage' => $rule->discountType?->percentage,
+            ];
+        });
+}
 
     /**
      * Get pending clearance requests
@@ -1146,7 +1230,7 @@ class PaymentCreateController extends BasePaymentController
                         'household.purok', 
                         'household.householdMembers.resident',
                         'householdMember',
-                        'residentPrivileges.privilege'
+                        'residentPrivileges.privilege.discountType'
                     ]);
                 },
                 'clearanceType'
@@ -1178,9 +1262,10 @@ class PaymentCreateController extends BasePaymentController
                             return $rp->isActive();
                         })
                         ->map(function ($rp) {
+                            $privilege = $rp->privilege;
                             return [
-                                'code' => $rp->privilege->code,
-                                'name' => $rp->privilege->name,
+                                'code' => $privilege->code,
+                                'name' => $privilege->name,
                                 'id_number' => $rp->id_number,
                             ];
                         })
@@ -1222,6 +1307,8 @@ class PaymentCreateController extends BasePaymentController
                         'contact_number' => $request->resident->contact_number,
                         'email' => $request->resident->email,
                         'address' => $request->resident->address,
+                        'photo_path' => $request->resident->photo_path,
+                        'photo_url' => $this->getPhotoUrl($request->resident->photo_path),
                         'birth_date' => $request->resident->birth_date?->format('Y-m-d'),
                         'age' => $request->resident->age,
                         'gender' => $request->resident->gender,
@@ -1242,7 +1329,7 @@ class PaymentCreateController extends BasePaymentController
     }
 
     /**
-     * Get applicable discounts for clearance request
+     * Get applicable discounts for clearance request - REVISED to use SimpleDiscountService
      */
     private function getApplicableDiscountsForClearance($request, array $allPrivileges): array
     {
@@ -1253,30 +1340,21 @@ class PaymentCreateController extends BasePaymentController
         }
 
         $resident = $request->resident;
-
-        foreach ($resident->residentPrivileges as $rp) {
-            if (!$rp->isActive()) {
-                continue;
-            }
-            
-            $privilege = $rp->privilege;
-            
-            $hasDiscountField = "has_{$privilege->code}_discount";
-            $percentageField = "{$privilege->code}_discount_percentage";
-            
-            $isDiscountApplicable = $request->clearanceType->$hasDiscountField ?? false;
-            $applicablePercentage = $request->clearanceType->$percentageField ?? $rp->discount_percentage ?? $privilege->default_discount_percentage;
-
-            if ($isDiscountApplicable) {
-                $applicableDiscounts[] = [
-                    'type' => strtolower($privilege->code),
-                    'label' => $privilege->name,
-                    'percentage' => $applicablePercentage,
-                    'id_number' => $rp->id_number,
-                    'has_id' => !empty($rp->id_number),
-                    'privilege_code' => $privilege->code,
-                ];
-            }
+        
+        // Use the discount service to get eligible discounts
+        $discountResult = $this->discountService->calculateDiscount($resident, $request->fee_amount, $request->clearanceType);
+        
+        // Transform to frontend format
+        foreach ($discountResult['applied_discounts'] as $applied) {
+            $applicableDiscounts[] = [
+                'type' => strtolower($applied['code']),
+                'label' => $applied['name'],
+                'percentage' => $applied['percentage'],
+                'id_number' => $applied['id_number'] ?? null,
+                'has_id' => !empty($applied['id_number']),
+                'privilege_code' => $applied['code'],
+                'discount_type_code' => $applied['code'],
+            ];
         }
 
         return $applicableDiscounts;
@@ -1284,6 +1362,7 @@ class PaymentCreateController extends BasePaymentController
 
     /**
      * Get clearance types details
+     * ✅ FIXED: Use discount percentage from allPrivileges (which now comes from DiscountType)
      */
     private function getClearanceTypesDetails(array $allPrivileges): Collection
     {
@@ -1325,6 +1404,7 @@ class PaymentCreateController extends BasePaymentController
 
     /**
      * Process clearance request pre-fill
+     * ✅ FIXED: Use discount percentage from allPrivileges (which now comes from DiscountType)
      */
     private function processClearanceRequestPreFill($clearanceRequestId, array $allPrivileges): array
     {
@@ -1334,7 +1414,7 @@ class PaymentCreateController extends BasePaymentController
                         'household.purok', 
                         'household.householdMembers.resident',
                         'householdMember',
-                        'residentPrivileges.privilege'
+                        'residentPrivileges.privilege.discountType'
                     ]);
                 },
                 'clearanceType'
@@ -1416,6 +1496,7 @@ class PaymentCreateController extends BasePaymentController
 
     /**
      * Get selected fee details
+     * ✅ FIXED: Use discount percentage from allPrivileges (which now comes from DiscountType)
      */
     private function getSelectedFeeDetails($feeId, array $allPrivileges): ?array
     {
@@ -1469,6 +1550,8 @@ class PaymentCreateController extends BasePaymentController
                 'contact_number' => $resident->contact_number,
                 'email' => $resident->email,
                 'address' => $resident->address,
+                'photo_path' => $resident->photo_path,
+                'photo_url' => $this->getPhotoUrl($resident->photo_path),
                 'birth_date' => $resident->birth_date?->format('Y-m-d'),
                 'age' => $resident->age,
                 'gender' => $resident->gender,
@@ -1557,22 +1640,26 @@ class PaymentCreateController extends BasePaymentController
     /**
      * Format discount types for dropdown
      */
-    private function formatDiscountTypes($discountRules): array
-    {
-        return $discountRules->mapWithKeys(function ($rule) {
-            $label = $rule['name'];
-            if ($rule['formatted_value']) {
-                $label .= ' (' . $rule['formatted_value'] . ')';
-            }
-            if ($rule['minimum_purchase_amount'] > 0) {
-                $label .= ' - Min: ₱' . number_format($rule['minimum_purchase_amount'], 2);
-            }
-            if ($rule['requires_verification']) {
-                $label .= ' ✓';
-            }
-            return [$rule['code'] => $label];
-        })->toArray();
-    }
+  private function formatDiscountTypes($discountRules): array
+{
+    return $discountRules->mapWithKeys(function ($rule) {
+        $label = $rule['name'];
+        if ($rule['formatted_value']) {
+            $label .= ' (' . $rule['formatted_value'] . ')';
+        }
+        if ($rule['minimum_purchase_amount'] > 0) {
+            $label .= ' - Min: ₱' . number_format($rule['minimum_purchase_amount'], 2);
+        }
+        // ✅ FIXED: Check both old and new field locations
+        $requiresVerification = $rule['requires_verification'] 
+            ?? $rule['discount_type_requires_verification'] 
+            ?? false;
+        if ($requiresVerification) {
+            $label .= ' ✓';
+        }
+        return [$rule['code'] => $label];
+    })->toArray();
+}
 
     /**
      * Get discount code to ID map
@@ -1586,6 +1673,7 @@ class PaymentCreateController extends BasePaymentController
 
     /**
      * Format clearance request for response
+     * ✅ FIXED: Use discount percentage from allPrivileges (which now comes from DiscountType)
      */
     private function formatClearanceRequest($clearanceRequest, array $allPrivileges): ?array
     {
@@ -1606,9 +1694,10 @@ class PaymentCreateController extends BasePaymentController
                     return $rp->isActive();
                 })
                 ->map(function ($rp) {
+                    $privilege = $rp->privilege;
                     return [
-                        'code' => $rp->privilege->code,
-                        'name' => $rp->privilege->name,
+                        'code' => $privilege->code,
+                        'name' => $privilege->name,
                         'id_number' => $rp->id_number,
                     ];
                 })
@@ -1664,6 +1753,8 @@ class PaymentCreateController extends BasePaymentController
                 'contact_number' => $clearanceRequest->resident->contact_number,
                 'email' => $clearanceRequest->resident->email,
                 'address' => $clearanceRequest->resident->address,
+                'photo_path' => $clearanceRequest->resident->photo_path,
+                'photo_url' => $this->getPhotoUrl($clearanceRequest->resident->photo_path),
                 'household_number' => $clearanceRequest->resident->household->household_number ?? null,
                 'purok' => $clearanceRequest->resident->household->purok->name ?? null,
                 'purok_id' => $clearanceRequest->resident->household->purok_id ?? null,
@@ -1711,7 +1802,7 @@ class PaymentCreateController extends BasePaymentController
     }
 
     /**
-     * Get payer-specific clearance requests - FIXED version with extensive logging
+     * Get payer-specific clearance requests
      */
     private function getPayerClearanceRequests($payerType, $payerId, array $allPrivileges): array
     {
@@ -1727,7 +1818,6 @@ class PaymentCreateController extends BasePaymentController
             return [];
         }
 
-        // Convert model string to simple type if needed
         $simpleType = null;
         if ($payerType === 'App\Models\Resident' || $payerType === 'resident') {
             $simpleType = 'resident';
@@ -1812,21 +1902,6 @@ class PaymentCreateController extends BasePaymentController
             }
         }
 
-        // Log the raw data before formatting
-        Log::info('📋 Raw clearance requests before formatting:', [
-            'count' => $clearanceRequests->count(),
-            'data' => $clearanceRequests->map(function($cr) {
-                return [
-                    'id' => $cr->id,
-                    'resident_id' => $cr->resident_id,
-                    'reference_number' => $cr->reference_number,
-                    'fee_amount' => $cr->fee_amount,
-                    'status' => $cr->status,
-                    'clearance_type_name' => $cr->clearanceType?->name,
-                ];
-            })->toArray()
-        ]);
-
         $formatted = $clearanceRequests->map(function ($cr) use ($allPrivileges) {
             $applicableDiscounts = $this->getApplicableDiscountsForClearance($cr, $allPrivileges);
             
@@ -1846,20 +1921,14 @@ class PaymentCreateController extends BasePaymentController
                     'code' => $cr->clearanceType->code ?? strtoupper(str_replace(' ', '_', $cr->clearanceType->name)),
                     'fee' => floatval($cr->clearanceType->fee),
                     'formatted_fee' => '₱' . number_format($cr->clearanceType->fee, 2),
-                    'has_senior_discount' => $cr->clearanceType->has_senior_discount ?? false,
-                    'senior_discount_percentage' => $cr->clearanceType->senior_discount_percentage ?? 0,
-                    'has_pwd_discount' => $cr->clearanceType->has_pwd_discount ?? false,
-                    'pwd_discount_percentage' => $cr->clearanceType->pwd_discount_percentage ?? 0,
-                    'has_solo_parent_discount' => $cr->clearanceType->has_solo_parent_discount ?? false,
-                    'solo_parent_discount_percentage' => $cr->clearanceType->solo_parent_discount_percentage ?? 0,
-                    'has_indigent_discount' => $cr->clearanceType->has_indigent_discount ?? false,
-                    'indigent_discount_percentage' => $cr->clearanceType->indigent_discount_percentage ?? 0,
                 ] : null,
                 'resident' => $cr->resident ? [
                     'id' => $cr->resident->id,
                     'name' => $cr->resident->full_name,
                     'contact_number' => $cr->resident->contact_number,
                     'address' => $cr->resident->address,
+                    'photo_path' => $cr->resident->photo_path,
+                    'photo_url' => $this->getPhotoUrl($cr->resident->photo_path),
                 ] : null,
                 'applicableDiscounts' => $applicableDiscounts,
                 'canApplyDiscount' => count($applicableDiscounts) > 0,
@@ -1909,4 +1978,193 @@ class PaymentCreateController extends BasePaymentController
             'clearance_requests' => $requests
         ]);
     }
+
+    /**
+     * Verify discount ID number - Fixed to use Privilege -> DiscountType relationship
+     */
+public function verifyDiscountId(Request $request)
+{
+    try {
+        $request->validate([
+            'id_number' => 'required|string',
+            'payer_id' => 'required',
+            'payer_type' => 'required|string',
+            'discount_code' => 'nullable|string',
+            'privilege_code' => 'nullable|string'
+        ]);
+
+        $idNumber = $request->id_number;
+        $payerId = $request->payer_id;
+        $payerType = $request->payer_type;
+        $selectedDiscountCode = $request->discount_code; // This is the discount type code from frontend
+
+        Log::info('🔍 Verification request:', [
+            'id_number' => $idNumber,
+            'payer_id' => $payerId,
+            'payer_type' => $payerType,
+            'selected_discount_code' => $selectedDiscountCode
+        ]);
+
+        // Normalize payer type
+        $normalizedPayerType = '';
+        if (str_contains($payerType, 'Resident') || $payerType === 'resident') {
+            $normalizedPayerType = 'App\\Models\\Resident';
+        } elseif (str_contains($payerType, 'Household') || $payerType === 'household') {
+            $normalizedPayerType = 'App\\Models\\Household';
+        } elseif (str_contains($payerType, 'Business') || $payerType === 'business') {
+            $normalizedPayerType = 'App\\Models\\Business';
+        } else {
+            $normalizedPayerType = $payerType;
+        }
+
+        // Find the resident
+        $resident = null;
+        
+        if ($normalizedPayerType === 'App\\Models\\Resident') {
+            $resident = Resident::find($payerId);
+        } elseif ($normalizedPayerType === 'App\\Models\\Household') {
+            $household = Household::find($payerId);
+            if ($household && $household->head_of_household) {
+                $resident = $household->head_of_household;
+            }
+        }
+
+        if (!$resident) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payer not found. Please try again.'
+            ], 404);
+        }
+
+        // Find the resident privilege by ID number
+        $residentPrivilege = $resident->residentPrivileges()
+            ->with(['privilege.discountType'])
+            ->where('id_number', $idNumber)
+            ->whereNotNull('verified_at')
+            ->where(function($query) {
+                $query->whereNull('expires_at')
+                      ->orWhere('expires_at', '>', now());
+            })
+            ->first();
+
+        if (!$residentPrivilege) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid ID number. No active privilege found with this ID number.'
+            ], 400);
+        }
+
+        // Check if expired
+        if ($residentPrivilege->expires_at && $residentPrivilege->expires_at->isPast()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This ID number has expired. Valid until: ' . $residentPrivilege->expires_at->format('Y-m-d')
+            ], 400);
+        }
+
+        // Get the privilege and discount type
+        $privilege = $residentPrivilege->privilege;
+        
+        if (!$privilege) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No privilege associated with this ID. Please contact administrator.'
+            ], 400);
+        }
+
+        // Get discount type from privilege
+        $discountType = $privilege->discountType;
+        
+        if (!$discountType) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No discount type associated with this privilege. Please contact administrator.'
+            ], 400);
+        }
+
+        Log::info('📊 Found discount type:', [
+            'discount_type_id' => $discountType->id,
+            'discount_type_name' => $discountType->name,
+            'discount_type_code' => $discountType->code,
+            'discount_percentage' => $discountType->percentage,
+            'selected_discount_code' => $selectedDiscountCode
+        ]);
+
+        // ✅ FIXED: Compare discount type code, not privilege code
+        // Map frontend discount codes to database discount type codes
+        $discountCodeMapping = [
+            'senior' => 'SENIOR',
+            'senior_citizen' => 'SENIOR',
+            'sc' => 'SENIOR',
+            'pwd' => 'PWD',
+            'solo_parent' => 'SOLO_PARENT',
+            'solo' => 'SOLO_PARENT',
+            'indigent' => 'INDIGENT',
+            'student' => 'STUDENT',
+            'veteran' => 'VETERAN'
+        ];
+
+        $expectedDiscountCode = null;
+        if ($selectedDiscountCode) {
+            $selectedLower = strtolower($selectedDiscountCode);
+            $expectedDiscountCode = $discountCodeMapping[$selectedLower] ?? strtoupper($selectedDiscountCode);
+        }
+
+        // Check if the discount type matches what was selected
+        if ($expectedDiscountCode && $discountType->code !== $expectedDiscountCode) {
+            // Map codes to friendly names
+            $friendlyNames = [
+                'SENIOR' => 'Senior Citizen',
+                'PWD' => 'Person with Disability',
+                'SOLO_PARENT' => 'Solo Parent',
+                'INDIGENT' => 'Indigent',
+                'STUDENT' => 'Student',
+                'VETERAN' => 'Veteran'
+            ];
+            
+            $expectedName = $friendlyNames[$expectedDiscountCode] ?? $expectedDiscountCode;
+            $actualName = $friendlyNames[$discountType->code] ?? $discountType->name;
+            
+            return response()->json([
+                'success' => false,
+                'message' => "ID number mismatch: This ID belongs to a {$actualName} discount, but you selected {$expectedName}. Please select the correct discount type or use the correct ID number."
+            ], 400);
+        }
+
+        $discountPercentage = $residentPrivilege->discount_percentage 
+            ?? $discountType->percentage 
+            ?? 0;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'ID number verified successfully',
+            'resident_privilege_id' => $residentPrivilege->id,
+            'privilege_id' => $privilege->id,
+            'privilege_name' => $privilege->name,
+            'privilege_code' => $privilege->code,
+            'discount_type_id' => $discountType->id,
+            'discount_type_code' => $discountType->code,
+            'discount_type_name' => $discountType->name,
+            'discount_percentage' => $discountPercentage,
+            'id_number' => $residentPrivilege->id_number,
+            'expires_at' => $residentPrivilege->expires_at?->format('Y-m-d'),
+            'verified_at' => $residentPrivilege->verified_at?->format('Y-m-d'),
+            'requires_id_number' => $discountType->requires_id_number,
+            'requires_verification' => $discountType->requires_verification,
+            'verification_document' => $discountType->verification_document,
+            'validity_days' => $discountType->validity_days,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Discount ID verification failed: ' . $e->getMessage(), [
+            'trace' => $e->getTraceAsString(),
+            'request' => $request->all()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'An error occurred during verification. Please try again.'
+        ], 500);
+    }
+}
 }

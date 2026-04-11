@@ -36,29 +36,25 @@ export default function Residents() {
         privileges = [] 
     } = props;
     
-    // Debug: Log privileges to verify they're being received
-    console.log('Privileges received from server:', privileges);
-    
-    // State management
+    // State management for client-side filtering/sorting
+// State management for client-side filtering/sorting
     const [search, setSearch] = useState(filters.search || '');
-    const [filtersState, setFiltersState] = useState<FilterState>({
-        status: filters.status || 'all',
-        purok_id: filters.purok_id || 'all',
-        gender: filters.gender || 'all',
-        min_age: filters.min_age || '',
-        max_age: filters.max_age || '',
-        civil_status: filters.civil_status || 'all',
-        is_voter: filters.is_voter || 'all',
-        is_head: filters.is_head || 'all',
-        privilege: filters.privilege || 'all',
-        privilege_id: filters.privilege_id || 'all',
-        sort_by: filters.sort_by || 'last_name',
-        sort_order: filters.sort_order || 'asc',
-        search: filters.search || ''
-    });
+    const [statusFilter, setStatusFilter] = useState<string>(filters.status || 'all');
+    const [purokFilter, setPurokFilter] = useState<string>(filters.purok_id ? String(filters.purok_id) : 'all');
+    const [genderFilter, setGenderFilter] = useState<string>(filters.gender || 'all');
+    const [civilStatusFilter, setCivilStatusFilter] = useState<string>(filters.civil_status || 'all');
+    const [voterFilter, setVoterFilter] = useState<string>(filters.is_voter || 'all');
+    const [headFilter, setHeadFilter] = useState<string>(filters.is_head || 'all');
+    const [privilegeFilter, setPrivilegeFilter] = useState<string>(
+        filters.privilege_id ? String(filters.privilege_id) : 'all'
+    );
+    const [minAge, setMinAge] = useState<string>(filters.min_age ? String(filters.min_age) : '');
+    const [maxAge, setMaxAge] = useState<string>(filters.max_age ? String(filters.max_age) : '');
+    const [sortBy, setSortBy] = useState<string>(filters.sort_by || 'last_name');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(filters.sort_order as 'asc' | 'desc' || 'asc');
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(15);
+    const itemsPerPage = 15;
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -81,32 +77,6 @@ export default function Residents() {
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // Immediate search handler
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setSearch(value);
-        
-        const params = {
-            ...filtersState,
-            search: value
-        };
-        
-        // Clean up empty values
-        const cleanedParams: Record<string, any> = {};
-        Object.keys(params).forEach(key => {
-            const value = params[key as keyof typeof params];
-            if (value !== undefined && value !== '' && value !== 'all') {
-                cleanedParams[key] = value;
-            }
-        });
-        
-        router.get('/admin/residents', cleanedParams, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
     // Handle window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -128,7 +98,7 @@ export default function Residents() {
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, statusFilter, purokFilter, genderFilter, civilStatusFilter, voterFilter, headFilter, privilegeFilter, minAge, maxAge, sortBy, sortOrder]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -143,7 +113,6 @@ export default function Residents() {
         if (isMobile) return;
         
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl/Cmd + A to select all
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -152,7 +121,6 @@ export default function Residents() {
                     handleSelectAllOnPage();
                 }
             }
-            // Escape key
             if (e.key === 'Escape') {
                 if (isBulkMode) {
                     if (selectedResidents.length > 0) {
@@ -162,17 +130,14 @@ export default function Residents() {
                     }
                 }
             }
-            // Ctrl/Cmd + Shift + B to toggle bulk mode
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 setIsBulkMode(!isBulkMode);
             }
-            // Ctrl/Cmd + F to focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            // Delete key for bulk delete
             if (e.key === 'Delete' && isBulkMode && selectedResidents.length > 0) {
                 e.preventDefault();
                 setShowBulkDeleteDialog(true);
@@ -183,16 +148,123 @@ export default function Residents() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [isBulkMode, selectedResidents, isMobile]);
 
-    // Filter residents with privilege support
+    // Filter and sort residents (client-side)
     const filteredResidents = useMemo(() => {
-        return filterResidents(
-            allResidents,
-            search,
-            filtersState,
-            filtersState.sort_by,
-            filtersState.sort_order
-        );
-    }, [allResidents, search, filtersState]);
+        let filtered = [...allResidents];
+        
+        // Apply search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(resident =>
+                (resident.first_name?.toLowerCase() || '').includes(searchLower) ||
+                (resident.last_name?.toLowerCase() || '').includes(searchLower) ||
+                (resident.middle_name?.toLowerCase() || '').includes(searchLower) ||
+                (resident.email?.toLowerCase() || '').includes(searchLower) ||
+                (resident.contact_number?.toLowerCase() || '').includes(searchLower)
+            );
+        }
+        
+        // Apply status filter
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(resident => resident.status === statusFilter);
+        }
+        
+        // Apply purok filter
+        if (purokFilter !== 'all') {
+            filtered = filtered.filter(resident => resident.purok_id?.toString() === purokFilter);
+        }
+        
+        // Apply gender filter
+        if (genderFilter !== 'all') {
+            filtered = filtered.filter(resident => resident.gender === genderFilter);
+        }
+        
+        // Apply civil status filter
+        if (civilStatusFilter !== 'all') {
+            filtered = filtered.filter(resident => resident.civil_status === civilStatusFilter);
+        }
+        
+        // Apply voter filter
+        if (voterFilter !== 'all') {
+            filtered = filtered.filter(resident => resident.is_voter === (voterFilter === 'yes'));
+        }
+        
+        // Apply head filter
+        if (headFilter !== 'all') {
+            filtered = filtered.filter(resident => isHeadOfHousehold(resident) === (headFilter === 'yes'));
+        }
+        
+        // Apply privilege filter
+        if (privilegeFilter !== 'all') {
+            filtered = filtered.filter(resident =>
+                resident.privileges?.some(p => p.privilege_id?.toString() === privilegeFilter || p.privilege_code === privilegeFilter)
+            );
+        }
+        
+        // Apply age range filter
+        if (minAge) {
+            const min = parseInt(minAge);
+            filtered = filtered.filter(resident => (resident.age || 0) >= min);
+        }
+        if (maxAge) {
+            const max = parseInt(maxAge);
+            filtered = filtered.filter(resident => (resident.age || 0) <= max);
+        }
+        
+        // Apply sorting
+        filtered.sort((a, b) => {
+            let valueA: any;
+            let valueB: any;
+            
+            switch (sortBy) {
+                case 'first_name':
+                    valueA = a.first_name || '';
+                    valueB = b.first_name || '';
+                    break;
+                case 'last_name':
+                    valueA = a.last_name || '';
+                    valueB = b.last_name || '';
+                    break;
+                case 'age':
+                    valueA = a.age || 0;
+                    valueB = b.age || 0;
+                    break;
+                case 'gender':
+                    valueA = a.gender || '';
+                    valueB = b.gender || '';
+                    break;
+                case 'civil_status':
+                    valueA = a.civil_status || '';
+                    valueB = b.civil_status || '';
+                    break;
+                case 'status':
+                    valueA = a.status || '';
+                    valueB = b.status || '';
+                    break;
+                case 'purok':
+                    valueA = a.purok?.name || '';
+                    valueB = b.purok?.name || '';
+                    break;
+                case 'is_voter':
+                    valueA = a.is_voter ? 1 : 0;
+                    valueB = b.is_voter ? 1 : 0;
+                    break;
+                case 'created_at':
+                    valueA = new Date(a.created_at).getTime();
+                    valueB = new Date(b.created_at).getTime();
+                    break;
+                default:
+                    valueA = a.last_name || '';
+                    valueB = b.last_name || '';
+            }
+            
+            if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+            if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        return filtered;
+    }, [allResidents, search, statusFilter, purokFilter, genderFilter, civilStatusFilter, voterFilter, headFilter, privilegeFilter, minAge, maxAge, sortBy, sortOrder]);
 
     // Pagination
     const totalItems = filteredResidents.length;
@@ -255,25 +327,24 @@ export default function Residents() {
         return filteredResidents.filter(resident => selectedResidents.includes(resident.id));
     }, [selectedResidents, filteredResidents]);
 
-    // Calculate selection stats including privilege information
+    // Calculate selection stats
     const rawSelectionStats = useMemo(() => {
         const baseStats = getSelectionStats(selectedResidentsData);
         
-        // Add privilege stats
         const privilegeCounts: Record<string, number> = {};
         const heads = selectedResidentsData.filter(r => isHeadOfHousehold(r)).length;
         
-       selectedResidentsData.forEach(resident => {
-    if (resident.privileges && Array.isArray(resident.privileges)) {
-        resident.privileges.forEach((privilege: ResidentPrivilege) => {  // Changed from Privilege to ResidentPrivilege
-            // Access the privilege code from either the nested privilege object or direct property
-            const code = privilege.privilege?.code || privilege.privilege_code;
-            if (code) {
-                privilegeCounts[code] = (privilegeCounts[code] || 0) + 1;
+        selectedResidentsData.forEach(resident => {
+            if (resident.privileges && Array.isArray(resident.privileges)) {
+                resident.privileges.forEach((privilege: ResidentPrivilege) => {
+                    const code = privilege.privilege?.code || privilege.privilege_code;
+                    if (code) {
+                        privilegeCounts[code] = (privilegeCounts[code] || 0) + 1;
+                    }
+                });
             }
         });
-    }
-});
+        
         return {
             ...baseStats,
             heads,
@@ -282,14 +353,13 @@ export default function Residents() {
         };
     }, [selectedResidentsData]);
 
-    // Normalize selection stats to match the SelectionStats interface
     const selectionStats: SelectionStats = useMemo(() => {
         return {
             total: rawSelectionStats.total || 0,
             male: rawSelectionStats.male || 0,
             female: rawSelectionStats.female || 0,
-            males: rawSelectionStats.male || rawSelectionStats.male || 0,
-            females: rawSelectionStats.female || rawSelectionStats.female || 0,
+            males: rawSelectionStats.male || 0,
+            females: rawSelectionStats.female || 0,
             other: rawSelectionStats.other || 0,
             voters: rawSelectionStats.voters || 0,
             heads: rawSelectionStats.heads || 0,
@@ -301,6 +371,18 @@ export default function Residents() {
             hasPrivileges: rawSelectionStats.hasPrivileges || 0
         };
     }, [rawSelectionStats]);
+
+    // Handle sort change from dropdown
+    const handleSortChange = (value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    };
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = (): string => {
+        return `${sortBy}-${sortOrder}`;
+    };
 
     // Bulk operations
     const handleBulkOperation = async (operation: string, data?: any) => {
@@ -316,73 +398,42 @@ export default function Residents() {
                 case 'delete':
                     setShowBulkDeleteDialog(true);
                     break;
-
                 case 'activate':
-                    await router.post('/admin/residents/bulk-action', {
-                        action: 'activate',
-                        resident_ids: selectedResidents,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedResidents([]);
-                            toast.success(`${selectedResidents.length} residents activated successfully`);
-                        },
-                        onError: (errors) => {
-                            toast.error(errors.message || 'Failed to activate residents');
-                        }
-                    });
-                    break;
-
                 case 'deactivate':
                     await router.post('/admin/residents/bulk-action', {
-                        action: 'deactivate',
+                        action: operation,
                         resident_ids: selectedResidents,
                     }, {
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedResidents([]);
-                            toast.success(`${selectedResidents.length} residents deactivated successfully`);
+                            toast.success(`${selectedResidents.length} residents ${operation}d successfully`);
                         },
                         onError: (errors) => {
-                            toast.error(errors.message || 'Failed to deactivate residents');
+                            toast.error(errors.message || `Failed to ${operation} residents`);
                         }
                     });
                     break;
-
-                case 'export':
-                    toast.info('Export functionality to be implemented');
-                    break;
-
-                case 'print':
-                    toast.info('Print functionality to be implemented');
-                    break;
-
                 case 'update_status':
                     setShowBulkStatusDialog(true);
                     break;
-
                 case 'update_purok':
                     setShowBulkPurokDialog(true);
                     break;
-
                 case 'add_privilege':
                     setBulkPrivilegeAction('add');
                     setShowBulkPrivilegeDialog(true);
                     break;
-
                 case 'remove_privilege':
                     setBulkPrivilegeAction('remove');
                     setShowBulkRemovePrivilegeDialog(true);
                     break;
-
+                case 'export':
+                case 'print':
                 case 'print_ids':
-                    toast.info('Print IDs functionality to be implemented');
-                    break;
-
                 case 'export_csv':
-                    toast.info('Export CSV functionality to be implemented');
+                    toast.info(`${operation} functionality to be implemented`);
                     break;
-                    
                 default:
                     toast.info(`Operation ${operation} to be implemented`);
             }
@@ -510,14 +561,12 @@ export default function Residents() {
         }
     };
 
-    // Copy selected data to clipboard
     const handleCopySelectedData = () => {
         if (selectedResidentsData.length === 0) {
             toast.error('No data to copy');
             return;
         }
         
-        // Directly use formatForClipboard with the selected residents data
         const csv = formatForClipboard(selectedResidentsData);
         
         navigator.clipboard.writeText(csv).then(() => {
@@ -527,7 +576,6 @@ export default function Residents() {
         });
     };
 
-    // Individual resident operations
     const handleDelete = (resident: Resident) => {
         if (confirm(`Are you sure you want to delete resident "${getFullName(resident) || 'Untitled'}"?`)) {
             router.delete(`/admin/residents/${resident.id}`, {
@@ -567,82 +615,24 @@ export default function Residents() {
     };
 
     const handleViewPhoto = (resident: Resident) => {
-        // Implement photo viewing logic
         console.log('View photo for:', getFullName(resident));
         toast.info('Photo viewer would open here');
     };
 
-    const handleSort = (column: string) => {
-        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
-        
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column,
-            sort_order: newOrder
-        }));
-        
-        // Trigger server-side sort update
-        const params = {
-            ...filtersState,
-            sort_by: column,
-            sort_order: newOrder,
-            search: search
-        };
-        
-        // Clean up empty values
-        const cleanedParams: Record<string, any> = {};
-        Object.keys(params).forEach(key => {
-            const value = params[key as keyof typeof params];
-            if (value !== undefined && value !== '' && value !== 'all') {
-                cleanedParams[key] = value;
-            }
-        });
-        
-        router.get('/admin/residents', cleanedParams, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
     const handleClearFilters = () => {
         setSearch('');
-        setFiltersState({
-            status: 'all',
-            purok_id: 'all',
-            gender: 'all',
-            min_age: '',
-            max_age: '',
-            civil_status: 'all',
-            is_voter: 'all',
-            is_head: 'all',
-            privilege: 'all',
-            privilege_id: 'all',
-            sort_by: 'last_name',
-            sort_order: 'asc',
-            search: ''
-        });
-        
-        // Trigger server-side filter clear
-        router.get('/admin/residents', {
-            search: '',
-            status: 'all',
-            purok_id: 'all',
-            gender: 'all',
-            min_age: '',
-            max_age: '',
-            civil_status: 'all',
-            is_voter: 'all',
-            is_head: 'all',
-            privilege: 'all',
-            privilege_id: 'all',
-            sort_by: 'last_name',
-            sort_order: 'asc'
-        }, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
+        setStatusFilter('all');
+        setPurokFilter('all');
+        setGenderFilter('all');
+        setCivilStatusFilter('all');
+        setVoterFilter('all');
+        setHeadFilter('all');
+        setPrivilegeFilter('all');
+        setMinAge('');
+        setMaxAge('');
+        setSortBy('last_name');
+        setSortOrder('asc');
+        setCurrentPage(1);
     };
 
     const handleClearSelection = () => {
@@ -650,46 +640,67 @@ export default function Residents() {
         setIsSelectAll(false);
     };
 
-    const updateFilter = (key: keyof FilterState, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
-        
-        // Trigger server-side filter update
-        const params = {
-            ...filtersState,
-            [key]: value,
-            search: search
-        };
-        
-        // Clean up empty values
-        const cleanedParams: Record<string, any> = {};
-        Object.keys(params).forEach(key => {
-            const value = params[key as keyof typeof params];
-            if (value !== undefined && value !== '' && value !== 'all') {
-                cleanedParams[key] = value;
-            }
-        });
-        
-        router.get('/admin/residents', cleanedParams, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
-    // Ensure hasActiveFilters is a boolean
     const hasActiveFilters = Boolean(
         search || 
-        filtersState.status !== 'all' || 
-        filtersState.purok_id !== 'all' || 
-        filtersState.gender !== 'all' ||
-        filtersState.min_age ||
-        filtersState.max_age ||
-        filtersState.civil_status !== 'all' ||
-        filtersState.is_voter !== 'all' ||
-        filtersState.is_head !== 'all' ||
-        filtersState.privilege !== 'all' ||
-        filtersState.privilege_id !== 'all'
+        statusFilter !== 'all' || 
+        purokFilter !== 'all' || 
+        genderFilter !== 'all' ||
+        civilStatusFilter !== 'all' ||
+        voterFilter !== 'all' ||
+        headFilter !== 'all' ||
+        privilegeFilter !== 'all' ||
+        minAge ||
+        maxAge
     );
+
+    // Prepare filters object for the Filters component
+    const filtersStateForComponent = {
+        status: statusFilter,
+        purok_id: purokFilter,
+        gender: genderFilter,
+        privilege: privilegeFilter,
+        civil_status: civilStatusFilter,
+        is_voter: voterFilter,
+        is_head: headFilter,
+        privilege_id: privilegeFilter,
+        min_age: minAge,
+        max_age: maxAge,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        search: search
+    };
+
+    const updateFilter = (key: string, value: string) => {
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'purok_id':
+                setPurokFilter(value);
+                break;
+            case 'gender':
+                setGenderFilter(value);
+                break;
+            case 'civil_status':
+                setCivilStatusFilter(value);
+                break;
+            case 'is_voter':
+                setVoterFilter(value);
+                break;
+            case 'is_head':
+                setHeadFilter(value);
+                break;
+            case 'privilege_id':
+                setPrivilegeFilter(value);
+                break;
+            case 'min_age':
+                setMinAge(value);
+                break;
+            case 'max_age':
+                setMaxAge(value);
+                break;
+        }
+    };
 
     return (
         <AppLayout
@@ -713,8 +724,8 @@ export default function Residents() {
                         stats={stats}
                         search={search}
                         setSearch={setSearch}
-                        onSearchChange={handleSearchChange}
-                        filtersState={filtersState}
+                        onSearchChange={(e) => setSearch(e.target.value)}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
@@ -758,18 +769,22 @@ export default function Residents() {
                         onViewPhoto={handleViewPhoto}
                         onCopyToClipboard={handleCopyToClipboard}
                         onCopySelectedData={handleCopySelectedData}
-                        onSort={handleSort}
+                        onSort={() => {}} // No longer needed for server-side
                         onBulkOperation={handleBulkOperation}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
                         setShowBulkPurokDialog={setShowBulkPurokDialog}
                         setShowBulkPrivilegeDialog={setShowBulkPrivilegeDialog}
                         setShowBulkRemovePrivilegeDialog={setShowBulkRemovePrivilegeDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
                         puroks={puroks}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Keyboard Shortcuts Help */}

@@ -40,7 +40,11 @@ class PaymentShowController extends BasePaymentController
         $relatedPayments = $this->getRelatedPayments($payment);
         $paymentBreakdown = $this->calculatePaymentBreakdown($payment);
         $discountDetails = $this->getDiscountDetails($payment);
-        $history = $this->getPaymentHistory($payment); // Add history
+        $history = $this->getPaymentHistory($payment);
+        
+        // ✅ Get discount percentage from the applied discount rule
+        $discountPercentage = $this->getDiscountPercentage($payment);
+        $discountValueType = $this->getDiscountValueType($payment);
 
         $this->enrichPaymentWithFormattedData($payment);
 
@@ -52,12 +56,70 @@ class PaymentShowController extends BasePaymentController
             'relatedPayments' => $relatedPayments,
             'paymentBreakdown' => $paymentBreakdown,
             'discountDetails' => $discountDetails,
-            'history' => $history, // Add history to props
+            'history' => $history,
+            'discountPercentage' => $discountPercentage,  // ✅ Add this
+            'discountValueType' => $discountValueType,    // ✅ Add this
             'isClearancePayment' => $payment->items()->whereNotNull('clearance_request_id')->exists(),
             'isFeePayment' => $payment->items()->whereNotNull('fee_id')->exists(),
             'hasClearanceRequests' => $clearanceRequests->isNotEmpty(),
             'hasFees' => $fees->isNotEmpty(),
         ]);
+    }
+
+    /**
+     * ✅ Get the actual discount percentage from the applied discount rule
+     */
+    private function getDiscountPercentage(Payment $payment): ?float
+    {
+        // First check if there's a discount rule linked through payment_discounts
+        if ($payment->relationLoaded('discounts') && $payment->discounts->count() > 0) {
+            $firstDiscount = $payment->discounts->first();
+            if ($firstDiscount && $firstDiscount->rule) {
+                // Get the discount value from the rule (percentage value)
+                if ($firstDiscount->rule->value_type === 'percentage') {
+                    return (float) $firstDiscount->rule->discount_value;
+                }
+                // For fixed amount, return the fixed value
+                return (float) $firstDiscount->rule->discount_value;
+            }
+        }
+        
+        // Fallback: try to get from discount_type if it's a numeric value
+        if ($payment->discount_type && is_numeric($payment->discount_type)) {
+            return (float) $payment->discount_type;
+        }
+        
+        // If discount is percentage-based, try to calculate from discount amount and total
+        if ($payment->total_amount > 0 && $payment->discount > 0) {
+            $calculatedPercentage = ($payment->discount / $payment->total_amount) * 100;
+            // Only use if it's a round number (likely a percentage discount)
+            if ($calculatedPercentage <= 100 && $calculatedPercentage > 0) {
+                return round($calculatedPercentage, 2);
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * ✅ Get the discount value type (percentage or fixed)
+     */
+    private function getDiscountValueType(Payment $payment): ?string
+    {
+        // First check if there's a discount rule linked through payment_discounts
+        if ($payment->relationLoaded('discounts') && $payment->discounts->count() > 0) {
+            $firstDiscount = $payment->discounts->first();
+            if ($firstDiscount && $firstDiscount->rule) {
+                return $firstDiscount->rule->value_type;
+            }
+        }
+        
+        // Fallback to the stored discount_type if it exists
+        if ($payment->discount_type) {
+            return $payment->discount_type;
+        }
+        
+        return 'percentage'; // default
     }
 
     /**
@@ -67,6 +129,33 @@ class PaymentShowController extends BasePaymentController
     {
         $history = [];
 
+        // Ensure recorder is loaded
+        if (!$payment->relationLoaded('recorder')) {
+            $payment->load('recorder');
+        }
+        
+        // Get recorder name with proper fallbacks
+        $recorderName = 'System';
+        $recorder = $payment->recorder;
+        
+        if ($recorder) {
+            // Try different possible name fields
+            if (!empty($recorder->name)) {
+                $recorderName = $recorder->name;
+            } elseif (!empty($recorder->first_name) || !empty($recorder->last_name)) {
+                $recorderName = trim(($recorder->first_name ?? '') . ' ' . ($recorder->last_name ?? ''));
+                if (empty($recorderName)) {
+                    $recorderName = $recorder->username ?? $recorder->email ?? 'User #' . $recorder->id;
+                }
+            } elseif (!empty($recorder->username)) {
+                $recorderName = $recorder->username;
+            } elseif (!empty($recorder->email)) {
+                $recorderName = $recorder->email;
+            } else {
+                $recorderName = 'User #' . $recorder->id;
+            }
+        }
+
         // Add creation event
         $history[] = [
             'id' => $payment->id . '_created',
@@ -74,10 +163,10 @@ class PaymentShowController extends BasePaymentController
             'action' => 'created',
             'status' => $payment->status,
             'description' => "Payment #{$payment->or_number} was created",
-            'user' => $payment->recorder ? [
-                'id' => $payment->recorder->id,
-                'name' => $payment->recorder->name ?? $payment->recorder->first_name . ' ' . $payment->recorder->last_name,
-                'email' => $payment->recorder->email ?? null,
+            'user' => $recorder ? [
+                'id' => $recorder->id,
+                'name' => $recorderName,
+                'email' => $recorder->email ?? null,
             ] : null,
             'created_at' => $payment->created_at,
             'formatted_created_at' => $payment->formatted_created_at ?? $payment->created_at->format('F j, Y g:i A'),
@@ -89,6 +178,27 @@ class PaymentShowController extends BasePaymentController
                 $action = $this->mapActivityToAction($activity);
                 $changes = $this->extractChangesFromActivity($activity);
                 
+                // Get causer name with proper fallbacks
+                $causerName = 'System';
+                $causer = $activity->causer;
+                
+                if ($causer) {
+                    if (!empty($causer->name)) {
+                        $causerName = $causer->name;
+                    } elseif (!empty($causer->first_name) || !empty($causer->last_name)) {
+                        $causerName = trim(($causer->first_name ?? '') . ' ' . ($causer->last_name ?? ''));
+                        if (empty($causerName)) {
+                            $causerName = $causer->username ?? $causer->email ?? 'User #' . $causer->id;
+                        }
+                    } elseif (!empty($causer->username)) {
+                        $causerName = $causer->username;
+                    } elseif (!empty($causer->email)) {
+                        $causerName = $causer->email;
+                    } else {
+                        $causerName = 'User #' . $causer->id;
+                    }
+                }
+                
                 $history[] = [
                     'id' => $activity->id,
                     'payment_id' => $payment->id,
@@ -97,10 +207,10 @@ class PaymentShowController extends BasePaymentController
                     'description' => $activity->description ?? $this->getActivityDescription($activity),
                     'changes' => $changes,
                     'metadata' => $this->extractMetadataFromActivity($activity),
-                    'user' => $activity->causer ? [
-                        'id' => $activity->causer->id,
-                        'name' => $activity->causer->name ?? $activity->causer->first_name . ' ' . $activity->causer->last_name,
-                        'email' => $activity->causer->email ?? null,
+                    'user' => $causer ? [
+                        'id' => $causer->id,
+                        'name' => $causerName,
+                        'email' => $causer->email ?? null,
                     ] : null,
                     'created_at' => $activity->created_at,
                     'formatted_created_at' => $activity->created_at->format('F j, Y g:i A'),
@@ -110,6 +220,27 @@ class PaymentShowController extends BasePaymentController
 
         // Add void event if payment is voided
         if ($payment->status === 'voided') {
+            // Get current user name with proper fallbacks
+            $currentUser = auth()->user();
+            $currentUserName = 'System';
+            
+            if ($currentUser) {
+                if (!empty($currentUser->name)) {
+                    $currentUserName = $currentUser->name;
+                } elseif (!empty($currentUser->first_name) || !empty($currentUser->last_name)) {
+                    $currentUserName = trim(($currentUser->first_name ?? '') . ' ' . ($currentUser->last_name ?? ''));
+                    if (empty($currentUserName)) {
+                        $currentUserName = $currentUser->username ?? $currentUser->email ?? 'User #' . $currentUser->id;
+                    }
+                } elseif (!empty($currentUser->username)) {
+                    $currentUserName = $currentUser->username;
+                } elseif (!empty($currentUser->email)) {
+                    $currentUserName = $currentUser->email;
+                } else {
+                    $currentUserName = 'User #' . $currentUser->id;
+                }
+            }
+            
             $history[] = [
                 'id' => $payment->id . '_voided',
                 'payment_id' => $payment->id,
@@ -119,10 +250,10 @@ class PaymentShowController extends BasePaymentController
                 'metadata' => [
                     'reason' => $payment->remarks ?? 'No reason provided',
                 ],
-                'user' => auth()->user() ? [
-                    'id' => auth()->user()->id,
-                    'name' => auth()->user()->name ?? auth()->user()->first_name . ' ' . auth()->user()->last_name,
-                    'email' => auth()->user()->email ?? null,
+                'user' => $currentUser ? [
+                    'id' => $currentUser->id,
+                    'name' => $currentUserName,
+                    'email' => $currentUser->email ?? null,
                 ] : null,
                 'created_at' => $payment->updated_at,
                 'formatted_created_at' => $payment->formatted_updated_at ?? $payment->updated_at->format('F j, Y g:i A'),
@@ -591,7 +722,7 @@ class PaymentShowController extends BasePaymentController
                 'or_number' => $payment->or_number
             ]);
 
-            $action = $request->get('action', 'download'); // 'preview' or 'download'
+            $action = $request->get('action', 'download');
 
             // Load relationships
             $payment->load([
@@ -697,12 +828,10 @@ class PaymentShowController extends BasePaymentController
 
             $filename = "receipt-{$payment->or_number}.pdf";
 
-            // Try to load the receipt view
             try {
                 $pdf = Pdf::loadView('pdf.payment-receipt', $data);
             } catch (\Exception $e) {
                 Log::warning('Payment receipt PDF view not found', ['error' => $e->getMessage()]);
-                // Fallback to a simple view
                 $html = view('pdf.receipt-simple', $data)->render();
                 $pdf = Pdf::loadHTML($html);
             }

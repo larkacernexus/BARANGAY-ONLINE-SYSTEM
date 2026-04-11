@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Shield, Users, Trash2, Loader2 } from 'lucide-react';
-import { SelectionStats } from '@/admin-utils/rolesUtils';
+import { BulkOperation, SelectionStats } from '@/types/admin/roles/roles'; // CHANGE THIS IMPORT
 
 interface RolesDialogsProps {
     showBulkDeleteDialog: boolean;
@@ -21,8 +21,8 @@ interface RolesDialogsProps {
     setShowBulkTypeDialog: (show: boolean) => void;
     isPerformingBulkAction: boolean;
     selectedRoles: number[];
-    handleBulkOperation: (operation: string) => void;
-    selectionStats: SelectionStats;
+    handleBulkOperation: (operation: BulkOperation) => void; // CHANGE THIS LINE
+    selectionStats?: SelectionStats; // MAKE THIS OPTIONAL
     bulkEditValue: string;
     setBulkEditValue: (value: string) => void;
 }
@@ -50,9 +50,11 @@ export default function RolesDialogs({
                             Are you sure you want to delete {selectedRoles.length} selected role{selectedRoles.length !== 1 ? 's' : ''}?
                             This action cannot be undone. System roles or roles with users cannot be deleted.
                             <br /><br />
-                            <span className="font-medium">
-                                {selectionStats.deletable} out of {selectedRoles.length} roles are deletable.
-                            </span>
+                            {selectionStats && (
+                                <span className="font-medium">
+                                    {selectionStats.deletable || 0} out of {selectedRoles.length} roles are deletable.
+                                </span>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -60,7 +62,7 @@ export default function RolesDialogs({
                         <AlertDialogAction
                             onClick={() => handleBulkOperation('delete')}
                             className="bg-red-600 hover:bg-red-700 text-white"
-                            disabled={isPerformingBulkAction || selectionStats.deletable === 0}
+                            disabled={isPerformingBulkAction || (selectionStats ? selectionStats.deletable === 0 : false)}
                         >
                             {isPerformingBulkAction ? (
                                 <>
@@ -68,7 +70,7 @@ export default function RolesDialogs({
                                     Deleting...
                                 </>
                             ) : (
-                                `Delete ${selectionStats.deletable} Role${selectionStats.deletable !== 1 ? 's' : ''}`
+                                `Delete ${selectionStats?.deletable || 0} Role${selectionStats?.deletable !== 1 ? 's' : ''}`
                             )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -97,16 +99,18 @@ export default function RolesDialogs({
                                 <option value="system">System Role</option>
                             </select>
                         </div>
-                        <div className="text-sm text-gray-500 p-3 bg-gray-50 dark:bg-gray-900 rounded">
-                            <div className="font-medium mb-1">Current selection stats:</div>
-                            <ul className="list-disc list-inside space-y-1">
-                                <li>{selectionStats.total} total roles</li>
-                                <li>{selectionStats.system} system roles</li>
-                                <li>{selectionStats.custom} custom roles</li>
-                                <li>{selectionStats.totalUsers} total users assigned</li>
-                                <li>{selectionStats.deletable} deletable roles</li>
-                            </ul>
-                        </div>
+                        {selectionStats && (
+                            <div className="text-sm text-gray-500 p-3 bg-gray-50 dark:bg-gray-900 rounded">
+                                <div className="font-medium mb-1">Current selection stats:</div>
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>{selectionStats.total} total roles</li>
+                                    <li>{selectionStats.systemRoles} system roles</li>
+                                    <li>{selectionStats.customRoles} custom roles</li>
+                                    <li>{selectionStats.totalUsers} total users assigned</li>
+                                    <li>{selectionStats.totalPermissions} total permissions</li>
+                                </ul>
+                            </div>
+                        )}
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isPerformingBulkAction}>Cancel</AlertDialogCancel>

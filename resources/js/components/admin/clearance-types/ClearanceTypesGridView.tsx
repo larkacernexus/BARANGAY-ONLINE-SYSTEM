@@ -1,4 +1,5 @@
 // components/admin/clearance-types/ClearanceTypesGridView.tsx
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,7 +18,6 @@ import {
 } from '@/components/ui/tooltip';
 import {
     CheckCircle,
-    Clock,
     Calendar,
     Users,
     MoreVertical,
@@ -35,30 +35,21 @@ import {
     Timer,
     FileSpreadsheet,
     CheckSquare,
-    Square
+    Square,
+    Lock,
+    Unlock
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 
-interface ClearanceType {
-    id: number;
-    name: string;
-    code: string;
-    description: string;
-    fee: number;
-    formatted_fee: string;
-    processing_days: number;
-    validity_days: number;
-    is_active: boolean;
-    requires_payment: boolean;
-    requires_approval: boolean;
-    is_online_only: boolean;
-    clearances_count?: number;
-    purpose_options?: string;
-    document_types_count?: number;
-    created_at: string;
-    updated_at: string;
-}
+// Import types and utilities
+import { 
+    ClearanceType, 
+    getStatusBadgeVariant,
+    getPurposeOptionsCount,
+    formatClearanceTypeDate as formatDate,
+    truncateText
+} from '@/types/admin/clearance-types/clearance-types';
 
 interface ClearanceTypesGridViewProps {
     clearanceTypes: ClearanceType[];
@@ -69,11 +60,10 @@ interface ClearanceTypesGridViewProps {
     onClearFilters: () => void;
     onDelete: (type: ClearanceType) => void;
     onToggleStatus?: (type: ClearanceType) => void;
+    onToggleDiscountable?: (type: ClearanceType) => void;
     onDuplicate?: (type: ClearanceType) => void;
     onViewPhoto: (type: ClearanceType) => void;
     onCopyToClipboard: (text: string, label: string) => void;
-    truncateText: (text: string, maxLength?: number) => string;
-    getStatusBadgeVariant: (isActive: boolean) => "default" | "secondary" | "destructive" | "outline";
     getPurposeOptionsCount: (type: ClearanceType) => number;
     getTruncationLength: (type: 'name' | 'description' | 'code') => number;
 }
@@ -87,12 +77,11 @@ export default function ClearanceTypesGridView({
     onClearFilters,
     onDelete,
     onToggleStatus,
+    onToggleDiscountable,
     onDuplicate,
     onViewPhoto,
     onCopyToClipboard,
-    truncateText,
-    getStatusBadgeVariant,
-    getPurposeOptionsCount,
+    getPurposeOptionsCount: getPurposeCount,
     getTruncationLength
 }: ClearanceTypesGridViewProps) {
     
@@ -102,16 +91,10 @@ export default function ClearanceTypesGridView({
             <XCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />;
     };
 
-    const formatDate = (dateString: string) => {
-        try {
-            return new Date(dateString).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-            });
-        } catch {
-            return dateString;
-        }
+    const getDiscountableIcon = (isDiscountable: boolean) => {
+        return isDiscountable ? 
+            <Unlock className="h-3 w-3 text-green-500" /> : 
+            <Lock className="h-3 w-3 text-gray-500" />;
     };
 
     return (
@@ -163,6 +146,17 @@ export default function ClearanceTypesGridView({
                                         {getStatusIcon(type.is_active)}
                                         {type.is_active ? 'Active' : 'Inactive'}
                                     </Badge>
+                                    <Badge 
+                                        variant="outline"
+                                        className={`flex items-center gap-1 text-xs ${
+                                            type.is_discountable 
+                                                ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-900/20 dark:text-green-400' 
+                                                : 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                                        }`}
+                                    >
+                                        {getDiscountableIcon(type.is_discountable)}
+                                        {type.is_discountable ? 'Disc.' : 'Non-Disc.'}
+                                    </Badge>
                                 </div>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -174,132 +168,154 @@ export default function ClearanceTypesGridView({
                                             <MoreVertical className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                     <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.clearance-types.show', type.id)} className="flex items-center cursor-pointer">
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            <span>View Details</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.clearance-types.edit', type.id)} className="flex items-center cursor-pointer">
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            <span>Edit Type</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.clearances.create', { type: type.id })} className="flex items-center cursor-pointer">
-                                                            <FileText className="mr-2 h-4 w-4" />
-                                                            <span>Issue Clearance</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuSeparator />
-                                                    
-                                                    <DropdownMenuItem 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onCopyToClipboard(type.code, 'Clearance Type Code');
-                                                        }}
-                                                        className="flex items-center cursor-pointer"
-                                                    >
-                                                        <Copy className="mr-2 h-4 w-4" />
-                                                        <span>Copy Code</span>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onCopyToClipboard(type.name, 'Clearance Type Name');
-                                                        }}
-                                                        className="flex items-center cursor-pointer"
-                                                    >
-                                                        <Copy className="mr-2 h-4 w-4" />
-                                                        <span>Copy Name</span>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={route('admin.clearance-types.print', type.id)} className="flex items-center cursor-pointer">
-                                                            <Printer className="mr-2 h-4 w-4" />
-                                                            <span>Print Details</span>
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    
-                                                    <DropdownMenuSeparator />
-                                                    
-                                                    {isBulkMode && (
+                                    <DropdownMenuContent align="end" className="w-48">
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('admin.clearance-types.show', type.id)} className="flex items-center cursor-pointer">
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                <span>View Details</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('admin.clearance-types.edit', type.id)} className="flex items-center cursor-pointer">
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                <span>Edit Type</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('admin.clearances.create', { type: type.id })} className="flex items-center cursor-pointer">
+                                                <FileText className="mr-2 h-4 w-4" />
+                                                <span>Issue Clearance</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuSeparator />
+                                        
+                                        <DropdownMenuItem 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCopyToClipboard(type.code, 'Clearance Type Code');
+                                            }}
+                                            className="flex items-center cursor-pointer"
+                                        >
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            <span>Copy Code</span>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuItem 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCopyToClipboard(type.name, 'Clearance Type Name');
+                                            }}
+                                            className="flex items-center cursor-pointer"
+                                        >
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            <span>Copy Name</span>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuItem asChild>
+                                            <Link href={route('admin.clearance-types.print', type.id)} className="flex items-center cursor-pointer">
+                                                <Printer className="mr-2 h-4 w-4" />
+                                                <span>Print Details</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        
+                                        <DropdownMenuSeparator />
+                                        
+                                        {isBulkMode && (
+                                            <>
+                                                <DropdownMenuItem 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onItemSelect(type.id);
+                                                    }}
+                                                    className="flex items-center cursor-pointer"
+                                                >
+                                                    {isSelected ? (
                                                         <>
-                                                            <DropdownMenuItem 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    onItemSelect(type.id);
-                                                                }}
-                                                                className="flex items-center cursor-pointer"
-                                                            >
-                                                                {isSelected ? (
-                                                                    <>
-                                                                        <CheckSquare className="mr-2 h-4 w-4" />
-                                                                        <span>Deselect</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <Square className="mr-2 h-4 w-4" />
-                                                                        <span>Select</span>
-                                                                    </>
-                                                                )}
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
+                                                            <CheckSquare className="mr-2 h-4 w-4" />
+                                                            <span>Deselect</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Square className="mr-2 h-4 w-4" />
+                                                            <span>Select</span>
                                                         </>
                                                     )}
-                                                    
-                                                    {onDuplicate && (
-                                                        <DropdownMenuItem 
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onDuplicate(type);
-                                                            }}
-                                                            className="flex items-center cursor-pointer"
-                                                        >
-                                                            <Copy className="mr-2 h-4 w-4" />
-                                                            <span>Duplicate Type</span>
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    
-                                                    {onToggleStatus && (
-                                                        <DropdownMenuItem 
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onToggleStatus(type);
-                                                            }}
-                                                            className="flex items-center cursor-pointer"
-                                                        >
-                                                            {type.is_active ? (
-                                                                <>
-                                                                    <XCircle className="mr-2 h-4 w-4" />
-                                                                    <span>Deactivate</span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                                                    <span>Activate</span>
-                                                                </>
-                                                            )}
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    
-                                                    <DropdownMenuItem 
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onDelete(type);
-                                                        }}
-                                                    >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        <span>Delete Type</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                            </>
+                                        )}
+                                        
+                                        {onDuplicate && (
+                                            <DropdownMenuItem 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onDuplicate(type);
+                                                }}
+                                                className="flex items-center cursor-pointer"
+                                            >
+                                                <Copy className="mr-2 h-4 w-4" />
+                                                <span>Duplicate Type</span>
+                                            </DropdownMenuItem>
+                                        )}
+                                        
+                                        {onToggleStatus && (
+                                            <DropdownMenuItem 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onToggleStatus(type);
+                                                }}
+                                                className="flex items-center cursor-pointer"
+                                            >
+                                                {type.is_active ? (
+                                                    <>
+                                                        <XCircle className="mr-2 h-4 w-4" />
+                                                        <span>Deactivate</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                                        <span>Activate</span>
+                                                    </>
+                                                )}
+                                            </DropdownMenuItem>
+                                        )}
+                                        
+                                        {onToggleDiscountable && (
+                                            <DropdownMenuItem 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onToggleDiscountable(type);
+                                                }}
+                                                className="flex items-center cursor-pointer"
+                                            >
+                                                {type.is_discountable ? (
+                                                    <>
+                                                        <Lock className="mr-2 h-4 w-4" />
+                                                        <span>Mark Non-Discountable</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Unlock className="mr-2 h-4 w-4" />
+                                                        <span>Mark Discountable</span>
+                                                    </>
+                                                )}
+                                            </DropdownMenuItem>
+                                        )}
+                                        
+                                        <DropdownMenuItem 
+                                            className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDelete(type);
+                                            }}
+                                        >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            <span>Delete Type</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
 
@@ -385,7 +401,7 @@ export default function ClearanceTypesGridView({
                                 </Badge>
                                 <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
                                     <Copy className="h-3 w-3 mr-1" />
-                                    {getPurposeOptionsCount(type)} purposes
+                                    {getPurposeCount(type)} purposes
                                 </Badge>
                             </div>
 

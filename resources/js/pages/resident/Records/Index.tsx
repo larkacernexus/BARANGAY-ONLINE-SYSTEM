@@ -1,14 +1,14 @@
-// /Pages/resident/MyRecords.tsx
+// pages/resident/MyRecords.tsx (Fixed Order Version - with Mobile List View)
+
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, FolderIcon, UserIcon, FileIcon, HardDrive, Database, CalendarIcon, FileTextIcon, AlertCircleIcon } from 'lucide-react';
+import { Loader2, FolderIcon, UserIcon, HardDrive, CalendarIcon, FileTextIcon, AlertCircleIcon } from 'lucide-react';
 
 // Reusable Components
-import { CustomTabs } from '@/components/residentui/CustomTabs';
 import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
 import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
 import { ModernEmptyState } from '@/components/residentui/modern-empty-state';
@@ -23,24 +23,23 @@ import { PasswordModal } from '@/components/portal/records/index/PasswordModal';
 import { StorageCard } from '@/components/portal/records/index/StorageCard';
 import { ModernRecordGridView } from '@/components/residentui/records/modern-record-grid-view';
 import { ModernRecordListView } from '@/components/residentui/records/modern-record-list-view';
+import { ModernRecordMobileListView } from '@/components/residentui/records/modern-record-mobile-list-view'; // New import
 import { ModernRecordFilters } from '@/components/residentui/records/modern-record-filters';
 import { ModernCardHeader } from '@/components/residentui/modern/card-header';
 import { ViewToggle } from '@/components/residentui/modern/view-toggle';
 import { SortDropdown } from '@/components/residentui/modern/sort-dropdown';
 import { SelectModeButton } from '@/components/residentui/modern/select-mode-button';
 import { ActionButtons } from '@/components/residentui/modern/action-buttons';
+import { CategoryTabs, CATEGORY_TABS_CONFIG } from '@/components/portal/records/index/category-tabs';
 
 // Hooks
-import { useFilters } from '@/components/residentui/hooks/use-filters';
 import { useMobile } from '@/components/residentui/hooks/use-mobile';
-import { useSelection } from '@/components/residentui/hooks/use-selection';
 
 // Types and Utils
 import type { 
     Document, 
     DocumentCategory, 
     StorageStats, 
-    RecordFilters, 
     Resident, 
     Household 
 } from '@/types/portal/records/records';
@@ -71,17 +70,11 @@ interface PageProps {
     documents: {
         data: Document[];
         total: number;
-        current_page: number;
-        last_page: number;
-        from: number;
-        to: number;
-        per_page: number;
     };
-    categories: DocumentCategory[]; // Changed from Category
+    categories: DocumentCategory[];
     storageStats?: StorageStats;
-    filters: RecordFilters;
-    householdResidents?: Resident[]; // Changed from HouseholdResident
-    currentResident?: Resident; // Changed from CurrentResident
+    householdResidents?: Resident[];
+    currentResident?: Resident;
     household?: Household;
     error?: string;
 }
@@ -90,7 +83,6 @@ export default function MyRecords({
     documents: initialDocuments, 
     categories, 
     storageStats,
-    filters: initialFilters,
     householdResidents,
     currentResident,
     household,
@@ -103,9 +95,15 @@ export default function MyRecords({
     const [mounted, setMounted] = useState(false);
     const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [allDocuments, setAllDocuments] = useState<Document[]>(initialDocuments.data || []);
-    const [filteredDocuments, setFilteredDocuments] = useState<Document[]>(initialDocuments.data || []);
+    const [allDocuments] = useState<Document[]>(initialDocuments.data || []);
+    
+    // Client-side filter state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [residentFilter, setResidentFilter] = useState('all');
     const [currentPage, setCurrentPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    
     const itemsPerPage = 10;
     
     // Password modal state
@@ -115,7 +113,6 @@ export default function MyRecords({
     const [verifyingPassword, setVerifyingPassword] = useState(false);
     const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
     const [actionType, setActionType] = useState<'view' | 'download' | null>(null);
-    const [isModalMode, setIsModalMode] = useState(false);
     
     // Action feedback state
     const [actionStatus, setActionStatus] = useState<{
@@ -125,24 +122,67 @@ export default function MyRecords({
     
     const [isExporting, setIsExporting] = useState(false);
     
-    // Hooks
-    const { filters, updateFilters, loading, hasActiveFilters, clearFilters } = useFilters({
-        initialFilters: initialFilters || {},
-        route: '/portal/my-records'
-    });
+    // Selection state
+    const [selectedItems, setSelectedItems] = useState<number[]>([]);
+    const [selectMode, setSelectMode] = useState(false);
     
-    const { selectedItems, selectMode, toggleSelect, selectAll, clearSelection, toggleSelectMode } = useSelection(
-        filteredDocuments.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-        (doc) => doc.id
-    );
+    // Set mounted after hydration
+    useEffect(() => { setMounted(true); }, []);
     
-    const selectedRecordIds = useMemo(() => 
-        selectedItems.filter((id): id is number => typeof id === 'number'), 
-        [selectedItems]
-    );
+    // Filter documents client-side
+    const filteredDocuments = useMemo(() => {
+        let result = [...allDocuments];
+        
+        // Search filter
+        if (searchQuery) {
+            const searchLower = searchQuery.toLowerCase();
+            result = result.filter(doc => 
+                doc.name?.toLowerCase().includes(searchLower) ||
+                doc.description?.toLowerCase().includes(searchLower) ||
+                doc.reference_number?.toLowerCase().includes(searchLower) ||
+                doc.file_name?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Category filter
+        if (categoryFilter !== 'all') {
+            const categoryId = parseInt(categoryFilter);
+            result = result.filter(doc => 
+                doc.document_category_id === categoryId || doc.category?.id === categoryId
+            );
+        }
+        
+        // Resident filter
+        if (residentFilter !== 'all') {
+            const residentId = parseInt(residentFilter);
+            result = result.filter(doc => doc.resident_id === residentId);
+        }
+        
+        // Sorting
+        result.sort((a, b) => {
+            if (sortBy === 'date') {
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            }
+            if (sortBy === 'name') {
+                const nameA = (a.name || '').toLowerCase();
+                const nameB = (b.name || '').toLowerCase();
+                return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+            }
+            if (sortBy === 'size') {
+                const sizeA = a.file_size || 0;
+                const sizeB = b.file_size || 0;
+                return sortOrder === 'asc' ? sizeA - sizeB : sizeB - sizeA;
+            }
+            return 0;
+        });
+        
+        return result;
+    }, [allDocuments, searchQuery, categoryFilter, residentFilter, sortBy, sortOrder]);
     
     // Process categories for tabs
-    const { allCategories, currentCategory } = useMemo(() => {
+    const { allCategories, currentCategory, tabCounts } = useMemo(() => {
         const sortedCategories = [...categories].sort((a, b) => {
             if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
             return a.name.localeCompare(b.name);
@@ -156,13 +196,28 @@ export default function MyRecords({
             color: cat.color
         }));
         
-        const totalDocumentsCount = storageStats?.document_count || 0;
-        const allCategory = { id: 'all', name: 'All Documents', count: totalDocumentsCount, icon: 'folder-open', color: 'blue' };
+        const allCategory = { 
+            id: 'all', 
+            name: 'All Documents', 
+            count: filteredDocuments.length, 
+            icon: 'folder-open', 
+            color: 'blue' 
+        };
         const allCats = [allCategory, ...processed];
-        const currentCat = allCats.find(c => c.id === (filters.category || 'all'));
+        const currentCat = allCats.find(c => c.id === categoryFilter);
         
-        return { allCategories: allCats, currentCategory: currentCat };
-    }, [categories, storageStats?.document_count, filters.category]);
+        // Calculate tab counts
+        const counts: Record<string, number> = {
+            all: filteredDocuments.length,
+        };
+        processed.forEach(cat => {
+            counts[cat.id] = filteredDocuments.filter(doc => 
+                doc.document_category_id?.toString() === cat.id || doc.category?.id?.toString() === cat.id
+            ).length;
+        });
+        
+        return { allCategories: allCats, currentCategory: currentCat, tabCounts: counts };
+    }, [categories, categoryFilter, filteredDocuments]);
     
     // Resident map
     const residentMap = useMemo(() => {
@@ -171,14 +226,14 @@ export default function MyRecords({
             const name = resident.full_name || `${resident.first_name} ${resident.last_name}`.trim();
             if (name) map.set(resident.id, name);
         });
-        initialDocuments.data?.forEach(doc => {
+        allDocuments?.forEach(doc => {
             if (doc.resident && doc.resident.id) {
                 const name = doc.resident.full_name || `${doc.resident.first_name || ''} ${doc.resident.last_name || ''}`.trim();
                 if (name && !map.has(doc.resident.id)) map.set(doc.resident.id, name);
             }
         });
         return map;
-    }, [householdResidents, initialDocuments.data]);
+    }, [householdResidents, allDocuments]);
     
     const customGetResidentName = useCallback((residentId?: number, doc?: Document): string => {
         if (doc?.resident?.full_name) return doc.resident.full_name;
@@ -193,81 +248,85 @@ export default function MyRecords({
         return 'Unknown Resident';
     }, [residentMap, householdResidents]);
     
-    // Set mounted after hydration
-    useEffect(() => { setMounted(true); }, []);
+    const toggleSelect = (id: number) => {
+        setSelectedItems(prev =>
+            prev.includes(id) ? prev.filter(itemId => itemId !== id) : [...prev, id]
+        );
+    };
     
-    // Initialize documents
-    useEffect(() => {
-        setAllDocuments(initialDocuments.data || []);
-        setFilteredDocuments(initialDocuments.data || []);
-    }, [initialDocuments.data]);
+    const selectAll = () => {
+        setSelectedItems(paginatedDocuments.map(doc => doc.id));
+    };
     
-    // Filter logic
-    useEffect(() => {
-        if (isModalMode) return;
-        if (allDocuments.length === 0) { setFilteredDocuments([]); return; }
-        
-        let result = [...allDocuments];
-        
-        if (filters.search) {
-            const searchLower = filters.search.toLowerCase();
-            result = result.filter(doc => 
-                doc.name?.toLowerCase().includes(searchLower) ||
-                doc.description?.toLowerCase().includes(searchLower) ||
-                doc.reference_number?.toLowerCase().includes(searchLower) ||
-                doc.file_name?.toLowerCase().includes(searchLower)
-            );
+    const clearSelection = () => {
+        setSelectedItems([]);
+    };
+    
+    const toggleSelectMode = () => {
+        if (selectMode) {
+            setSelectMode(false);
+            clearSelection();
+        } else {
+            setSelectMode(true);
         }
-        
-        if (filters.category && filters.category !== 'all') {
-            const categoryId = parseInt(filters.category);
-            result = result.filter(doc => doc.document_category_id === categoryId || doc.category?.id === categoryId);
-        }
-        
-        if (filters.resident && filters.resident !== 'all') {
-            const residentId = parseInt(filters.resident);
-            result = result.filter(doc => doc.resident_id === residentId);
-        }
-        
-        result.sort((a, b) => {
-            if (sortBy === 'date') {
-                const dateA = new Date(a.created_at).getTime();
-                const dateB = new Date(b.created_at).getTime();
-                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-            }
-            if (sortBy === 'name') {
-                const nameA = a.name.toLowerCase();
-                const nameB = b.name.toLowerCase();
-                return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-            }
-            if (sortBy === 'size') {
-                const sizeA = a.file_size || 0;
-                const sizeB = b.file_size || 0;
-                return sortOrder === 'asc' ? sizeA - sizeB : sizeB - sizeA;
-            }
-            return 0;
-        });
-        
+    };
+    
+    // Pagination
+    const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
+    const tabHasData = paginatedDocuments.length > 0;
+    
+    // Reset to first page when filters change
+    const handleFilterChange = (filterType: string, value: string) => {
         setCurrentPage(1);
-        setFilteredDocuments(result);
-    }, [allDocuments, filters.search, filters.category, filters.resident, isModalMode, sortBy, sortOrder]);
+        
+        switch (filterType) {
+            case 'search':
+                setSearchQuery(value);
+                break;
+            case 'category':
+                setCategoryFilter(value);
+                break;
+            case 'resident':
+                setResidentFilter(value);
+                break;
+        }
+        
+        clearSelection();
+        setSelectMode(false);
+    };
+    
+    const hasActiveFilters = searchQuery !== '' || categoryFilter !== 'all' || residentFilter !== 'all';
+    
+    const clearFilters = () => {
+        setSearchQuery('');
+        setCategoryFilter('all');
+        setResidentFilter('all');
+        setCurrentPage(1);
+        
+        if (isMobile) setShowMobileFilters(false);
+        clearSelection();
+        setSelectMode(false);
+    };
     
     const handleTabChange = (categoryId: string) => {
-        updateFilters({ category: categoryId === 'all' ? '' : categoryId });
+        handleFilterChange('category', categoryId);
         if (mounted) window.scrollTo({ top: 0, behavior: 'smooth' });
     };
     
     const handleResidentChange = (value: string) => {
-        updateFilters({ resident: value === 'all' ? '' : value });
+        handleFilterChange('resident', value);
         if (isMobile) setShowMobileFilters(false);
     };
     
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        updateFilters({ search: filters.search?.trim() || '' });
+        handleFilterChange('search', searchQuery.trim());
     };
     
-    const handleSearchClear = () => updateFilters({ search: '' });
+    const handleSearchClear = () => handleFilterChange('search', '');
     
     const triggerDirectDownload = (doc: Document) => {
         setActionStatus({ type: 'success', message: `Starting download for "${doc.name}"...` });
@@ -297,7 +356,6 @@ export default function MyRecords({
     
     const handleDocumentAction = (doc: Document, action: 'view' | 'download', e?: React.MouseEvent) => {
         if (e) { e.preventDefault(); e.stopPropagation(); }
-        setIsModalMode(true);
         setSelectedDocument(doc);
         setActionType(action);
         
@@ -306,8 +364,11 @@ export default function MyRecords({
             setPassword('');
             setPasswordError('');
         } else {
-            if (action === 'view') router.visit(`/portal/my-records/${doc.id}`);
-            else if (action === 'download') triggerDirectDownload(doc);
+            if (action === 'view') {
+                window.location.href = `/portal/my-records/${doc.id}`;
+            } else if (action === 'download') {
+                triggerDirectDownload(doc);
+            }
         }
     };
     
@@ -317,24 +378,30 @@ export default function MyRecords({
         setPasswordError('');
         
         try {
-            router.post(`/portal/my-records/${selectedDocument.id}/verify-password`, { password }, {
-                preserveScroll: true,
-                onSuccess: (page: any) => {
-                    if (page.props?.success) {
-                        setPasswordModalOpen(false);
-                        setPassword('');
-                        setActionStatus({ type: 'success', message: 'Password verified! Redirecting...' });
-                        setIsModalMode(false);
-                        setTimeout(() => router.visit(page.props?.redirect_url || `/portal/my-records/${selectedDocument.id}`), 1000);
-                    } else {
-                        setPasswordError(page.props?.errors?.password || page.props?.message || 'Incorrect password.');
-                    }
+            const response = await fetch(`/portal/my-records/${selectedDocument.id}/verify-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken() || '',
                 },
-                onError: (errors: any) => setPasswordError(typeof errors === 'string' ? errors : errors?.password || errors?.message || 'Verification failed.'),
-                onFinish: () => setVerifyingPassword(false)
+                body: JSON.stringify({ password }),
             });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                setPasswordModalOpen(false);
+                setPassword('');
+                setActionStatus({ type: 'success', message: 'Password verified! Redirecting...' });
+                setTimeout(() => {
+                    window.location.href = data.redirect_url || `/portal/my-records/${selectedDocument.id}`;
+                }, 1000);
+            } else {
+                setPasswordError(data.message || 'Incorrect password.');
+            }
         } catch (error) {
             setPasswordError('Network error. Please try again.');
+        } finally {
             setVerifyingPassword(false);
         }
     };
@@ -369,6 +436,7 @@ export default function MyRecords({
     };
     
     const handleCopyReference = (ref: string) => copyToClipboard(ref, `Copied: ${ref}`);
+    
     const handleDeleteSelected = () => {
         if (confirm(`Delete ${selectedItems.length} selected documents?`)) {
             toast.success(`Deleted ${selectedItems.length} documents`);
@@ -379,21 +447,9 @@ export default function MyRecords({
     const handlePrintRecords = () => toast.info('Print feature coming soon');
     const handleExportCSV = () => toast.info('Export feature coming soon');
     
-    const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
-    const tabHasData = paginatedDocuments.length > 0;
-    
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
         if (mounted) window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    
-    const getCategoryCount = (categoryId: string) => {
-        if (categoryId === 'all') return filteredDocuments.length;
-        const category = allCategories.find(c => c.id === categoryId);
-        return category?.count || 0;
     };
     
     if (!mounted) {
@@ -425,7 +481,13 @@ export default function MyRecords({
             
             <PasswordModal
                 isOpen={passwordModalOpen}
-                onClose={() => { setPasswordModalOpen(false); setIsModalMode(false); setPassword(''); setPasswordError(''); setSelectedDocument(null); setActionType(null); }}
+                onClose={() => { 
+                    setPasswordModalOpen(false); 
+                    setPassword(''); 
+                    setPasswordError(''); 
+                    setSelectedDocument(null); 
+                    setActionType(null); 
+                }}
                 document={selectedDocument}
                 password={password}
                 setPassword={setPassword}
@@ -454,19 +516,19 @@ export default function MyRecords({
                 
                 {showStats && storageStats && (
                     <div className="animate-slide-down">
-                    <ModernStatsCards cards={getRecordStatsCards(storageStats)} loading={loading} />
+                        <ModernStatsCards cards={getRecordStatsCards(storageStats)} loading={loading} />
                     </div>
                 )}
                 
                 {!isMobile && (
                     <ModernRecordFilters
-                        search={filters.search || ''}
-                        setSearch={(value) => updateFilters({ search: value, page: '1' })}
+                        search={searchQuery}
+                        setSearch={(value) => handleFilterChange('search', value)}
                         handleSearchSubmit={handleSearchSubmit}
                         handleSearchClear={handleSearchClear}
-                        activeTab={filters.category || 'all'}
+                        activeTab={categoryFilter}
                         handleTabChange={handleTabChange}
-                        residentFilter={filters.resident || 'all'}
+                        residentFilter={residentFilter}
                         handleResidentChange={handleResidentChange}
                         loading={loading}
                         allCategories={allCategories}
@@ -476,14 +538,22 @@ export default function MyRecords({
                         isExporting={isExporting}
                         hasActiveFilters={hasActiveFilters}
                         handleClearFilters={clearFilters}
-                        onCopySummary={() => { navigator.clipboard.writeText(`Records Summary:\nTotal: ${filteredDocuments.length}`); toast.success('Summary copied'); }}
+                        onCopySummary={() => { 
+                            navigator.clipboard.writeText(`Records Summary:\nTotal: ${filteredDocuments.length}`); 
+                            toast.success('Summary copied'); 
+                        }}
                     />
                 )}
                 
                 <div className="mt-4">
-                    <CustomTabs statusFilter={filters.category || 'all'} handleTabChange={handleTabChange} getStatusCount={getCategoryCount} />
+                    <CategoryTabs
+                        categoryFilter={categoryFilter}
+                        handleTabChange={handleTabChange}
+                        tabCounts={tabCounts}
+                        categories={allCategories}
+                    />
                     
-                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 mt-4">
                         <CardContent className="p-4 md:p-6">
                             {selectMode && tabHasData && (
                                 <ModernSelectionBanner
@@ -499,66 +569,117 @@ export default function MyRecords({
                             
                             <ModernCardHeader
                                 title={`${currentCategory?.name || 'All'} Documents`}
-                                description={tabHasData ? `Showing ${paginatedDocuments.length} document${paginatedDocuments.length !== 1 ? 's' : ''}` : 'No documents found'}
+                                description={tabHasData 
+                                    ? `Showing ${paginatedDocuments.length} of ${filteredDocuments.length} document${filteredDocuments.length !== 1 ? 's' : ''}`
+                                    : 'No documents found'
+                                }
                                 action={
                                     <div className="flex items-center gap-2">
                                         <SortDropdown 
                                             sortBy={sortBy} 
                                             sortOrder={sortOrder} 
-                                            onSort={(by, order) => { setSortBy(by as any); setSortOrder(order); }} 
+                                            onSort={(by, order) => { 
+                                                setSortBy(by as 'date' | 'name' | 'size'); 
+                                                setSortOrder(order); 
+                                                setCurrentPage(1);
+                                            }} 
                                             options={[
                                                 { value: 'date', label: 'Date', icon: CalendarIcon }, 
                                                 { value: 'name', label: 'Name', icon: FileTextIcon }, 
                                                 { value: 'size', label: 'Size', icon: HardDrive }
                                             ]} 
                                         />
-                                        {!selectMode && tabHasData && <ViewToggle viewMode={viewMode} onViewChange={setViewMode} disabled={isMobile} />}
-                                        {tabHasData && <SelectModeButton isActive={selectMode} onToggle={toggleSelectMode} />}
+                                        {!selectMode && tabHasData && (
+                                            <ViewToggle viewMode={viewMode} onViewChange={setViewMode} disabled={false} />
+                                        )}
+                                        {tabHasData && (
+                                            <SelectModeButton isActive={selectMode} onToggle={toggleSelectMode} />
+                                        )}
                                     </div>
                                 }
                             />
                             
                             {!tabHasData ? (
                                 <ModernEmptyState 
-                                    status={filters.category === 'all' ? 'all' : 'filtered'} 
+                                    status={categoryFilter === 'all' ? 'all' : 'filtered'} 
                                     hasFilters={hasActiveFilters} 
                                     onClearFilters={clearFilters} 
                                     icon={FolderIcon} 
-                                    title={filters.search ? `No documents match "${filters.search}"` : 'No documents found'} 
+                                    title={searchQuery ? `No documents match "${searchQuery}"` : 'No documents found'} 
                                     message="Upload your first document to get started" 
                                     actionLabel="Upload Document" 
-                                    onAction={() => router.visit('/portal/my-records/create')} 
-                                />
-                            ) : viewMode === 'grid' ? (
-                                <ModernRecordGridView 
-                                    records={paginatedDocuments} 
-                                    selectMode={selectMode} 
-                                    selectedRecords={selectedRecordIds} 
-                                    onSelectRecord={toggleSelect} 
-                                    getResidentName={customGetResidentName} 
-                                    onView={(doc) => handleDocumentAction(doc, 'view')} 
-                                    onDownload={(doc) => handleDocumentAction(doc, 'download')} 
-                                    onDelete={handleDelete} 
-                                    onCopyReference={handleCopyReference} 
-                                    isMobile={isMobile} 
+                                    onAction={() => window.location.href = '/portal/my-records/create'} 
                                 />
                             ) : (
-                                <ModernRecordListView 
-                                    records={paginatedDocuments} 
-                                    selectMode={selectMode} 
-                                    selectedRecords={selectedRecordIds} 
-                                    onSelectRecord={toggleSelect} 
-                                    onSelectAll={selectAll} 
-                                    getResidentName={customGetResidentName} 
-                                    onView={(doc) => handleDocumentAction(doc, 'view')} 
-                                    onDownload={(doc) => handleDocumentAction(doc, 'download')} 
-                                    onDelete={handleDelete} 
-                                    onCopyReference={handleCopyReference} 
-                                    onPrint={handlePrintRecords} 
-                                />
+                                // Mobile-specific rendering
+                                isMobile ? (
+                                    viewMode === 'grid' ? (
+                                        <ModernRecordGridView 
+                                            records={paginatedDocuments} 
+                                            selectMode={selectMode} 
+                                            selectedRecords={selectedItems} 
+                                            onSelectRecord={toggleSelect} 
+                                            getResidentName={customGetResidentName} 
+                                            onView={(doc) => handleDocumentAction(doc, 'view')} 
+                                            onDownload={(doc) => handleDocumentAction(doc, 'download')} 
+                                            onDelete={handleDelete} 
+                                            onCopyReference={handleCopyReference} 
+                                            isMobile={true} 
+                                        />
+                                    ) : (
+                                        <ModernRecordMobileListView 
+                                            records={paginatedDocuments} 
+                                            selectMode={selectMode} 
+                                            selectedRecords={selectedItems} 
+                                            onSelectRecord={toggleSelect} 
+                                            getResidentName={customGetResidentName} 
+                                            onView={(doc) => handleDocumentAction(doc, 'view')} 
+                                            onDownload={(doc) => handleDocumentAction(doc, 'download')} 
+                                            onDelete={handleDelete} 
+                                            onCopyReference={handleCopyReference} 
+                                        />
+                                    )
+                                ) : (
+                                    // Desktop rendering
+                                    viewMode === 'grid' ? (
+                                        <ModernRecordGridView 
+                                            records={paginatedDocuments} 
+                                            selectMode={selectMode} 
+                                            selectedRecords={selectedItems} 
+                                            onSelectRecord={toggleSelect} 
+                                            getResidentName={customGetResidentName} 
+                                            onView={(doc) => handleDocumentAction(doc, 'view')} 
+                                            onDownload={(doc) => handleDocumentAction(doc, 'download')} 
+                                            onDelete={handleDelete} 
+                                            onCopyReference={handleCopyReference} 
+                                            isMobile={false} 
+                                        />
+                                    ) : (
+                                        <ModernRecordListView 
+                                            records={paginatedDocuments} 
+                                            selectMode={selectMode} 
+                                            selectedRecords={selectedItems} 
+                                            onSelectRecord={toggleSelect} 
+                                            onSelectAll={selectAll} 
+                                            getResidentName={customGetResidentName} 
+                                            onView={(doc) => handleDocumentAction(doc, 'view')} 
+                                            onDownload={(doc) => handleDocumentAction(doc, 'download')} 
+                                            onDelete={handleDelete} 
+                                            onCopyReference={handleCopyReference} 
+                                            onPrint={handlePrintRecords} 
+                                        />
+                                    )
+                                )
                             )}
                             
-                            {totalPages > 1 && <ModernPagination currentPage={currentPage} lastPage={totalPages} onPageChange={handlePageChange} loading={loading} />}
+                            {totalPages > 1 && (
+                                <ModernPagination 
+                                    currentPage={currentPage} 
+                                    lastPage={totalPages} 
+                                    onPageChange={handlePageChange} 
+                                    loading={loading} 
+                                />
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -571,9 +692,13 @@ export default function MyRecords({
                 onClose={() => setShowMobileFilters(false)} 
                 title="Filter Records" 
                 description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'} 
-                search={filters.search || ''} 
-                onSearchChange={(value) => updateFilters({ search: value, page: '1' })} 
-                onSearchSubmit={handleSearchSubmit} 
+                search={searchQuery} 
+                onSearchChange={(value) => setSearchQuery(value)} 
+                onSearchSubmit={(e) => { 
+                    e.preventDefault(); 
+                    handleFilterChange('search', searchQuery);
+                    setShowMobileFilters(false);
+                }} 
                 onSearchClear={handleSearchClear} 
                 loading={loading} 
                 hasActiveFilters={hasActiveFilters} 
@@ -582,8 +707,8 @@ export default function MyRecords({
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
                     <ModernSelect 
-                        value={filters.category || 'all'} 
-                        onValueChange={handleTabChange} 
+                        value={categoryFilter} 
+                        onValueChange={(value) => handleFilterChange('category', value)} 
                         placeholder="All categories" 
                         options={allCategories.map(cat => ({ value: cat.id, label: cat.name }))} 
                         disabled={loading} 
@@ -594,7 +719,7 @@ export default function MyRecords({
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Resident</label>
                         <ModernSelect 
-                            value={filters.resident || 'all'} 
+                            value={residentFilter} 
                             onValueChange={handleResidentChange} 
                             placeholder="All residents" 
                             options={[

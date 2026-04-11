@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, Camera, Upload, Search, X, ImageIcon, Video, File, Trash2 } from 'lucide-react';
 
 // Import types
-import type { FileWithPreview, ReportType } from '@/components/admin/community-reports/create//types/community-report';
+import type { FileWithPreview, ReportType } from '@/types/admin/reports/community-report';
 
 interface ExistingFile {
     id: number;

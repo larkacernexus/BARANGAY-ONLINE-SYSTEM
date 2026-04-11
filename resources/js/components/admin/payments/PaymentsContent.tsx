@@ -1,34 +1,19 @@
-// components/admin/payments/PaymentsContent.tsx
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     Receipt,
-    DollarSign,
-    CreditCard,
-    CheckCircle,
-    Clock,
-    XCircle,
-    User,
-    Users,
-    Download,
-    Printer,
-    Edit,
-    Trash2,
-    Copy,
-    Eye,
-    FileSpreadsheet,
-    CheckSquare,
-    Square,
-    Mail,
-    QrCode,
-    CheckCheck,
-    Layers,
-    List,
-    Grid3X3
+    ArrowUpDown
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -39,7 +24,7 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import PaymentsTableView from './PaymentsTableView';
 import PaymentsGridView from './PaymentsGridView';
 import PaymentsBulkActions from './PaymentsBulkActions';
-import { Payment, Filters, SelectionStats } from '@/types/payments.types';
+import { Payment, Filters, SelectionStats, BulkOperationType } from '@/types/admin/payments/payments';
 
 interface PaymentMethod {
     value: string;
@@ -92,7 +77,7 @@ interface PaymentsContentProps {
     onCopyToClipboard: (text: string, label: string) => void;
     onCopySelectedData: () => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperationType, customData?: any) => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     filtersState: Filters;
     isPerformingBulkAction: boolean;
@@ -105,12 +90,14 @@ interface PaymentsContentProps {
     payerTypeOptions?: PayerTypeOption[];
     isLoading: boolean;
     windowWidth: number;
-    // Refs for bulk actions
-    bulkActionRef?: React.RefObject<HTMLDivElement>;
+    bulkActionRef?: React.RefObject<HTMLDivElement | null>;
     showBulkActions?: boolean;
     setShowBulkActions?: (show: boolean) => void;
-    // Optional custom bulk actions
     customBulkActions?: any;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function PaymentsContent({
@@ -168,7 +155,11 @@ export default function PaymentsContent({
     bulkActionRef,
     showBulkActions = false,
     setShowBulkActions = () => {},
-    customBulkActions
+    customBulkActions,
+    sortBy = 'payment_date',
+    sortOrder = 'desc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'payment_date-desc'
 }: PaymentsContentProps) {
     
     // Toggle handler for bulk mode
@@ -250,6 +241,35 @@ export default function PaymentsContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="or_number-asc">OR Number (A to Z)</SelectItem>
+                                        <SelectItem value="or_number-desc">OR Number (Z to A)</SelectItem>
+                                        <SelectItem value="payer_name-asc">Payer Name (A to Z)</SelectItem>
+                                        <SelectItem value="payer_name-desc">Payer Name (Z to A)</SelectItem>
+                                        <SelectItem value="payment_method-asc">Payment Method (A to Z)</SelectItem>
+                                        <SelectItem value="payment_method-desc">Payment Method (Z to A)</SelectItem>
+                                        <SelectItem value="total_amount-asc">Amount (Low to High)</SelectItem>
+                                        <SelectItem value="total_amount-desc">Amount (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (A to Z)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Z to A)</SelectItem>
+                                        <SelectItem value="payment_date-asc">Payment Date (Oldest first)</SelectItem>
+                                        <SelectItem value="payment_date-desc">Payment Date (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && payments.length > 0 && (
                             <div className="flex items-center gap-2">

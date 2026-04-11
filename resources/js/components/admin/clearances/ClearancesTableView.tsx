@@ -17,9 +17,32 @@ import {
     Eye, Edit, Printer, Trash2, Copy, MoreVertical,
     ArrowUpDown, CreditCard, Home, Building
 } from 'lucide-react';
-import { ClearanceRequest, ClearanceType, Resident, StatusOption } from '@/types/admin/clearances/clearance-types';
+import { ClearanceRequest, ClearanceType, StatusOption } from '@/types/admin/clearances/clearance';
 import { toast } from 'sonner';
 import { JSX } from 'react';
+
+// Define simplified types for nested objects
+interface SimpleResident {
+    id: number;
+    first_name: string;
+    last_name: string;
+    middle_name?: string;
+    suffix?: string;
+    full_name: string;
+    contact_number?: string;
+    email?: string;
+    address?: string;
+    purok?: string;
+}
+
+interface SimpleBusiness {
+    business_name?: string;
+}
+
+interface SimpleHousehold {
+    head_name?: string;
+    household_number?: string;
+}
 
 interface ClearancesTableViewProps {
     clearances: ClearanceRequest[];
@@ -127,15 +150,7 @@ export default function ClearancesTableView({
         }
     };
 
-    const safeString = (value: any): string => {
-        if (value === null || value === undefined) return '';
-        if (typeof value === 'boolean') return '';
-        if (typeof value === 'object') return '';
-        return String(value);
-    };
-
     const getContactNumber = (clearance: ClearanceRequest): string => {
-        // Try clearance-level contact number first (if exists in extended type)
         const anyClearance = clearance as any;
         if (anyClearance.contact_number && typeof anyClearance.contact_number === 'string') {
             return anyClearance.contact_number;
@@ -168,33 +183,32 @@ export default function ClearancesTableView({
         return '';
     };
 
-    const getResidentName = (resident?: Resident): string => {
+    const getResidentName = (resident?: SimpleResident): string => {
         if (!resident) return 'N/A';
         if (resident.full_name && typeof resident.full_name === 'string') return resident.full_name;
         if (resident.first_name || resident.last_name) {
-            const firstName = typeof resident.first_name === 'string' ? resident.first_name : '';
-            const lastName = typeof resident.last_name === 'string' ? resident.last_name : '';
+            const firstName = resident.first_name || '';
+            const lastName = resident.last_name || '';
             return `${firstName} ${lastName}`.trim();
         }
         return 'N/A';
     };
 
-    const getBusinessName = (business: any): string => {
-        if (!business || typeof business !== 'object') return '';
-        if (business && 'business_name' in business) {
-            const businessName = (business as any).business_name;
-            if (typeof businessName === 'string') return businessName;
+    const getBusinessName = (business?: SimpleBusiness): string => {
+        if (!business) return '';
+        if (business.business_name && typeof business.business_name === 'string') {
+            return business.business_name;
         }
         return '';
     };
 
-    const getHouseholdName = (household: any): string => {
-        if (!household || typeof household !== 'object') return '';
-        if ('head_name' in household && typeof (household as any).head_name === 'string') {
-            return (household as any).head_name;
+    const getHouseholdName = (household?: SimpleHousehold): string => {
+        if (!household) return '';
+        if (household.head_name && typeof household.head_name === 'string') {
+            return household.head_name;
         }
-        if ('household_number' in household && (household as any).household_number) {
-            return `Household ${(household as any).household_number}`;
+        if (household.household_number) {
+            return `Household ${household.household_number}`;
         }
         return '';
     };
@@ -209,7 +223,7 @@ export default function ClearancesTableView({
         
         // Check based on payer_type
         if (anyClearance.payer_type === 'resident') {
-            return getResidentName(clearance.resident);
+            return getResidentName(clearance.resident as SimpleResident);
         }
         
         if (anyClearance.payer_type === 'household') {
@@ -227,7 +241,7 @@ export default function ClearancesTableView({
             return anyClearance.contact_name;
         }
         
-        return getResidentName(clearance.resident) || 'N/A';
+        return getResidentName(clearance.resident as SimpleResident) || 'N/A';
     };
 
     const getPayerId = (clearance: ClearanceRequest): string => {
@@ -298,6 +312,21 @@ export default function ClearancesTableView({
         toast.info('Redirecting to payment page...');
         window.location.href = url;
     };
+
+    if (clearances.length === 0 && !isLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+                <FileText className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No clearances found</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">No clearance requests match your current filters.</p>
+                {hasActiveFilters && (
+                    <Button variant="outline" onClick={onClearFilters}>
+                        Clear Filters
+                    </Button>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="overflow-x-auto">

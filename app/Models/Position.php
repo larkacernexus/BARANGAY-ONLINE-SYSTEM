@@ -1,5 +1,6 @@
 <?php
 
+// app/Models/Position.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -25,7 +26,24 @@ class Position extends Model
     protected $casts = [
         'requires_account' => 'boolean',
         'is_active' => 'boolean',
+        'additional_committees' => 'array',
     ];
+
+    /**
+     * Relationship with officials - adjust the foreign key based on your actual schema
+     * If officials table uses position_id instead of position column
+     */
+    public function officials()
+    {
+        // Option 1: If officials table has position_id column
+        return $this->hasMany(Official::class, 'position_id');
+        
+        // Option 2: If officials table has position column with position ID
+        // return $this->hasMany(Official::class, 'position');
+        
+        // Option 3: If officials table has position_code column with position code
+        // return $this->hasMany(Official::class, 'position_code', 'code');
+    }
 
     /**
      * Scope a query to only include active positions.
@@ -51,45 +69,41 @@ class Position extends Model
         return $query->where('code', $code);
     }
 
-    // Relationship with committee
+    /**
+     * Relationship with committee
+     */
     public function committee()
     {
         return $this->belongsTo(Committee::class, 'committee_id');
     }
 
-    // Relationship with role
+    /**
+     * Relationship with role
+     */
     public function role()
     {
         return $this->belongsTo(Role::class, 'role_id');
     }
 
-    // Accessor for additional_committees to fix the double-encoded JSON
+    /**
+     * Get additional committees as collection
+     */
     public function getAdditionalCommitteesAttribute($value)
     {
-        if (is_null($value) || $value === '') {
+        if (is_null($value)) {
             return [];
         }
         
-        // First, decode the JSON string
-        $decoded = json_decode($value, true);
-        
-        // If decoding returns a string (because it's double-encoded), decode again
-        if (is_string($decoded)) {
-            $decoded = json_decode($decoded, true);
+        if (is_string($value)) {
+            return json_decode($value, true) ?? [];
         }
         
-        // If it's still not an array, return empty array
-        return is_array($decoded) ? $decoded : [];
+        return $value;
     }
 
-    // Mutator for additional_committees to store as proper JSON
-    public function setAdditionalCommitteesAttribute($value)
-    {
-        // Store as JSON array, not JSON string of JSON array
-        $this->attributes['additional_committees'] = json_encode($value ?? []);
-    }
-
-    // Get additional committees (relationship-like method)
+    /**
+     * Get additional committees models
+     */
     public function additionalCommittees()
     {
         $committeeIds = $this->additional_committees;
@@ -103,38 +117,39 @@ class Position extends Model
             ->get();
     }
 
-    // Get ALL committees for this position
+    /**
+     * Get ALL committees for this position
+     */
     public function allCommittees()
     {
         $committees = collect();
         
-        // Add primary committee
         if ($this->committee) {
             $committees->push($this->committee);
         }
         
-        // Add additional committees
-        $committees = $committees->merge($this->additionalCommittees());
-        
-        return $committees->unique('id');
+        return $committees->merge($this->additionalCommittees())->unique('id');
     }
 
-    // Check if position is Kagawad
-    public function isKagawad()
+    /**
+     * Check if position is Kagawad
+     */
+    public function isKagawad(): bool
     {
-        return strpos(strtolower($this->code), 'kagawad') !== false || 
-               strpos(strtolower($this->name), 'kagawad') !== false;
+        return str_contains(strtolower($this->code), 'kagawad') || 
+               str_contains(strtolower($this->name), 'kagawad');
     }
 
-    // Format for dropdown
-    public function toSelectOption()
+    /**
+     * Format for dropdown
+     */
+    public function toSelectOption(): array
     {
         return [
             'value' => $this->id,
             'label' => $this->name,
             'code' => $this->code,
             'committee_id' => $this->committee_id,
-            'additional_committees' => $this->additional_committees,
             'requires_account' => $this->requires_account,
             'order' => $this->order,
             'role_id' => $this->role_id,

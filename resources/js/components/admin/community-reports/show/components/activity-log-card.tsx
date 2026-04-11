@@ -1,7 +1,7 @@
 // resources/js/components/admin/community-reports/show/components/activity-log-card.tsx
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Edit, Trash2, CheckCircle, UserCheck, Eye, HistoryIcon } from 'lucide-react';
-import { ActivityLog } from './types';
+import { ActivityLog } from '@/types/admin/reports/community-report';
 
 interface ActivityLogCardProps {
     activityLogs: ActivityLog[];

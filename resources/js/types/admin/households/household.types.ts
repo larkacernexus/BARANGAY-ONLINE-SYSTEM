@@ -25,6 +25,8 @@ export type ResidentDocumentStatus = 'active' | 'expired' | 'pending' | 'rejecte
 // ============================================================================
 
 export interface Household {
+    head_of_household: any;
+    purok: any;
     id: number;
     household_number: string;
     head_of_family: string;

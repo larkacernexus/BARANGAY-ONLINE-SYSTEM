@@ -1,7 +1,7 @@
-// pages/resident/Receipts/Index.tsx (Fixed version)
+// pages/resident/Receipts/Index.tsx (Updated with mobile list view)
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Head, router, usePage } from '@inertiajs/react';
+import { useState, useMemo } from 'react';
+import { Head, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,50 +22,80 @@ import { ModernSelect } from '@/components/residentui/modern-select';
 import { CustomTabs } from '@/components/residentui/CustomTabs';
 import { ModernReceiptGridView } from '@/components/residentui/receipts/modern-receipt-grid-view';
 import { ModernReceiptListView } from '@/components/residentui/receipts/modern-receipt-list-view';
+import { ModernReceiptMobileListView } from '@/components/residentui/receipts/modern-receipt-mobile-list-view'; // New import
 import { ReceiptStatsCards } from '@/components/residentui/receipts/receipt-stats-cards';
 import { ModernReceiptFilters } from '@/components/residentui/receipts/modern-receipt-filters';
 import { useMobile } from '@/components/residentui/hooks/use-mobile';
-import { Receipt, DollarSign, List, Clock, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { Receipt, List, Clock, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
 import { 
     ReceiptItem, 
-    ReceiptStats, 
-    ReceiptFilters,
+    ReceiptStats,
     HouseholdData
 } from '@/types/portal/receipts/receipt.types';
 
-// Helper functions
-const formatCurrency = (amount: string | number): string => {
-    if (typeof amount === 'string') return amount;
+// Helper functions with safety checks
+const formatCurrency = (amount: string | number | undefined | null): string => {
+    if (amount === undefined || amount === null || amount === '') {
+        return '₱0.00';
+    }
+    
+    if (typeof amount === 'string' && amount.startsWith('₱')) {
+        return amount;
+    }
+    
+    let numericAmount: number;
+    if (typeof amount === 'string') {
+        const cleanAmount = amount.replace(/[₱,]/g, '');
+        numericAmount = parseFloat(cleanAmount);
+    } else {
+        numericAmount = amount;
+    }
+    
+    if (isNaN(numericAmount) || !isFinite(numericAmount)) {
+        return '₱0.00';
+    }
+    
     return new Intl.NumberFormat('en-PH', {
         style: 'currency',
         currency: 'PHP',
         minimumFractionDigits: 2,
-    }).format(amount);
+        maximumFractionDigits: 2,
+    }).format(numericAmount);
 };
 
-const formatDate = (date: string | null, isMobile: boolean = false): string => {
+const formatDate = (date: string | null | undefined, isMobile: boolean = false): string => {
     if (!date) return '—';
     try {
         const dateObj = new Date(date);
-        if (isMobile) {
-            return dateObj.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+        if (isNaN(dateObj.getTime())) {
+            return '—';
         }
-        return dateObj.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
+        if (isMobile) {
+            return dateObj.toLocaleDateString('en-PH', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
+            });
+        }
+        return dateObj.toLocaleDateString('en-PH', { 
+            month: 'long', 
+            day: 'numeric', 
+            year: 'numeric' 
+        });
     } catch {
-        return date;
+        return date || '—';
     }
 };
 
-const getReceiptStatusCount = (stats: ReceiptStats, status: string): number => {
-    if (!stats) return 0;
-    switch (status) {
-        case 'all': return stats.total_count || 0;
-        case 'paid': return stats.paid_count || 0;
-        case 'partial': return stats.partial_count || 0;
-        case 'pending': return stats.pending_count || 0;
-        case 'cancelled': return stats.cancelled_count || 0;
-        default: return 0;
+const parseAmount = (amount: string | number | undefined | null): number => {
+    if (amount === undefined || amount === null || amount === '') return 0;
+    if (typeof amount === 'number') return amount;
+    if (typeof amount === 'string') {
+        const cleanAmount = amount.replace(/[₱,]/g, '');
+        const parsed = parseFloat(cleanAmount);
+        return isNaN(parsed) ? 0 : parsed;
     }
+    return 0;
 };
 
 interface PageProps extends Record<string, any> {
@@ -83,11 +113,9 @@ interface PageProps extends Record<string, any> {
     household?: HouseholdData;
     receiptTypes?: Array<{ value: string; label: string }>;
     paymentMethods?: Array<{ value: string; label: string }>;
-    filters?: ReceiptFilters;
     error?: string;
 }
 
-// Define tabs configuration for CustomTabs
 const RECEIPT_TABS_CONFIG = [
     { id: 'all', label: 'All Receipts', icon: List },
     { id: 'paid', label: 'Paid', icon: CheckCircle },
@@ -97,20 +125,9 @@ const RECEIPT_TABS_CONFIG = [
 ];
 
 export default function ReceiptsIndex() {
-    const page = usePage<PageProps>();
-    const { props } = page;
+    const { props } = usePage<PageProps>();
     
-    const receipts = props.receipts || { 
-        data: [], 
-        current_page: 1, 
-        last_page: 1, 
-        total: 0, 
-        from: 0, 
-        to: 0, 
-        per_page: 15,
-        links: [] 
-    };
-    
+    const allReceipts = props.receipts?.data || [];
     const stats = props.stats || { 
         total_count: 0, 
         total_amount: '₱0.00', 
@@ -148,28 +165,167 @@ export default function ReceiptsIndex() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>(isMobile ? 'grid' : 'grid');
     const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [statusFilter, setStatusFilter] = useState('all');
     
-    // Filter state
-    const [search, setSearch] = useState(props.filters?.search || '');
-    const [dateFrom, setDateFrom] = useState(props.filters?.date_from || '');
-    const [dateTo, setDateTo] = useState(props.filters?.date_to || '');
-    const [receiptTypeFilter, setReceiptTypeFilter] = useState(props.filters?.receipt_type || 'all');
-    const [paymentMethodFilter, setPaymentMethodFilter] = useState(props.filters?.payment_method || 'all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [receiptTypeFilter, setReceiptTypeFilter] = useState('all');
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
     
     const [loading, setLoading] = useState(false);
     const [selectedReceipts, setSelectedReceipts] = useState<ReceiptItem[]>([]);
     const [selectMode, setSelectMode] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     
-    const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+    const filteredReceipts = useMemo(() => {
+        if (!allReceipts || !Array.isArray(allReceipts)) {
+            return [];
+        }
+        
+        let filtered = [...allReceipts];
+        
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(receipt => receipt?.status === statusFilter);
+        }
+        
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(receipt => 
+                receipt?.receipt_number?.toLowerCase().includes(query) ||
+                receipt?.or_number?.toLowerCase().includes(query) ||
+                receipt?.payor_name?.toLowerCase().includes(query) ||
+                receipt?.amount?.toString().includes(query)
+            );
+        }
+        
+        if (dateFrom) {
+            const fromDate = new Date(dateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            filtered = filtered.filter(receipt => {
+                if (!receipt?.payment_date) return false;
+                try {
+                    const paymentDate = new Date(receipt.payment_date);
+                    return paymentDate >= fromDate;
+                } catch {
+                    return false;
+                }
+            });
+        }
+        
+        if (dateTo) {
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(receipt => {
+                if (!receipt?.payment_date) return false;
+                try {
+                    const paymentDate = new Date(receipt.payment_date);
+                    return paymentDate <= toDate;
+                } catch {
+                    return false;
+                }
+            });
+        }
+        
+        if (receiptTypeFilter !== 'all') {
+            filtered = filtered.filter(receipt => receipt?.receipt_type === receiptTypeFilter);
+        }
+        
+        if (paymentMethodFilter !== 'all') {
+            filtered = filtered.filter(receipt => receipt?.payment_method === paymentMethodFilter);
+        }
+        
+        filtered.sort((a, b) => {
+            let comparison = 0;
+            
+            switch (sortBy) {
+                case 'date':
+                    const dateA = a?.payment_date ? new Date(a.payment_date).getTime() : 0;
+                    const dateB = b?.payment_date ? new Date(b.payment_date).getTime() : 0;
+                    comparison = dateA - dateB;
+                    break;
+                case 'amount':
+                    const amountA = parseAmount(a?.amount);
+                    const amountB = parseAmount(b?.amount);
+                    comparison = amountA - amountB;
+                    break;
+            }
+            
+            return sortOrder === 'asc' ? comparison : -comparison;
+        });
+        
+        return filtered;
+    }, [allReceipts, statusFilter, searchQuery, dateFrom, dateTo, receiptTypeFilter, paymentMethodFilter, sortBy, sortOrder]);
     
-    // Selection handlers
+    const itemsPerPage = props.receipts?.per_page || 15;
+    const totalPages = Math.ceil(filteredReceipts.length / itemsPerPage);
+    const paginatedReceipts = useMemo(() => {
+        if (!filteredReceipts || filteredReceipts.length === 0) {
+            return [];
+        }
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        return filteredReceipts.slice(start, end);
+    }, [filteredReceipts, currentPage, itemsPerPage]);
+    
+    const handleFilterChange = (filterType: string, value: string) => {
+        setCurrentPage(1);
+        
+        switch (filterType) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'search':
+                setSearchQuery(value);
+                break;
+            case 'dateFrom':
+                setDateFrom(value);
+                break;
+            case 'dateTo':
+                setDateTo(value);
+                break;
+            case 'receiptType':
+                setReceiptTypeFilter(value);
+                break;
+            case 'paymentMethod':
+                setPaymentMethodFilter(value);
+                break;
+        }
+        
+        clearSelection();
+        setSelectMode(false);
+    };
+    
+    const hasActiveFilters = statusFilter !== 'all' || 
+                            searchQuery !== '' || 
+                            dateFrom !== '' || 
+                            dateTo !== '' || 
+                            receiptTypeFilter !== 'all' || 
+                            paymentMethodFilter !== 'all';
+    
+    const clearFilters = () => {
+        setStatusFilter('all');
+        setSearchQuery('');
+        setDateFrom('');
+        setDateTo('');
+        setReceiptTypeFilter('all');
+        setPaymentMethodFilter('all');
+        setSortBy('date');
+        setSortOrder('desc');
+        setCurrentPage(1);
+        
+        if (isMobile) setShowMobileFilters(false);
+        clearSelection();
+        setSelectMode(false);
+    };
+    
     const toggleSelect = (receipt: ReceiptItem) => {
+        if (!receipt) return;
         setSelectedReceipts(prev => {
-            const isSelected = prev.some(item => item.id === receipt.id);
+            const isSelected = prev.some(item => item?.id === receipt.id);
             if (isSelected) {
-                return prev.filter(item => item.id !== receipt.id);
+                return prev.filter(item => item?.id !== receipt.id);
             } else {
                 return [...prev, receipt];
             }
@@ -177,7 +333,9 @@ export default function ReceiptsIndex() {
     };
     
     const selectAll = () => {
-        setSelectedReceipts([...receipts.data]);
+        if (paginatedReceipts && paginatedReceipts.length > 0) {
+            setSelectedReceipts([...paginatedReceipts]);
+        }
     };
     
     const clearSelection = () => {
@@ -191,126 +349,59 @@ export default function ReceiptsIndex() {
         }
     };
     
-    const selectedReceiptIds = selectedReceipts.map(receipt => receipt.id);
+    const selectedReceiptIds = selectedReceipts.map(receipt => receipt?.id).filter(id => id);
     
-    // Filter update helper
-    const updateFilters = useCallback((newFilters: Record<string, string>) => {
-        setLoading(true);
-        
-        const updatedFilters = {
-            search,
-            date_from: dateFrom,
-            date_to: dateTo,
-            receipt_type: receiptTypeFilter === 'all' ? '' : receiptTypeFilter,
-            payment_method: paymentMethodFilter === 'all' ? '' : paymentMethodFilter,
-            status: statusFilter === 'all' ? '' : statusFilter,
-            sort: `${sortBy}_${sortOrder}`,
-            ...newFilters
-        };
-        
-        const cleanFilters: Record<string, string> = {};
-        Object.entries(updatedFilters).forEach(([key, value]) => {
-            if (key === 'page' && value === '1') return;
-            if (value && value !== '' && value !== 'all' && value !== undefined && value !== null) {
-                cleanFilters[key] = value;
-            }
-        });
-        
-        router.get('/portal/receipts', cleanFilters, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
-    }, [search, dateFrom, dateTo, receiptTypeFilter, paymentMethodFilter, statusFilter, sortBy, sortOrder]);
-    
-    // Debounced search
-    useEffect(() => {
-        if (searchTimeout.current) clearTimeout(searchTimeout.current);
-        searchTimeout.current = setTimeout(() => {
-            if (search !== props.filters?.search) {
-                updateFilters({ search: search.trim(), page: '1' });
-            }
-        }, 800);
-        return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current); };
-    }, [search, updateFilters, props.filters?.search]);
-    
-    // Handle filter changes
     const handleTabChange = (tab: string) => {
-        setStatusFilter(tab);
-        updateFilters({ status: tab === 'all' ? '' : tab, page: '1' });
+        handleFilterChange('status', tab);
         if (isMobile) setShowMobileFilters(false);
-        clearSelection();
-        setSelectMode(false);
-    };
-    
-    const handleReceiptTypeChange = (type: string) => {
-        setReceiptTypeFilter(type);
-        updateFilters({ receipt_type: type === 'all' ? '' : type, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-        clearSelection();
-        setSelectMode(false);
-    };
-    
-    const handlePaymentMethodChange = (method: string) => {
-        setPaymentMethodFilter(method);
-        updateFilters({ payment_method: method === 'all' ? '' : method, page: '1' });
-        if (isMobile) setShowMobileFilters(false);
-        clearSelection();
-        setSelectMode(false);
-    };
-    
-    const handleDateFromChange = (date: string) => {
-        setDateFrom(date);
-        updateFilters({ date_from: date, page: '1' });
-    };
-    
-    const handleDateToChange = (date: string) => {
-        setDateTo(date);
-        updateFilters({ date_to: date, page: '1' });
-    };
-    
-    const handleSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        updateFilters({ search: search.trim(), page: '1' });
-    };
-    
-    const handleSearchClear = () => {
-        setSearch('');
-        updateFilters({ search: '', page: '1' });
-    };
-    
-    const handleClearFilters = () => {
-        setSearch('');
-        setDateFrom('');
-        setDateTo('');
-        setReceiptTypeFilter('all');
-        setStatusFilter('all');
-        setPaymentMethodFilter('all');
-        setSortBy('date');
-        setSortOrder('desc');
-        
-        router.get('/portal/receipts', {}, { 
-            preserveState: true, 
-            preserveScroll: true, 
-            onFinish: () => setLoading(false) 
-        });
-        
-        if (isMobile) setShowMobileFilters(false);
-        clearSelection();
-        setSelectMode(false);
     };
     
     const handlePrintReceipts = () => {
+        if (filteredReceipts.length === 0) {
+            toast.error('No receipts to print');
+            return;
+        }
         toast.info('Print functionality coming soon');
     };
     
     const handleExportToCSV = async () => {
+        if (filteredReceipts.length === 0) {
+            toast.error('No receipts to export');
+            return;
+        }
+        
         setIsExporting(true);
         try {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            toast.success('Export successful');
+            const headers = ['Receipt #', 'OR #', 'Date', 'Payor', 'Amount', 'Type', 'Method', 'Status'];
+            const rows = filteredReceipts.map(r => [
+                r?.receipt_number || '',
+                r?.or_number || '',
+                r?.payment_date || '',
+                r?.payor_name || '',
+                formatCurrency(r?.amount || 0),
+                r?.receipt_type || '',
+                r?.payment_method || '',
+                r?.status || ''
+            ]);
+            
+            const csvContent = [headers, ...rows]
+                .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                .join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `receipts_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            toast.success(`Exported ${filteredReceipts.length} receipts`);
         } catch (error) {
+            console.error('Export error:', error);
             toast.error('Export failed');
         } finally {
             setIsExporting(false);
@@ -318,6 +409,7 @@ export default function ReceiptsIndex() {
     };
     
     const handleCopyReceiptNumber = (code: string) => {
+        if (!code) return;
         navigator.clipboard.writeText(code);
         toast.success(`Copied: ${code}`);
     };
@@ -330,29 +422,35 @@ export default function ReceiptsIndex() {
     };
     
     const handleViewReceipt = (id: number) => {
-        router.get(`/portal/receipts/${id}`);
+        if (id) {
+            window.location.href = `/portal/receipts/${id}`;
+        }
     };
     
     const handleDownloadReceipt = (id: number) => {
-        window.open(`/portal/receipts/${id}/download`, '_blank');
+        if (id) {
+            window.open(`/portal/receipts/${id}/download`, '_blank');
+        }
     };
     
     const handlePrintReceipt = (id: number) => {
-        window.open(`/portal/receipts/${id}/print`, '_blank');
+        if (id) {
+            window.open(`/portal/receipts/${id}/print`, '_blank');
+        }
     };
     
     const handleSelectReceipt = (receipt: ReceiptItem) => {
-        toggleSelect(receipt);
+        if (receipt) {
+            toggleSelect(receipt);
+        }
     };
     
-    const hasActiveFilters = useMemo(() => {
-        return !!(search || dateFrom || dateTo || 
-            receiptTypeFilter !== 'all' || 
-            statusFilter !== 'all' || 
-            paymentMethodFilter !== 'all');
-    }, [search, dateFrom, dateTo, receiptTypeFilter, statusFilter, paymentMethodFilter]);
+    const getStatusCountForTab = (status: string): number => {
+        if (!filteredReceipts || !Array.isArray(filteredReceipts)) return 0;
+        if (status === 'all') return filteredReceipts.length;
+        return filteredReceipts.filter(receipt => receipt?.status === status).length;
+    };
     
-    // Error state
     if (props.error) {
         return (
             <ResidentLayout breadcrumbs={[
@@ -371,8 +469,7 @@ export default function ReceiptsIndex() {
         );
     }
     
-    const currentReceipts = receipts.data;
-    const tabHasData = currentReceipts.length > 0;
+    const tabHasData = paginatedReceipts && paginatedReceipts.length > 0;
     
     return (
         <>
@@ -386,7 +483,7 @@ export default function ReceiptsIndex() {
                     {isMobile ? (
                         <MobileHeader
                             title="My Receipts"
-                            subtitle={`${stats.total_count || 0} receipt${stats.total_count !== 1 ? 's' : ''} • ${household.household_number || ''}`}
+                            subtitle={`${filteredReceipts.length} receipt${filteredReceipts.length !== 1 ? 's' : ''} • ${household?.household_number || ''}`}
                             showStats={showStats}
                             onToggleStats={() => setShowStats(!showStats)}
                             onOpenFilters={() => setShowMobileFilters(true)}
@@ -406,7 +503,7 @@ export default function ReceiptsIndex() {
                         />
                     )}
                     
-                    {showStats && (
+                    {showStats && stats && (
                         <div className="animate-slide-down">
                             <ReceiptStatsCards 
                                 stats={stats}
@@ -418,23 +515,23 @@ export default function ReceiptsIndex() {
                     
                     {!isMobile && (
                         <ModernReceiptFilters
-                            search={search}
-                            setSearch={setSearch}
-                            handleSearchSubmit={handleSearchSubmit}
-                            handleSearchClear={handleSearchClear}
+                            search={searchQuery}
+                            setSearch={(value) => handleFilterChange('search', value)}
+                            handleSearchSubmit={(e) => { e.preventDefault(); }}
+                            handleSearchClear={() => handleFilterChange('search', '')}
                             dateFrom={dateFrom}
-                            setDateFrom={handleDateFromChange}
+                            setDateFrom={(value) => handleFilterChange('dateFrom', value)}
                             dateTo={dateTo}
-                            setDateTo={handleDateToChange}
+                            setDateTo={(value) => handleFilterChange('dateTo', value)}
                             receiptTypeFilter={receiptTypeFilter}
-                            handleReceiptTypeChange={handleReceiptTypeChange}
+                            handleReceiptTypeChange={(type) => handleFilterChange('receiptType', type)}
                             paymentMethodFilter={paymentMethodFilter}
-                            handlePaymentMethodChange={handlePaymentMethodChange}
+                            handlePaymentMethodChange={(method) => handleFilterChange('paymentMethod', method)}
                             loading={loading}
                             receiptTypes={receiptTypes}
                             paymentMethods={paymentMethods}
                             hasActiveFilters={hasActiveFilters}
-                            handleClearFilters={handleClearFilters}
+                            handleClearFilters={clearFilters}
                             onPrint={handlePrintReceipts}
                             onExport={handleExportToCSV}
                             isExporting={isExporting}
@@ -445,7 +542,7 @@ export default function ReceiptsIndex() {
                         <CustomTabs 
                             statusFilter={statusFilter}
                             handleTabChange={handleTabChange}
-                            getStatusCount={(status) => getReceiptStatusCount(stats, status)}
+                            getStatusCount={getStatusCountForTab}
                             tabsConfig={RECEIPT_TABS_CONFIG}
                         />
                         
@@ -454,7 +551,7 @@ export default function ReceiptsIndex() {
                                 {selectMode && tabHasData && (
                                     <ModernSelectionBanner
                                         selectedCount={selectedReceipts.length}
-                                        totalCount={currentReceipts.length}
+                                        totalCount={paginatedReceipts.length}
                                         onSelectAll={selectAll}
                                         onDeselectAll={clearSelection}
                                         onCancel={toggleSelectMode}
@@ -470,7 +567,7 @@ export default function ReceiptsIndex() {
                                 <ModernCardHeader
                                     title={`${statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Receipts`}
                                     description={tabHasData 
-                                        ? `Showing ${currentReceipts.length} receipt${currentReceipts.length !== 1 ? 's' : ''}`
+                                        ? `Showing ${paginatedReceipts.length} of ${filteredReceipts.length} receipt${filteredReceipts.length !== 1 ? 's' : ''}`
                                         : `No ${statusFilter === 'all' ? 'receipts' : statusFilter} found`
                                     }
                                     action={
@@ -481,17 +578,14 @@ export default function ReceiptsIndex() {
                                                 onSort={(by, order) => {
                                                     setSortBy(by as 'date' | 'amount');
                                                     setSortOrder(order);
-                                                    updateFilters({ 
-                                                        sort: `${by}_${order}`, 
-                                                        page: '1' 
-                                                    });
+                                                    setCurrentPage(1);
                                                 }}
                                             />
                                             {!selectMode && tabHasData && (
                                                 <ViewToggle
                                                     viewMode={viewMode}
                                                     onViewChange={setViewMode}
-                                                    disabled={isMobile}
+                                                    disabled={false}
                                                 />
                                             )}
                                             {tabHasData && (
@@ -508,46 +602,83 @@ export default function ReceiptsIndex() {
                                     <ModernEmptyState 
                                         status={statusFilter}
                                         hasFilters={hasActiveFilters}
-                                        onClearFilters={handleClearFilters}
-                                    />
-                                ) : viewMode === 'grid' ? (
-                                    <ModernReceiptGridView
-                                        receipts={currentReceipts}
-                                        selectMode={selectMode}
-                                        selectedReceipts={selectedReceiptIds}
-                                        onSelectReceipt={handleSelectReceipt}
-                                        formatDate={(date: string | null) => formatDate(date, isMobile)}
-                                        formatCurrency={formatCurrency}
-                                        onView={handleViewReceipt}
-                                        onDownload={handleDownloadReceipt}
-                                        onPrint={handlePrintReceipt}
-                                        onCopyReceiptNumber={handleCopyReceiptNumber}
-                                        onCopyORNNumber={handleCopyORNNumber}
-                                        isMobile={isMobile}
+                                        onClearFilters={clearFilters}
                                     />
                                 ) : (
-                                    <ModernReceiptListView
-                                        receipts={currentReceipts}
-                                        selectMode={selectMode}
-                                        selectedReceipts={selectedReceiptIds}
-                                        onSelectReceipt={handleSelectReceipt}
-                                        onSelectAll={selectAll}
-                                        formatDate={(date: string | null) => formatDate(date, isMobile)}
-                                        formatCurrency={formatCurrency}
-                                        onView={handleViewReceipt}
-                                        onDownload={handleDownloadReceipt}
-                                        onPrint={handlePrintReceipt}
-                                        onCopyReceiptNumber={handleCopyReceiptNumber}
-                                        onCopyORNNumber={handleCopyORNNumber}
-                                    />
+                                    // Mobile-specific rendering
+                                    isMobile ? (
+                                        viewMode === 'grid' ? (
+                                            <ModernReceiptGridView
+                                                receipts={paginatedReceipts}
+                                                selectMode={selectMode}
+                                                selectedReceipts={selectedReceiptIds}
+                                                onSelectReceipt={handleSelectReceipt}
+                                                formatDate={(date: string | null) => formatDate(date, true)}
+                                                formatCurrency={formatCurrency}
+                                                onView={handleViewReceipt}
+                                                onDownload={handleDownloadReceipt}
+                                                onPrint={handlePrintReceipt}
+                                                onCopyReceiptNumber={handleCopyReceiptNumber}
+                                                onCopyORNNumber={handleCopyORNNumber}
+                                                isMobile={true}
+                                            />
+                                        ) : (
+                                            <ModernReceiptMobileListView
+                                                receipts={paginatedReceipts}
+                                                selectMode={selectMode}
+                                                selectedReceipts={selectedReceiptIds}
+                                                onSelectReceipt={handleSelectReceipt}
+                                                formatDate={(date: string | null) => formatDate(date, true)}
+                                                formatCurrency={formatCurrency}
+                                                onView={handleViewReceipt}
+                                                onDownload={handleDownloadReceipt}
+                                                onPrint={handlePrintReceipt}
+                                                onCopyReceiptNumber={handleCopyReceiptNumber}
+                                                onCopyORNNumber={handleCopyORNNumber}
+                                            />
+                                        )
+                                    ) : (
+                                        // Desktop rendering
+                                        viewMode === 'grid' ? (
+                                            <ModernReceiptGridView
+                                                receipts={paginatedReceipts}
+                                                selectMode={selectMode}
+                                                selectedReceipts={selectedReceiptIds}
+                                                onSelectReceipt={handleSelectReceipt}
+                                                formatDate={(date: string | null) => formatDate(date, false)}
+                                                formatCurrency={formatCurrency}
+                                                onView={handleViewReceipt}
+                                                onDownload={handleDownloadReceipt}
+                                                onPrint={handlePrintReceipt}
+                                                onCopyReceiptNumber={handleCopyReceiptNumber}
+                                                onCopyORNNumber={handleCopyORNNumber}
+                                                isMobile={false}
+                                            />
+                                        ) : (
+                                            <ModernReceiptListView
+                                                receipts={paginatedReceipts}
+                                                selectMode={selectMode}
+                                                selectedReceipts={selectedReceiptIds}
+                                                onSelectReceipt={handleSelectReceipt}
+                                                onSelectAll={selectAll}
+                                                formatDate={(date: string | null) => formatDate(date, false)}
+                                                formatCurrency={formatCurrency}
+                                                onView={handleViewReceipt}
+                                                onDownload={handleDownloadReceipt}
+                                                onPrint={handlePrintReceipt}
+                                                onCopyReceiptNumber={handleCopyReceiptNumber}
+                                                onCopyORNNumber={handleCopyORNNumber}
+                                            />
+                                        )
+                                    )
                                 )}
                                 
-                                {receipts.last_page > 1 && (
+                                {totalPages > 1 && (
                                     <div className="mt-6">
                                         <ModernPagination
-                                            currentPage={receipts.current_page}
-                                            lastPage={receipts.last_page}
-                                            onPageChange={(page: number) => updateFilters({ page: page.toString() })}
+                                            currentPage={currentPage}
+                                            lastPage={totalPages}
+                                            onPageChange={(page: number) => setCurrentPage(page)}
                                             loading={loading}
                                         />
                                     </div>
@@ -562,17 +693,17 @@ export default function ReceiptsIndex() {
                     onClose={() => setShowMobileFilters(false)}
                     title="Filter Receipts"
                     description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
-                    search={search}
-                    onSearchChange={setSearch}
+                    search={searchQuery}
+                    onSearchChange={(value) => setSearchQuery(value)}
                     onSearchSubmit={(e: React.FormEvent) => { 
                         e.preventDefault(); 
-                        updateFilters({ search: search.trim(), page: '1' }); 
+                        handleFilterChange('search', searchQuery);
                         setShowMobileFilters(false); 
                     }}
-                    onSearchClear={() => setSearch('')}
+                    onSearchClear={() => handleFilterChange('search', '')}
                     loading={loading}
                     hasActiveFilters={hasActiveFilters}
-                    onClearFilters={handleClearFilters}
+                    onClearFilters={clearFilters}
                 >
                     <div className="space-y-4">
                         <div className="space-y-2">
@@ -580,7 +711,7 @@ export default function ReceiptsIndex() {
                             <input
                                 type="date"
                                 value={dateFrom}
-                                onChange={(e) => handleDateFromChange(e.target.value)}
+                                onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
@@ -590,7 +721,7 @@ export default function ReceiptsIndex() {
                             <input
                                 type="date"
                                 value={dateTo}
-                                onChange={(e) => handleDateToChange(e.target.value)}
+                                onChange={(e) => handleFilterChange('dateTo', e.target.value)}
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
@@ -599,7 +730,7 @@ export default function ReceiptsIndex() {
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Receipt Type</label>
                             <ModernSelect
                                 value={receiptTypeFilter}
-                                onValueChange={handleReceiptTypeChange}
+                                onValueChange={(value) => handleFilterChange('receiptType', value)}
                                 placeholder="All receipt types"
                                 options={receiptTypes}
                                 disabled={loading}
@@ -611,7 +742,7 @@ export default function ReceiptsIndex() {
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
                             <ModernSelect
                                 value={paymentMethodFilter}
-                                onValueChange={handlePaymentMethodChange}
+                                onValueChange={(value) => handleFilterChange('paymentMethod', value)}
                                 placeholder="All payment methods"
                                 options={paymentMethods}
                                 disabled={loading}

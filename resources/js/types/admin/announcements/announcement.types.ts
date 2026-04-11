@@ -1,13 +1,11 @@
-// types/admin/announcements/announcement.types.ts
-
 export type AnnouncementType = 'general' | 'important' | 'event' | 'maintenance' | 'other';
-export type PriorityLevel = 1 | 2 | 3 | 4;
+export type PriorityLevel = 0 | 1 | 2 | 3 | 4; // 0=normal, 1=low, 2=medium, 3=high, 4=urgent
 export type AudienceType = 'all' | 'roles' | 'puroks' | 'households' | 'household_members' | 'businesses' | 'specific_users';
-export type AnnouncementStatus = 'draft' | 'pending' | 'published' | 'active' | 'archived';
+export type AnnouncementStatus = 'draft' | 'pending' | 'published' | 'active' | 'archived' | 'expired' | 'upcoming' | 'inactive';
 
 export interface AnnouncementAttachment {
     id: number;
-    announcement_id?: number; // Make optional for admin view
+    announcement_id?: number;
     file_path: string;
     file_name: string;
     original_name: string;
@@ -26,7 +24,7 @@ export interface Announcement {
     title: string;
     content: string;
     excerpt?: string;
-    type: AnnouncementType;
+    type: string;
     type_label: string;
     priority: PriorityLevel;
     priority_label: string;
@@ -123,9 +121,10 @@ export interface AnnouncementFilters {
     search?: string;
     type?: string;
     priority?: string;
+    audience_type?: string;
     from_date?: string;
-    status?: string;
     to_date?: string;
+    status?: string;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
     author_id?: string;
@@ -177,3 +176,40 @@ export interface AnnouncementsPaginatedResponse {
     to: number;
     per_page: number;
 }
+
+// Priority mapping utilities
+export const PRIORITY_LABELS: Record<PriorityLevel, string> = {
+    0: 'normal',
+    1: 'low',
+    2: 'medium',
+    3: 'high',
+    4: 'urgent'
+};
+
+export const PRIORITY_DISPLAY: Record<PriorityLevel, string> = {
+    0: 'Normal',
+    1: 'Low',
+    2: 'Medium',
+    3: 'High',
+    4: 'Urgent'
+};
+
+export const PRIORITY_ORDER: Record<string, PriorityLevel> = {
+    'urgent': 4,
+    'high': 3,
+    'medium': 2,
+    'low': 1,
+    'normal': 0
+};
+
+// Status order for sorting
+export const STATUS_ORDER: Record<AnnouncementStatus, number> = {
+    'active': 1,
+    'upcoming': 2,
+    'published': 3,
+    'pending': 4,
+    'draft': 5,
+    'inactive': 6,
+    'expired': 7,
+    'archived': 8
+};

@@ -1,53 +1,66 @@
+// stats-grid.tsx - Generic fix for common stats grid pattern
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ReactNode } from 'react';
 
-interface StatCardProps {
-    title: string;
-    value: string | number;
-    description?: string;
-    icon?: ReactNode;
+// Safe number formatter
+const formatNumber = (value: any): string => {
+    if (value === undefined || value === null) return '0';
+    if (typeof value === 'number') {
+        if (value % 1 !== 0) {
+            return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        return value.toLocaleString();
+    }
+    const num = Number(value);
+    if (isNaN(num)) return String(value);
+    if (num % 1 !== 0) {
+        return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    return num.toLocaleString();
+};
+
+interface StatItem {
+    label: string;
+    value: any;
+    change?: number;
+    icon?: React.ReactNode;
+    color?: string;
+}
+
+interface StatsGridProps {
+    stats: StatItem[];
     className?: string;
 }
 
-export function StatCard({ title, value, description, icon, className = '' }: StatCardProps) {
-    return (
-        <Card className={`overflow-hidden ${className}`}>
-            <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-4">
-                <CardTitle className="text-xs sm:text-sm font-medium text-gray-500 flex items-center gap-2">
-                    {icon}
-                    {title}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 sm:p-4 pt-0">
-                <div className="text-lg sm:text-xl md:text-2xl font-bold">{value}</div>
-                {description && (
-                    <div className="text-xs text-gray-500 mt-0.5">
-                        {description}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
+export function StatsGrid({ stats, className = '' }: StatsGridProps) {
+    if (!stats || !Array.isArray(stats) || stats.length === 0) {
+        return (
+            <div className="text-center py-8 text-gray-500">
+                No statistics available
+            </div>
+        );
+    }
 
-interface StatsCardsProps {
-    stats: Array<{
-        title: string;
-        value: string | number;
-        description?: string;
-        icon?: ReactNode;
-        className?: string;
-    }>;
-    columns?: 2 | 4;
-}
-
-export function StatsCards({ stats, columns = 4 }: StatsCardsProps) {
-    const gridCols = columns === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-2 lg:grid-cols-4';
-    
     return (
-        <div className={`grid ${gridCols} gap-2 sm:gap-4`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${className}`}>
             {stats.map((stat, index) => (
-                <StatCard key={index} {...stat} />
+                <Card key={index} className="overflow-hidden">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-gray-500">
+                            {stat.label}
+                        </CardTitle>
+                        {stat.icon && <div className="text-gray-400">{stat.icon}</div>}
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                            {formatNumber(stat.value)}
+                        </div>
+                        {stat.change !== undefined && (
+                            <p className={`text-xs ${stat.change >= 0 ? 'text-green-600' : 'text-red-600'} mt-1`}>
+                                {stat.change >= 0 ? '+' : ''}{stat.change}% from last period
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
             ))}
         </div>
     );

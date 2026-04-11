@@ -98,7 +98,6 @@ class FeeController extends Controller
             $feeIds = $validated['fee_ids'] ?? null;
 
             $fees = $this->getFeesForReminders($days, $feeIds);
-            
             $results = $this->sendReminders($fees);
 
             $message = "Sent {$results['sent']} reminders successfully. Skipped {$results['skipped']} fees.";
@@ -117,9 +116,7 @@ class FeeController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to send fee reminders', [
-                'error' => $e->getMessage()
-            ]);
+            Log::error('Failed to send fee reminders', ['error' => $e->getMessage()]);
 
             $errorMessage = 'Failed to send reminders: ' . $e->getMessage();
 
@@ -147,7 +144,6 @@ class FeeController extends Controller
 
             $fee = Fee::with('payer')->findOrFail($id);
             
-            // Validate fee can receive reminder
             $validationError = $this->validateFeeForReminder($fee);
             if ($validationError) {
                 return $this->handleReminderError($validationError);
@@ -164,13 +160,9 @@ class FeeController extends Controller
             }
 
             $daysUntilDue = (int) now()->diffInDays($fee->due_date, false);
-            
             $user->notify(new FeeDueReminderNotification($fee, $daysUntilDue));
 
-            Log::info('Single fee reminder sent', [
-                'fee_id' => $id,
-                'user_id' => $user->id
-            ]);
+            Log::info('Single fee reminder sent', ['fee_id' => $id, 'user_id' => $user->id]);
 
             if (request()->wantsJson()) {
                 return response()->json([
@@ -190,11 +182,7 @@ class FeeController extends Controller
             return back()->with('success', 'Reminder sent successfully.');
 
         } catch (\Exception $e) {
-            Log::error('Failed to send single reminder', [
-                'fee_id' => $id,
-                'error' => $e->getMessage()
-            ]);
-
+            Log::error('Failed to send single reminder', ['fee_id' => $id, 'error' => $e->getMessage()]);
             return $this->handleReminderError('Failed to send reminder: ' . $e->getMessage());
         }
     }
@@ -205,8 +193,6 @@ class FeeController extends Controller
     public function getDueStats(Request $request)
     {
         try {
-            Log::debug('FeeController@getDueStats called');
-
             $days = (int) $request->input('days', 7);
             
             $stats = [
@@ -217,12 +203,7 @@ class FeeController extends Controller
                 'overdue' => $this->countOverdueFees(),
             ];
 
-            Log::info('Due stats retrieved', ['stats' => $stats]);
-
-            return Inertia::render('admin/Fees/Index', [
-                'dueStats' => $stats,
-                'flash' => session('flash')
-            ]);
+            return Inertia::render('admin/Fees/Index', ['dueStats' => $stats]);
 
         } catch (\Exception $e) {
             Log::error('Failed to get due stats', ['error' => $e->getMessage()]);
@@ -236,8 +217,6 @@ class FeeController extends Controller
     public function getReminderHistory($id)
     {
         try {
-            Log::debug('FeeController@getReminderHistory called', ['fee_id' => $id]);
-
             $fee = Fee::findOrFail($id);
 
             $reminders = DB::table('notifications')
@@ -247,47 +226,29 @@ class FeeController extends Controller
                 ->get()
                 ->map(fn($notification) => $this->formatReminderHistory($notification));
 
-            Log::info('Reminder history retrieved', [
-                'fee_id' => $id,
-                'count' => $reminders->count()
-            ]);
-
             if (request()->wantsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'data' => $reminders
-                ]);
+                return response()->json(['success' => true, 'data' => $reminders]);
             }
 
             return back()->with('reminders', $reminders);
 
         } catch (\Exception $e) {
-            Log::error('Failed to get reminder history', [
-                'fee_id' => $id,
-                'error' => $e->getMessage()
-            ]);
-
+            Log::error('Failed to get reminder history', ['fee_id' => $id, 'error' => $e->getMessage()]);
             return $this->handleError('Failed to fetch reminder history');
         }
     }
 
     /**
-     * Get quick statistics
+     * Get quick statistics (API)
      */
     public function quickStats(Request $request)
     {
         try {
             $period = $request->get('period', 'today');
             $stats = $this->getPeriodStats($period);
-
             return response()->json($stats);
-
         } catch (\Exception $e) {
-            Log::error('FeeController@quickStats error', [
-                'period' => $period ?? 'unknown',
-                'error' => $e->getMessage()
-            ]);
-
+            Log::error('FeeController@quickStats error', ['error' => $e->getMessage()]);
             return response()->json(['error' => 'Failed to fetch statistics'], 500);
         }
     }
@@ -301,11 +262,7 @@ class FeeController extends Controller
             $data = Fee::selectRaw('status, COUNT(*) as count')
                 ->groupBy('status')
                 ->pluck('count', 'status');
-
-            $chartData = $this->buildStatusChartData($data);
-
-            return response()->json($chartData);
-
+            return response()->json($this->buildStatusChartData($data));
         } catch (\Exception $e) {
             Log::error('FeeController@statusChartData error', ['error' => $e->getMessage()]);
             return response()->json(['labels' => [], 'datasets' => [[]]], 500);
@@ -332,7 +289,6 @@ class FeeController extends Controller
                 ->get();
 
             return response()->json($this->buildMonthlyChartData($data));
-
         } catch (\Exception $e) {
             Log::error('FeeController@monthlyCollectionChart error', ['error' => $e->getMessage()]);
             return response()->json(['labels' => [], 'datasets' => [[]]], 500);
@@ -345,14 +301,10 @@ class FeeController extends Controller
     public function dashboard()
     {
         try {
-            Log::debug('FeeController@dashboard accessed');
-
             $stats = $this->getDashboardStats();
             $recentFees = Fee::with('feeType')->latest()->limit(10)->get();
             $monthlyCollections = $this->getMonthlyCollections();
             $feesByCategory = $this->getFeesByCategory();
-
-            Log::info('Fee dashboard data loaded');
 
             return Inertia::render('admin/Fees/Dashboard', [
                 'stats' => $stats,
@@ -360,13 +312,8 @@ class FeeController extends Controller
                 'monthlyCollections' => $monthlyCollections,
                 'feesByCategory' => $feesByCategory,
             ]);
-
         } catch (\Exception $e) {
-            Log::error('FeeController@dashboard error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
+            Log::error('FeeController@dashboard error', ['error' => $e->getMessage()]);
             return back()->with('error', 'Failed to load dashboard.');
         }
     }
@@ -377,8 +324,6 @@ class FeeController extends Controller
     public function outstanding(Request $request)
     {
         try {
-            Log::info('FeeController@outstanding accessed');
-
             $filters = $request->only(['search', 'status', 'purok']);
             
             $query = Fee::with('feeType')
@@ -398,7 +343,6 @@ class FeeController extends Controller
                 'puroks' => $puroks,
                 'filters' => $filters,
             ]);
-
         } catch (\Exception $e) {
             Log::error('FeeController@outstanding error', ['error' => $e->getMessage()]);
             return back()->with('error', 'Failed to load outstanding fees.');
@@ -411,8 +355,6 @@ class FeeController extends Controller
     public function export(Request $request)
     {
         try {
-            Log::info('FeeController@export started');
-
             $query = Fee::query()->with('feeType')->latest();
             $this->applyFilters($query, $request);
 
@@ -420,7 +362,6 @@ class FeeController extends Controller
             $fileName = 'fees_export_' . now()->format('Y-m-d_H-i-s') . '.csv';
 
             return $this->generateCsvExport($fees, $fileName);
-
         } catch (\Exception $e) {
             Log::error('Fee export failed', ['error' => $e->getMessage()]);
             return back()->with('error', 'Failed to export fees.');
@@ -435,8 +376,6 @@ class FeeController extends Controller
         DB::beginTransaction();
 
         try {
-            Log::info('FeeController@bulkAction started');
-
             $validated = $request->validate([
                 'action' => 'required|in:issue,mark_paid,cancel,delete,send_reminders',
                 'fee_ids' => 'required|array',
@@ -444,7 +383,6 @@ class FeeController extends Controller
             ]);
 
             $results = $this->processBulkAction($validated['action'], $validated['fee_ids']);
-
             DB::commit();
 
             $message = $validated['action'] === 'send_reminders'
@@ -452,15 +390,9 @@ class FeeController extends Controller
                 : "{$results['count']} fees updated successfully.";
 
             return back()->with('success', $message);
-
         } catch (\Exception $e) {
             DB::rollBack();
-
-            Log::error('Bulk action failed', [
-                'action' => $request->action ?? 'unknown',
-                'error' => $e->getMessage()
-            ]);
-
+            Log::error('Bulk action failed', ['error' => $e->getMessage()]);
             return back()->with('error', 'Failed to perform bulk action.');
         }
     }
@@ -472,6 +404,7 @@ class FeeController extends Controller
      */
     private function applyFilters(Builder $query, Request $request): void
     {
+        // Search filter
         if ($search = $request->search) {
             $query->where(function ($q) use ($search) {
                 $q->where('payer_name', 'like', "%{$search}%")
@@ -483,36 +416,118 @@ class FeeController extends Controller
             });
         }
 
-        if ($request->status) {
+        // Status filter
+        if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
-        if ($request->category) {
+        // Category filter
+        if ($request->filled('category') && $request->category !== 'all') {
             $query->whereHas('feeType', fn($q) => $q->where('document_category_id', $request->category));
         }
 
-        if ($request->purok) {
+        // Purok filter
+        if ($request->filled('purok') && $request->purok !== 'all') {
             $query->where('purok', $request->purok);
         }
 
-        if ($request->payer_type) {
-            $query->where('payer_type', $request->payer_type);
+        // ✅ FIXED: Payer Type filter - convert frontend value to database value
+        if ($request->filled('payer_type') && $request->payer_type !== 'all') {
+            $payerTypeValue = $this->normalizePayerTypeForDatabase($request->payer_type);
+            $query->where('payer_type', $payerTypeValue);
         }
 
-        if ($request->from_date) {
-            $query->whereDate('issue_date', '>=', $request->from_date);
+        // Date range filter (created_at)
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
         }
 
-        if ($request->to_date) {
-            $query->whereDate('issue_date', '<=', $request->to_date);
+        // Amount range filter (min/max)
+        if ($request->filled('min_amount')) {
+            $query->where('total_amount', '>=', (float) $request->min_amount);
+        }
+        if ($request->filled('max_amount')) {
+            $query->where('total_amount', '<=', (float) $request->max_amount);
         }
 
-        if ($request->min_amount) {
-            $query->where('total_amount', '>=', $request->min_amount);
+        // Amount range preset
+        if ($request->filled('amount_range')) {
+            $this->applyAmountRangeFilter($query, $request->amount_range);
         }
 
-        if ($request->max_amount) {
-            $query->where('total_amount', '<=', $request->max_amount);
+        // Due date range filter
+        if ($request->filled('due_date_range')) {
+            $this->applyDueDateRangeFilter($query, $request->due_date_range);
+        }
+    }
+
+    /**
+     * Normalize payer type from frontend value to database value
+     */
+    private function normalizePayerTypeForDatabase(string $payerType): string
+    {
+        $mapping = [
+            'resident' => 'App\Models\Resident',
+            'household' => 'App\Models\Household',
+            'business' => 'App\Models\Business',
+            'visitor' => 'App\Models\Visitor',
+            'other' => 'App\Models\Other',
+        ];
+        
+        return $mapping[strtolower($payerType)] ?? $payerType;
+    }
+
+    /**
+     * Apply amount range filter
+     */
+    private function applyAmountRangeFilter(Builder $query, string $range): void
+    {
+        switch ($range) {
+            case '0-100':
+                $query->whereBetween('total_amount', [0, 100]);
+                break;
+            case '101-500':
+                $query->whereBetween('total_amount', [101, 500]);
+                break;
+            case '501-1000':
+                $query->whereBetween('total_amount', [501, 1000]);
+                break;
+            case '1001-5000':
+                $query->whereBetween('total_amount', [1001, 5000]);
+                break;
+            case '5000+':
+                $query->where('total_amount', '>=', 5000);
+                break;
+        }
+    }
+
+    /**
+     * Apply due date range filter
+     */
+    private function applyDueDateRangeFilter(Builder $query, string $range): void
+    {
+        $today = Carbon::today();
+        
+        switch ($range) {
+            case 'overdue':
+                $query->where('due_date', '<', $today)
+                      ->whereNotIn('status', ['paid', 'cancelled', 'waived']);
+                break;
+            case 'due_today':
+                $query->whereDate('due_date', $today);
+                break;
+            case 'due_this_week':
+                $query->whereBetween('due_date', [$today, $today->copy()->endOfWeek()]);
+                break;
+            case 'due_next_week':
+                $query->whereBetween('due_date', [$today->copy()->startOfWeek()->addWeek(), $today->copy()->endOfWeek()->addWeek()]);
+                break;
+            case 'due_this_month':
+                $query->whereBetween('due_date', [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()]);
+                break;
         }
     }
 
@@ -521,11 +536,14 @@ class FeeController extends Controller
      */
     private function formatFeeForDisplay(Fee $fee): array
     {
+        $payerTypeLabel = $this->getPayerTypeLabel($fee->payer_type);
+        
         return [
             'id' => $fee->id,
             'fee_code' => $fee->fee_code,
             'payer_name' => $fee->payer_name,
-            'payer_type' => $fee->payer_type,
+            'payer_type' => $payerTypeLabel,
+            'payer_type_raw' => $fee->payer_type,
             'status' => $fee->status,
             'total_amount' => $fee->total_amount,
             'amount_paid' => $fee->amount_paid,
@@ -533,19 +551,42 @@ class FeeController extends Controller
             'issue_date' => $fee->issue_date,
             'due_date' => $fee->due_date,
             'or_number' => $fee->or_number,
-            'fee_type' => $fee->feeType,
-            'formatted_issue_date' => Carbon::parse($fee->issue_date)->format('M d, Y'),
-            'formatted_due_date' => Carbon::parse($fee->due_date)->format('M d, Y'),
+            'purok' => $fee->purok,
+            'contact_number' => $fee->contact_number,
+            'certificate_number' => $fee->certificate_number,
+            'fee_type' => $fee->feeType ? [
+                'id' => $fee->feeType->id,
+                'name' => $fee->feeType->name,
+                'code' => $fee->feeType->code,
+                'document_category_id' => $fee->feeType->document_category_id,
+            ] : null,
+            'formatted_issue_date' => $fee->issue_date ? Carbon::parse($fee->issue_date)->format('M d, Y') : 'N/A',
+            'formatted_due_date' => $fee->due_date ? Carbon::parse($fee->due_date)->format('M d, Y') : 'N/A',
             'formatted_created_at' => Carbon::parse($fee->created_at)->format('M d, Y h:i A'),
             'is_overdue' => $fee->status === 'overdue',
-            'days_overdue' => $fee->status === 'overdue' ? Carbon::parse($fee->due_date)->diffInDays(now()) : 0,
+            'days_overdue' => $fee->status === 'overdue' && $fee->due_date ? Carbon::parse($fee->due_date)->diffInDays(now()) : 0,
             'payer_type_icon' => $this->getPayerTypeIcon($fee->payer_type),
             'formatted_total_amount' => '₱' . number_format($fee->total_amount, 2),
             'formatted_amount_paid' => '₱' . number_format($fee->amount_paid, 2),
             'formatted_balance' => '₱' . number_format($fee->balance, 2),
-            'resident_id' => $fee->payer_type === 'resident' ? $fee->payer_id : null,
-            'household_id' => $fee->payer_type === 'household' ? $fee->payer_id : null,
+            'created_at' => $fee->created_at,
         ];
+    }
+
+    /**
+     * Get payer type label for frontend
+     */
+    private function getPayerTypeLabel(string $payerType): string
+    {
+        $mapping = [
+            'App\Models\Resident' => 'resident',
+            'App\Models\Household' => 'household',
+            'App\Models\Business' => 'business',
+            'App\Models\Visitor' => 'visitor',
+            'App\Models\Other' => 'other',
+        ];
+        
+        return $mapping[$payerType] ?? 'other';
     }
 
     /**
@@ -602,621 +643,7 @@ class FeeController extends Controller
     }
 
     /**
-     * Get fees for reminders
-     */
-    private function getFeesForReminders(int $days, ?array $feeIds = null)
-    {
-        $query = Fee::with('payer');
-        $query->whereNotIn('status', ['paid', 'cancelled', 'waived']);
-
-        if ($feeIds) {
-            $query->whereIn('id', $feeIds);
-        } elseif ($days === 0) {
-            $query->whereDate('due_date', '<', now());
-        } else {
-            $query->whereDate('due_date', '<=', now()->addDays($days))
-                  ->whereDate('due_date', '>=', now());
-        }
-
-        return $query->get();
-    }
-
-    /**
-     * Send reminders to fees
-     */
-    private function sendReminders($fees): array
-    {
-        $sent = 0;
-        $skipped = 0;
-
-        foreach ($fees as $fee) {
-            $user = $this->getNotifiableUserForFee($fee);
-            
-            if ($user && $user->email) {
-                $daysUntilDue = (int) now()->diffInDays($fee->due_date, false);
-                $user->notify(new FeeDueReminderNotification($fee, $daysUntilDue));
-                $sent++;
-            } else {
-                $skipped++;
-            }
-        }
-
-        return [
-            'sent' => $sent,
-            'skipped' => $skipped,
-            'total' => $sent + $skipped
-        ];
-    }
-
-    /**
-     * Get notifiable user for a fee
-     */
-    private function getNotifiableUserForFee(Fee $fee): ?User
-    {
-        $payer = $fee->payer;
-        
-        if (!$payer) {
-            return null;
-        }
-
-        if ($payer instanceof Resident) {
-            return $this->findUserForResident($payer);
-        }
-
-        if ($payer instanceof Household) {
-            return $this->findUserForHousehold($payer);
-        }
-
-        if ($payer instanceof Business) {
-            return $this->findUserForBusiness($payer);
-        }
-
-        return null;
-    }
-
-    /**
-     * Find user for a resident
-     */
-    private function findUserForResident(Resident $resident): ?User
-    {
-        $householdMember = HouseholdMember::where('resident_id', $resident->id)->first();
-        
-        if ($householdMember) {
-            // Try exact match first
-            $user = User::where('household_id', $householdMember->household_id)
-                ->where('current_resident_id', $resident->id)
-                ->first();
-
-            if ($user) {
-                return $user;
-            }
-
-            // Try household head
-            if ($householdMember->is_head) {
-                $user = User::where('household_id', $householdMember->household_id)
-                    ->whereHas('role', fn($q) => $q->where('name', 'Household Head'))
-                    ->first();
-
-                if ($user) {
-                    return $user;
-                }
-            }
-
-            // Any user in household
-            $user = User::where('household_id', $householdMember->household_id)->first();
-            if ($user) {
-                return $user;
-            }
-        }
-
-        // Direct user relation
-        return User::where('current_resident_id', $resident->id)->first();
-    }
-
-    /**
-     * Find user for a household
-     */
-    private function findUserForHousehold(Household $household): ?User
-    {
-        $headMember = HouseholdMember::where('household_id', $household->id)
-            ->where('is_head', true)
-            ->first();
-
-        if ($headMember && $headMember->resident) {
-            return $this->findUserForResident($headMember->resident);
-        }
-
-        return User::where('household_id', $household->id)->first();
-    }
-
-    /**
-     * Find user for a business
-     */
-    private function findUserForBusiness(Business $business): ?User
-    {
-        if ($business->contact_person_id) {
-            return User::find($business->contact_person_id);
-        }
-
-        if ($business->owner_id) {
-            return User::find($business->owner_id);
-        }
-
-        return null;
-    }
-
-    /**
-     * Validate if fee can receive reminder
-     */
-    private function validateFeeForReminder(Fee $fee): ?string
-    {
-        if (in_array($fee->status, ['paid', 'cancelled', 'waived'])) {
-            return 'Cannot send reminder for paid, cancelled, or waived fees.';
-        }
-
-        return null;
-    }
-
-    /**
-     * Handle reminder error response
-     */
-    private function handleReminderError(string $message)
-    {
-        if (request()->wantsJson()) {
-            return response()->json([
-                'success' => false,
-                'message' => $message
-            ], 400);
-        }
-
-        return back()->with('error', $message);
-    }
-
-    /**
-     * Count due fees in date range
-     */
-    private function countDueFees($startDate, $endDate): int
-    {
-        return Fee::whereBetween('due_date', [$startDate, $endDate])
-            ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
-            ->count();
-    }
-
-    /**
-     * Count overdue fees
-     */
-    private function countOverdueFees(): int
-    {
-        return Fee::whereDate('due_date', '<', now())
-            ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
-            ->count();
-    }
-
-    /**
-     * Format reminder history item
-     */
-    private function formatReminderHistory($notification): array
-    {
-        $data = json_decode($notification->data, true);
-        
-        return [
-            'id' => $notification->id,
-            'notifiable_id' => $notification->notifiable_id,
-            'sent_at' => Carbon::parse($notification->created_at)->format('M d, Y h:i A'),
-            'read_at' => $notification->read_at ? Carbon::parse($notification->read_at)->format('M d, Y h:i A') : null,
-            'days_until_due' => $data['days_until_due'] ?? null,
-            'status' => $data['status'] ?? 'unknown',
-            'is_read' => !is_null($notification->read_at),
-            'fee_code' => $data['fee_code'] ?? null,
-            'payer_name' => $data['payer_name'] ?? null
-        ];
-    }
-
-    /**
-     * Handle error response
-     */
-    private function handleError(string $message)
-    {
-        if (request()->wantsJson()) {
-            return response()->json([
-                'success' => false,
-                'message' => $message
-            ], 500);
-        }
-
-        return back()->with('error', $message);
-    }
-
-    /**
-     * Get statistics for a period
-     */
-    private function getPeriodStats(string $period): array
-    {
-        $query = Fee::query();
-
-        switch ($period) {
-            case 'today':
-                $query->whereDate('created_at', today());
-                break;
-            case 'week':
-                $query->whereBetween('created_at', [
-                    now()->startOfWeek(),
-                    now()->endOfWeek()
-                ]);
-                break;
-            case 'month':
-                $query->whereMonth('created_at', now()->month)
-                    ->whereYear('created_at', now()->year);
-                break;
-            case 'year':
-                $query->whereYear('created_at', now()->year);
-                break;
-        }
-
-        return [
-            'count' => $query->count(),
-            'total_amount' => $query->sum('total_amount'),
-            'collected' => $query->where('status', 'paid')->sum('amount_paid'),
-            'pending' => $query->whereIn('status', ['issued', 'partially_paid', 'overdue'])->sum('balance'),
-        ];
-    }
-
-    /**
-     * Build status chart data
-     */
-    private function buildStatusChartData($data): array
-    {
-        $statuses = ['pending', 'issued', 'partially_paid', 'paid', 'overdue', 'cancelled', 'waived'];
-        $colors = [
-            '#fbbf24', // pending - yellow
-            '#60a5fa', // issued - blue
-            '#a78bfa', // partially_paid - purple
-            '#34d399', // paid - green
-            '#f87171', // overdue - red
-            '#9ca3af', // cancelled - gray
-            '#c084fc', // waived - purple
-        ];
-
-        $labels = [];
-        $values = [];
-
-        foreach ($statuses as $index => $status) {
-            $labels[] = ucfirst(str_replace('_', ' ', $status));
-            $values[] = $data[$status] ?? 0;
-        }
-
-        return [
-            'labels' => $labels,
-            'datasets' => [
-                [
-                    'label' => 'Number of Fees',
-                    'data' => $values,
-                    'backgroundColor' => $colors,
-                ]
-            ]
-        ];
-    }
-
-    /**
-     * Build monthly chart data
-     */
-    private function buildMonthlyChartData($data): array
-    {
-        $labels = [];
-        $totals = [];
-        $collected = [];
-
-        foreach ($data as $item) {
-            $date = Carbon::create($item->year, $item->month, 1);
-            $labels[] = $date->format('M Y');
-            $totals[] = $item->total;
-            $collected[] = $item->collected;
-        }
-
-        return [
-            'labels' => $labels,
-            'datasets' => [
-                [
-                    'label' => 'Total Amount',
-                    'data' => $totals,
-                    'borderColor' => '#60a5fa',
-                    'backgroundColor' => 'rgba(96, 165, 250, 0.1)',
-                ],
-                [
-                    'label' => 'Amount Collected',
-                    'data' => $collected,
-                    'borderColor' => '#34d399',
-                    'backgroundColor' => 'rgba(52, 211, 153, 0.1)',
-                ]
-            ]
-        ];
-    }
-
-    /**
-     * Get dashboard statistics
-     */
-    private function getDashboardStats(): array
-    {
-        $today = now()->toDateString();
-
-        return [
-            'total_fees' => Fee::count(),
-            'today_fees' => Fee::whereDate('created_at', $today)->count(),
-            'total_collected' => Fee::where('status', 'paid')->sum('amount_paid'),
-            'pending_collection' => Fee::whereIn('status', ['issued', 'partially_paid', 'overdue'])->sum('balance'),
-            'overdue_fees' => Fee::where('status', 'overdue')->count(),
-            'due_soon_count' => Fee::whereBetween('due_date', [now(), now()->addDays(7)])
-                                  ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
-                                  ->count(),
-            'due_soon_amount' => Fee::whereBetween('due_date', [now(), now()->addDays(7)])
-                                   ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
-                                   ->sum('balance')
-        ];
-    }
-
-    /**
-     * Get monthly collections data
-     */
-    private function getMonthlyCollections()
-    {
-        return Fee::select(
-            DB::raw('MONTH(payment_date) as month'),
-            DB::raw('YEAR(payment_date) as year'),
-            DB::raw('SUM(amount_paid) as total')
-        )
-            ->where('status', 'paid')
-            ->whereYear('payment_date', now()->year)
-            ->groupBy('year', 'month')
-            ->orderBy('year')
-            ->orderBy('month')
-            ->get();
-    }
-
-    /**
-     * Get fees by category
-     */
-    private function getFeesByCategory()
-    {
-        return Fee::select(
-            'fee_types.document_category_id',
-            DB::raw('COUNT(fees.id) as count'),
-            DB::raw('SUM(fees.total_amount) as total')
-        )
-            ->join('fee_types', 'fees.fee_type_id', '=', 'fee_types.id')
-            ->groupBy('fee_types.document_category_id')
-            ->get();
-    }
-
-    /**
-     * Apply outstanding filters
-     */
-    private function applyOutstandingFilters(Builder $query, array $filters): void
-    {
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('fee_code', 'like', "%{$search}%")
-                    ->orWhere('payer_name', 'like', "%{$search}%");
-            });
-        }
-
-        if (!empty($filters['status'])) {
-            if ($filters['status'] === 'overdue') {
-                $query->where('due_date', '<', Carbon::today());
-            } elseif ($filters['status'] === 'pending') {
-                $query->where('due_date', '>=', Carbon::today());
-            }
-        }
-
-        if (!empty($filters['purok'])) {
-            $query->where('purok', $filters['purok']);
-        }
-    }
-
-    /**
-     * Get outstanding statistics
-     */
-    private function getOutstandingStats(): array
-    {
-        $overdueFees = Fee::where('balance', '>', 0)
-            ->where('due_date', '<', Carbon::today())
-            ->whereIn('status', ['pending', 'issued', 'partially_paid'])
-            ->get();
-
-        $totalOutstanding = Fee::where('balance', '>', 0)
-            ->whereIn('status', ['pending', 'issued', 'partially_paid'])
-            ->sum('balance');
-
-        $overdueCount = Fee::where('balance', '>', 0)
-            ->where('due_date', '<', Carbon::today())
-            ->whereIn('status', ['pending', 'issued', 'partially_paid'])
-            ->count();
-
-        $pendingCount = Fee::where('balance', '>', 0)
-            ->where('due_date', '>=', Carbon::today())
-            ->whereIn('status', ['pending', 'issued', 'partially_paid'])
-            ->count();
-
-        $averageDaysOverdue = $overdueFees->count() > 0
-            ? $overdueFees->avg(fn($fee) => Carbon::parse($fee->due_date)->diffInDays(Carbon::today()))
-            : 0;
-
-        return [
-            'totalOutstanding' => $totalOutstanding,
-            'overdueCount' => $overdueCount,
-            'pendingCount' => $pendingCount,
-            'averageDaysOverdue' => round($averageDaysOverdue, 1),
-        ];
-    }
-
-    /**
-     * Get distinct puroks
-     */
-    private function getDistinctPuroks()
-    {
-        return Fee::whereNotNull('purok')
-            ->distinct()
-            ->pluck('purok')
-            ->sort()
-            ->values();
-    }
-
-    /**
-     * Generate CSV export
-     */
-    private function generateCsvExport($fees, string $fileName)
-    {
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
-        ];
-
-        $callback = function () use ($fees) {
-            $file = fopen('php://output', 'w');
-            fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
-
-            fputcsv($file, [
-                'ID', 'Fee Code', 'Fee Type', 'Document Category ID', 'Payer Name',
-                'Payer Type', 'Contact Number', 'Purok', 'Issue Date', 'Due Date',
-                'Base Amount', 'Surcharge', 'Penalty', 'Discount', 'Total Amount',
-                'Amount Paid', 'Balance', 'Status', 'OR Number', 'Certificate Number',
-                'User ID', 'Created At'
-            ]);
-
-            foreach ($fees as $fee) {
-                fputcsv($file, [
-                    $fee->id,
-                    $fee->fee_code,
-                    $fee->feeType->name ?? 'N/A',
-                    $fee->feeType->document_category_id ?? 'N/A',
-                    $fee->payer_name,
-                    $fee->payer_type,
-                    $fee->contact_number,
-                    $fee->purok,
-                    $fee->issue_date,
-                    $fee->due_date,
-                    $fee->base_amount,
-                    $fee->surcharge_amount,
-                    $fee->penalty_amount,
-                    $fee->discount_amount,
-                    $fee->total_amount,
-                    $fee->amount_paid,
-                    $fee->balance,
-                    $fee->status,
-                    $fee->or_number,
-                    $fee->certificate_number,
-                    $fee->user_id,
-                    $fee->created_at,
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
-    }
-
-    /**
-     * Process bulk action
-     */
-    private function processBulkAction(string $action, array $feeIds): array
-    {
-        $count = 0;
-
-        foreach ($feeIds as $feeId) {
-            $fee = Fee::find($feeId);
-
-            if (!$fee) {
-                continue;
-            }
-
-            $success = match ($action) {
-                'issue' => $this->bulkIssue($fee),
-                'mark_paid' => $this->bulkMarkPaid($fee),
-                'cancel' => $this->bulkCancel($fee),
-                'delete' => $this->bulkDelete($fee),
-                'send_reminders' => $this->bulkSendReminder($fee),
-                default => false
-            };
-
-            if ($success) {
-                $count++;
-            }
-        }
-
-        return ['count' => $count];
-    }
-
-    /**
-     * Bulk issue fee
-     */
-    private function bulkIssue(Fee $fee): bool
-    {
-        if ($fee->status === 'pending') {
-            return $fee->update(['status' => 'issued']);
-        }
-        return false;
-    }
-
-    /**
-     * Bulk mark fee as paid
-     */
-    private function bulkMarkPaid(Fee $fee): bool
-    {
-        if (in_array($fee->status, ['issued', 'partially_paid', 'overdue'])) {
-            $fee->applyPayment($fee->balance, null, [
-                'payment_date' => now(),
-                'payment_method' => 'cash',
-                'collected_by' => auth()->id(),
-            ]);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Bulk cancel fee
-     */
-    private function bulkCancel(Fee $fee): bool
-    {
-        if (in_array($fee->status, ['pending', 'issued'])) {
-            return $fee->update([
-                'status' => 'cancelled',
-                'cancelled_by' => auth()->id(),
-                'cancelled_at' => now(),
-            ]);
-        }
-        return false;
-    }
-
-    /**
-     * Bulk delete fee
-     */
-    private function bulkDelete(Fee $fee): bool
-    {
-        if ($fee->status === 'pending') {
-            return $fee->delete();
-        }
-        return false;
-    }
-
-    /**
-     * Bulk send reminder
-     */
-    private function bulkSendReminder(Fee $fee): bool
-    {
-        $user = $this->getNotifiableUserForFee($fee);
-        
-        if ($user && $user->email && !in_array($fee->status, ['paid', 'cancelled', 'waived'])) {
-            $daysUntilDue = (int) now()->diffInDays($fee->due_date, false);
-            $user->notify(new FeeDueReminderNotification($fee, $daysUntilDue));
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Get statistics (original helper)
+     * Get statistics
      */
     private function getStatistics(): array
     {
@@ -1259,7 +686,13 @@ class FeeController extends Controller
      */
     private function getPayerTypeIcon($payerType): string
     {
-        return match ($payerType) {
+        $type = is_string($payerType) ? $payerType : '';
+        
+        if (str_contains($type, 'Resident')) return 'user';
+        if (str_contains($type, 'Business')) return 'building';
+        if (str_contains($type, 'Household')) return 'home';
+        
+        return match ($type) {
             'resident' => 'user',
             'business' => 'building',
             'household' => 'home',
@@ -1268,20 +701,484 @@ class FeeController extends Controller
     }
 
     /**
-     * Get status label
+     * Get fees for reminders
      */
-    private function getStatusLabel($status): string
+    private function getFeesForReminders(int $days, ?array $feeIds = null)
     {
-        return match ($status) {
-            'pending' => 'Pending',
-            'issued' => 'Issued',
-            'partially_paid' => 'Partially Paid',
-            'paid' => 'Paid',
-            'overdue' => 'Overdue',
-            'cancelled' => 'Cancelled',
-            'waived' => 'Waived',
-            'written_off' => 'Written Off',
-            default => ucfirst($status),
+        $query = Fee::with('payer');
+        $query->whereNotIn('status', ['paid', 'cancelled', 'waived']);
+
+        if ($feeIds) {
+            $query->whereIn('id', $feeIds);
+        } elseif ($days === 0) {
+            $query->whereDate('due_date', '<', now());
+        } else {
+            $query->whereDate('due_date', '<=', now()->addDays($days))
+                  ->whereDate('due_date', '>=', now());
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Send reminders to fees
+     */
+    private function sendReminders($fees): array
+    {
+        $sent = 0;
+        $skipped = 0;
+
+        foreach ($fees as $fee) {
+            $user = $this->getNotifiableUserForFee($fee);
+            
+            if ($user && $user->email) {
+                $daysUntilDue = (int) now()->diffInDays($fee->due_date, false);
+                $user->notify(new FeeDueReminderNotification($fee, $daysUntilDue));
+                $sent++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        return ['sent' => $sent, 'skipped' => $skipped, 'total' => $sent + $skipped];
+    }
+
+    /**
+     * Get notifiable user for a fee
+     */
+    private function getNotifiableUserForFee(Fee $fee): ?User
+    {
+        $payer = $fee->payer;
+        
+        if (!$payer) return null;
+
+        if ($payer instanceof Resident) {
+            return $this->findUserForResident($payer);
+        }
+
+        if ($payer instanceof Household) {
+            return $this->findUserForHousehold($payer);
+        }
+
+        if ($payer instanceof Business) {
+            return $this->findUserForBusiness($payer);
+        }
+
+        return null;
+    }
+
+    /**
+     * Find user for a resident
+     */
+    private function findUserForResident(Resident $resident): ?User
+    {
+        $householdMember = HouseholdMember::where('resident_id', $resident->id)->first();
+        
+        if ($householdMember) {
+            $user = User::where('household_id', $householdMember->household_id)
+                ->where('current_resident_id', $resident->id)
+                ->first();
+
+            if ($user) return $user;
+
+            if ($householdMember->is_head) {
+                $user = User::where('household_id', $householdMember->household_id)
+                    ->whereHas('role', fn($q) => $q->where('name', 'Household Head'))
+                    ->first();
+                if ($user) return $user;
+            }
+
+            $user = User::where('household_id', $householdMember->household_id)->first();
+            if ($user) return $user;
+        }
+
+        return User::where('current_resident_id', $resident->id)->first();
+    }
+
+    /**
+     * Find user for a household
+     */
+    private function findUserForHousehold(Household $household): ?User
+    {
+        $headMember = HouseholdMember::where('household_id', $household->id)
+            ->where('is_head', true)
+            ->first();
+
+        if ($headMember && $headMember->resident) {
+            return $this->findUserForResident($headMember->resident);
+        }
+
+        return User::where('household_id', $household->id)->first();
+    }
+
+    /**
+     * Find user for a business
+     */
+    private function findUserForBusiness(Business $business): ?User
+    {
+        if ($business->contact_person_id) return User::find($business->contact_person_id);
+        if ($business->owner_id) return User::find($business->owner_id);
+        return null;
+    }
+
+    /**
+     * Validate if fee can receive reminder
+     */
+    private function validateFeeForReminder(Fee $fee): ?string
+    {
+        if (in_array($fee->status, ['paid', 'cancelled', 'waived'])) {
+            return 'Cannot send reminder for paid, cancelled, or waived fees.';
+        }
+        return null;
+    }
+
+    /**
+     * Handle reminder error response
+     */
+    private function handleReminderError(string $message)
+    {
+        if (request()->wantsJson()) {
+            return response()->json(['success' => false, 'message' => $message], 400);
+        }
+        return back()->with('error', $message);
+    }
+
+    /**
+     * Count due fees in date range
+     */
+    private function countDueFees($startDate, $endDate): int
+    {
+        return Fee::whereBetween('due_date', [$startDate, $endDate])
+            ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
+            ->count();
+    }
+
+    /**
+     * Count overdue fees
+     */
+    private function countOverdueFees(): int
+    {
+        return Fee::whereDate('due_date', '<', now())
+            ->whereNotIn('status', ['paid', 'cancelled', 'waived'])
+            ->count();
+    }
+
+    /**
+     * Format reminder history item
+     */
+    private function formatReminderHistory($notification): array
+    {
+        $data = json_decode($notification->data, true);
+        
+        return [
+            'id' => $notification->id,
+            'sent_at' => Carbon::parse($notification->created_at)->format('M d, Y h:i A'),
+            'read_at' => $notification->read_at ? Carbon::parse($notification->read_at)->format('M d, Y h:i A') : null,
+            'days_until_due' => $data['days_until_due'] ?? null,
+            'is_read' => !is_null($notification->read_at),
+            'fee_code' => $data['fee_code'] ?? null,
+            'payer_name' => $data['payer_name'] ?? null
+        ];
+    }
+
+    /**
+     * Handle error response
+     */
+    private function handleError(string $message)
+    {
+        if (request()->wantsJson()) {
+            return response()->json(['success' => false, 'message' => $message], 500);
+        }
+        return back()->with('error', $message);
+    }
+
+    /**
+     * Get statistics for a period
+     */
+    private function getPeriodStats(string $period): array
+    {
+        $query = Fee::query();
+
+        switch ($period) {
+            case 'today':
+                $query->whereDate('created_at', today());
+                break;
+            case 'week':
+                $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]);
+                break;
+            case 'month':
+                $query->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year);
+                break;
+            case 'year':
+                $query->whereYear('created_at', now()->year);
+                break;
+        }
+
+        return [
+            'count' => $query->count(),
+            'total_amount' => $query->sum('total_amount'),
+            'collected' => $query->where('status', 'paid')->sum('amount_paid'),
+            'pending' => $query->whereIn('status', ['issued', 'partially_paid', 'overdue'])->sum('balance'),
+        ];
+    }
+
+    /**
+     * Build status chart data
+     */
+    private function buildStatusChartData($data): array
+    {
+        $statuses = ['pending', 'issued', 'partially_paid', 'paid', 'overdue', 'cancelled', 'waived'];
+        $colors = ['#fbbf24', '#60a5fa', '#a78bfa', '#34d399', '#f87171', '#9ca3af', '#c084fc'];
+
+        $labels = [];
+        $values = [];
+
+        foreach ($statuses as $index => $status) {
+            $labels[] = ucfirst(str_replace('_', ' ', $status));
+            $values[] = $data[$status] ?? 0;
+        }
+
+        return [
+            'labels' => $labels,
+            'datasets' => [['label' => 'Number of Fees', 'data' => $values, 'backgroundColor' => $colors]]
+        ];
+    }
+
+    /**
+     * Build monthly chart data
+     */
+    private function buildMonthlyChartData($data): array
+    {
+        $labels = [];
+        $totals = [];
+        $collected = [];
+
+        foreach ($data as $item) {
+            $date = Carbon::create($item->year, $item->month, 1);
+            $labels[] = $date->format('M Y');
+            $totals[] = $item->total;
+            $collected[] = $item->collected;
+        }
+
+        return [
+            'labels' => $labels,
+            'datasets' => [
+                ['label' => 'Total Amount', 'data' => $totals, 'borderColor' => '#60a5fa', 'backgroundColor' => 'rgba(96, 165, 250, 0.1)'],
+                ['label' => 'Amount Collected', 'data' => $collected, 'borderColor' => '#34d399', 'backgroundColor' => 'rgba(52, 211, 153, 0.1)']
+            ]
+        ];
+    }
+
+    /**
+     * Get dashboard statistics
+     */
+    private function getDashboardStats(): array
+    {
+        return [
+            'total_fees' => Fee::count(),
+            'today_fees' => Fee::whereDate('created_at', today())->count(),
+            'total_collected' => Fee::where('status', 'paid')->sum('amount_paid'),
+            'pending_collection' => Fee::whereIn('status', ['issued', 'partially_paid', 'overdue'])->sum('balance'),
+            'overdue_fees' => Fee::where('status', 'overdue')->count(),
+            'due_soon_count' => Fee::whereBetween('due_date', [now(), now()->addDays(7)])->whereNotIn('status', ['paid', 'cancelled', 'waived'])->count(),
+            'due_soon_amount' => Fee::whereBetween('due_date', [now(), now()->addDays(7)])->whereNotIn('status', ['paid', 'cancelled', 'waived'])->sum('balance')
+        ];
+    }
+
+    /**
+     * Get monthly collections data
+     */
+    private function getMonthlyCollections()
+    {
+        return Fee::select(DB::raw('MONTH(payment_date) as month, YEAR(payment_date) as year, SUM(amount_paid) as total'))
+            ->where('status', 'paid')
+            ->whereYear('payment_date', now()->year)
+            ->groupBy('year', 'month')
+            ->orderBy('year')
+            ->orderBy('month')
+            ->get();
+    }
+
+    /**
+     * Get fees by category
+     */
+    private function getFeesByCategory()
+    {
+        return Fee::select('fee_types.document_category_id', DB::raw('COUNT(fees.id) as count, SUM(fees.total_amount) as total'))
+            ->join('fee_types', 'fees.fee_type_id', '=', 'fee_types.id')
+            ->groupBy('fee_types.document_category_id')
+            ->get();
+    }
+
+    /**
+     * Apply outstanding filters
+     */
+    private function applyOutstandingFilters(Builder $query, array $filters): void
+    {
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('fee_code', 'like', "%{$search}%")->orWhere('payer_name', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($filters['status'])) {
+            if ($filters['status'] === 'overdue') {
+                $query->where('due_date', '<', Carbon::today());
+            } elseif ($filters['status'] === 'pending') {
+                $query->where('due_date', '>=', Carbon::today());
+            }
+        }
+
+        if (!empty($filters['purok'])) {
+            $query->where('purok', $filters['purok']);
+        }
+    }
+
+    /**
+     * Get outstanding statistics
+     */
+    private function getOutstandingStats(): array
+    {
+        $overdueFees = Fee::where('balance', '>', 0)
+            ->where('due_date', '<', Carbon::today())
+            ->whereIn('status', ['pending', 'issued', 'partially_paid'])
+            ->get();
+
+        $totalOutstanding = Fee::where('balance', '>', 0)->whereIn('status', ['pending', 'issued', 'partially_paid'])->sum('balance');
+        $overdueCount = Fee::where('balance', '>', 0)->where('due_date', '<', Carbon::today())->whereIn('status', ['pending', 'issued', 'partially_paid'])->count();
+        $pendingCount = Fee::where('balance', '>', 0)->where('due_date', '>=', Carbon::today())->whereIn('status', ['pending', 'issued', 'partially_paid'])->count();
+        $averageDaysOverdue = $overdueFees->count() > 0 ? $overdueFees->avg(fn($fee) => Carbon::parse($fee->due_date)->diffInDays(Carbon::today())) : 0;
+
+        return [
+            'totalOutstanding' => $totalOutstanding,
+            'overdueCount' => $overdueCount,
+            'pendingCount' => $pendingCount,
+            'averageDaysOverdue' => round($averageDaysOverdue, 1),
+        ];
+    }
+
+    /**
+     * Get distinct puroks
+     */
+    private function getDistinctPuroks()
+    {
+        return Fee::whereNotNull('purok')->distinct()->pluck('purok')->sort()->values();
+    }
+
+    /**
+     * Generate CSV export
+     */
+    private function generateCsvExport($fees, string $fileName)
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+        ];
+
+        $callback = function () use ($fees) {
+            $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF");
+
+            fputcsv($file, [
+                'ID', 'Fee Code', 'Fee Type', 'Payer Name', 'Payer Type', 'Contact Number',
+                'Purok', 'Issue Date', 'Due Date', 'Total Amount', 'Amount Paid', 'Balance',
+                'Status', 'OR Number', 'Certificate Number', 'Created At'
+            ]);
+
+            foreach ($fees as $fee) {
+                fputcsv($file, [
+                    $fee->id, $fee->fee_code, $fee->feeType->name ?? 'N/A', $fee->payer_name,
+                    $fee->payer_type, $fee->contact_number, $fee->purok, $fee->issue_date,
+                    $fee->due_date, $fee->total_amount, $fee->amount_paid, $fee->balance,
+                    $fee->status, $fee->or_number, $fee->certificate_number, $fee->created_at,
+                ]);
+            }
+
+            fclose($file);
         };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Process bulk action
+     */
+    private function processBulkAction(string $action, array $feeIds): array
+    {
+        $count = 0;
+
+        foreach ($feeIds as $feeId) {
+            $fee = Fee::find($feeId);
+            if (!$fee) continue;
+
+            $success = match ($action) {
+                'issue' => $this->bulkIssue($fee),
+                'mark_paid' => $this->bulkMarkPaid($fee),
+                'cancel' => $this->bulkCancel($fee),
+                'delete' => $this->bulkDelete($fee),
+                'send_reminders' => $this->bulkSendReminder($fee),
+                default => false
+            };
+
+            if ($success) $count++;
+        }
+
+        return ['count' => $count];
+    }
+
+    /**
+     * Bulk issue fee
+     */
+    private function bulkIssue(Fee $fee): bool
+    {
+        if ($fee->status === 'pending') return $fee->update(['status' => 'issued']);
+        return false;
+    }
+
+    /**
+     * Bulk mark fee as paid
+     */
+    private function bulkMarkPaid(Fee $fee): bool
+    {
+        if (in_array($fee->status, ['issued', 'partially_paid', 'overdue'])) {
+            $fee->applyPayment($fee->balance, null, ['payment_date' => now(), 'payment_method' => 'cash', 'collected_by' => auth()->id()]);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Bulk cancel fee
+     */
+    private function bulkCancel(Fee $fee): bool
+    {
+        if (in_array($fee->status, ['pending', 'issued'])) {
+            return $fee->update(['status' => 'cancelled', 'cancelled_by' => auth()->id(), 'cancelled_at' => now()]);
+        }
+        return false;
+    }
+
+    /**
+     * Bulk delete fee
+     */
+    private function bulkDelete(Fee $fee): bool
+    {
+        if ($fee->status === 'pending') return $fee->delete();
+        return false;
+    }
+
+    /**
+     * Bulk send reminder
+     */
+    private function bulkSendReminder(Fee $fee): bool
+    {
+        $user = $this->getNotifiableUserForFee($fee);
+        if ($user && $user->email && !in_array($fee->status, ['paid', 'cancelled', 'waived'])) {
+            $daysUntilDue = (int) now()->diffInDays($fee->due_date, false);
+            $user->notify(new FeeDueReminderNotification($fee, $daysUntilDue));
+            return true;
+        }
+        return false;
     }
 }

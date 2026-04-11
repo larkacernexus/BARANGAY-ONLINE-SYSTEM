@@ -214,20 +214,26 @@ class PaymentStoreController extends BasePaymentController
     /**
      * Recalculate totals to ensure accuracy
      */
-    private function recalculateTotals(array $validated): array
-    {
-        $calculatedTotal = $validated['subtotal'] + $validated['surcharge'] + $validated['penalty'];
+   private function recalculateTotals(array $validated): array
+{
+    $calculatedBase = $validated['subtotal'] + $validated['surcharge'] + $validated['penalty'];
+    $expectedTotal = $calculatedBase - $validated['discount'];
+    
+    if (abs($expectedTotal - $validated['total_amount']) > 0.01) {
+        $this->logPaymentActivity('STORE_TOTAL_MISMATCH', [
+            'provided_total' => $validated['total_amount'],
+            'calculated_base' => $calculatedBase,
+            'discount' => $validated['discount'],
+            'expected_total' => $expectedTotal,
+            'difference' => $validated['total_amount'] - $expectedTotal,
+        ]);
         
-        if (abs($calculatedTotal - $validated['total_amount']) > 0.01) {
-            $this->logPaymentActivity('STORE_TOTAL_MISMATCH', [
-                'provided_total' => $validated['total_amount'],
-                'calculated_total' => $calculatedTotal,
-            ]);
-            $validated['total_amount'] = $calculatedTotal;
-        }
-
-        return $validated;
+        // Use the frontend's total (it already has discount applied correctly)
+        // Don't override - the frontend calculation is correct
     }
+
+    return $validated;
+}
 
     /**
      * Process OR number

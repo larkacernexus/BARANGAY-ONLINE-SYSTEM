@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Search, X } from 'lucide-react';
-import { Resident } from '@/components/admin/community-reports/create/types/community-report';
+import { Resident } from '@/types/admin/reports/community-report';
 
 interface SearchableResidentDropdownProps {
     residents: Resident[];

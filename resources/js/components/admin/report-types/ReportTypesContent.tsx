@@ -1,11 +1,17 @@
-// components/admin/report-types/ReportTypesContent.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { FileText, Grid3X3, Rows, AlertTriangle } from 'lucide-react';
+import { FileText, Grid3X3, Rows, AlertTriangle, ArrowUpDown } from 'lucide-react';
 
 // Import reusable components
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -61,6 +67,10 @@ interface ReportTypesContentProps {
         icon: string;
     };
     formatDate: (dateString: string) => string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function ReportTypesContent({
@@ -111,7 +121,11 @@ export default function ReportTypesContent({
         totalResolutionDays: 0
     },
     getPriorityDetails,
-    formatDate
+    formatDate,
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc'
 }: ReportTypesContentProps) {
     
     const handleBulkModeToggle = () => {
@@ -179,6 +193,37 @@ export default function ReportTypesContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="code-asc">Code (A to Z)</SelectItem>
+                                        <SelectItem value="code-desc">Code (Z to A)</SelectItem>
+                                        <SelectItem value="priority-asc">Priority (Low to High)</SelectItem>
+                                        <SelectItem value="priority-desc">Priority (High to Low)</SelectItem>
+                                        <SelectItem value="resolution_days-asc">Resolution Days (Low to High)</SelectItem>
+                                        <SelectItem value="resolution_days-desc">Resolution Days (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="requires_immediate_action-asc">Requires Action (No to Yes)</SelectItem>
+                                        <SelectItem value="requires_immediate_action-desc">Requires Action (Yes to No)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && reportTypes.length > 0 && (
                             <div className="flex items-center gap-2">

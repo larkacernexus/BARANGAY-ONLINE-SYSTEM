@@ -34,7 +34,6 @@ import { usePurposeManagement } from '@/components/portal/request/hooks/use-purp
 
 // Import types and constants
 import type { ClearanceType, Resident, PageProps, UploadedFileWithMetadata, FormData } from '@/components/portal/request/types';
-import { COMMON_PURPOSE_OPTIONS } from '@/components/portal/request/constants';
 
 export default function RequestClearance({ clearanceTypes, resident }: PageProps) {
     const [selectedClearance, setSelectedClearance] = useState<ClearanceType | null>(null);
@@ -143,6 +142,24 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
         }
     };
 
+    // FIXED: Handle purpose selection properly
+    const onPurposeSelect = (value: string, label: string) => {
+        // Call handlePurposeSelect which updates the hook's state
+        const result = handlePurposeSelect(value, label);
+        
+        // Update form data based on selection
+        if (value === 'custom') {
+            setData('purpose', '');
+            setData('purpose_custom', '');
+        } else {
+            setData('purpose', result.value);
+            setData('purpose_custom', '');
+        }
+        
+        // Clear specific purpose when purpose changes
+        setData('specific_purpose', '');
+    };
+
     const handleFileSelect = (files: File[]) => {
         const newFiles = files.map(file => ({
             file,
@@ -247,7 +264,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
         });
     };
 
-    // ✅ Use useMemo for isFormValid - returns boolean value
+    // Use useMemo for isFormValid
     const isFormValid = useMemo(() => {
         const finalPurpose = isCustomPurpose ? data.purpose_custom : data.purpose;
         return Boolean(
@@ -264,9 +281,12 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
             return;
         }
         
-        if (activeStep === 2 && (!data.purpose && !isCustomPurpose)) {
-            toast.error('Please select or enter a purpose');
-            return;
+        if (activeStep === 2) {
+            const finalPurpose = isCustomPurpose ? data.purpose_custom : data.purpose;
+            if (!finalPurpose) {
+                toast.error('Please select or enter a purpose');
+                return;
+            }
         }
         
         if (activeStep === 3 && documentRequirements.requiredCount > 0 && documentRequirements.missing.length > 0) {
@@ -278,7 +298,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
             setActiveStep(prev => prev + 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-    }, [activeStep, data.clearance_type_id, data.purpose, isCustomPurpose, documentRequirements]);
+    }, [activeStep, data.clearance_type_id, data.purpose, data.purpose_custom, isCustomPurpose, documentRequirements]);
 
     const prevStep = useCallback(() => {
         if (activeStep > 1) {
@@ -355,7 +375,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
                                         setPurposeSearch={setPurposeSearch}
                                         showPurposeDropdown={showPurposeDropdown}
                                         setShowPurposeDropdown={setShowPurposeDropdown}
-                                        onPurposeSelect={handlePurposeSelect}
+                                        onPurposeSelect={onPurposeSelect}
                                         getPurposeSuggestions={getPurposeSuggestions}
                                     />
                                 )}

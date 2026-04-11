@@ -8,7 +8,7 @@ import {
     Download,
     TrendingUp,
 } from 'lucide-react';
-import { Form } from '../types';
+import { Form } from '@/types/admin/forms/forms.types';
 
 interface Props {
     form: Form;

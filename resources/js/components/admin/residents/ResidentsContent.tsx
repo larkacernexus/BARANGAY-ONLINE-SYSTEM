@@ -1,10 +1,16 @@
-// Updated ResidentsContent.tsx with fixed customBulkActions type
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     User, 
     Download, 
@@ -20,7 +26,8 @@ import {
     Square,
     UserPlus,
     UserMinus,
-    FileDown
+    FileDown,
+    ArrowUpDown
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -81,6 +88,10 @@ interface ResidentsContentProps {
         destructive?: BulkActionItem[];
         privilege?: BulkActionItem[];
     };
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function ResidentsContent({
@@ -122,7 +133,11 @@ export default function ResidentsContent({
     selectionMode,
     selectionStats,
     puroks = [],
-    customBulkActions
+    customBulkActions,
+    sortBy = 'last_name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'last_name-asc'
 }: ResidentsContentProps) {
     
     // Toggle handler for bulk mode
@@ -137,31 +152,19 @@ export default function ResidentsContent({
     const activeFilters = Boolean(hasActiveFilters);
 
     // Convert selectionStats to match the expected SelectionStats type
-    // The SelectionStats interface expects both singular and plural forms
     const normalizedSelectionStats = selectionStats ? {
-        // Core stats
         total: selectionStats.total,
-        
-        // Gender stats - both singular and plural
         male: selectionStats.male || selectionStats.males || 0,
         female: selectionStats.female || selectionStats.females || 0,
         males: selectionStats.males || selectionStats.male || 0,
         females: selectionStats.females || selectionStats.female || 0,
         other: selectionStats.other || 0,
-        
-        // Voter and household stats
         voters: selectionStats.voters || 0,
         heads: selectionStats.heads || 0,
-        
-        // Status stats
         active: selectionStats.active || 0,
         inactive: selectionStats.inactive || 0,
-        
-        // Additional stats
         averageAge: selectionStats.averageAge || 0,
         hasPhotos: selectionStats.hasPhotos || 0,
-        
-        // Privilege stats
         privilegeCounts: selectionStats.privilegeCounts || {},
         hasPrivileges: selectionStats.hasPrivileges || 0
     } : undefined;
@@ -223,6 +226,41 @@ export default function ResidentsContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="last_name-asc">Last Name (A to Z)</SelectItem>
+                                        <SelectItem value="last_name-desc">Last Name (Z to A)</SelectItem>
+                                        <SelectItem value="first_name-asc">First Name (A to Z)</SelectItem>
+                                        <SelectItem value="first_name-desc">First Name (Z to A)</SelectItem>
+                                        <SelectItem value="age-asc">Age (Youngest to Oldest)</SelectItem>
+                                        <SelectItem value="age-desc">Age (Oldest to Youngest)</SelectItem>
+                                        <SelectItem value="gender-asc">Gender (A to Z)</SelectItem>
+                                        <SelectItem value="gender-desc">Gender (Z to A)</SelectItem>
+                                        <SelectItem value="civil_status-asc">Civil Status (A to Z)</SelectItem>
+                                        <SelectItem value="civil_status-desc">Civil Status (Z to A)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="purok-asc">Purok (A to Z)</SelectItem>
+                                        <SelectItem value="purok-desc">Purok (Z to A)</SelectItem>
+                                        <SelectItem value="is_voter-asc">Voter (No to Yes)</SelectItem>
+                                        <SelectItem value="is_voter-desc">Voter (Yes to No)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && residents.length > 0 && (
                             <div className="flex items-center gap-2">

@@ -1,14 +1,18 @@
+// resources/js/components/admin/backup/KeyboardShortcuts.tsx
+
 import { Button } from '@/components/ui/button';
 import { KeyRound } from 'lucide-react';
 
 interface KeyboardShortcutsProps {
   onExitBulkMode: () => void;
   isPerformingBulkAction: boolean;
+  selectedCount?: number; // Add this prop as optional
 }
 
 export default function KeyboardShortcuts({
   onExitBulkMode,
-  isPerformingBulkAction
+  isPerformingBulkAction,
+  selectedCount = 0 // Add with default value
 }: KeyboardShortcutsProps) {
   return (
     <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border dark:border-gray-700">
@@ -16,6 +20,11 @@ export default function KeyboardShortcuts({
         <div className="flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-gray-500" />
           <span className="text-sm font-medium">Keyboard Shortcuts</span>
+          {selectedCount > 0 && (
+            <span className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 rounded-full">
+              {selectedCount} selected
+            </span>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -45,6 +54,11 @@ export default function KeyboardShortcuts({
           <span>Exit/clear</span>
         </div>
       </div>
+      {selectedCount > 0 && (
+        <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
+          <span className="font-medium">{selectedCount}</span> item(s) currently selected
+        </div>
+      )}
     </div>
   );
 }

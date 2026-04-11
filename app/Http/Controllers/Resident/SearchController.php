@@ -33,7 +33,7 @@ class SearchController extends Controller
             
             if ($user && $user->resident_id) {
                 $this->residentId = $user->resident_id;
-                $this->resident = Resident::with(['residentPrivileges.privilege'])->find($this->residentId);
+                $this->resident = Resident::with(['residentPrivileges.privilege.discountType'])->find($this->residentId);
                 
                 // Get user's household ID
                 $this->householdId = $user->household_id;
@@ -48,10 +48,27 @@ class SearchController extends Controller
                 }
             }
             
-            // Get all active privileges for reference
+            // Get all active privileges for reference - FIXED: use discountType relationship
             $this->allPrivileges = Cache::remember('all_active_privileges', 3600, function () {
-                return Privilege::where('is_active', true)
-                    ->get(['id', 'name', 'code', 'description'])
+                return Privilege::with('discountType')
+                    ->where('is_active', true)
+                    ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
+                    ->map(function ($privilege) {
+                        return [
+                            'id' => $privilege->id,
+                            'name' => $privilege->name,
+                            'code' => $privilege->code,
+                            'description' => $privilege->description,
+                            'discount_type_id' => $privilege->discount_type_id,
+                            'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
+                            'discount_type' => $privilege->discountType ? [
+                                'id' => $privilege->discountType->id,
+                                'code' => $privilege->discountType->code,
+                                'name' => $privilege->discountType->name,
+                                'percentage' => (float) $privilege->discountType->percentage,
+                            ] : null,
+                        ];
+                    })
                     ->keyBy('code')
                     ->toArray();
             });
@@ -186,7 +203,7 @@ class SearchController extends Controller
     }
 
     /**
-     * Get resident's active privileges
+     * Get resident's active privileges - FIXED: includes discount percentage
      */
     protected function getResidentPrivileges($resident)
     {
@@ -200,12 +217,19 @@ class SearchController extends Controller
             })
             ->map(function ($rp) {
                 $privilege = $rp->privilege;
+                $discountPercentage = $rp->discount_percentage 
+                    ?? $privilege->discountType?->percentage 
+                    ?? 0;
+                
                 return [
                     'id' => $rp->id,
                     'privilege_id' => $privilege->id,
                     'code' => $privilege->code,
                     'name' => $privilege->name,
                     'id_number' => $rp->id_number,
+                    'discount_percentage' => (float) $discountPercentage,
+                    'expires_at' => $rp->expires_at?->toISOString(),
+                    'verified_at' => $rp->verified_at?->toISOString(),
                 ];
             })
             ->values()
@@ -227,7 +251,7 @@ class SearchController extends Controller
     protected function searchResidents($searchTerm, $rawQuery, $quick = false)
     {
         // Only return the logged-in resident's own profile
-        $resident = Resident::with(['purok', 'household', 'residentPrivileges.privilege'])
+        $resident = Resident::with(['purok', 'household', 'residentPrivileges.privilege.discountType'])
             ->where('id', $this->residentId)
             ->where(function($q) use ($searchTerm) {
                 $q->where('first_name', 'like', $searchTerm)
@@ -296,7 +320,7 @@ class SearchController extends Controller
             return [];
         }
 
-        $query = Resident::with(['purok', 'residentPrivileges.privilege'])
+        $query = Resident::with(['purok', 'residentPrivileges.privilege.discountType'])
             ->whereIn('id', $this->householdMemberIds)
             ->where('id', '!=', $this->residentId) // Exclude self
             ->where(function($q) use ($searchTerm) {
@@ -478,7 +502,8 @@ class SearchController extends Controller
     protected function searchPayments($searchTerm, $quick = false)
     {
         $query = Payment::query()
-            ->where('resident_id', $this->residentId)
+            ->where('payer_type', 'resident')
+            ->where('payer_id', $this->residentId)
             ->where(function($q) use ($searchTerm) {
                 $q->where('or_number', 'like', $searchTerm)
                   ->orWhere('reference_number', 'like', $searchTerm)
@@ -521,8 +546,10 @@ class SearchController extends Controller
 
     protected function searchAnnouncements($searchTerm, $quick = false)
     {
-        $query = Announcement::where('title', 'like', '%' . $searchTerm . '%')
-            ->orWhere('content', 'like', '%' . $searchTerm . '%')
+        $query = Announcement::where(function($q) use ($searchTerm) {
+                $q->where('title', 'like', $searchTerm)
+                  ->orWhere('content', 'like', $searchTerm);
+            })
             ->where('is_active', true)
             ->where(function($q) {
                 $q->whereNull('target_audience')
@@ -569,43 +596,43 @@ class SearchController extends Controller
         return $announcements;
     }
 
-protected function searchBusinesses($searchTerm)
-{
-    // Only show businesses if the resident has a business or if businesses are publicly viewable
-    $businesses = Business::with(['purok'])
-        ->where(function($q) use ($searchTerm) {
-            $q->where('business_name', 'like', '%' . $searchTerm . '%')
-              ->orWhere('business_type', 'like', '%' . $searchTerm . '%')
-              ->orWhere('owner_name', 'like', '%' . $searchTerm . '%');
-        })
-        ->where('status', 'active')
-        ->limit(10)
-        ->get()
-        ->map(function ($business) {
-            $url = '#';
-            if (Route::has('resident.businesses.show')) {
-                $url = route('resident.businesses.show', $business->id);
-            }
+    protected function searchBusinesses($searchTerm)
+    {
+        // Only show businesses if the resident has a business or if businesses are publicly viewable
+        $businesses = Business::with(['purok'])
+            ->where(function($q) use ($searchTerm) {
+                $q->where('business_name', 'like', $searchTerm)
+                  ->orWhere('business_type', 'like', $searchTerm)
+                  ->orWhere('owner_name', 'like', $searchTerm);
+            })
+            ->where('status', 'active')
+            ->limit(10)
+            ->get()
+            ->map(function ($business) {
+                $url = '#';
+                if (Route::has('resident.businesses.show')) {
+                    $url = route('resident.businesses.show', $business->id);
+                }
 
-            return [
-                'id' => $business->id,
-                'type' => 'business',
-                'title' => $business->business_name ?? 'Unnamed Business',
-                'subtitle' => $business->business_type ?? 'Business',
-                'description' => 'Owner: ' . ($business->owner_name ?? 'Unknown'),
-                'url' => $url,
-                'icon' => 'Briefcase',
-                'badge' => 'Business',
-                'tags' => [$business->status],
-                'meta' => [
-                    'location' => $business->address,
-                ]
-            ];
-        })
-        ->toArray();
+                return [
+                    'id' => $business->id,
+                    'type' => 'business',
+                    'title' => $business->business_name ?? 'Unnamed Business',
+                    'subtitle' => $business->business_type ?? 'Business',
+                    'description' => 'Owner: ' . ($business->owner_name ?? 'Unknown'),
+                    'url' => $url,
+                    'icon' => 'Briefcase',
+                    'badge' => 'Business',
+                    'tags' => [$business->status],
+                    'meta' => [
+                        'location' => $business->address,
+                    ]
+                ];
+            })
+            ->toArray();
 
-    return $businesses;
-}
+        return $businesses;
+    }
 
     protected function getRelationshipToHead($memberId)
     {

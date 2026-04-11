@@ -20,9 +20,9 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        if (!auth()->user()->hasPermission('view-dashboard')) {
-            abort(403, 'You do not have permission to view the dashboard.');
-        }
+        // if (!auth()->user()->hasPermission('view-dashboard')) {
+        //     abort(403, 'You do not have permission to view the dashboard.');
+        // }
         
         // Get date range from request or default to 'week'
         $dateRange = $request->get('dateRange', 'week');

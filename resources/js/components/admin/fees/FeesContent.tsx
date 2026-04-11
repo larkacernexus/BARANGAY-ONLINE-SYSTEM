@@ -1,12 +1,17 @@
-// components/admin/fees/FeesContent.tsx
-
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { FileText } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { FileText, ArrowUpDown } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
 import { Pagination } from '@/components/adminui/pagination';
@@ -45,7 +50,7 @@ interface FeesContentProps {
     onCopyToClipboard?: (text: string, label: string) => void;
     onCopySelectedData?: () => void;
     onSort: (column: string) => void;
-    onBulkOperation: (operation: BulkOperation) => void; // Changed to BulkOperation
+    onBulkOperation: (operation: BulkOperation) => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     filtersState: Filters;
     isPerformingBulkAction: boolean;
@@ -54,11 +59,13 @@ interface FeesContentProps {
     statuses?: Record<string, string>;
     categories?: Record<string, string>;
     puroks?: string[];
-    // Refs for bulk actions
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
     bulkActionRef?: React.RefObject<HTMLDivElement>;
     showBulkActions?: boolean;
     setShowBulkActions?: (show: boolean) => void;
-    // Additional props that might be needed
     onRemindersSent?: () => void;
     onExport?: () => void;
     onPrint?: () => void;
@@ -100,6 +107,10 @@ export default function FeesContent({
     statuses = {},
     categories = {},
     puroks = [],
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc',
     bulkActionRef,
     showBulkActions = false,
     setShowBulkActions = () => {},
@@ -131,29 +142,19 @@ export default function FeesContent({
         const colors: Record<string, string> = {
             active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
-            archived: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-            overdue: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-            issued: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-            partial: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-            cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+            archived: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
         };
         return colors[status] || 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
     };
 
-    const getStatusIcon = (status: string) => {
-        // This can be implemented based on your icon library
-        return null;
-    };
+    const getStatusIcon = (status: string) => null;
 
     const getCategoryColor = (category: string) => {
         const colors: Record<string, string> = {
             tax: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
             clearance: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             permit: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-            fee: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            donation: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+            fee: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
         };
         return colors[category] || colors.fee;
     };
@@ -163,13 +164,11 @@ export default function FeesContent({
             tax: 'Tax',
             clearance: 'Clearance',
             permit: 'Permit',
-            fee: 'Fee',
-            donation: 'Donation'
+            fee: 'Fee'
         };
         return labels[category] || category;
     };
 
-    // Check if we have any fees to display
     const hasFees = fees && fees.length > 0;
 
     return (
@@ -235,6 +234,35 @@ export default function FeesContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="code-asc">Code (A to Z)</SelectItem>
+                                        <SelectItem value="code-desc">Code (Z to A)</SelectItem>
+                                        <SelectItem value="amount-asc">Amount (Low to High)</SelectItem>
+                                        <SelectItem value="amount-desc">Amount (High to Low)</SelectItem>
+                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="category-asc">Category (A to Z)</SelectItem>
+                                        <SelectItem value="category-desc">Category (Z to A)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && hasFees && (
                             <div className="flex items-center gap-2">
@@ -282,7 +310,7 @@ export default function FeesContent({
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 dark:bg-gray-900">
-                    {/* Empty State with dark mode - FIXED */}
+                    {/* Empty State */}
                     {!hasFees ? (
                         <EmptyState
                             icon={<FileText className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
@@ -346,7 +374,7 @@ export default function FeesContent({
                                 />
                             )}
 
-                            {/* Grid Selection Summary with dark mode */}
+                            {/* Grid Selection Summary */}
                             {viewMode === 'grid' && isBulkMode && selectedFees.length > 0 && (
                                 <GridSelectionSummary
                                     selectedCount={selectedFees.length}
@@ -365,7 +393,7 @@ export default function FeesContent({
                                 />
                             )}
 
-                            {/* Pagination with dark mode */}
+                            {/* Pagination */}
                             {totalPages > 1 && (
                                 <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
                                     <Pagination

@@ -5,7 +5,7 @@ import {
     Resident,
     PaymentFormData,
     OutstandingFee 
-} from '../types';
+} from '@/types/admin/payments/payments';
 import { 
     parseAmount,
     generateORNumber

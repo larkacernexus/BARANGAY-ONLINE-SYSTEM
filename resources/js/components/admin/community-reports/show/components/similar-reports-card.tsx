@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Link, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { ChevronRight, Layers } from 'lucide-react';
-import { CommunityReport } from './types';
+import { CommunityReport } from '@/types/admin/reports/community-report';
 
 interface SimilarReportsCardProps {
     similarReports: CommunityReport[];

@@ -1,9 +1,6 @@
-// resources/js/Pages/Admin/Privileges/Index.tsx
-
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
-import debounce from 'lodash/debounce';
 import AppLayout from '@/layouts/admin-app-layout';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -49,6 +46,43 @@ const defaultStats: PrivilegeStats = {
     activeAssignments: 0
 };
 
+// Helper functions for safe value extraction
+const getSafeString = (value: any, defaultValue: string = ''): string => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number') return String(value);
+    return defaultValue;
+};
+
+const getSafeSortOrder = (value: any): 'asc' | 'desc' => {
+    if (value === 'asc') return 'asc';
+    if (value === 'desc') return 'desc';
+    return 'asc';
+};
+
+// Helper functions for range filtering
+const checkAssignmentsRange = (count: number, range: string): boolean => {
+    switch (range) {
+        case '0': return count === 0;
+        case '1-10': return count >= 1 && count <= 10;
+        case '11-50': return count >= 11 && count <= 50;
+        case '51-100': return count >= 51 && count <= 100;
+        case '100+': return count >= 100;
+        default: return true;
+    }
+};
+
+const checkDiscountPercentageRange = (percentage: number, range: string): boolean => {
+    switch (range) {
+        case '0-10': return percentage >= 0 && percentage <= 10;
+        case '11-25': return percentage >= 11 && percentage <= 25;
+        case '26-50': return percentage >= 26 && percentage <= 50;
+        case '51-75': return percentage >= 51 && percentage <= 75;
+        case '75+': return percentage >= 75;
+        default: return true;
+    }
+};
+
 export default function PrivilegesIndex({ 
     privileges, 
     filters, 
@@ -58,21 +92,30 @@ export default function PrivilegesIndex({
 }: PrivilegesPageProps) {
     const { flash } = usePage().props as any;
     
-    // State management
-    const [search, setSearch] = useState(filters.search || '');
-    const [filtersState, setFiltersState] = useState<PrivilegeFilters>({
-        status: filters.status || 'all',
-        discount_type: filters.discount_type || 'all',
-        requires_verification: filters.requires_verification || 'all',
-        requires_id_number: filters.requires_id_number || 'all',
-        sort_by: filters.sort_by || 'name',
-        sort_order: filters.sort_order || 'asc'
-    });
+    // Safe data extraction
+    const safePrivileges = privileges || { data: [], current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 };
+    const allPrivileges = safePrivileges.data || [];
+    const safeFilters = filters || {};
+    
+    // Filter states - client-side only
+    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
+    const [discountTypeFilter, setDiscountTypeFilter] = useState<string>(getSafeString(safeFilters.discount_type, 'all'));
+    const [assignmentsRange, setAssignmentsRange] = useState<string>('');
+    const [discountPercentageRange, setDiscountPercentageRange] = useState<string>('');
+    const [requiresVerificationFilter, setRequiresVerificationFilter] = useState<string>('all');
+    const [requiresIdNumberFilter, setRequiresIdNumberFilter] = useState<string>('all');
+    
+    // Sorting is now handled by table header only
+    const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'name'));
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
+    
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(15);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     
     // Bulk selection states
     const [selectedPrivileges, setSelectedPrivileges] = useState<number[]>([]);
@@ -82,45 +125,9 @@ export default function PrivilegesIndex({
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
     const [showBulkStatusDialog, setShowBulkStatusDialog] = useState(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    // Debounced search function
-    const debouncedSearch = useCallback(
-        debounce((value: string) => {
-            const params = {
-                ...filtersState,
-                search: value || undefined,
-                status: filtersState.status === 'all' ? undefined : filtersState.status,
-                discount_type: filtersState.discount_type === 'all' ? undefined : filtersState.discount_type,
-                requires_verification: filtersState.requires_verification === 'all' ? undefined : filtersState.requires_verification,
-                requires_id_number: filtersState.requires_id_number === 'all' ? undefined : filtersState.requires_id_number,
-            };
-            
-            Object.keys(params).forEach(key => {
-                const k = key as keyof typeof params;
-                if (params[k] === undefined || params[k] === '') {
-                    delete params[k];
-                }
-            });
-            
-            router.get('/admin/privileges', params, {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-            });
-        }, 300),
-        [filtersState]
-    );
-
-    // Cleanup debounce on unmount
-    useEffect(() => {
-        return () => {
-            debouncedSearch.cancel();
-        };
-    }, [debouncedSearch]);
 
     // Handle window resize
     useEffect(() => {
@@ -157,36 +164,10 @@ export default function PrivilegesIndex({
         }
     }, [flash]);
 
-    // Filter privileges
-    const filteredPrivileges = useMemo(() => {
-        return privilegeUtils.filterPrivileges({
-            privileges: privileges.data,
-            search,
-            filters: filtersState
-        });
-    }, [privileges.data, search, filtersState]);
-
-    // Calculate filtered stats
-    const filteredStats = useMemo(() => {
-        return {
-            total: filteredPrivileges.length,
-            active: filteredPrivileges.filter(p => p.is_active).length,
-            totalAssignments: filteredPrivileges.reduce((sum, p) => sum + (p.residents_count || 0), 0),
-            activeAssignments: filteredPrivileges.reduce((sum, p) => sum + (p.active_residents_count || 0), 0)
-        };
-    }, [filteredPrivileges]);
-
-    // Pagination
-    const totalItems = filteredPrivileges.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedPrivileges = filteredPrivileges.slice(startIndex, endIndex);
-
     // Reset to first page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filtersState]);
+    }, [search, statusFilter, discountTypeFilter, assignmentsRange, discountPercentageRange, requiresVerificationFilter, requiresIdNumberFilter, sortBy, sortOrder]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -196,48 +177,150 @@ export default function PrivilegesIndex({
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
+    // Filter privileges client-side
+    const filteredPrivileges = useMemo(() => {
+        if (!allPrivileges || allPrivileges.length === 0) {
+            return [];
+        }
         
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
+        let filtered = [...allPrivileges];
+        
+        // Search filter
+        if (search) {
+            const searchLower = search.toLowerCase();
+            filtered = filtered.filter(privilege =>
+                privilege?.name?.toLowerCase().includes(searchLower) ||
+                privilege?.code?.toLowerCase().includes(searchLower) ||
+                privilege?.description?.toLowerCase().includes(searchLower)
+            );
+        }
+        
+        // Status filter
+        if (statusFilter && statusFilter !== 'all') {
+            filtered = filtered.filter(privilege => privilege?.is_active === (statusFilter === 'active'));
+        }
+        
+        // Discount type filter
+        if (discountTypeFilter && discountTypeFilter !== 'all') {
+            filtered = filtered.filter(privilege => privilege?.discount_type_id?.toString() === discountTypeFilter);
+        }
+        
+        // Assignments range filter
+        if (assignmentsRange) {
+            filtered = filtered.filter(privilege => 
+                checkAssignmentsRange(privilege?.residents_count || 0, assignmentsRange)
+            );
+        }
+        
+        // Discount percentage range filter - uses discountType.percentage from relationship
+        if (discountPercentageRange) {
+            filtered = filtered.filter(privilege => 
+                checkDiscountPercentageRange(privilege?.discountType?.percentage || 0, discountPercentageRange)
+            );
+        }
+        
+        // Requires verification filter - uses discountType.requires_verification from relationship
+        if (requiresVerificationFilter && requiresVerificationFilter !== 'all') {
+            filtered = filtered.filter(privilege => 
+                privilege?.discountType?.requires_verification === (requiresVerificationFilter === 'yes')
+            );
+        }
+        
+        // Requires ID number filter - uses discountType.requires_id_number from relationship
+        if (requiresIdNumberFilter && requiresIdNumberFilter !== 'all') {
+            filtered = filtered.filter(privilege => 
+                privilege?.discountType?.requires_id_number === (requiresIdNumberFilter === 'yes')
+            );
+        }
+        
+        // Apply sorting
+        if (filtered.length > 0) {
+            filtered.sort((a, b) => {
+                let valueA: any;
+                let valueB: any;
+                
+                switch (sortBy) {
+                    case 'name':
+                        valueA = a?.name || '';
+                        valueB = b?.name || '';
+                        break;
+                    case 'code':
+                        valueA = a?.code || '';
+                        valueB = b?.code || '';
+                        break;
+                    case 'discount_type':
+                        valueA = a?.discountType?.name || '';
+                        valueB = b?.discountType?.name || '';
+                        break;
+                    case 'discount_percentage':
+                        valueA = a?.discountType?.percentage || 0;
+                        valueB = b?.discountType?.percentage || 0;
+                        break;
+                    case 'residents_count':
+                        valueA = a?.residents_count || 0;
+                        valueB = b?.residents_count || 0;
+                        break;
+                    case 'active_residents_count':
+                        valueA = a?.active_residents_count || 0;
+                        valueB = b?.active_residents_count || 0;
+                        break;
+                    case 'status':
+                        valueA = a?.is_active ? 1 : 0;
+                        valueB = b?.is_active ? 1 : 0;
+                        break;
+                    case 'created_at':
+                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
+                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
+                        break;
+                    default:
+                        valueA = a?.name || '';
+                        valueB = b?.name || '';
                 }
-            }
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedPrivileges.length > 0) {
-                        setSelectedPrivileges([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
+                
+                if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
                 }
-            }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            if (e.key === 'Delete' && isBulkMode && selectedPrivileges.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
+                
+                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
+                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [allPrivileges, search, statusFilter, discountTypeFilter, assignmentsRange, discountPercentageRange, requiresVerificationFilter, requiresIdNumberFilter, sortBy, sortOrder]);
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedPrivileges, isMobile]);
+    // Calculate filtered stats
+    const filteredStats = useMemo(() => {
+        if (!filteredPrivileges || filteredPrivileges.length === 0) {
+            return globalStats;
+        }
+        
+        const totalAssignments = filteredPrivileges.reduce((sum, p) => sum + (p?.residents_count || 0), 0);
+        const totalActiveAssignments = filteredPrivileges.reduce((sum, p) => sum + (p?.active_residents_count || 0), 0);
+        const avgDiscount = filteredPrivileges.reduce((sum, p) => sum + (p?.discountType?.percentage || 0), 0) / filteredPrivileges.length;
+        const unassignedCount = filteredPrivileges.filter(p => (p?.residents_count || 0) === 0).length;
+        
+        return {
+            total: filteredPrivileges.length,
+            active: filteredPrivileges.filter(p => p?.is_active).length,
+            totalAssignments,
+            activeAssignments: totalActiveAssignments,
+            avgDiscount: Math.round(avgDiscount),
+            unassignedCount
+        };
+    }, [filteredPrivileges, globalStats]);
+
+    // Pagination
+    const totalItems = filteredPrivileges.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const paginatedPrivileges = filteredPrivileges.slice(startIndex, endIndex);
 
     // Selection handlers
-    const handleSelectAllOnPage = () => {
+    const handleSelectAllOnPage = useCallback(() => {
         const pageIds = paginatedPrivileges.map(privilege => privilege.id);
         if (isSelectAll) {
             setSelectedPrivileges(prev => prev.filter(id => !pageIds.includes(id)));
@@ -247,9 +330,9 @@ export default function PrivilegesIndex({
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    };
+    }, [paginatedPrivileges, isSelectAll, selectedPrivileges]);
 
-    const handleSelectAllFiltered = () => {
+    const handleSelectAllFiltered = useCallback(() => {
         const allIds = filteredPrivileges.map(privilege => privilege.id);
         if (selectedPrivileges.length === allIds.length && allIds.every(id => selectedPrivileges.includes(id))) {
             setSelectedPrivileges(prev => prev.filter(id => !allIds.includes(id)));
@@ -258,17 +341,17 @@ export default function PrivilegesIndex({
             setSelectedPrivileges(newSelected);
             setSelectionMode('filtered');
         }
-    };
+    }, [filteredPrivileges, selectedPrivileges]);
 
-    const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${privileges.total || 0} privileges. This action may take a moment.`)) {
-            const allIds = privileges.data.map(p => p.id);
+    const handleSelectAll = useCallback(() => {
+        if (confirm(`This will select ALL ${totalItems} privileges. This action may take a moment.`)) {
+            const allIds = filteredPrivileges.map(privilege => privilege.id);
             setSelectedPrivileges(allIds);
             setSelectionMode('all');
         }
-    };
+    }, [filteredPrivileges, totalItems]);
 
-    const handleItemSelect = (id: number) => {
+    const handleItemSelect = useCallback((id: number) => {
         setSelectedPrivileges(prev => {
             if (prev.includes(id)) {
                 return prev.filter(itemId => itemId !== id);
@@ -276,7 +359,7 @@ export default function PrivilegesIndex({
                 return [...prev, id];
             }
         });
-    };
+    }, []);
 
     // Check if all items on current page are selected
     useEffect(() => {
@@ -294,6 +377,25 @@ export default function PrivilegesIndex({
     const selectionStats = useMemo((): SelectionStats => {
         return privilegeUtils.getSelectionStats(selectedPrivilegesData);
     }, [selectedPrivilegesData]);
+
+    // Handle sort change from dropdown
+    const handleSortChange = useCallback((value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    }, []);
+
+    // Get current sort value for dropdown
+    const getCurrentSortValue = useCallback((): string => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
+
+    // Handle sort from column click
+    const handleSort = useCallback((column: string) => {
+        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortBy(column);
+        setSortOrder(newSortOrder);
+    }, [sortBy, sortOrder]);
 
     // Bulk operations
     const handleBulkOperation = async (operation: BulkOperation) => {
@@ -316,7 +418,37 @@ export default function PrivilegesIndex({
 
                 case 'export':
                 case 'export_csv':
-                    privilegeUtils.exportToCSV(selectedPrivilegesData);
+                    const exportData = selectedPrivilegesData.map(privilege => ({
+                        'Name': privilege.name,
+                        'Code': privilege.code,
+                        'Discount Type': privilege?.discountType?.name || 'N/A',
+                        'Discount %': privilege?.discountType?.percentage || 0,
+                        'Requires Verification': privilege?.discountType?.requires_verification ? 'Yes' : 'No',
+                        'Requires ID': privilege?.discountType?.requires_id_number ? 'Yes' : 'No',
+                        'Status': privilege.is_active ? 'Active' : 'Inactive',
+                        'Active Assignments': privilege.active_residents_count || 0,
+                        'Total Assignments': privilege.residents_count || 0,
+                    }));
+                    
+                    const headers = Object.keys(exportData[0]);
+                    const csv = [
+                        headers.join(','),
+                        ...exportData.map(row => 
+                            headers.map(header => {
+                                const value = row[header as keyof typeof row];
+                                return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+                            }).join(',')
+                        )
+                    ].join('\n');
+                    
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `privileges-export-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
                     toast.success(`${selectedPrivileges.length} privileges exported successfully`);
                     setSelectedPrivileges([]);
                     break;
@@ -421,91 +553,52 @@ export default function PrivilegesIndex({
     };
 
     const handleToggleStatus = (privilege: Privilege) => {
-        router.post(`/admin/privileges/${privilege.id}/toggle-status`, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success(`Privilege ${privilege.is_active ? 'deactivated' : 'activated'} successfully`);
-            },
-            onError: () => {
-                toast.error('Failed to toggle privilege status');
-            }
-        });
+        if (confirm(`Are you sure you want to ${privilege.is_active ? 'deactivate' : 'activate'} "${privilege.name}"?`)) {
+            router.post(`/admin/privileges/${privilege.id}/toggle-status`, {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`Privilege ${privilege.is_active ? 'deactivated' : 'activated'} successfully`);
+                },
+                onError: () => {
+                    toast.error('Failed to toggle privilege status');
+                }
+            });
+        }
     };
 
     const handleDuplicate = (privilege: Privilege) => {
-        router.post(`/admin/privileges/${privilege.id}/duplicate`, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Privilege duplicated successfully');
-            },
-            onError: () => {
-                toast.error('Failed to duplicate privilege');
-            }
-        });
+        if (confirm(`Duplicate "${privilege.name}" privilege?`)) {
+            router.post(`/admin/privileges/${privilege.id}/duplicate`, {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Privilege duplicated successfully');
+                },
+                onError: () => {
+                    toast.error('Failed to duplicate privilege');
+                }
+            });
+        }
     };
 
-    const handleSort = (column: string) => {
-        const newOrder = filtersState.sort_by === column && filtersState.sort_order === 'asc' ? 'desc' : 'asc';
-        
-        setFiltersState(prev => ({
-            ...prev,
-            sort_by: column,
-            sort_order: newOrder
-        }));
-        
-        const params = {
-            ...filtersState,
-            sort_by: column,
-            sort_order: newOrder,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
-            }
-        });
-        
-        router.get('/admin/privileges', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleClearFilters = () => {
+    const handleClearFilters = useCallback(() => {
         setSearch('');
-        setFiltersState({
-            status: 'all',
-            discount_type: 'all',
-            requires_verification: 'all',
-            requires_id_number: 'all',
-            sort_by: 'name',
-            sort_order: 'asc'
-        });
-        
-        router.get('/admin/privileges', {
-            search: '',
-            status: 'all',
-            discount_type: 'all',
-            requires_verification: 'all',
-            requires_id_number: 'all',
-            sort_by: 'name',
-            sort_order: 'asc'
-        }, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+        setStatusFilter('all');
+        setDiscountTypeFilter('all');
+        setAssignmentsRange('');
+        setDiscountPercentageRange('');
+        setRequiresVerificationFilter('all');
+        setRequiresIdNumberFilter('all');
+        setSortBy('name');
+        setSortOrder('asc');
+        setCurrentPage(1);
+    }, []);
 
-    const handleClearSelection = () => {
+    const handleClearSelection = useCallback(() => {
         setSelectedPrivileges([]);
         setIsSelectAll(false);
-    };
+    }, []);
 
-    const handleCopySelectedData = () => {
+    const handleCopySelectedData = useCallback(() => {
         if (selectedPrivilegesData.length === 0) {
             toast.error('No data to copy');
             return;
@@ -514,8 +607,8 @@ export default function PrivilegesIndex({
         const data = selectedPrivilegesData.map(privilege => ({
             'Name': privilege.name,
             'Code': privilege.code,
-            'Discount %': privilege.default_discount_percentage,
-            'Type': privilege.discount_type?.name || 'N/A',
+            'Discount %': privilege?.discountType?.percentage || 0,
+            'Type': privilege.discountType?.name || 'N/A',
             'Status': privilege.is_active ? 'Active' : 'Inactive',
             'Assignments': privilege.residents_count || 0,
             'Active': privilege.active_residents_count || 0,
@@ -531,38 +624,72 @@ export default function PrivilegesIndex({
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
+    }, [selectedPrivilegesData]);
+
+    const updateFilter = useCallback((key: keyof PrivilegeFilters, value: string) => {
+        switch (key) {
+            case 'status':
+                setStatusFilter(value);
+                break;
+            case 'discount_type':
+                setDiscountTypeFilter(value);
+                break;
+        }
+    }, []);
+
+    const hasActiveFilters = Boolean(
+        search || 
+        (statusFilter && statusFilter !== 'all') ||
+        (discountTypeFilter && discountTypeFilter !== 'all') ||
+        assignmentsRange ||
+        discountPercentageRange
+    );
+
+    // Create filters object for the Filters component
+    const filtersStateForComponent = {
+        status: statusFilter,
+        discount_type: discountTypeFilter,
     };
 
-    const updateFilter = (key: keyof PrivilegeFilters, value: string) => {
-        setFiltersState(prev => ({ ...prev, [key]: value }));
+    // Keyboard shortcuts
+    useEffect(() => {
+        if (isMobile) return;
         
-        const params = {
-            ...filtersState,
-            [key]: value,
-            search: search
-        };
-        
-        Object.keys(params).forEach(key => {
-            const k = key as keyof typeof params;
-            if (!params[k] || params[k] === 'all') {
-                delete params[k];
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleSelectAllFiltered();
+                } else {
+                    handleSelectAllOnPage();
+                }
             }
-        });
-        
-        router.get('/admin/privileges', params, {
-            preserveState: true,
-            replace: true,
-            preserveScroll: true,
-        });
-    };
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    if (selectedPrivileges.length > 0) {
+                        setSelectedPrivileges([]);
+                    } else {
+                        setIsBulkMode(false);
+                    }
+                }
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(!isBulkMode);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedPrivileges.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
 
-  const hasActiveFilters = Boolean(
-    search || 
-    filtersState.status !== 'all' ||
-    filtersState.discount_type !== 'all' ||
-    filtersState.requires_verification !== 'all' ||
-    filtersState.requires_id_number !== 'all'
-);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedPrivileges, isMobile]);
 
     return (
         <AppLayout
@@ -592,9 +719,8 @@ export default function PrivilegesIndex({
                         setSearch={setSearch}
                         onSearchChange={(value) => {
                             setSearch(value);
-                            debouncedSearch(value);
                         }}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         updateFilter={updateFilter}
                         showAdvancedFilters={showAdvancedFilters}
                         setShowAdvancedFilters={setShowAdvancedFilters}
@@ -607,6 +733,10 @@ export default function PrivilegesIndex({
                         searchInputRef={searchInputRef}
                         isLoading={isPerformingBulkAction}
                         discountTypes={discountTypes}
+                        assignmentsRange={assignmentsRange}
+                        setAssignmentsRange={setAssignmentsRange}
+                        discountPercentageRange={discountPercentageRange}
+                        setDiscountPercentageRange={setDiscountPercentageRange}
                     />
 
                     <PrivilegesContent
@@ -638,12 +768,16 @@ export default function PrivilegesIndex({
                         onCopySelectedData={handleCopySelectedData}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
-                        filtersState={filtersState}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
                         discountTypes={discountTypes}
                         can={can}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
                     />
 
                     {/* Keyboard Shortcuts Help */}

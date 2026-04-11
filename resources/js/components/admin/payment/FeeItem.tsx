@@ -22,35 +22,9 @@ import {
     X
 } from 'lucide-react';
 
-// Updated Fee interface to match your main component
-interface Fee {
-    id: string | number;
-    name: string;
-    code: string;
-    description?: string;
-    base_amount: number | string;
-    category: 'tax' | 'clearance' | 'certificate' | 'service' | 'rental' | 'fine' | 'business' | 'document' | 'other';
-    frequency: string;
-    has_surcharge?: boolean;
-    surcharge_rate?: number;
-    surcharge_fixed?: number;
-    has_penalty?: boolean;
-    penalty_rate?: number;
-    penalty_fixed?: number;
-    validity_days?: number;
-    applicable_to?: string[];
-    is_active?: boolean;
-    processing_days?: number;
-}
+import { OutstandingFee, Fee, FeeItemProps } from '@/types/admin/payments/payments';
 
-interface FeeItemProps {
-    fee: Fee;
-    handleFeeSelection: (fee: Fee) => void;
-    isSelected?: boolean;
-    showDetails?: boolean;
-    compact?: boolean;
-    disabled?: boolean;
-}
+
 
 // Helper functions
 function formatCurrency(amount: number): string {

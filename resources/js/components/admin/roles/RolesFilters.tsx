@@ -1,10 +1,12 @@
 // components/admin/roles/RolesFilters.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Search, Filter, Download, X, FilterX, Shield, Edit, AlertCircle } from 'lucide-react';
-import { FilterState } from '@/admin-utils/rolesUtils';
+import { Search, Filter, Download, X, FilterX, Users, Shield, Lock, Unlock } from 'lucide-react';
+import { FilterState } from '@/types/admin/roles/roles';
+import { RefObject } from 'react';
 
 interface RolesFiltersProps {
     search: string;
@@ -19,9 +21,14 @@ interface RolesFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef: React.RefObject<HTMLInputElement>;
+    searchInputRef: RefObject<HTMLInputElement | null>;
     handleExport: () => void;
     isLoading?: boolean;
+    // New filters
+    usersRange?: string;
+    setUsersRange?: (value: string) => void;
+    permissionsRange?: string;
+    setPermissionsRange?: (value: string) => void;
 }
 
 export default function RolesFilters({
@@ -39,7 +46,11 @@ export default function RolesFilters({
     endIndex,
     searchInputRef,
     handleExport,
-    isLoading = false
+    isLoading = false,
+    usersRange = '',
+    setUsersRange,
+    permissionsRange = '',
+    setPermissionsRange
 }: RolesFiltersProps) {
     
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,37 +61,36 @@ export default function RolesFilters({
         setSearch('');
     };
 
-    const quickFilterActions = [
-        {
-            label: 'System Roles',
-            icon: <Shield className="h-4 w-4" />,
-            action: () => updateFilter('type', 'system'),
-            active: filtersState.type === 'system',
-            lightColor: 'text-purple-700 bg-purple-50 border-purple-200',
-            darkColor: 'dark:text-purple-400 dark:bg-purple-950/50 dark:border-purple-800'
-        },
-        {
-            label: 'Custom Roles',
-            icon: <Edit className="h-4 w-4" />,
-            action: () => updateFilter('type', 'custom'),
-            active: filtersState.type === 'custom',
-            lightColor: 'text-green-700 bg-green-50 border-green-200',
-            darkColor: 'dark:text-green-400 dark:bg-green-950/50 dark:border-green-800'
-        },
-        {
-            label: 'All Roles',
-            icon: <Shield className="h-4 w-4" />,
-            action: () => updateFilter('type', 'all'),
-            active: filtersState.type === 'all',
-            lightColor: 'text-blue-700 bg-blue-50 border-blue-200',
-            darkColor: 'dark:text-blue-400 dark:bg-blue-950/50 dark:border-blue-800'
-        },
+    // Users count range options
+    const usersRanges = [
+        { value: '', label: 'All Roles' },
+        { value: '0', label: 'No Users Assigned (0)' },
+        { value: '1-5', label: 'Few Users (1-5)' },
+        { value: '6-10', label: 'Moderate Users (6-10)' },
+        { value: '11-20', label: 'Many Users (11-20)' },
+        { value: '20+', label: 'Popular Role (20+)' }
     ];
+
+    // Permissions count range options
+    const permissionsRanges = [
+        { value: '', label: 'All Roles' },
+        { value: '0', label: 'No Permissions (0)' },
+        { value: '1-5', label: 'Limited Access (1-5)' },
+        { value: '6-10', label: 'Standard Access (6-10)' },
+        { value: '11-20', label: 'Extended Access (11-20)' },
+        { value: '20+', label: 'Full Access (20+)' }
+    ];
+
+    // Convert hasActiveFilters to boolean
+    const activeFilters = typeof hasActiveFilters === 'string' 
+        ? hasActiveFilters === 'true' || hasActiveFilters === '1'
+        : Boolean(hasActiveFilters);
 
     return (
         <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
             <CardContent className="pt-6">
                 <div className="flex flex-col space-y-4">
+                    {/* Search Bar */}
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
@@ -91,11 +101,6 @@ export default function RolesFilters({
                                 value={search}
                                 onChange={handleSearchChange}
                                 disabled={isLoading}
-                                onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                        // Search is debounced, so no action needed here
-                                    }
-                                }}
                             />
                             {search && !isLoading && (
                                 <Button
@@ -103,7 +108,6 @@ export default function RolesFilters({
                                     size="sm"
                                     className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                                     onClick={clearSearch}
-                                    disabled={isLoading}
                                 >
                                     <X className="h-3 w-3" />
                                 </Button>
@@ -111,9 +115,9 @@ export default function RolesFilters({
                         </div>
                         <div className="flex gap-2">
                             <Button 
-                                variant="outline"
-                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                variant="outline" 
                                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 disabled={isLoading}
                             >
                                 <Filter className="h-4 w-4 mr-2" />
@@ -136,89 +140,21 @@ export default function RolesFilters({
                         </div>
                     </div>
 
-                    {/* Advanced Filters */}
-                    {showAdvancedFilters && (
-                        <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {/* Type Filter */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role Type</Label>
-                                    <select
-                                        className="w-full border rounded px-2 py-2 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
-                                        value={filtersState.type}
-                                        onChange={(e) => updateFilter('type', e.target.value)}
-                                        disabled={isLoading}
-                                    >
-                                        <option value="all" className="bg-white dark:bg-gray-900">All Types</option>
-                                        <option value="custom" className="bg-white dark:bg-gray-900">Custom Roles</option>
-                                        <option value="system" className="bg-white dark:bg-gray-900">System Roles</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Quick Filter Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                        {quickFilterActions.map((filter, index) => (
-                            <Button
-                                key={index}
-                                variant="outline"
-                                size="sm"
-                                onClick={filter.action}
-                                disabled={isLoading}
-                                className={`
-                                    h-7 text-xs
-                                    bg-white dark:bg-gray-900
-                                    border-gray-200 dark:border-gray-700
-                                    text-gray-700 dark:text-gray-300
-                                    hover:bg-gray-100 dark:hover:bg-gray-700
-                                    ${filter.active ? `${filter.lightColor} ${filter.darkColor}` : ''}
-                                `}
-                            >
-                                {filter.icon}
-                                <span className="ml-1">{filter.label}</span>
-                            </Button>
-                        ))}
-                    </div>
-
-                    {/* Active Filters Summary */}
-                    {hasActiveFilters && (
-                        <div className="flex items-center gap-2 text-sm bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                            <span className="flex-1">
-                                Active filters applied.
-                                {search && ` Search: "${search}"`}
-                                {filtersState.type !== 'all' && ` Type: ${filtersState.type} roles`}
-                            </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleClearFilters}
-                                disabled={isLoading}
-                                className="text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 h-7 px-2"
-                            >
-                                Clear all
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* Active filters indicator and clear button */}
+                    {/* Active Filters Info and Clear Button */}
                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                             Showing {startIndex} to {endIndex} of {totalItems} roles
                             {search && ` matching "${search}"`}
-                            {filtersState.type !== 'all' && ` (${filtersState.type} roles)`}
                         </div>
                         
                         <div className="flex items-center gap-3">
-                            {hasActiveFilters && !showAdvancedFilters && (
+                            {activeFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleClearFilters}
                                     disabled={isLoading}
-                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 h-8"
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
                                 >
                                     <FilterX className="h-3.5 w-3.5 mr-1" />
                                     Clear Filters
@@ -227,13 +163,249 @@ export default function RolesFilters({
                         </div>
                     </div>
 
-                    {/* Loading indicator */}
-                    {isLoading && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 animate-pulse">
-                            Updating...
+                    {/* Basic Filters - Role Type + Users Range + Permissions Range */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <Shield className="h-3 w-3" />
+                                Role Type
+                            </Label>
+                            <select
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                value={filtersState.type || 'all'}
+                                onChange={(e) => updateFilter('type', e.target.value)}
+                                disabled={isLoading}
+                            >
+                                <option value="all">All Types</option>
+                                <option value="custom">Custom Roles</option>
+                                <option value="system">System Roles</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                Users Count
+                            </Label>
+                            <select
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                value={usersRange}
+                                onChange={(e) => setUsersRange?.(e.target.value)}
+                                disabled={isLoading}
+                            >
+                                {usersRanges.map(range => (
+                                    <option key={range.value} value={range.value}>
+                                        {range.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <Lock className="h-3 w-3" />
+                                Permissions Count
+                            </Label>
+                            <select
+                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                value={permissionsRange}
+                                onChange={(e) => setPermissionsRange?.(e.target.value)}
+                                disabled={isLoading}
+                            >
+                                {permissionsRanges.map(range => (
+                                    <option key={range.value} value={range.value}>
+                                        {range.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Advanced Filters */}
+                    {showAdvancedFilters && (
+                        <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Quick Filters</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Quick Type Filters */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Type</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                updateFilter('type', 'all');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            All Roles
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                updateFilter('type', 'custom');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Custom Roles
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                updateFilter('type', 'system');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            System Roles
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Quick Users Filters */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Users</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                setUsersRange?.('0');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Unassigned Roles
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                setUsersRange?.('1-5');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Light Usage
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                setUsersRange?.('20+');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Popular Roles
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Quick Permissions Filters */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Permissions</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                setPermissionsRange?.('0');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            No Permissions
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                setPermissionsRange?.('1-5');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Limited Access
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                setPermissionsRange?.('20+');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Full Access
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Reset Options */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reset Options</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={() => {
+                                                setUsersRange?.('');
+                                                setPermissionsRange?.('');
+                                                setShowAdvancedFilters(false);
+                                            }}
+                                            disabled={isLoading}
+                                        >
+                                            Clear Ranges
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs"
+                                            onClick={handleClearFilters}
+                                            disabled={isLoading}
+                                        >
+                                            Clear All
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Information Section */}
+                            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Information</h4>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                                    <p>• <span className="font-medium">System roles</span> - Built-in roles that cannot be deleted</p>
+                                    <p>• <span className="font-medium">Custom roles</span> - User-created roles that can be modified</p>
+                                    <p>• <span className="font-medium">Users count</span> - Number of users assigned to this role</p>
+                                    <p>• <span className="font-medium">Permissions count</span> - Number of permissions this role has</p>
+                                    <p>• Use the table header to sort by any column</p>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
+                
+                {/* Loading indicator */}
+                {isLoading && (
+                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 animate-pulse">
+                        Updating...
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

@@ -6,6 +6,7 @@ import {
     Plus,
     Award
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PrivilegesHeaderProps {
     isBulkMode: boolean;
@@ -23,51 +24,47 @@ export default function PrivilegesHeader({
     return (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
+                <h1 className="text-2xl font-bold tracking-tight dark:text-white">
                     Privilege Management
                 </h1>
-                <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Manage resident privileges, discounts, and benefits
                 </p>
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsBulkMode(!isBulkMode)}
-                    className={`
-                        h-9 
-                        bg-white dark:bg-gray-900 
-                        border-gray-200 dark:border-gray-700
-                        text-gray-700 dark:text-gray-300
-                        hover:bg-gray-100 dark:hover:bg-gray-700
-                        ${isBulkMode ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50' : ''}
-                    `}
-                >
-                    {isBulkMode ? (
-                        <>
-                            <Layers className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">Bulk Mode</span>
-                            <span className="sm:hidden">Bulk</span>
-                        </>
-                    ) : (
-                        <>
-                            <MousePointer className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">Bulk Select</span>
-                            <span className="sm:hidden">Select</span>
-                        </>
-                    )}
-                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsBulkMode(!isBulkMode)}
+                            className={isBulkMode ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400' : ''}
+                        >
+                            {isBulkMode ? (
+                                <>
+                                    <Layers className="h-4 w-4 mr-2" />
+                                    Bulk Mode
+                                </>
+                            ) : (
+                                <>
+                                    <MousePointer className="h-4 w-4 mr-2" />
+                                    Bulk Select
+                                </>
+                            )}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Toggle Bulk Mode (Ctrl+Shift+B)</p>
+                        <p className="text-xs text-gray-500">Select multiple privileges for batch operations</p>
+                    </TooltipContent>
+                </Tooltip>
                 
                 {canCreate && (
                     <Link href="/admin/privileges/privileges/create">
-                        <Button 
-                            size="sm"
-                            className="h-9 bg-primary-600 hover:bg-primary-700 text-white dark:bg-primary-600 dark:hover:bg-primary-700"
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">Add Privilege</span>
-                            <span className="sm:hidden">Add</span>
+                        <Button asChild>
+                            <a>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Privilege
+                            </a>
                         </Button>
                     </Link>
                 )}

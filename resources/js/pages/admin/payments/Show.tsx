@@ -78,7 +78,7 @@ export default function PaymentShow() {
         relatedPayments = [], 
         paymentBreakdown,
         discountDetails = [],
-        history = [], // Add history prop
+        history = [],
     } = usePage<PageProps>().props;
     
     const [copied, setCopied] = useState(false);
@@ -121,7 +121,7 @@ export default function PaymentShow() {
         });
     };
 
-    // Prepare receipt data for printing - FIX: Add safe check for payment.items
+    // Prepare receipt data for printing
     const receiptData = useMemo(() => ({
         id: payment.id,
         receipt_number: payment.or_number,
@@ -232,11 +232,9 @@ export default function PaymentShow() {
                             getStatusIcon={getStatusIcon}
                             getMethodIcon={getMethodIcon} 
                             onEmailReceipt={() => {
-                                // TODO: Implement email receipt
                                 console.log('Email receipt');
                             }} 
                             onExportPDF={() => {
-                                // TODO: Implement export PDF
                                 console.log('Export PDF');
                             }}                        
                         />
@@ -298,9 +296,14 @@ export default function PaymentShow() {
                                 </div>
                             </AdminTabPanel>
 
-                            {/* Items Tab */}
+                            {/* Items Tab - UPDATED with discount props */}
                             <AdminTabPanel value="items">
-                                <PaymentItemsTable items={payment.items || []} />
+                                <PaymentItemsTable 
+                                    items={payment.items || []}
+                                    discountAmount={payment.discount}
+                                    discountCode={payment.discount_code}
+                                    discountType={payment.discount_type}
+                                />
                                 {!hasItems && (
                                     <Card className="dark:bg-gray-900">
                                         <CardContent className="py-12">

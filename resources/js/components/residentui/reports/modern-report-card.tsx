@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { STATUS_CONFIG, URGENCY_CONFIG } from './constants';
+import { STATUS_CONFIG, URGENCY_CONFIG } from '@/components/residentui/reports/constants';
 
 interface ModernReportCardProps {
     report: any;

@@ -66,6 +66,7 @@ export interface Resident {
 
 // Resident Privilege Type
 export interface ResidentPrivilege {
+    code(code: any): unknown;
     discount_percentage: any;
     id: number;
     resident_id: number;
@@ -125,6 +126,7 @@ export interface Household {
 
 // Household Membership Type
 export interface HouseholdMembership {
+    relationship_to_head(relationship_to_head: any): string;
     id: number;
     household_id: number;
     resident_id: number;

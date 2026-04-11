@@ -1,11 +1,11 @@
 // /Pages/resident/Forms/Index.tsx
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Head, router, usePage } from '@inertiajs/react';
+import { useState, useEffect, useMemo } from 'react';
+import { Head, usePage, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, FileText, Download, Clock, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { AlertCircle, FileText, Download, Clock } from 'lucide-react';
 
 // Reusable Components
 import { CustomTabs } from '@/components/residentui/CustomTabs';
@@ -15,9 +15,10 @@ import { ModernPagination } from '@/components/residentui/modern-pagination';
 import { ModernLoadingOverlay } from '@/components/residentui/modern-loading-overlay';
 import { ModernSelectionBanner } from '@/components/residentui/modern-selection-banner';
 
-// Form-specific components - Updated paths
+// Form-specific components
 import { ModernFormCard } from '@/components/residentui/forms/modern-form-card';
 import { ModernFormGridCard } from '@/components/residentui/forms/modern-form-grid-card';
+import { ModernFormMobileListView } from '@/components/residentui/forms/modern-form-mobile-list-view'; // New import
 import { ModernFormTable } from '@/components/residentui/forms/modern-form-table';
 import { ModernFormFilters } from '@/components/residentui/forms/modern-form-filters';
 import { MobileHeader } from '@/components/portal/forms/index/MobileHeader';
@@ -27,9 +28,8 @@ import { CollapsibleStats } from '@/components/portal/forms/index/CollapsibleSta
 import { DesktopStats } from '@/components/portal/forms/index/DesktopStats';
 import { FilterModalContent } from '@/components/portal/forms/index/FilterModalContent';
 
-
 // Types and Utils
-import type { Form, PaginationData, Stats, FormFilters } from '@/types/portal/forms/form.types';
+import type { Form, PaginationData, Stats } from '@/types/portal/forms/form.types';
 import { FORM_TABS, SORT_OPTIONS, getCategoryColor, getAgencyIcon, getFileTypeIcon, getFileTypeColor } from '@/components/residentui/forms/constants';
 import { 
     formatDate, 
@@ -37,24 +37,23 @@ import {
     formatFileSize, 
     truncateText, 
     copyToClipboard,
-    getFormStatsCards,
     getStatusCount 
 } from '@/utils/portal/forms/form-utils';
 
 interface PageProps extends Record<string, any> {
     forms: PaginationData;
-    filters: FormFilters;
+    stats: Stats;
     categories: string[];
     agencies: string[];
-    stats: Stats;
     error?: string;
 }
 
 export default function FormsIndex() {
-    const page = usePage<PageProps>();
-    const pageProps = page.props;
+    const { props } = usePage<PageProps>();
     
-    const forms = pageProps.forms || {
+    // Extract the forms array from paginated data
+    const allForms = props.forms?.data || [];
+    const forms = props.forms || {
         data: [],
         current_page: 1,
         last_page: 1,
@@ -64,7 +63,7 @@ export default function FormsIndex() {
         to: 0,
     };
     
-    const stats = pageProps.stats || {
+    const stats = props.stats || {
         total: 0,
         active: 0,
         downloads: 0,
@@ -74,15 +73,18 @@ export default function FormsIndex() {
         popular_agencies: [],
     };
     
-    const categories = pageProps.categories || [];
-    const agencies = pageProps.agencies || [];
-    const filters = pageProps.filters || {};
+    const categories = props.categories || [];
+    const agencies = props.agencies || [];
     
-    const [search, setSearch] = useState(filters.search || '');
-    const [categoryFilter, setCategoryFilter] = useState(filters.category || 'all');
-    const [agencyFilter, setAgencyFilter] = useState(filters.agency || 'all');
-    const [sortBy, setSortBy] = useState(filters.sort_by || 'created_at');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(filters.sort_order === 'asc' ? 'asc' : 'desc');
+    // CLIENT-SIDE FILTER STATE
+    const [search, setSearch] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [agencyFilter, setAgencyFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('created_at');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [activeTab, setActiveTab] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    
     const [loading, setLoading] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [showStats, setShowStats] = useState(true);
@@ -91,10 +93,8 @@ export default function FormsIndex() {
     const [isExporting, setIsExporting] = useState(false);
     const [selectMode, setSelectMode] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [activeTab, setActiveTab] = useState('all');
     
-    const hasInitialized = useRef(false);
-    const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+    const itemsPerPage = 15;
     
     // Check if mobile on mount and resize
     useEffect(() => {
@@ -111,162 +111,162 @@ export default function FormsIndex() {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
     
-    // Initialize filters from props
-    useEffect(() => {
-        if (!hasInitialized.current) {
-            setSearch(filters.search || '');
-            setCategoryFilter(filters.category || 'all');
-            setAgencyFilter(filters.agency || 'all');
-            setSortBy(filters.sort_by || 'created_at');
-            setSortOrder(filters.sort_order === 'asc' ? 'asc' : 'desc');
-            hasInitialized.current = true;
-        }
-    }, [filters]);
-    
-    // Search debounce
-    useEffect(() => {
-        if (!hasInitialized.current) return;
-        if (search === '' && !filters.search) return;
-        if (search === filters.search) return;
+    // CLIENT-SIDE FILTERING
+    const filteredForms = useMemo(() => {
+        let filtered = [...allForms];
         
-        if (searchTimeout.current) {
-            clearTimeout(searchTimeout.current);
-        }
-        
-        searchTimeout.current = setTimeout(() => {
-            updateFilters({ 
-                search: search.trim(),
-                page: '1'
+        // Tab filter
+        if (activeTab === 'popular') {
+            filtered = filtered.filter(form => form.download_count > 0);
+        } else if (activeTab === 'recent') {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            filtered = filtered.filter(form => {
+                const createdDate = new Date(form.created_at);
+                return createdDate >= thirtyDaysAgo;
             });
-        }, 800);
-        
-        return () => {
-            if (searchTimeout.current) {
-                clearTimeout(searchTimeout.current);
-            }
-        };
-    }, [search]);
-    
-    const updateFilters = (newFilters: Record<string, string>) => {
-        setLoading(true);
-        
-        const updatedFilters = {
-            ...filters,
-            ...newFilters,
-        };
-        
-        const cleanFilters: Record<string, string> = {};
-        
-        Object.entries(updatedFilters).forEach(([key, value]) => {
-            if (key === 'page' && value === '1') return;
-            if (value && value !== '' && value !== 'all' && value !== undefined) {
-                cleanFilters[key] = value;
-            }
-        });
-        
-        router.get('/portal/forms', cleanFilters, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-            onFinish: () => setLoading(false),
-        });
-    };
-    
-    const handleTabChange = (tab: string) => {
-        setActiveTab(tab);
-        
-        let sortField = 'created_at';
-        let sortDir: 'asc' | 'desc' = 'desc';
-        
-        if (tab === 'popular') {
-            sortField = 'download_count';
-            sortDir = 'desc';
-        } else if (tab === 'recent') {
-            sortField = 'created_at';
-            sortDir = 'desc';
         }
         
-        setSortBy(sortField);
-        setSortOrder(sortDir);
+        // Search filter
+        if (search) {
+            const query = search.toLowerCase();
+            filtered = filtered.filter(form => 
+                form.title?.toLowerCase().includes(query) ||
+                form.description?.toLowerCase().includes(query) ||
+                form.category?.toLowerCase().includes(query) ||
+                form.issuing_agency?.toLowerCase().includes(query)
+            );
+        }
         
-        updateFilters({ 
-            sort_by: sortField,
-            sort_order: sortDir,
-            page: '1'
+        // Category filter
+        if (categoryFilter !== 'all') {
+            filtered = filtered.filter(form => 
+                form.category?.toLowerCase() === categoryFilter.toLowerCase()
+            );
+        }
+        
+        // Agency filter
+        if (agencyFilter !== 'all') {
+            filtered = filtered.filter(form => 
+                form.issuing_agency?.toLowerCase() === agencyFilter.toLowerCase()
+            );
+        }
+        
+        // Sorting
+        filtered.sort((a, b) => {
+            let aValue: any;
+            let bValue: any;
+            
+            switch (sortBy) {
+                case 'title':
+                    aValue = a.title?.toLowerCase() || '';
+                    bValue = b.title?.toLowerCase() || '';
+                    break;
+                case 'download_count':
+                    aValue = a.download_count || 0;
+                    bValue = b.download_count || 0;
+                    break;
+                case 'category':
+                    aValue = a.category?.toLowerCase() || '';
+                    bValue = b.category?.toLowerCase() || '';
+                    break;
+                case 'issuing_agency':
+                    aValue = a.issuing_agency?.toLowerCase() || '';
+                    bValue = b.issuing_agency?.toLowerCase() || '';
+                    break;
+                case 'created_at':
+                default:
+                    aValue = new Date(a.created_at || 0).getTime();
+                    bValue = new Date(b.created_at || 0).getTime();
+                    break;
+            }
+            
+            if (sortOrder === 'asc') {
+                return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+            } else {
+                return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+            }
         });
         
-        if (isMobile) setShowMobileFilters(false);
-    };
+        return filtered;
+    }, [allForms, activeTab, search, categoryFilter, agencyFilter, sortBy, sortOrder]);
     
-    const handleCategoryChange = (category: string) => {
-        setCategoryFilter(category);
-        updateFilters({ 
-            category: category === 'all' ? '' : category,
-            page: '1'
-        });
-        if (isMobile) setShowMobileFilters(false);
-    };
+    // Pagination
+    const totalPages = Math.ceil(filteredForms.length / itemsPerPage);
+    const paginatedForms = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        return filteredForms.slice(start, end);
+    }, [filteredForms, currentPage]);
     
-    const handleAgencyChange = (agency: string) => {
-        setAgencyFilter(agency);
-        updateFilters({ 
-            agency: agency === 'all' ? '' : agency,
-            page: '1'
-        });
+    // Reset to first page when filters change
+    const handleFilterChange = (filterType: string, value: string) => {
+        setCurrentPage(1);
+        
+        switch (filterType) {
+            case 'tab':
+                setActiveTab(value);
+                if (value === 'popular') {
+                    setSortBy('download_count');
+                    setSortOrder('desc');
+                } else if (value === 'recent') {
+                    setSortBy('created_at');
+                    setSortOrder('desc');
+                } else {
+                    setSortBy('created_at');
+                    setSortOrder('desc');
+                }
+                break;
+            case 'search':
+                setSearch(value);
+                break;
+            case 'category':
+                setCategoryFilter(value);
+                break;
+            case 'agency':
+                setAgencyFilter(value);
+                break;
+            case 'sort':
+                setSortBy(value);
+                break;
+        }
+        
+        setSelectedForms([]);
+        setSelectMode(false);
         if (isMobile) setShowMobileFilters(false);
-    };
-    
-    const handleSortChange = (sort: string) => {
-        setSortBy(sort);
-        updateFilters({ 
-            sort_by: sort,
-            page: '1'
-        });
     };
     
     const handleSortOrderToggle = () => {
-        const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-        setSortOrder(newOrder);
-        updateFilters({ 
-            sort_order: newOrder,
-            page: '1'
-        });
+        setCurrentPage(1);
+        setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
     };
     
-    const handleClearFilters = () => {
+    const hasActiveFilters = search !== '' || 
+                            categoryFilter !== 'all' || 
+                            agencyFilter !== 'all' ||
+                            activeTab !== 'all';
+    
+    const clearFilters = () => {
         setSearch('');
         setCategoryFilter('all');
         setAgencyFilter('all');
         setSortBy('created_at');
         setSortOrder('desc');
         setActiveTab('all');
-        
-        router.get('/portal/forms', {}, {
-            preserveState: true,
-            preserveScroll: true,
-            onFinish: () => setLoading(false),
-        });
+        setCurrentPage(1);
         
         if (isMobile) setShowMobileFilters(false);
+        setSelectedForms([]);
+        setSelectMode(false);
+    };
+    
+    const handleTabChange = (tab: string) => {
+        handleFilterChange('tab', tab);
     };
     
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (searchTimeout.current) {
-            clearTimeout(searchTimeout.current);
-        }
-        updateFilters({ 
-            search: search.trim(),
-            page: '1'
-        });
-    };
-    
-    const handleSearchClear = () => {
-        setSearch('');
-        updateFilters({ 
-            search: '',
-            page: '1'
-        });
+        // Search is already applied via useMemo
     };
     
     // Selection mode functions
@@ -277,11 +277,10 @@ export default function FormsIndex() {
     };
     
     const selectAllForms = () => {
-        const currentForms = forms.data;
-        if (selectedForms.length === currentForms.length && currentForms.length > 0) {
+        if (selectedForms.length === paginatedForms.length && paginatedForms.length > 0) {
             setSelectedForms([]);
         } else {
-            setSelectedForms(currentForms.map(f => f.id));
+            setSelectedForms(paginatedForms.map(f => f.id));
         }
     };
     
@@ -296,10 +295,12 @@ export default function FormsIndex() {
     
     const handleDownloadSelected = () => {
         toast.info(`Download functionality for ${selectedForms.length} forms would be implemented here`);
+        setSelectedForms([]);
+        setSelectMode(false);
     };
     
     const handleViewDetails = (id: number) => {
-        router.visit(`/portal/forms/${id}`);
+        window.location.href = `/portal/forms/${id}`;
     };
     
     const handleDownloadForm = (form: Form) => {
@@ -319,15 +320,30 @@ export default function FormsIndex() {
         const reportWindow = window.open('', '_blank');
         if (reportWindow) {
             reportWindow.document.write(`
-                <h1>Form Details: ${form.title}</h1>
-                <p><strong>Category:</strong> ${form.category}</p>
-                <p><strong>Agency:</strong> ${form.issuing_agency}</p>
-                <p><strong>Description:</strong> ${form.description}</p>
-                <p><strong>Downloads:</strong> ${form.download_count.toLocaleString()}</p>
-                <p><strong>File Size:</strong> ${formatFileSize(form.file_size)}</p>
-                <p><strong>File Type:</strong> ${form.file_type}</p>
-                <p><strong>Uploaded:</strong> ${formatDateTime(form.created_at)}</p>
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Form Details: ${form.title}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h1 { color: #333; }
+                        .detail { margin: 10px 0; }
+                        .label { font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Form Details: ${form.title}</h1>
+                    <div class="detail"><span class="label">Category:</span> ${form.category}</div>
+                    <div class="detail"><span class="label">Agency:</span> ${form.issuing_agency}</div>
+                    <div class="detail"><span class="label">Description:</span> ${form.description || 'N/A'}</div>
+                    <div class="detail"><span class="label">Downloads:</span> ${form.download_count.toLocaleString()}</div>
+                    <div class="detail"><span class="label">File Size:</span> ${formatFileSize(form.file_size)}</div>
+                    <div class="detail"><span class="label">File Type:</span> ${form.file_type}</div>
+                    <div class="detail"><span class="label">Uploaded:</span> ${formatDateTime(form.created_at)}</div>
+                </body>
+                </html>
             `);
+            reportWindow.document.close();
         }
     };
     
@@ -335,20 +351,16 @@ export default function FormsIndex() {
         toast.info('Report issue feature would open a form');
     };
     
-    const getCurrentForms = () => forms.data;
-    
-    const hasActiveFilters = useMemo(() => {
-        return Object.entries(filters).some(([key, value]) => 
-            key !== 'page' && value && value !== '' && value !== 'all'
-        );
-    }, [filters]);
-    
     const handlePrint = () => {
         toast.info('Print functionality would be implemented here');
     };
     
     const handleExport = () => {
-        toast.info('Export functionality would be implemented here');
+        setIsExporting(true);
+        setTimeout(() => {
+            toast.info('Export functionality would be implemented here');
+            setIsExporting(false);
+        }, 1000);
     };
     
     const handleCopySummary = async () => {
@@ -358,6 +370,7 @@ export default function FormsIndex() {
             `Total Downloads: ${stats.downloads.toLocaleString()}\n` +
             `Categories: ${stats.categories_count}\n` +
             `Agencies: ${stats.agencies_count}\n\n` +
+            `Filtered Results: ${filteredForms.length}\n` +
             `Generated on: ${new Date().toLocaleDateString()}\n` +
             `View online: ${window.location.origin}/portal/forms`;
         
@@ -369,166 +382,16 @@ export default function FormsIndex() {
         window.location.href = `mailto:?subject=${encodeURIComponent(subject)}`;
     };
     
-    const handlePageChange = (page: number) => {
-        updateFilters({ page: page.toString() });
-    };
-    
     const formatNumber = (num: number) => num.toLocaleString();
     
-    const renderTabContent = () => {
-        const currentForms = getCurrentForms();
-        const tabHasData = currentForms.length > 0;
-        
-        const displayTab = activeTab === 'all' ? 'All' : 
-                          activeTab === 'popular' ? 'Most Downloaded' : 'Recently Added';
-        
-        return (
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
-                <CardContent className="p-4 md:p-6">
-                    <ModernSelectionBanner
-                        selectedCount={selectedForms.length}
-                        totalCount={currentForms.length}
-                        onSelectAll={selectAllForms}
-                        onDeselectAll={() => setSelectedForms([])}
-                        onCancel={() => {
-                            setSelectMode(false);
-                            setSelectedForms([]);
-                        }}
-                        onDelete={handleDownloadSelected}
-                        deleteLabel="Download Selected"
-                    />
-                    
-                    <TabHeader
-                        displayTab={displayTab}
-                        count={currentForms.length}
-                        selectMode={selectMode}
-                        selectedCount={selectedForms.length}
-                        hasFilters={categoryFilter !== 'all' || agencyFilter !== 'all' || !!search}
-                        viewMode={viewMode}
-                        setViewMode={setViewMode}
-                        sortBy={sortBy}
-                        sortOrder={sortOrder}
-                        onSortChange={handleSortChange}
-                        onSortOrderToggle={handleSortOrderToggle}
-                        onToggleSelectMode={toggleSelectMode}
-                        tabHasData={tabHasData}
-                    />
-                    
-                    {!tabHasData ? (
-                        <ModernEmptyState
-                            status={activeTab}
-                            hasFilters={hasActiveFilters}
-                            onClearFilters={handleClearFilters}
-                            icon={activeTab === 'all' ? FileText : 
-                                  activeTab === 'popular' ? Download :
-                                  activeTab === 'recent' ? Clock : FileText}
-                            title={`No ${activeTab === 'all' ? '' : activeTab} forms found`}
-                            message={hasActiveFilters 
-                                ? 'Try adjusting your filters or search criteria' 
-                                : 'There are currently no forms available in this category'}
-                        />
-                    ) : (
-                        <>
-                            {viewMode === 'grid' && (
-                                <>
-                                    {isMobile && (
-                                        <div className="pb-4">
-                                            {currentForms.map((form) => (
-                                                <ModernFormCard
-                                                    key={form.id}
-                                                    form={form}
-                                                    selectMode={selectMode}
-                                                    selectedForms={selectedForms}
-                                                    toggleSelectForm={toggleSelectForm}
-                                                    formatDate={(date) => formatDate(date, true)}
-                                                    formatFileSize={formatFileSize}
-                                                    getCategoryColor={getCategoryColor}
-                                                    getAgencyIcon={getAgencyIcon}
-                                                    getFileTypeIcon={getFileTypeIcon}
-                                                    getFileTypeColor={getFileTypeColor}
-                                                    truncateText={truncateText}
-                                                    onCopyLink={handleCopyLink}
-                                                    onCopyTitle={handleCopyTitle}
-                                                    onViewDetails={handleViewDetails}
-                                                    onDownload={handleDownloadForm}
-                                                    onGenerateReport={handleGenerateReport}
-                                                    onReportIssue={handleReportIssue}
-                                                    isMobile={isMobile}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                    
-                                    {!isMobile && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {currentForms.map((form) => (
-                                                <ModernFormGridCard
-                                                    key={form.id}
-                                                    form={form}
-                                                    selectMode={selectMode}
-                                                    selectedForms={selectedForms}
-                                                    toggleSelectForm={toggleSelectForm}
-                                                    formatDate={(date) => formatDate(date, true)}
-                                                    formatFileSize={formatFileSize}
-                                                    getCategoryColor={getCategoryColor}
-                                                    getAgencyIcon={getAgencyIcon}
-                                                    getFileTypeIcon={getFileTypeIcon}
-                                                    getFileTypeColor={getFileTypeColor}
-                                                    truncateText={truncateText}
-                                                    onCopyLink={handleCopyLink}
-                                                    onCopyTitle={handleCopyTitle}
-                                                    onViewDetails={handleViewDetails}
-                                                    onDownload={handleDownloadForm}
-                                                    onGenerateReport={handleGenerateReport}
-                                                    onReportIssue={handleReportIssue}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                            
-                            {viewMode === 'list' && !isMobile && (
-                                <ModernFormTable
-                                    forms={currentForms}
-                                    selectMode={selectMode}
-                                    selectedForms={selectedForms}
-                                    toggleSelectForm={toggleSelectForm}
-                                    selectAllForms={selectAllForms}
-                                    formatDate={formatDateTime}
-                                    formatFileSize={formatFileSize}
-                                    getCategoryColor={getCategoryColor}
-                                    getAgencyIcon={getAgencyIcon}
-                                    getFileTypeIcon={getFileTypeIcon}
-                                    getFileTypeColor={getFileTypeColor}
-                                    truncateText={truncateText}
-                                    onCopyLink={handleCopyLink}
-                                    onCopyTitle={handleCopyTitle}
-                                    onViewDetails={handleViewDetails}
-                                    onDownload={handleDownloadForm}
-                                    onGenerateReport={handleGenerateReport}
-                                    onReportIssue={handleReportIssue}
-                                />
-                            )}
-                            
-                            {forms.last_page > 1 && (
-                                <div className="mt-6">
-                                    <ModernPagination
-                                        currentPage={forms.current_page}
-                                        lastPage={forms.last_page}
-                                        onPageChange={handlePageChange}
-                                        loading={loading}
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-        );
-    };
+    const tabHasData = paginatedForms.length > 0;
+    const displayTab = activeTab === 'all' ? 'All' : 
+                      activeTab === 'popular' ? 'Most Downloaded' : 'Recently Added';
     
-    if (pageProps.error) {
+    const from = tabHasData ? (currentPage - 1) * itemsPerPage + 1 : 0;
+    const to = tabHasData ? Math.min(currentPage * itemsPerPage, filteredForms.length) : 0;
+    
+    if (props.error) {
         return (
             <ResidentLayout
                 breadcrumbs={[
@@ -545,7 +408,7 @@ export default function FormsIndex() {
                             </div>
                             <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Error</h3>
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                {pageProps.error}
+                                {props.error}
                             </p>
                             <Button 
                                 onClick={() => window.location.href = '/portal/dashboard'}
@@ -610,25 +473,22 @@ export default function FormsIndex() {
                         title="Filter Forms"
                         description={hasActiveFilters ? 'Filters are currently active' : 'No filters applied'}
                         search={search}
-                        onSearchChange={setSearch}
+                        onSearchChange={(value) => handleFilterChange('search', value)}
                         onSearchSubmit={handleSearchSubmit}
-                        onSearchClear={handleSearchClear}
+                        onSearchClear={() => handleFilterChange('search', '')}
                         loading={loading}
                         hasActiveFilters={hasActiveFilters}
-                        onClearFilters={handleClearFilters}
+                        onClearFilters={clearFilters}
                     >
                         <FilterModalContent
                             categoryFilter={categoryFilter}
-                            onCategoryChange={handleCategoryChange}
+                            onCategoryChange={(category) => handleFilterChange('category', category)}
                             agencyFilter={agencyFilter}
-                            onAgencyChange={handleAgencyChange}
+                            onAgencyChange={(agency) => handleFilterChange('agency', agency)}
                             sortBy={sortBy}
-                            onSortChange={handleSortChange}
+                            onSortChange={(sort) => handleFilterChange('sort', sort)}
                             sortOrder={sortOrder}
-                            onSortOrderChange={(order) => {
-                                setSortOrder(order);
-                                updateFilters({ sort_order: order, page: '1' });
-                            }}
+                            onSortOrderChange={handleSortOrderToggle}
                             loading={loading}
                             categories={categories}
                             agencies={agencies}
@@ -639,15 +499,15 @@ export default function FormsIndex() {
                     {!isMobile && (
                         <ModernFormFilters
                             search={search}
-                            setSearch={setSearch}
+                            setSearch={(value) => handleFilterChange('search', value)}
                             handleSearchSubmit={handleSearchSubmit}
-                            handleSearchClear={handleSearchClear}
+                            handleSearchClear={() => handleFilterChange('search', '')}
                             categoryFilter={categoryFilter}
-                            handleCategoryChange={handleCategoryChange}
+                            handleCategoryChange={(category) => handleFilterChange('category', category)}
                             agencyFilter={agencyFilter}
-                            handleAgencyChange={handleAgencyChange}
+                            handleAgencyChange={(agency) => handleFilterChange('agency', agency)}
                             sortBy={sortBy}
-                            handleSortChange={handleSortChange}
+                            handleSortChange={(sort) => handleFilterChange('sort', sort)}
                             sortOrder={sortOrder}
                             handleSortOrderToggle={handleSortOrderToggle}
                             loading={loading}
@@ -658,7 +518,7 @@ export default function FormsIndex() {
                             exportToCSV={handleExport}
                             isExporting={isExporting}
                             hasActiveFilters={hasActiveFilters}
-                            handleClearFilters={handleClearFilters}
+                            handleClearFilters={clearFilters}
                             onCopySummary={handleCopySummary}
                             onEmailSummary={handleEmailSummary}
                         />
@@ -675,7 +535,166 @@ export default function FormsIndex() {
                         />
                         
                         <div className="mt-4">
-                            {renderTabContent()}
+                            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+                                <CardContent className="p-4 md:p-6">
+                                    {selectMode && tabHasData && (
+                                        <ModernSelectionBanner
+                                            selectedCount={selectedForms.length}
+                                            totalCount={paginatedForms.length}
+                                            onSelectAll={selectAllForms}
+                                            onDeselectAll={() => setSelectedForms([])}
+                                            onCancel={() => {
+                                                setSelectMode(false);
+                                                setSelectedForms([]);
+                                            }}
+                                            onDelete={handleDownloadSelected}
+                                            deleteLabel="Download Selected"
+                                        />
+                                    )}
+                                    
+                                    <TabHeader
+                                        displayStatus={displayTab}
+                                        from={from}
+                                        to={to}
+                                        total={filteredForms.length}
+                                        selectMode={selectMode}
+                                        selectedCount={selectedForms.length}
+                                        hasFilters={hasActiveFilters}
+                                        viewMode={viewMode}
+                                        setViewMode={setViewMode}
+                                        sortBy={sortBy}
+                                        sortOrder={sortOrder}
+                                        onSortChange={(sort) => handleFilterChange('sort', sort)}
+                                        onSortOrderToggle={handleSortOrderToggle}
+                                        onToggleSelectMode={toggleSelectMode}
+                                        tabHasData={tabHasData}
+                                    />
+                                    
+                                    {!tabHasData ? (
+                                        <ModernEmptyState
+                                            status={activeTab}
+                                            hasFilters={hasActiveFilters}
+                                            onClearFilters={clearFilters}
+                                            icon={activeTab === 'all' ? FileText : 
+                                                  activeTab === 'popular' ? Download : Clock}
+                                        />
+                                    ) : (
+                                        <>
+                                            {/* Mobile-specific rendering */}
+                                            {isMobile ? (
+                                                viewMode === 'grid' ? (
+                                                    <div className="pb-4 space-y-3">
+                                                        {paginatedForms.map((form) => (
+                                                            <ModernFormCard
+                                                                key={form.id}
+                                                                form={form}
+                                                                selectMode={selectMode}
+                                                                selectedForms={selectedForms}
+                                                                toggleSelectForm={toggleSelectForm}
+                                                                formatDate={(date) => formatDate(date, true)}
+                                                                formatFileSize={formatFileSize}
+                                                                getCategoryColor={getCategoryColor}
+                                                                getAgencyIcon={getAgencyIcon}
+                                                                getFileTypeIcon={getFileTypeIcon}
+                                                                getFileTypeColor={getFileTypeColor}
+                                                                truncateText={truncateText}
+                                                                onCopyLink={handleCopyLink}
+                                                                onCopyTitle={handleCopyTitle}
+                                                                onViewDetails={handleViewDetails}
+                                                                onDownload={handleDownloadForm}
+                                                                onGenerateReport={handleGenerateReport}
+                                                                onReportIssue={handleReportIssue}
+                                                                isMobile={true}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <ModernFormMobileListView
+                                                        forms={paginatedForms}
+                                                        selectMode={selectMode}
+                                                        selectedForms={selectedForms}
+                                                        toggleSelectForm={toggleSelectForm}
+                                                        formatDate={(date) => formatDate(date, true)}
+                                                        formatDateTime={formatDateTime}
+                                                        formatFileSize={formatFileSize}
+                                                        getCategoryColor={getCategoryColor}
+                                                        getAgencyIcon={getAgencyIcon}
+                                                        getFileTypeIcon={getFileTypeIcon}
+                                                        getFileTypeColor={getFileTypeColor}
+                                                        truncateText={truncateText}
+                                                        onCopyLink={handleCopyLink}
+                                                        onCopyTitle={handleCopyTitle}
+                                                        onViewDetails={handleViewDetails}
+                                                        onDownload={handleDownloadForm}
+                                                        onGenerateReport={handleGenerateReport}
+                                                        onReportIssue={handleReportIssue}
+                                                    />
+                                                )
+                                            ) : (
+                                                // Desktop rendering
+                                                viewMode === 'grid' ? (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                        {paginatedForms.map((form) => (
+                                                            <ModernFormGridCard
+                                                                key={form.id}
+                                                                form={form}
+                                                                selectMode={selectMode}
+                                                                selectedForms={selectedForms}
+                                                                toggleSelectForm={toggleSelectForm}
+                                                                formatDate={(date) => formatDate(date, true)}
+                                                                formatFileSize={formatFileSize}
+                                                                getCategoryColor={getCategoryColor}
+                                                                getAgencyIcon={getAgencyIcon}
+                                                                getFileTypeIcon={getFileTypeIcon}
+                                                                getFileTypeColor={getFileTypeColor}
+                                                                truncateText={truncateText}
+                                                                onCopyLink={handleCopyLink}
+                                                                onCopyTitle={handleCopyTitle}
+                                                                onViewDetails={handleViewDetails}
+                                                                onDownload={handleDownloadForm}
+                                                                onGenerateReport={handleGenerateReport}
+                                                                onReportIssue={handleReportIssue}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <ModernFormTable
+                                                        forms={paginatedForms}
+                                                        selectMode={selectMode}
+                                                        selectedForms={selectedForms}
+                                                        toggleSelectForm={toggleSelectForm}
+                                                        selectAllForms={selectAllForms}
+                                                        formatDate={formatDateTime}
+                                                        formatFileSize={formatFileSize}
+                                                        getCategoryColor={getCategoryColor}
+                                                        getAgencyIcon={getAgencyIcon}
+                                                        getFileTypeIcon={getFileTypeIcon}
+                                                        getFileTypeColor={getFileTypeColor}
+                                                        truncateText={truncateText}
+                                                        onCopyLink={handleCopyLink}
+                                                        onCopyTitle={handleCopyTitle}
+                                                        onViewDetails={handleViewDetails}
+                                                        onDownload={handleDownloadForm}
+                                                        onGenerateReport={handleGenerateReport}
+                                                        onReportIssue={handleReportIssue}
+                                                    />
+                                                )
+                                            )}
+                                            
+                                            {totalPages > 1 && (
+                                                <div className="mt-6">
+                                                    <ModernPagination
+                                                        currentPage={currentPage}
+                                                        lastPage={totalPages}
+                                                        onPageChange={setCurrentPage}
+                                                        loading={loading}
+                                                    />
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </CardContent>
+                            </Card>
                         </div>
                     </div>
                 </div>

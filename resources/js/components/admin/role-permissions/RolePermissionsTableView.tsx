@@ -1,3 +1,5 @@
+// components/admin/role-permissions/RolePermissionsTableView.tsx
+
 import {
     Table,
     TableBody,
@@ -11,9 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link } from '@inertiajs/react';
-import { Key, User, Shield, MoreVertical, Eye, Copy, Trash2, CheckSquare, Square } from 'lucide-react';
-import { RolePermission, FilterState } from '@/admin-utils/rolePermissionsUtils';
+import { Key, User, Shield, MoreVertical, Eye, Copy, Trash2, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
+import { RolePermission, FilterState } from '@/types/admin/rolepermissions/rolePermissions.types';
 import { truncateText, getTruncationLength, formatDate, getModuleBadgeVariant, formatTimeAgo } from '@/admin-utils/rolePermissionsUtils';
+import React from 'react';
 
 interface RolePermissionsTableViewProps {
     permissions: RolePermission[];
@@ -28,9 +31,8 @@ interface RolePermissionsTableViewProps {
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
     windowWidth: number;
-    // Remove these if you don't need expand/collapse
-    // expandedPermission: number | null;
-    // togglePermissionExpansion: (id: number) => void;
+    expandedPermission?: number | null;
+    togglePermissionExpansion?: (id: number) => void;
 }
 
 export default function RolePermissionsTableView({
@@ -46,11 +48,32 @@ export default function RolePermissionsTableView({
     onSelectAllOnPage,
     isSelectAll,
     windowWidth,
-    // Remove these if you don't need expand/collapse
-    // expandedPermission,
-    // togglePermissionExpansion
+    expandedPermission,
+    togglePermissionExpansion,
 }: RolePermissionsTableViewProps) {
     
+    const permNameLength = getTruncationLength('name', windowWidth);
+    const roleNameLength = getTruncationLength('name', windowWidth);
+    
+    if (permissions.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <Key className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No permission assignments found</h3>
+                <p className="text-gray-500">
+                    {hasActiveFilters 
+                        ? 'Try adjusting your filters to see more results'
+                        : 'No permissions have been assigned to roles yet'}
+                </p>
+                {hasActiveFilters && (
+                    <Button onClick={onClearFilters} variant="outline" className="mt-4">
+                        Clear Filters
+                    </Button>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className="overflow-x-auto">
             <div className="min-w-full inline-block align-middle">
@@ -69,6 +92,9 @@ export default function RolePermissionsTableView({
                                         </div>
                                     </TableHead>
                                 )}
+                                <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[50px]">
+                                    <span className="sr-only">Expand</span>
+                                </TableHead>
                                 <TableHead className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                                     Permission
                                 </TableHead>
@@ -90,43 +116,14 @@ export default function RolePermissionsTableView({
                             </TableRow>
                         </TableHeader>
                         <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {permissions.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={isBulkMode ? 7 : 6} className="text-center py-8 text-gray-500">
-                                        <div className="flex flex-col items-center justify-center space-y-4">
-                                            <Key className="h-16 w-16 text-gray-300 dark:text-gray-700" />
-                                            <div>
-                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                                                    No permission assignments found
-                                                </h3>
-                                                <p className="text-gray-500 dark:text-gray-400">
-                                                    {hasActiveFilters 
-                                                        ? 'Try changing your filters or search criteria.'
-                                                        : 'No permissions have been assigned to roles yet.'}
-                                                </p>
-                                            </div>
-                                            {hasActiveFilters && (
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={onClearFilters}
-                                                    className="h-8"
-                                                >
-                                                    Clear Filters
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                permissions.map((permission) => {
-                                    const isSelected = selectedPermissions.includes(permission.id);
-                                    const permNameLength = getTruncationLength('name', windowWidth);
-                                    const roleNameLength = getTruncationLength('name', windowWidth);
-                                    const moduleBadge = getModuleBadgeVariant(permission.permission?.module || 'Unknown');
-                                    
-                                    return (
+                            {permissions.map((permission) => {
+                                const isSelected = selectedPermissions.includes(permission.id);
+                                const isExpanded = expandedPermission === permission.id;
+                                const moduleBadge = getModuleBadgeVariant(permission.permission?.module || 'Unknown');
+                                
+                                return (
+                                    <React.Fragment key={permission.id}>
                                         <TableRow 
-                                            key={permission.id} 
                                             className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                                 isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
                                             }`}
@@ -152,6 +149,26 @@ export default function RolePermissionsTableView({
                                                     </div>
                                                 </TableCell>
                                             )}
+                                            
+                                            <TableCell className="px-4 py-3">
+                                                {togglePermissionExpansion && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => togglePermissionExpansion(permission.id)}
+                                                        className="h-8 w-8 p-0"
+                                                        disabled={isBulkMode}
+                                                        aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                                                    >
+                                                        {isExpanded ? (
+                                                            <ChevronUp className="h-4 w-4" />
+                                                        ) : (
+                                                            <ChevronDown className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+                                                )}
+                                            </TableCell>
+                                            
                                             <TableCell className="px-4 py-3 whitespace-nowrap">
                                                 <div className="flex items-center gap-3">
                                                     <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -322,9 +339,38 @@ export default function RolePermissionsTableView({
                                                 </div>
                                             </TableCell>
                                         </TableRow>
-                                    );
-                                })
-                            )}
+                                        
+                                        {/* Expanded Row for Additional Details */}
+                                        {isExpanded && togglePermissionExpansion && (
+                                            <TableRow className="bg-gray-50 dark:bg-gray-900/20">
+                                                <TableCell colSpan={isBulkMode ? 8 : 7} className="p-0">
+                                                    <div className="p-4 pl-12 border-t">
+                                                        <h4 className="font-medium mb-3">Additional Details</h4>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                            <div>
+                                                                <div className="text-sm font-medium text-gray-500">Permission Code</div>
+                                                                <div className="text-sm mt-1">{permission.permission?.name || 'N/A'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm font-medium text-gray-500">Description</div>
+                                                                <div className="text-sm mt-1">
+                                                                    {permission.permission?.description || 'No description available'}
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-sm font-medium text-gray-500">Status</div>
+                                                                <Badge variant={permission.permission?.is_active ? 'default' : 'secondary'} className="mt-1">
+                                                                    {permission.permission?.is_active ? 'Active' : 'Inactive'}
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </div>

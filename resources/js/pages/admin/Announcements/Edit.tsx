@@ -51,27 +51,26 @@ import {
 } from 'lucide-react';
 import { route } from 'ziggy-js';
 
-// Types
-interface Announcement {
-    created_at: string | number | Date;
-    id: number;
-    title: string;
-    content: string;
-    type: string;
-    priority: number;
-    is_active: boolean;
-    audience_type: string;
-    target_roles: number[];
-    target_puroks: number[];
-    target_households: number[];
-    target_businesses: number[];
-    target_users: number[];
-    start_date: string | null;
+// Import types from centralized types file
+import type {
+    AnnouncementType,
+    PriorityLevel,
+    AudienceType,
+    Role,
+    Purok,
+    Household,
+    Business,
+    User,
+    Announcement
+} from '@/types/admin/announcements/announcement.types';
+
+// Extend Announcement type for edit page specific fields
+interface EditAnnouncement extends Announcement {
     start_time: string | null;
-    end_date: string | null;
     end_time: string | null;
 }
 
+// Flash message interface
 interface FlashMessage {
     success?: string;
     error?: string;
@@ -79,25 +78,27 @@ interface FlashMessage {
     info?: string;
 }
 
+// Props interface using imported types
 interface EditAnnouncementProps {
-    announcement: Announcement;
-    types: Record<string, string>;
-    priorities: Record<string, string>;
-    audience_types: Record<string, string>;
-    roles: Array<{ id: number; name: string }>;
-    puroks: Array<{ id: number; name: string }>;
-    households: Array<{ id: number; household_number: string; purok?: { name: string } }>;
-    businesses: Array<{ id: number; business_name: string; owner_name?: string }>;
-    users: Array<{ id: number; first_name: string; last_name: string; email: string; role?: { name: string } }>;
+    announcement: EditAnnouncement;
+    types: Record<AnnouncementType, string>;
+    priorities: Record<PriorityLevel, string>;
+    audience_types: Record<AudienceType, string>;
+    roles: Role[];
+    puroks: Purok[];
+    households: Household[];
+    businesses: Business[];
+    users: User[];
 }
 
+// Form data interface
 interface FormData {
     title: string;
     content: string;
-    type: string;
-    priority: number;
+    type: AnnouncementType;
+    priority: PriorityLevel;
     is_active: boolean;
-    audience_type: string;
+    audience_type: AudienceType;
     target_roles: number[];
     target_puroks: number[];
     target_households: number[];
@@ -121,20 +122,20 @@ export default function EditAnnouncement({
     users
 }: EditAnnouncementProps) {
     const { flash } = usePage().props as unknown as { flash: FlashMessage };
-    const [activeTab, setActiveTab] = useState('content');
-    const [showStartTime, setShowStartTime] = useState(!!announcement.start_time);
-    const [showEndTime, setShowEndTime] = useState(!!announcement.end_time);
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [activeTab, setActiveTab] = useState<string>('content');
+    const [showStartTime, setShowStartTime] = useState<boolean>(!!announcement.start_time);
+    const [showEndTime, setShowEndTime] = useState<boolean>(!!announcement.end_time);
+    const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState<boolean>(false);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
     const { data, setData, put, processing, errors, reset } = useForm<FormData>({
         title: announcement.title,
         content: announcement.content,
-        type: announcement.type,
-        priority: announcement.priority,
+        type: announcement.type as AnnouncementType,
+        priority: announcement.priority as PriorityLevel,
         is_active: announcement.is_active,
-        audience_type: announcement.audience_type,
+        audience_type: announcement.audience_type as AudienceType,
         target_roles: announcement.target_roles || [],
         target_puroks: announcement.target_puroks || [],
         target_households: announcement.target_households || [],
@@ -174,7 +175,7 @@ export default function EditAnnouncement({
             
             toast.info('End date auto-set to 30 days from start date');
         }
-    }, [data.start_date]);
+    }, [data.start_date, setData]);
 
     // Validate end date is after start date
     useEffect(() => {
@@ -187,7 +188,7 @@ export default function EditAnnouncement({
                 setData('end_date', data.start_date);
             }
         }
-    }, [data.start_date, data.end_date]);
+    }, [data.start_date, data.end_date, setData]);
 
     const validateForm = useCallback((): boolean => {
         if (!data.title.trim()) {
@@ -280,7 +281,6 @@ export default function EditAnnouncement({
             ...data,
             start_time: showStartTime ? data.start_time : null,
             end_time: showEndTime ? data.end_time : null,
-            // Ensure arrays are properly formatted
             target_roles: data.target_roles.map(Number),
             target_puroks: data.target_puroks.map(Number),
             target_households: data.target_households.map(Number),
@@ -299,7 +299,6 @@ export default function EditAnnouncement({
                 onError: (errors) => {
                     console.error('Update errors:', errors);
                     
-                    // Handle specific error cases
                     if (errors.title) {
                         setActiveTab('content');
                     } else if (errors.content) {
@@ -400,7 +399,7 @@ export default function EditAnnouncement({
         }
     };
 
-    const getPriorityColor = (priority: number): string => {
+    const getPriorityColor = (priority: PriorityLevel): string => {
         switch (priority) {
             case 4: return 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800';
             case 3: return 'text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-800';
@@ -410,7 +409,7 @@ export default function EditAnnouncement({
         }
     };
 
-    const getTypeColor = (type: string): string => {
+    const getTypeColor = (type: AnnouncementType): string => {
         switch (type) {
             case 'important': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
             case 'event': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
@@ -420,7 +419,7 @@ export default function EditAnnouncement({
         }
     };
 
-    const getTypeIcon = (type: string) => {
+    const getTypeIcon = (type: AnnouncementType) => {
         switch (type) {
             case 'important': return AlertCircle;
             case 'event': return Calendar;
@@ -430,7 +429,7 @@ export default function EditAnnouncement({
         }
     };
 
-    const getAudienceIcon = (type: string) => {
+    const getAudienceIcon = (type: AudienceType) => {
         switch (type) {
             case 'roles': return Users;
             case 'puroks': return MapPin;
@@ -454,9 +453,13 @@ export default function EditAnnouncement({
         }
     };
 
-    const typeOptions = Object.entries(types).map(([value, label]) => ({ value, label }));
+    const typeOptions = Object.entries(types).map(([value, label]) => ({ 
+        value: value as AnnouncementType, 
+        label 
+    }));
+    
     const priorityOptions = Object.entries(priorities).map(([value, label]) => ({ 
-        value: parseInt(value, 10), 
+        value: parseInt(value, 10) as PriorityLevel, 
         label 
     }));
 
@@ -557,8 +560,8 @@ export default function EditAnnouncement({
 
                     {/* Main Content Tabs */}
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                        <TabsList className="grid grid-cols-3 w-full max-w-md ">
-                            <TabsTrigger value="content" type="button" >Content</TabsTrigger>
+                        <TabsList className="grid grid-cols-3 w-full max-w-md">
+                            <TabsTrigger value="content" type="button">Content</TabsTrigger>
                             <TabsTrigger value="settings" type="button">Settings</TabsTrigger>
                             <TabsTrigger value="audience" type="button">Audience</TabsTrigger>
                         </TabsList>
@@ -651,7 +654,7 @@ export default function EditAnnouncement({
                                             </Label>
                                             <Select 
                                                 value={data.type}
-                                                onValueChange={(value) => setData('type', value)}
+                                                onValueChange={(value: AnnouncementType) => setData('type', value)}
                                                 disabled={isProcessing}
                                             >
                                                 <SelectTrigger id="type" className={`${errors.type ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
@@ -682,7 +685,7 @@ export default function EditAnnouncement({
                                             </Label>
                                             <Select 
                                                 value={data.priority.toString()}
-                                                onValueChange={(value) => setData('priority', parseInt(value, 10))}
+                                                onValueChange={(value) => setData('priority', parseInt(value, 10) as PriorityLevel)}
                                                 disabled={isProcessing}
                                             >
                                                 <SelectTrigger id="priority" className={`${errors.priority ? 'border-red-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
@@ -910,7 +913,7 @@ export default function EditAnnouncement({
                                                 <span>Posted: {new Date().toLocaleDateString()}</span>
                                                 <span>•</span>
                                                 <span className={`font-medium ${getPriorityColor(data.priority)} px-2 py-1 rounded-full text-xs`}>
-                                                    {priorities[data.priority.toString()] || 'Normal'} Priority
+                                                    {priorities[data.priority] || 'Normal'} Priority
                                                 </span>
                                             </div>
                                         </div>
@@ -935,7 +938,7 @@ export default function EditAnnouncement({
                                     </Badge>
                                     {data.audience_type !== 'all' && (
                                         <Badge variant="secondary" className="text-xs dark:bg-gray-700 dark:text-gray-300">
-                                            {getAudienceCount()} {data.audience_type.replace('_', ' ')} selected
+                                            {getAudienceCount()} {data.audience_type.replace(/_/g, ' ')} selected
                                         </Badge>
                                     )}
                                 </div>

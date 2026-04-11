@@ -1,11 +1,17 @@
-// components/admin/roles/RolesContent.tsx
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Shield } from 'lucide-react';
+import { Shield, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -16,8 +22,7 @@ import { GridSelectionSummary } from '@/components/adminui/grid-selection-summar
 import RolesTableView from './RolesTableView';
 import RolesGridView from './RolesGridView';
 import RolesBulkActions from './RolesBulkActions';
-import { Role } from '@/types';
-import { FilterState, SelectionMode, SelectionStats } from '@/admin-utils/rolesUtils';
+import { Role, FilterState, SelectionMode, SelectionStats, BulkOperation } from '@/types/admin/roles/roles';
 
 interface RolesContentProps {
     roles: Role[];
@@ -42,7 +47,7 @@ interface RolesContentProps {
     onDelete: (role: Role) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onCopySelectedData: () => void;
-    onBulkOperation: (operation: string) => void;
+    onBulkOperation: (operation: BulkOperation) => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkTypeDialog?: (show: boolean) => void;
     filtersState: FilterState;
@@ -54,6 +59,11 @@ interface RolesContentProps {
     expandedRole: number | null;
     bulkEditValue: string;
     setBulkEditValue: (value: string) => void;
+    isLoading?: boolean;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
 }
 
 export default function RolesContent({
@@ -90,7 +100,12 @@ export default function RolesContent({
     toggleRoleExpansion,
     expandedRole,
     bulkEditValue,
-    setBulkEditValue
+    setBulkEditValue,
+    isLoading = false,
+    sortBy = 'name',
+    sortOrder = 'asc',
+    onSortChange = () => {},
+    getCurrentSortValue = () => 'name-asc'
 }: RolesContentProps) {
     
     // Add viewMode state for toggling between table and grid views
@@ -163,6 +178,33 @@ export default function RolesContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort By Dropdown */}
+                        {!isMobile && onSortChange && getCurrentSortValue && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="name-asc">Name (A to Z)</SelectItem>
+                                        <SelectItem value="name-desc">Name (Z to A)</SelectItem>
+                                        <SelectItem value="type-asc">Type (Custom to System)</SelectItem>
+                                        <SelectItem value="type-desc">Type (System to Custom)</SelectItem>
+                                        <SelectItem value="users_count-asc">Users (Low to High)</SelectItem>
+                                        <SelectItem value="users_count-desc">Users (High to Low)</SelectItem>
+                                        <SelectItem value="permissions_count-asc">Permissions (Low to High)</SelectItem>
+                                        <SelectItem value="permissions_count-desc">Permissions (High to Low)</SelectItem>
+                                        <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
+                                        <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && roles.length > 0 && (
                             <div className="flex items-center gap-2">
@@ -262,7 +304,6 @@ export default function RolesContent({
                                     onClearFilters={onClearFilters}
                                     onDelete={onDelete}
                                     onCopyToClipboard={onCopyToClipboard}
-                                    windowWidth={windowWidth}
                                 />
                             )}
 

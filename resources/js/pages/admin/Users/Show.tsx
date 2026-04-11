@@ -1,7 +1,7 @@
 // resources/js/Pages/Admin/Users/Show.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
     User as UserIcon,
@@ -26,246 +26,288 @@ import { ActivityTab } from '@/components/admin/users/show/components/tabs/activ
 import { SecurityTab } from '@/components/admin/users/show/components/tabs/security-tab';
 
 // Import types and utilities
-import { UserShowProps } from '@/components/admin/users/show/types';
+import type { UserShowProps, UserActivityLog, UserStats } from '@/types/admin/users/user-types';
 import { formatDate, getFullName, getInitials, getStatusColor, getStatusIcon } from '@/components/admin/users/show/utils/helpers';
 
-export default function UserShow({ user, activityLogs = [], stats = {} }: UserShowProps) {
-    const [copied, setCopied] = useState(false);
-    const [emailCopied, setEmailCopied] = useState(false);
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isResettingPassword, setIsResettingPassword] = useState(false);
-    const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
-    const [activeTab, setActiveTab] = useState('overview');
+// Default empty values for optional props
+const defaultStats: UserStats = {
+  total_logins: 0,
+  last_login: null,
+  sessions_count: 0,
+  permissions_count: 0,
+  roles_count: 0,
+  devices_count: 0,
+};
 
-    const fullName = getFullName(user);
+export default function UserShow({ 
+  user, 
+  activityLogs = [], 
+  stats = defaultStats,
+  can = {}
+}: UserShowProps) {
+  const [copied, setCopied] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
-    const handleCopyLink = () => {
-        navigator.clipboard.writeText(window.location.href);
-        setCopied(true);
-        toast.success('Link copied to clipboard');
-        setTimeout(() => setCopied(false), 2000);
-    };
+  // Safe access with fallbacks
+  const fullName = getFullName(user);
+  const userRole = user.role;
+  const userPermissions = user.permissions || [];
+  const rolePermissions = userRole?.permissions || [];
+  const totalPermissions = userPermissions.length + rolePermissions.length;
+  const has2FA = !!user.two_factor_confirmed_at;
+  const isActive = user.status === 'active';
+  const needsPasswordChange = user.require_password_change || false;
 
-    const handleCopyEmail = () => {
-        navigator.clipboard.writeText(user.email);
-        setEmailCopied(true);
-        toast.success('Email copied to clipboard');
-        setTimeout(() => setEmailCopied(false), 2000);
-    };
+  // Memoized handlers for better performance
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    toast.success('Link copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
+  }, []);
 
-    const handleResetPassword = () => {
-        if (confirm(`Send password reset email to ${fullName}?`)) {
-            setIsResettingPassword(true);
-            router.post(`/users/${user.id}/reset-password`, {}, {
-                onSuccess: () => {
-                    toast.success('Password reset email sent');
-                    setIsResettingPassword(false);
-                },
-                onError: () => {
-                    toast.error('Failed to send reset email');
-                    setIsResettingPassword(false);
-                }
-            });
-        }
-    };
+  const handleCopyEmail = useCallback(() => {
+    navigator.clipboard.writeText(user.email);
+    setEmailCopied(true);
+    toast.success('Email copied to clipboard');
+    setTimeout(() => setEmailCopied(false), 2000);
+  }, [user.email]);
 
-    const handleToggleStatus = () => {
-        const newStatus = user.status === 'active' ? 'inactive' : 'active';
-        const action = newStatus === 'active' ? 'activate' : 'deactivate';
-        
-        if (confirm(`Are you sure you want to ${action} ${fullName}?`)) {
-            router.put(`/users/${user.id}`, { status: newStatus }, {
-                onSuccess: () => {
-                    toast.success(`User ${action}d successfully`);
-                },
-                onError: () => {
-                    toast.error(`Failed to ${action} user`);
-                }
-            });
-        }
-    };
-
-    const handleLogoutAllSessions = () => {
-        if (confirm(`Log out all sessions for ${fullName}?`)) {
-            setIsLoggingOutAll(true);
-            router.post(`/users/${user.id}/logout-all`, {}, {
-                onSuccess: () => {
-                    toast.success('All sessions logged out');
-                    setIsLoggingOutAll(false);
-                },
-                onError: () => {
-                    toast.error('Failed to log out sessions');
-                    setIsLoggingOutAll(false);
-                }
-            });
-        }
-    };
-
-    const handleDelete = () => {
-        setIsDeleting(true);
-        router.delete(`/users/${user.id}`, {
-            onSuccess: () => {
-                toast.success('User deleted successfully');
-                router.visit('/users');
-            },
-            onError: () => {
-                toast.error('Failed to delete user');
-                setIsDeleting(false);
-                setShowDeleteDialog(false);
-            }
-        });
-    };
-
-    const handleToggle2FA = () => {
-        const action = user.two_factor_confirmed_at ? 'disable' : 'enable';
-        if (confirm(`Are you sure you want to ${action} two-factor authentication?`)) {
-            router.post(`/users/${user.id}/toggle-2fa`, {}, {
-                onSuccess: () => {
-                    toast.success(`2FA ${action}d successfully`);
-                },
-                onError: () => {
-                    toast.error(`Failed to ${action} 2FA`);
-                }
-            });
-        }
-    };
-
-    // Tab definitions
-    const tabs = [
-        { 
-            id: 'overview', 
-            label: 'Overview', 
-            icon: <UserIcon className="h-4 w-4" />,
+  const handleResetPassword = useCallback(() => {
+    if (confirm(`Send password reset email to ${fullName}?`)) {
+      setIsResettingPassword(true);
+      router.post(`/users/${user.id}/reset-password`, {}, {
+        onSuccess: () => {
+          toast.success('Password reset email sent');
+          setIsResettingPassword(false);
         },
-        { 
-            id: 'permissions', 
-            label: 'Permissions', 
-            icon: <Shield className="h-4 w-4" />,
-            count: (user.permissions?.length || 0) + (user.role?.permissions?.length || 0)
+        onError: () => {
+          toast.error('Failed to send reset email');
+          setIsResettingPassword(false);
+        }
+      });
+    }
+  }, [user.id, fullName]);
+
+  const handleToggleStatus = useCallback(() => {
+    const newStatus = isActive ? 'inactive' : 'active';
+    const action = newStatus === 'active' ? 'activate' : 'deactivate';
+    
+    if (confirm(`Are you sure you want to ${action} ${fullName}?`)) {
+      router.put(`/users/${user.id}`, { status: newStatus }, {
+        onSuccess: () => {
+          toast.success(`User ${action}d successfully`);
         },
-        { 
-            id: 'activity', 
-            label: 'Activity', 
-            icon: <History className="h-4 w-4" />,
-            count: activityLogs.length
+        onError: () => {
+          toast.error(`Failed to ${action} user`);
+        }
+      });
+    }
+  }, [user.id, fullName, isActive]);
+
+  const handleLogoutAllSessions = useCallback(() => {
+    if (confirm(`Log out all sessions for ${fullName}? This will end all active sessions except the current one.`)) {
+      setIsLoggingOutAll(true);
+      router.post(`/users/${user.id}/logout-all`, {}, {
+        onSuccess: () => {
+          toast.success('All other sessions logged out');
+          setIsLoggingOutAll(false);
         },
-        { 
-            id: 'security', 
-            label: 'Security', 
-            icon: <Lock className="h-4 w-4" />,
+        onError: () => {
+          toast.error('Failed to log out sessions');
+          setIsLoggingOutAll(false);
+        }
+      });
+    }
+  }, [user.id, fullName]);
+
+  const handleDelete = useCallback(() => {
+    setIsDeleting(true);
+    router.delete(`/users/${user.id}`, {
+      onSuccess: () => {
+        toast.success('User deleted successfully');
+        router.visit('/users');
+      },
+      onError: () => {
+        toast.error('Failed to delete user');
+        setIsDeleting(false);
+        setShowDeleteDialog(false);
+      }
+    });
+  }, [user.id]);
+
+  const handleToggle2FA = useCallback(() => {
+    const action = has2FA ? 'disable' : 'enable';
+    if (confirm(`Are you sure you want to ${action} two-factor authentication for ${fullName}?`)) {
+      router.post(`/users/${user.id}/toggle-2fa`, {}, {
+        onSuccess: () => {
+          toast.success(`2FA ${action}d successfully`);
         },
-    ];
+        onError: () => {
+          toast.error(`Failed to ${action} 2FA`);
+        }
+      });
+    }
+  }, [user.id, fullName, has2FA]);
 
-    return (
-        <>
-            <Head title={`User: ${fullName}`} />
-            
-            <AppLayout
-                title={`User Profile`}
-                breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Users', href: '/users' },
-                    { title: fullName, href: '#' }
-                ]}
-            >
-                <div className="space-y-6">
-                    {/* Header with Actions */}
-                    <UserHeader
-                        user={user}
-                        onCopyLink={handleCopyLink}
-                        onPrint={() => window.print()}
-                        onEdit={() => router.visit(`/users/${user.id}/edit`)}
-                        onResetPassword={handleResetPassword}
-                        onToggleStatus={handleToggleStatus}
-                        onToggle2FA={handleToggle2FA}
-                        onDelete={() => setShowDeleteDialog(true)}
-                    />
+  const handleEdit = useCallback(() => {
+    router.visit(`/users/${user.id}/edit`);
+  }, [user.id]);
 
-                    {/* Status Banner - For users requiring attention */}
-                    {user.require_password_change && (
-                        <StatusBanner
-                            user={user}
-                            onResetPassword={handleResetPassword}
-                            isResettingPassword={isResettingPassword}
-                        />
-                    )}
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
 
-                    {/* Profile Header */}
-                    <ProfileHeader
-                        user={user}
-                        fullName={fullName}
-                        getInitials={getInitials}
-                        getStatusColor={getStatusColor}
-                        getStatusIcon={getStatusIcon}
-                    />
+  // Tab definitions
+  const tabs = [
+    { 
+      id: 'overview', 
+      label: 'Overview', 
+      icon: <UserIcon className="h-4 w-4" />,
+    },
+    { 
+      id: 'permissions', 
+      label: 'Permissions', 
+      icon: <Shield className="h-4 w-4" />,
+      count: totalPermissions
+    },
+    { 
+      id: 'activity', 
+      label: 'Activity', 
+      icon: <History className="h-4 w-4" />,
+      count: activityLogs.length
+    },
+    { 
+      id: 'security', 
+      label: 'Security', 
+      icon: <Lock className="h-4 w-4" />,
+    },
+  ];
 
-                    {/* Admin Tabs Component */}
-                    <AdminTabsWithContent
-                        tabs={tabs}
-                        activeTab={activeTab}
-                        onTabChange={setActiveTab}
-                        variant="underlined"
-                        size="md"
-                        scrollable={true}
-                        showCountBadges={true}
-                        lazyLoad={true}
-                    >
-                        <AdminTabPanel value="overview">
-                            <OverviewTab
-                                user={user}
-                                stats={stats}
-                                emailCopied={emailCopied}
-                                onCopyEmail={handleCopyEmail}
-                                onResetPassword={handleResetPassword}
-                                onToggleStatus={handleToggleStatus}
-                                onLogoutAll={handleLogoutAllSessions}
-                                onDelete={() => setShowDeleteDialog(true)}
-                                formatDate={formatDate}
-                                isResettingPassword={isResettingPassword}
-                                isLoggingOutAll={isLoggingOutAll}
-                            />
-                        </AdminTabPanel>
+  return (
+    <>
+      <Head title={`User: ${fullName}`} />
+      
+      <AppLayout
+        title="User Profile"
+        breadcrumbs={[
+          { title: 'Dashboard', href: '/dashboard' },
+          { title: 'Users', href: '/users' },
+          { title: fullName, href: '#' }
+        ]}
+      >
+        <div className="space-y-6">
+          {/* Header with Actions */}
+          <UserHeader
+            user={user}
+            onCopyLink={handleCopyLink}
+            onPrint={handlePrint}
+            onEdit={handleEdit}
+            onResetPassword={handleResetPassword}
+            onToggleStatus={handleToggleStatus}
+            onToggle2FA={handleToggle2FA}
+            onDelete={() => setShowDeleteDialog(true)}
+            copied={copied}
+            isResettingPassword={isResettingPassword}
+            isActive={isActive}
+            has2FA={has2FA}
+            canEdit={can.edit_user}
+            canDelete={can.delete_user}
+          />
 
-                        <AdminTabPanel value="permissions">
-                            <PermissionsTab
-                                user={user}
-                            />
-                        </AdminTabPanel>
+          {/* Status Banner - For users requiring attention */}
+          {needsPasswordChange && (
+            <StatusBanner
+              user={user}
+              onResetPassword={handleResetPassword}
+              isResettingPassword={isResettingPassword}
+            />
+          )}
 
-                        <AdminTabPanel value="activity">
-                            <ActivityTab
-                                user={user}
-                                activityLogs={activityLogs}
-                                stats={stats}
-                                onLogoutAll={handleLogoutAllSessions}
-                                isLoggingOutAll={isLoggingOutAll}
-                                formatDate={formatDate}
-                            />
-                        </AdminTabPanel>
+          {/* Profile Header */}
+          <ProfileHeader
+            user={user}
+            fullName={fullName}
+            getInitials={getInitials}
+            getStatusColor={getStatusColor}
+            getStatusIcon={getStatusIcon}
+          />
 
-                        <AdminTabPanel value="security">
-                            <SecurityTab
-                                user={user}
-                                onResetPassword={handleResetPassword}
-                                onToggle2FA={handleToggle2FA}
-                                onDelete={() => setShowDeleteDialog(true)}
-                                isResettingPassword={isResettingPassword}
-                                formatDate={formatDate}
-                            />
-                        </AdminTabPanel>
-                    </AdminTabsWithContent>
+          {/* Admin Tabs Component */}
+          <AdminTabsWithContent
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            variant="underlined"
+            size="md"
+            scrollable={true}
+            showCountBadges={true}
+            lazyLoad={true}
+          >
+            <AdminTabPanel value="overview">
+              <OverviewTab
+                user={user}
+                stats={stats}
+                emailCopied={emailCopied}
+                onCopyEmail={handleCopyEmail}
+                onResetPassword={handleResetPassword}
+                onToggleStatus={handleToggleStatus}
+                onLogoutAll={handleLogoutAllSessions}
+                onDelete={() => setShowDeleteDialog(true)}
+                formatDate={formatDate}
+                isResettingPassword={isResettingPassword}
+                isLoggingOutAll={isLoggingOutAll}
+              />
+            </AdminTabPanel>
 
-                    {/* Delete Confirmation Dialog */}
-                    <DeleteConfirmationDialog
-                        open={showDeleteDialog}
-                        onOpenChange={setShowDeleteDialog}
-                        userName={fullName}
-                        isDeleting={isDeleting}
-                        onDelete={handleDelete}
-                    />
-                </div>
-            </AppLayout>
-        </>
-    );
+            <AdminTabPanel value="permissions">
+              <PermissionsTab
+                user={user}
+                role={userRole}
+                userPermissions={userPermissions}
+                rolePermissions={rolePermissions}
+              />
+            </AdminTabPanel>
+
+            <AdminTabPanel value="activity">
+              <ActivityTab
+                user={user}
+                activityLogs={activityLogs}
+                stats={stats}
+                onLogoutAll={handleLogoutAllSessions}
+                isLoggingOutAll={isLoggingOutAll}
+                formatDate={formatDate}
+              />
+            </AdminTabPanel>
+
+            <AdminTabPanel value="security">
+              <SecurityTab
+                user={user}
+                onResetPassword={handleResetPassword}
+                onToggle2FA={handleToggle2FA}
+                onDelete={() => setShowDeleteDialog(true)}
+                isResettingPassword={isResettingPassword}
+                formatDate={formatDate}
+                has2FA={has2FA}
+              />
+            </AdminTabPanel>
+          </AdminTabsWithContent>
+
+          {/* Delete Confirmation Dialog */}
+          <DeleteConfirmationDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            userName={fullName}
+            isDeleting={isDeleting}
+            onDelete={handleDelete}
+          />
+        </div>
+      </AppLayout>
+    </>
+  );
 }

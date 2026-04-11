@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Shield, CheckCircle, Eye, Printer, Download } from 'lucide-react';
-import { ClearanceRequest } from '@/types/admin/clearances/clearance-types'; // Fix import path
+import { ClearanceRequest } from '@/types/admin/clearances/clearance'; // Fix import path
 
 interface StatusBannerProps {
     clearance: ClearanceRequest;

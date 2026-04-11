@@ -1,4 +1,5 @@
 // components/admin/clearance-types/ClearanceTypesStats.tsx
+
 import { FileText, CheckCircle, CreditCard, Shield, Globe } from 'lucide-react';
 import { StatCard } from '@/components/adminui/stats-grid';
 
@@ -6,8 +7,12 @@ interface Stats {
     total: number;
     active: number;
     requires_payment: number;
-    requires_approval: number;
-    online_only: number;
+    requires_approval?: number;
+    online_only?: number;
+    inactive?: number;
+    discountable?: number;
+    non_discountable?: number;
+    averageFee?: number;
 }
 
 interface ClearanceTypesStatsProps {
@@ -21,7 +26,11 @@ export default function ClearanceTypesStats({ stats }: ClearanceTypesStatsProps)
         active: stats?.active || 0,
         requires_payment: stats?.requires_payment || 0,
         requires_approval: stats?.requires_approval || 0,
-        online_only: stats?.online_only || 0
+        online_only: stats?.online_only || 0,
+        inactive: stats?.inactive || 0,
+        discountable: stats?.discountable || 0,
+        non_discountable: stats?.non_discountable || 0,
+        averageFee: stats?.averageFee || 0
     };
 
     const calculatePercentage = (value: number) => {

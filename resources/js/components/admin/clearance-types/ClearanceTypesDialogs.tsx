@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Check, X } from 'lucide-react';
-import { BulkOperation, BulkEditField, SelectionStats } from '@/types/clearance-types';
+import { BulkOperation, BulkEditField, SelectionStats } from '@/types/admin/clearance-types/clearance-types';
 
 interface ClearanceTypesDialogsProps {
     showBulkDeleteDialog: boolean;
@@ -58,7 +58,9 @@ export default function ClearanceTypesDialogs({
         needsApproval: 0,
         onlineOnly: 0,
         totalValue: 0,
-        avgProcessingDays: 0
+        avgProcessingDays: 0,
+        discountable: 0,
+        non_discountable: 0
     }
 }: ClearanceTypesDialogsProps) {
     return (

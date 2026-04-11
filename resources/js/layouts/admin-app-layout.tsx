@@ -1,5 +1,5 @@
 import AppLayoutTemplate from '@/layouts/app/app-sidebar-layout';
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem } from '@/types/breadcrumbs';
 import { type ReactNode } from 'react';
 import MobileStickyFooter from '@/layouts/mobile-sticky-footer';
 import { usePage } from '@inertiajs/react';

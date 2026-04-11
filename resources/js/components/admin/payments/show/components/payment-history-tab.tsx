@@ -59,8 +59,19 @@ const getHistoryIcon = (action: string) => {
     }
 };
 
+const getActionDisplay = (action: string): string => {
+    const actionMap: Record<string, string> = {
+        'created': 'Payment Created',
+        'updated': 'Payment Updated',
+        'status_changed': 'Status Changed',
+        'voided': 'Payment Voided',
+        'refunded': 'Payment Refunded',
+    };
+    return actionMap[action] || action.charAt(0).toUpperCase() + action.slice(1);
+};
+
 const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
         case 'pending':
             return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800">Pending</Badge>;
         case 'completed':
@@ -72,15 +83,37 @@ const getStatusBadge = (status: string) => {
         case 'voided':
             return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700">Voided</Badge>;
         default:
-            return <Badge variant="outline">{status}</Badge>;
+            return <Badge variant="outline">{status || 'Unknown'}</Badge>;
     }
+};
+
+// Helper to get user initial
+const getUserInitial = (userName?: string): string => {
+    if (!userName) return 'S';
+    return userName.charAt(0).toUpperCase();
+};
+
+// Helper to format user display name
+const formatUserName = (user?: { name?: string; id?: number }): string => {
+    if (!user) return 'System';
+    if (user.name && user.name !== 'null' && user.name !== 'undefined') {
+        return user.name;
+    }
+    return `User #${user.id}`;
 };
 
 export const PaymentHistoryTab = ({ history = [], paymentId }: PaymentHistoryTabProps) => {
     // Safe check to ensure history is an array
     const safeHistory = Array.isArray(history) ? (history as PaymentHistory[]) : [];
     
-    if (safeHistory.length === 0) {
+    // Filter out duplicate events if needed (optional)
+    const uniqueHistory = safeHistory.filter((record, index, self) => 
+        index === self.findIndex(r => 
+            r.id === record.id && r.action === record.action && r.created_at === record.created_at
+        )
+    );
+    
+    if (uniqueHistory.length === 0) {
         return (
             <Card className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
                 <CardContent className="py-12">
@@ -114,107 +147,105 @@ export const PaymentHistoryTab = ({ history = [], paymentId }: PaymentHistoryTab
                         <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700"></div>
                         
                         <div className="space-y-6">
-                            {safeHistory.map((record, index) => (
-                                <div key={record.id || index} className="relative flex gap-4">
-                                    {/* Timeline dot */}
-                                    <div className="relative z-10 flex-shrink-0">
-                                        <div className="w-8 h-8 rounded-full bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center">
-                                            {getHistoryIcon(record.action)}
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0 pb-4">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-medium text-gray-900 dark:text-gray-100">
-                                                    {record.action === 'created' && 'Payment Created'}
-                                                    {record.action === 'updated' && 'Payment Updated'}
-                                                    {record.action === 'status_changed' && 'Status Changed'}
-                                                    {record.action === 'voided' && 'Payment Voided'}
-                                                    {record.action === 'refunded' && 'Payment Refunded'}
-                                                    {!['created', 'updated', 'status_changed', 'voided', 'refunded'].includes(record.action) && record.action}
-                                                </span>
-                                                {record.status && getStatusBadge(record.status)}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                <Clock className="h-3 w-3" />
-                                                <span>{formatDate(record.created_at)}</span>
+                            {uniqueHistory.map((record, index) => {
+                                const userName = formatUserName(record.user);
+                                const userInitial = getUserInitial(record.user?.name);
+                                
+                                return (
+                                    <div key={record.id || index} className="relative flex gap-4">
+                                        {/* Timeline dot */}
+                                        <div className="relative z-10 flex-shrink-0">
+                                            <div className="w-8 h-8 rounded-full bg-white dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                                                {getHistoryIcon(record.action)}
                                             </div>
                                         </div>
                                         
-                                        {record.description && (
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                                {record.description}
-                                            </p>
-                                        )}
-                                        
-                                        {/* User info */}
-                                        {record.user && (
+                                        {/* Content */}
+                                        <div className="flex-1 min-w-0 pb-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                                                        {getActionDisplay(record.action)}
+                                                    </span>
+                                                    {record.status && getStatusBadge(record.status)}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                    <Clock className="h-3 w-3" />
+                                                    <span>{formatDate(record.created_at)}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            {record.description && (
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                                    {record.description}
+                                                </p>
+                                            )}
+                                            
+                                            {/* User info - FIXED display */}
                                             <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
                                                 <Avatar className="h-5 w-5">
                                                     <AvatarFallback className="text-[10px] bg-gray-100 dark:bg-gray-800">
-                                                        {record.user.name?.charAt(0).toUpperCase() || 'U'}
+                                                        {userInitial}
                                                     </AvatarFallback>
                                                 </Avatar>
-                                                <span>by {record.user.name}</span>
+                                                <span>by <span className="font-medium text-gray-700 dark:text-gray-300">{userName}</span></span>
                                             </div>
-                                        )}
-                                        
-                                        {/* Changes details */}
-                                        {record.changes && Object.keys(record.changes).length > 0 && (
-                                            <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-xs">
-                                                <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Changes:</div>
-                                                <div className="space-y-1">
-                                                    {Object.entries(record.changes).map(([field, change]) => (
-                                                        <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                                            <span className="font-medium text-gray-600 dark:text-gray-400 capitalize w-32">
-                                                                {field.replace(/_/g, ' ')}:
-                                                            </span>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-red-600 dark:text-red-400 line-through">
-                                                                    {typeof change.old === 'number' ? `₱${change.old.toLocaleString()}` : change.old}
+                                            
+                                            {/* Changes details */}
+                                            {record.changes && Object.keys(record.changes).length > 0 && (
+                                                <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-xs">
+                                                    <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">Changes:</div>
+                                                    <div className="space-y-1">
+                                                        {Object.entries(record.changes).map(([field, change]) => (
+                                                            <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                                                                <span className="font-medium text-gray-600 dark:text-gray-400 capitalize w-32">
+                                                                    {field.replace(/_/g, ' ')}:
                                                                 </span>
-                                                                <span className="text-gray-400 dark:text-gray-600">→</span>
-                                                                <span className="text-green-600 dark:text-green-400">
-                                                                    {typeof change.new === 'number' ? `₱${change.new.toLocaleString()}` : change.new}
-                                                                </span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-red-600 dark:text-red-400 line-through">
+                                                                        {typeof change.old === 'number' ? `₱${change.old.toLocaleString()}` : change.old}
+                                                                    </span>
+                                                                    <span className="text-gray-400 dark:text-gray-600">→</span>
+                                                                    <span className="text-green-600 dark:text-green-400">
+                                                                        {typeof change.new === 'number' ? `₱${change.new.toLocaleString()}` : change.new}
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                        
-                                        {/* Metadata */}
-                                        {record.metadata && Object.keys(record.metadata).length > 0 && (
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                {record.metadata.reference_number && (
-                                                    <Badge variant="outline" className="text-xs">
-                                                        Ref: {record.metadata.reference_number}
-                                                    </Badge>
-                                                )}
-                                                {record.metadata.payment_method && (
-                                                    <Badge variant="outline" className="text-xs">
-                                                        Method: {record.metadata.payment_method}
-                                                    </Badge>
-                                                )}
-                                                {record.metadata.reason && (
-                                                    <Badge variant="outline" className="text-xs">
-                                                        Reason: {record.metadata.reason}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        )}
+                                            )}
+                                            
+                                            {/* Metadata */}
+                                            {record.metadata && Object.keys(record.metadata).length > 0 && (
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {record.metadata.reference_number && (
+                                                        <Badge variant="outline" className="text-xs">
+                                                            Ref: {record.metadata.reference_number}
+                                                        </Badge>
+                                                    )}
+                                                    {record.metadata.payment_method && (
+                                                        <Badge variant="outline" className="text-xs">
+                                                            Method: {record.metadata.payment_method}
+                                                        </Badge>
+                                                    )}
+                                                    {record.metadata.reason && (
+                                                        <Badge variant="outline" className="text-xs">
+                                                            Reason: {record.metadata.reason}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </ScrollArea>
                 
                 {/* View all history link */}
-                {paymentId && safeHistory.length > 5 && (
+                {paymentId && uniqueHistory.length > 5 && (
                     <div className="mt-4 pt-2 text-center border-t border-gray-200 dark:border-gray-700">
                         <Link
                             href={getRoute('admin.payments.history', paymentId)}

@@ -18,9 +18,12 @@ class RoleController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Role::withCount('users')->latest();
+        $query = Role::withCount('users')
+            ->withCount('permissions')
+            ->latest();
 
-        if ($request->has('search')) {
+        // Search filter
+        if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -28,22 +31,120 @@ class RoleController extends Controller
             });
         }
 
-        if ($request->has('type') && $request->type !== 'all') {
+        // Type filter (system/custom)
+        if ($request->filled('type') && $request->type !== 'all') {
             $query->where('is_system_role', $request->type === 'system');
+        }
+
+        // Users count range filter
+        if ($request->filled('users_range')) {
+            $this->applyUsersRangeFilter($query, $request->users_range);
+        }
+
+        // Permissions count range filter
+        if ($request->filled('permissions_range')) {
+            $this->applyPermissionsRangeFilter($query, $request->permissions_range);
+        }
+
+        // Sorting (for table header)
+        $sortBy = $request->get('sort_by', 'name');
+        $sortOrder = $request->get('sort_order', 'asc');
+        
+        // Handle sorting by relationship counts
+        switch ($sortBy) {
+            case 'users_count':
+                $query->orderBy('users_count', $sortOrder);
+                break;
+            case 'permissions_count':
+                $query->orderBy('permissions_count', $sortOrder);
+                break;
+            case 'type':
+                $query->orderBy('is_system_role', $sortOrder);
+                break;
+            case 'created_at':
+                $query->orderBy('created_at', $sortOrder);
+                break;
+            default:
+                $query->orderBy($sortBy, $sortOrder);
         }
 
         $roles = $query->paginate(20)->withQueryString();
 
+        // Transform roles to include counts
+        $roles->through(function ($role) {
+            return [
+                'id' => $role->id,
+                'name' => $role->name,
+                'description' => $role->description,
+                'is_system_role' => $role->is_system_role,
+                'users_count' => $role->users_count ?? 0,
+                'permissions_count' => $role->permissions_count ?? 0,
+                'created_at' => $role->created_at,
+                'updated_at' => $role->updated_at,
+            ];
+        });
+
         return Inertia::render('admin/Roles/Index', [
             'roles' => $roles,
-            'filters' => $request->only(['search', 'type']),
+            'filters' => $request->only(['search', 'type', 'users_range', 'permissions_range', 'sort_by', 'sort_order']),
             'stats' => [
                 'total_roles' => Role::count(),
                 'system_roles' => Role::where('is_system_role', true)->count(),
                 'custom_roles' => Role::where('is_system_role', false)->count(),
                 'roles_with_users' => Role::has('users')->count(),
+                'roles_without_users' => Role::doesntHave('users')->count(),
+                'roles_with_permissions' => Role::has('permissions')->count(),
+                'roles_without_permissions' => Role::doesntHave('permissions')->count(),
             ],
         ]);
+    }
+
+    /**
+     * Apply users count range filter to query
+     */
+    private function applyUsersRangeFilter($query, string $range): void
+    {
+        switch ($range) {
+            case '0':
+                $query->having('users_count', 0);
+                break;
+            case '1-5':
+                $query->havingBetween('users_count', [1, 5]);
+                break;
+            case '6-10':
+                $query->havingBetween('users_count', [6, 10]);
+                break;
+            case '11-20':
+                $query->havingBetween('users_count', [11, 20]);
+                break;
+            case '20+':
+                $query->having('users_count', '>=', 20);
+                break;
+        }
+    }
+
+    /**
+     * Apply permissions count range filter to query
+     */
+    private function applyPermissionsRangeFilter($query, string $range): void
+    {
+        switch ($range) {
+            case '0':
+                $query->having('permissions_count', 0);
+                break;
+            case '1-5':
+                $query->havingBetween('permissions_count', [1, 5]);
+                break;
+            case '6-10':
+                $query->havingBetween('permissions_count', [6, 10]);
+                break;
+            case '11-20':
+                $query->havingBetween('permissions_count', [11, 20]);
+                break;
+            case '20+':
+                $query->having('permissions_count', '>=', 20);
+                break;
+        }
     }
 
     /**
@@ -108,6 +209,7 @@ class RoleController extends Controller
                 'description' => $role->description,
                 'is_system_role' => $role->is_system_role,
                 'users_count' => $role->users_count ?? $role->users()->count(),
+                'permissions_count' => $role->permissions()->count(),
                 'permissions' => $role->permissions->map(function ($permission) {
                     return [
                         'id' => $permission->id,
@@ -308,5 +410,145 @@ class RoleController extends Controller
                 'error' => 'Failed to revoke permission: ' . $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Bulk action for roles
+     */
+    public function bulkAction(Request $request)
+    {
+        $request->validate([
+            'action' => 'required|in:delete,change_type,duplicate',
+            'role_ids' => 'required|array',
+            'role_ids.*' => 'exists:roles,id',
+            'is_system_role' => 'required_if:action,change_type|boolean',
+        ]);
+
+        $action = $request->action;
+        $roleIds = $request->role_ids;
+
+        DB::beginTransaction();
+
+        try {
+            switch ($action) {
+                case 'delete':
+                    // Filter out system roles and roles with users
+                    $deletableRoles = Role::whereIn('id', $roleIds)
+                        ->where('is_system_role', false)
+                        ->doesntHave('users')
+                        ->get();
+                    
+                    foreach ($deletableRoles as $role) {
+                        $role->delete();
+                    }
+                    
+                    DB::commit();
+                    return redirect()->back()->with('success', count($deletableRoles) . ' role(s) deleted successfully.');
+                    break;
+
+                case 'change_type':
+                    $isSystemRole = $request->is_system_role;
+                    $updated = Role::whereIn('id', $roleIds)
+                        ->where('is_system_role', false) // Only custom roles can change type
+                        ->update(['is_system_role' => $isSystemRole]);
+                    
+                    DB::commit();
+                    return redirect()->back()->with('success', $updated . ' role(s) type updated successfully.');
+                    break;
+
+                case 'duplicate':
+                    $duplicated = 0;
+                    $rolesToDuplicate = Role::whereIn('id', $roleIds)->get();
+                    
+                    foreach ($rolesToDuplicate as $role) {
+                        $newRole = $role->replicate();
+                        $newRole->name = $role->name . '_copy_' . time() . '_' . $duplicated;
+                        $newRole->is_system_role = false; // Duplicates are always custom roles
+                        $newRole->save();
+                        
+                        // Copy permissions
+                        foreach ($role->permissions as $permission) {
+                            $newRole->permissions()->attach($permission->id, [
+                                'granted_by' => Auth::id(),
+                                'granted_at' => now(),
+                            ]);
+                        }
+                        
+                        $duplicated++;
+                    }
+                    
+                    DB::commit();
+                    return redirect()->back()->with('success', $duplicated . ' role(s) duplicated successfully.');
+                    break;
+
+                default:
+                    DB::rollBack();
+                    return redirect()->back()->with('error', 'Invalid action.');
+            }
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Bulk action failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate bulk report for selected roles
+     */
+    public function generateBulkReport(Request $request)
+    {
+        $ids = explode(',', $request->get('ids', ''));
+        $roles = Role::whereIn('id', $ids)
+            ->withCount(['users', 'permissions'])
+            ->with(['permissions'])
+            ->get();
+
+        $report = [
+            'generated_at' => now()->toISOString(),
+            'total_roles' => $roles->count(),
+            'roles' => $roles->map(function ($role) {
+                return [
+                    'name' => $role->name,
+                    'type' => $role->is_system_role ? 'System' : 'Custom',
+                    'description' => $role->description,
+                    'users_count' => $role->users_count,
+                    'permissions_count' => $role->permissions_count,
+                    'permissions' => $role->permissions->pluck('display_name')->toArray(),
+                    'created_at' => $role->created_at->toDateString(),
+                ];
+            }),
+        ];
+
+        if ($request->wantsJson()) {
+            return response()->json($report);
+        }
+
+        // For CSV download
+        $csv = [];
+        $csv[] = ['Name', 'Type', 'Description', 'Users', 'Permissions', 'Created At'];
+        foreach ($report['roles'] as $role) {
+            $csv[] = [
+                $role['name'],
+                $role['type'],
+                $role['description'] ?? 'N/A',
+                $role['users_count'],
+                $role['permissions_count'],
+                $role['created_at'],
+            ];
+        }
+
+        $filename = 'roles-report-' . now()->format('Y-m-d') . '.csv';
+        $handle = fopen('php://temp', 'w+');
+        foreach ($csv as $row) {
+            fputcsv($handle, $row);
+        }
+        rewind($handle);
+        $content = stream_get_contents($handle);
+        fclose($handle);
+
+        return response($content)
+            ->withHeaders([
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            ]);
     }
 }
