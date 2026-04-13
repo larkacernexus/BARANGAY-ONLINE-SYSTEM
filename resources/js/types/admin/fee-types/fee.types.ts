@@ -4,6 +4,7 @@ import { Briefcase, FileText, Shield, DollarSign, Heart, Tag } from 'lucide-reac
 import React from 'react';
 
 export interface FeeType {
+    remarks: any;
     id: number;
     code: string;
     name: string;

@@ -1,4 +1,5 @@
 // resources/js/components/admin/receipts/ReceiptsGridView.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,8 +24,12 @@ import {
     Calendar,
     MoreVertical,
     Tag,
+    ChevronDown,
+    ChevronUp,
+    Square,
+    CheckSquare,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
     getReceiptStatusConfig, 
     getPaymentMethodConfig,
@@ -67,6 +72,7 @@ interface ReceiptsGridViewProps {
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     selectionStats: any;
+    windowWidth?: number;
 }
 
 const formatDate = (dateString: string) => {
@@ -107,25 +113,51 @@ export default function ReceiptsGridView({
     onDelete,
     hasActiveFilters,
     onClearFilters,
-    selectionStats
+    selectionStats,
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
 }: ReceiptsGridViewProps) {
-    const [expandedReceipts, setExpandedReceipts] = useState<number[]>([]);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
+    
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
+    
+    const isCompactView = isMobile;
+    
+    // Determine grid columns - 3 for laptops, 4 for wide screens
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;      // Mobile: 1 column
+        if (windowWidth < 1024) return 2;     // Tablet: 2 columns
+        if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
+        return 4;                              // Wide desktop: 4 columns
+    }, [windowWidth, devicePixelRatio]);
 
-    const toggleExpand = (id: number, e: React.MouseEvent) => {
+    // Toggle card expansion
+    const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
-        setExpandedReceipts(prev =>
-            prev.includes(id) ? prev.filter(rid => rid !== id) : [...prev, id]
-        );
+        setExpandedId(prev => prev === id ? null : id);
+    }, []);
+
+    // Handle card click
+    const handleCardClick = (receiptId: number, e: React.MouseEvent) => {
+        if (isBulkMode) {
+            e.stopPropagation();
+            return;
+        }
+        e.stopPropagation();
+        handleToggleExpand(receiptId, e);
     };
 
     const handleCopyToClipboard = (text: string, label: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(text).then(() => {
-            // Toast would be handled by parent
-        }).catch(() => {
-            // Toast would be handled by parent
+        navigator.clipboard.writeText(text).catch(() => {
+            console.error(`Failed to copy ${label}`);
         });
     };
+    
+    // Memoize selected set for quick lookup
+    const selectedSet = useMemo(() => new Set(selectedReceipts), [selectedReceipts]);
 
     const emptyState = (
         <EmptyState
@@ -141,45 +173,47 @@ export default function ReceiptsGridView({
         />
     );
 
+    // Early return for empty state
+    if (receipts.length === 0) {
+        return emptyState;
+    }
+
     return (
         <GridLayout
-            isEmpty={receipts.length === 0}
-            emptyState={emptyState}
-            gridCols={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+            isEmpty={false}
+            emptyState={null}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
             gap={{ base: '3', sm: '4' }}
             padding="p-4"
         >
             {receipts.map((receipt) => {
-                // ✅ Cast status to ReceiptStatus
                 const statusConfig = getReceiptStatusConfig(castToReceiptStatus(receipt.status), receipt.is_voided);
                 const paymentMethodConfig = getPaymentMethodConfig(receipt.payment_method);
-                const isSelected = selectedReceipts.includes(receipt.id);
-                const isExpanded = expandedReceipts.includes(receipt.id);
+                const isSelected = selectedSet.has(receipt.id);
+                const isExpanded = expandedId === receipt.id;
+                
+                // Truncation lengths based on view
+                const nameLength = isCompactView ? 20 : 30;
+                const receiptNumberLength = isCompactView ? 15 : 25;
                 
                 return (
                     <Card 
                         key={receipt.id}
-                        className={`overflow-hidden transition-all hover:shadow-md bg-white dark:bg-gray-900 border ${
+                        className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
                             isSelected 
-                                ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/20' 
-                                : 'border-gray-200 dark:border-gray-700'
-                        } ${isExpanded ? 'shadow-lg' : ''}`}
-                        onClick={(e) => {
-                            if (isBulkMode && e.target instanceof HTMLElement && 
-                                !e.target.closest('a') && 
-                                !e.target.closest('button') &&
-                                !e.target.closest('.dropdown-menu-content') &&
-                                !e.target.closest('input[type="checkbox"]')) {
-                                onItemSelect(receipt.id);
-                            }
-                        }}
+                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
+                        } ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
+                        onClick={(e) => handleCardClick(receipt.id, e)}
                     >
                         <CardContent className="p-4">
                             {/* Header */}
                             <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                        receipt.is_voided ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'
+                                        receipt.is_voided 
+                                            ? 'bg-red-100 dark:bg-red-900/30' 
+                                            : 'bg-blue-100 dark:bg-blue-900/30'
                                     }`}>
                                         {receipt.is_voided ? (
                                             <Ban className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -188,8 +222,8 @@ export default function ReceiptsGridView({
                                         )}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                            {truncateText(receipt.receipt_number, isMobile ? 15 : 25)}
+                                        <div className="font-medium text-gray-900 dark:text-white truncate">
+                                            {truncateText(receipt.receipt_number, receiptNumberLength)}
                                         </div>
                                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                             OR: {receipt.or_number || '—'} • {receipt.receipt_type_label}
@@ -197,60 +231,96 @@ export default function ReceiptsGridView({
                                     </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                <div className="flex items-center gap-1 ml-2">
                                     {isBulkMode && (
                                         <Checkbox
                                             checked={isSelected}
                                             onCheckedChange={() => onItemSelect(receipt.id)}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                         />
                                     )}
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button 
-                                                variant="ghost" 
-                                                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            <button
+                                                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                <span className="sr-only">Open menu</span>
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
+                                                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-48">
-                                            <DropdownMenuItem onClick={() => onView(receipt.id)}>
-                                                <Eye className="mr-2 h-4 w-4" />
-                                                <span>View Details</span>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onView(receipt.id);
+                                            }}>
+                                                <Eye className="h-4 w-4 mr-2" />
+                                                View Details
                                             </DropdownMenuItem>
                                             
-                                            <DropdownMenuItem onClick={() => onPrint(receipt)}>
-                                                <Printer className="mr-2 h-4 w-4" />
-                                                <span>Print Receipt</span>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onPrint(receipt);
+                                            }}>
+                                                <Printer className="h-4 w-4 mr-2" />
+                                                Print Receipt
                                             </DropdownMenuItem>
                                             
                                             <DropdownMenuSeparator />
                                             
                                             <DropdownMenuItem onClick={(e) => handleCopyToClipboard(receipt.receipt_number, 'Receipt #', e)}>
-                                                <Copy className="mr-2 h-4 w-4" />
-                                                <span>Copy Receipt #</span>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy Receipt #
                                             </DropdownMenuItem>
                                             
                                             {receipt.or_number && (
                                                 <DropdownMenuItem onClick={(e) => handleCopyToClipboard(receipt.or_number!, 'OR #', e)}>
-                                                    <Copy className="mr-2 h-4 w-4" />
-                                                    <span>Copy OR #</span>
+                                                    <Copy className="h-4 w-4 mr-2" />
+                                                    Copy OR #
                                                 </DropdownMenuItem>
+                                            )}
+                                            
+                                            {receipt.payer_address && (
+                                                <DropdownMenuItem onClick={(e) => handleCopyToClipboard(receipt.payer_address!, 'Address', e)}>
+                                                    <Copy className="h-4 w-4 mr-2" />
+                                                    Copy Address
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            {isBulkMode && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onItemSelect(receipt.id);
+                                                    }}>
+                                                        {isSelected ? (
+                                                            <>
+                                                                <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
+                                                                <span className="text-green-600">Deselect</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Square className="h-4 w-4 mr-2" />
+                                                                Select for Bulk
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuItem>
+                                                </>
                                             )}
                                             
                                             {!receipt.is_voided && (
                                                 <>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem 
-                                                        onClick={() => onVoid(receipt.id, receipt.receipt_number)}
-                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onVoid(receipt.id, receipt.receipt_number);
+                                                        }}
+                                                        className="text-red-600 dark:text-red-400"
                                                     >
-                                                        <Ban className="mr-2 h-4 w-4" />
-                                                        <span>Void Receipt</span>
+                                                        <Ban className="h-4 w-4 mr-2" />
+                                                        Void Receipt
                                                     </DropdownMenuItem>
                                                 </>
                                             )}
@@ -259,8 +329,8 @@ export default function ReceiptsGridView({
                                 </div>
                             </div>
 
-                            {/* Status Badge */}
-                            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                            {/* Status Badges */}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
                                 <Badge className={`text-xs px-2 py-0.5 ${statusConfig.className}`}>
                                     {statusConfig.label}
                                 </Badge>
@@ -273,82 +343,83 @@ export default function ReceiptsGridView({
                                 )}
                             </div>
 
-                            {/* Main Content */}
-                            <div className="space-y-2">
-                                {/* Payer Info */}
-                                <div className="flex items-center gap-2 text-sm">
-                                    <User className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                    <span className="font-medium text-gray-900 dark:text-white truncate">
-                                        {truncateText(receipt.payer_name, isMobile ? 20 : 30)}
+                            {/* Payer Info */}
+                            <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                <User className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="truncate" title={receipt.payer_name}>
+                                    {truncateText(receipt.payer_name, nameLength)}
+                                </span>
+                            </div>
+
+                            {/* Amount Summary */}
+                            <div className="space-y-1.5 mb-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">Total:</span>
+                                    <span className="font-bold text-gray-900 dark:text-white">
+                                        {receipt.formatted_total}
                                     </span>
                                 </div>
-
-                                {/* Amount */}
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Tag className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                                        <span className="text-gray-600 dark:text-gray-400">Total Amount:</span>
-                                    </div>
-                                    <div className="font-bold text-lg text-gray-900 dark:text-white">
-                                        {receipt.formatted_total}
-                                    </div>
-                                </div>
-
-                                {/* Paid Amount */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <CreditCard className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                                        <span className="text-gray-600 dark:text-gray-400">Paid:</span>
-                                    </div>
-                                    <div className="font-medium text-green-600 dark:text-green-400">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">Paid:</span>
+                                    <span className="font-medium text-green-600 dark:text-green-400">
                                         {receipt.formatted_amount_paid}
-                                    </div>
+                                    </span>
                                 </div>
+                            </div>
 
-                                {/* Payment Method & Date */}
-                                <div className="grid grid-cols-2 gap-2 pt-1">
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-xs text-gray-700 dark:text-gray-300">
-                                            {receipt.payment_method_label}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-1 justify-end">
-                                        <Calendar className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                                        <span className="text-xs text-gray-700 dark:text-gray-300">
-                                            {formatDate(receipt.formatted_issued_date)}
-                                        </span>
-                                    </div>
+                            {/* Payment Method & Date */}
+                            <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                <span>{receipt.payment_method_label}</span>
+                                <div className="flex items-center gap-1">
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    <span>{formatDate(receipt.formatted_issued_date)}</span>
                                 </div>
+                            </div>
 
-                                {/* Reference Number */}
-                                {receipt.reference_number && (
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                        Ref: {truncateText(receipt.reference_number, 20)}
-                                    </div>
-                                )}
+                            {/* Reference Number */}
+                            {receipt.reference_number && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    Ref: {truncateText(receipt.reference_number, 20)}
+                                </div>
+                            )}
 
-                                {/* Issued By */}
-                                {receipt.issued_by && (
+                            {/* Expand/Collapse indicator */}
+                            {!isBulkMode && (
+                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        Issued by: {receipt.issued_by}
+                                        {isExpanded ? 'Hide details' : 'Click to view details'}
                                     </div>
-                                )}
+                                    <button
+                                        className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={(e) => handleToggleExpand(receipt.id, e)}
+                                    >
+                                        {isExpanded ? (
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        ) : (
+                                            <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        )}
+                                    </button>
+                                </div>
+                            )}
 
-                                {/* Fee Breakdown - Expandable */}
-                                {receipt.fee_breakdown && receipt.fee_breakdown.length > 0 && (
-                                    <div className="pt-2">
-                                        <button
-                                            onClick={(e) => toggleExpand(receipt.id, e)}
-                                            className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                                        >
-                                            {isExpanded ? 'Hide' : 'Show'} Fee Breakdown
-                                            {isExpanded ? '↑' : '↓'}
-                                        </button>
-                                        
-                                        {isExpanded && (
-                                            <div className="mt-2 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
+                            {/* Expanded Details */}
+                            {isExpanded && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50">
+                                    {/* Issued By */}
+                                    {receipt.issued_by && (
+                                        <div className="text-sm">
+                                            <span className="text-gray-500 dark:text-gray-400">Issued by:</span>
+                                            <span className="text-gray-900 dark:text-white ml-1">{receipt.issued_by}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Fee Breakdown */}
+                                    {receipt.fee_breakdown && receipt.fee_breakdown.length > 0 && (
+                                        <div className="space-y-1">
+                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Fee Breakdown:</p>
+                                            <div className="space-y-1 pl-2">
                                                 {receipt.fee_breakdown.map((fee: any, index: number) => (
-                                                    <div key={index} className="flex items-center justify-between text-xs">
+                                                    <div key={index} className="flex items-center justify-between text-sm">
                                                         <span className="text-gray-600 dark:text-gray-400">
                                                             {fee.fee_name}
                                                         </span>
@@ -358,63 +429,39 @@ export default function ReceiptsGridView({
                                                     </div>
                                                 ))}
                                             </div>
-                                        )}
+                                        </div>
+                                    )}
+
+                                    {/* Void Reason */}
+                                    {receipt.is_voided && receipt.void_reason && (
+                                        <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
+                                            <p className="text-sm text-red-700 dark:text-red-400">
+                                                <span className="font-medium">Void Reason:</span> {receipt.void_reason}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* View full details link */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                                        <button
+                                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onView(receipt.id);
+                                            }}
+                                        >
+                                            <Eye className="h-3.5 w-3.5" />
+                                            View full details
+                                        </button>
+                                        <button
+                                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                            onClick={(e) => handleToggleExpand(receipt.id, e)}
+                                        >
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        </button>
                                     </div>
-                                )}
-
-                                {/* Void Reason */}
-                                {receipt.is_voided && receipt.void_reason && (
-                                    <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
-                                        <p className="text-xs text-red-700 dark:text-red-400">
-                                            <span className="font-medium">Void Reason:</span> {receipt.void_reason}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Quick Action Buttons */}
-                            <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-1">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onView(receipt.id);
-                                    }}
-                                    title="View Details"
-                                >
-                                    <Eye className="h-3.5 w-3.5" />
-                                </Button>
-
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 w-7 p-0 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-950"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onPrint(receipt);
-                                    }}
-                                    title="Print Receipt"
-                                >
-                                    <Printer className="h-3.5 w-3.5" />
-                                </Button>
-
-                                {receipt.payer_address && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 w-7 p-0 text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleCopyToClipboard(receipt.payer_address!, 'Address', e);
-                                        }}
-                                        title="Copy Address"
-                                    >
-                                        <Copy className="h-3.5 w-3.5" />
-                                    </Button>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 );

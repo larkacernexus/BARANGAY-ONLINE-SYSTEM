@@ -1,5 +1,6 @@
 // components/admin/payments/PaymentsGridView.tsx
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,12 +11,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 // prettier-ignore
-import { Receipt, User, Users, Phone, DollarSign, CreditCard, CheckCircle, Clock, XCircle, FileText, Calendar, Eye, Printer, Copy, Trash2, ChevronDown, ChevronUp, ExternalLink, MapPin, Home, Building, Hash, Info, MoreVertical, Square, CheckSquare } from 'lucide-react';
+import { Receipt, User, Users, Phone, DollarSign, CreditCard, CheckCircle, Clock, XCircle, FileText, Calendar, Eye, Printer, Copy, Trash2, ChevronDown, ChevronUp, ExternalLink, MapPin, Home, Building, Hash, MoreVertical, Square, CheckSquare } from 'lucide-react';
 import { Payment } from '@/types/admin/payments/payments';
 
 interface PaymentsGridViewProps {
@@ -30,9 +30,11 @@ interface PaymentsGridViewProps {
     onPrintReceipt: (payment: Payment) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     formatCurrency: (amount: number) => string;
+    windowWidth?: number;
+    isMobile?: boolean;
 }
 
-// Status color classes matching community reports pattern
+// Status color classes
 const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
         case 'completed':
@@ -47,7 +49,7 @@ const getStatusColor = (status: string) => {
 };
 
 // Format date helper
-const formatDate = (dateString: string) => {
+const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString);
@@ -61,7 +63,7 @@ const formatDate = (dateString: string) => {
     }
 };
 
-const formatDateTime = (dateString: string) => {
+const formatDateTime = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString);
@@ -77,6 +79,13 @@ const formatDateTime = (dateString: string) => {
     }
 };
 
+// Truncate text helper
+const truncateText = (text: string | null | undefined, maxLength: number = 30): string => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+};
+
 export default function PaymentsGridView({
     payments,
     isBulkMode,
@@ -88,45 +97,43 @@ export default function PaymentsGridView({
     onViewDetails,
     onPrintReceipt,
     onCopyToClipboard,
-    formatCurrency
+    formatCurrency,
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024,
+    isMobile = false
 }: PaymentsGridViewProps) {
-    const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
     
-    // Toggle card expansion
-    const toggleCardExpansion = (id: number, e?: React.MouseEvent) => {
-        if (e) {
-            e.stopPropagation();
-            e.preventDefault();
-        }
-        setExpandedCards(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
-        });
-    };
-
-    // Handle card click
-    const handleCardClick = (paymentId: number, e: React.MouseEvent) => {
-        if (isBulkMode) {
-            e.stopPropagation();
-            return;
-        }
-        e.stopPropagation();
-        toggleCardExpansion(paymentId);
-    };
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
+    
+    const isCompactView = isMobile;
+    
+    // Determine grid columns - 3 for laptops, 4 for wide screens
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;      // Mobile: 1 column
+        if (windowWidth < 1024) return 2;     // Tablet: 2 columns
+        if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
+        return 4;                              // Wide desktop: 4 columns
+    }, [windowWidth]);
+    
+    // Adjust text truncation based on grid columns
+    const nameLength = useMemo(() => {
+        if (gridCols >= 4) return 25;
+        if (gridCols === 3) return 22;
+        if (gridCols === 2) return 20;
+        return 18;
+    }, [gridCols]);
     
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'completed': 
-                return <CheckCircle className="h-3 w-3 text-green-500 dark:text-green-400" />;
+                return <CheckCircle className="h-3 w-3" />;
             case 'pending': 
-                return <Clock className="h-3 w-3 text-amber-500 dark:text-amber-400" />;
+                return <Clock className="h-3 w-3" />;
             case 'cancelled':
-                return <XCircle className="h-3 w-3 text-gray-500 dark:text-gray-400" />;
+                return <XCircle className="h-3 w-3" />;
             default: 
                 return null;
         }
@@ -171,6 +178,25 @@ export default function PaymentsGridView({
         }
     };
 
+    // Toggle card expansion
+    const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedId(prev => prev === id ? null : id);
+    }, []);
+
+    // Handle card click
+    const handleCardClick = (paymentId: number, e: React.MouseEvent) => {
+        if (isBulkMode) {
+            e.stopPropagation();
+            return;
+        }
+        e.stopPropagation();
+        handleToggleExpand(paymentId, e);
+    };
+    
+    // Memoize selected set for quick lookup
+    const selectedSet = useMemo(() => new Set(selectedPayments), [selectedPayments]);
+
     const emptyState = (
         <EmptyState
             title="No payments found"
@@ -185,230 +211,220 @@ export default function PaymentsGridView({
         />
     );
 
+    // Early return for empty state
+    if (payments.length === 0) {
+        return emptyState;
+    }
+
     return (
         <GridLayout
-            isEmpty={payments.length === 0}
-            emptyState={emptyState}
-            gridCols={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+            isEmpty={false}
+            emptyState={null}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
             gap={{ base: '3', sm: '4' }}
             padding="p-4"
         >
             {payments.map((payment) => {
-                const isSelected = selectedPayments.includes(payment.id);
-                const isExpanded = expandedCards.has(payment.id);
-                const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-                const isCompactView = isMobile;
+                const isSelected = selectedSet.has(payment.id);
+                const isExpanded = expandedId === payment.id;
                 
-                // Truncation lengths based on view
-                const nameLength = isCompactView ? 20 : 30;
+                // Safe accessors with fallbacks
+                const payerName = payment.payer_name || 'Unknown';
+                const orNumber = payment.or_number || 'N/A';
+                const amountPaid = payment.amount_paid || 0;
+                const contactNumber = payment.contact_number || null;
+                const address = payment.address || null;
+                const purok = payment.purok || null;
+                const referenceNumber = payment.reference_number || null;
+                const periodCovered = payment.period_covered || null;
+                const notes = payment.notes || null;
+                const remarks = payment.remarks || null;
                 
                 return (
                     <Card 
                         key={payment.id}
                         className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
                             isSelected 
-                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400 dark:shadow-blue-400/20' 
-                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-gray-800/50'
+                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
                         } ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
                         onClick={(e) => handleCardClick(payment.id, e)}
                     >
-                        {/* Bulk selection checkbox */}
-                        {isBulkMode && (
-                            <div 
-                                className="absolute top-2 left-2 z-20"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onItemSelect(payment.id);
-                                }}
-                            >
-                                <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={() => onItemSelect(payment.id)}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 shadow-sm h-4 w-4"
-                                />
-                            </div>
-                        )}
-
-                        {/* Dropdown Menu - 3 dots */}
-                        <div className="absolute top-2 right-2 z-20">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button 
-                                        variant="ghost" 
-                                        className="h-7 w-7 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        onViewDetails(payment);
-                                    }}>
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View Details
-                                    </DropdownMenuItem>
-                                    
-                                    <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        onPrintReceipt(payment);
-                                    }}>
-                                        <Printer className="mr-2 h-4 w-4" />
-                                        Print Receipt
-                                    </DropdownMenuItem>
-                                    
-                                    <DropdownMenuSeparator />
-                                    
-                                    <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        onCopyToClipboard(payment.or_number, 'OR Number');
-                                    }}>
-                                        <Copy className="mr-2 h-4 w-4" />
-                                        Copy OR Number
-                                    </DropdownMenuItem>
-                                    
-                                    <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        onCopyToClipboard(payment.payer_name, 'Payer Name');
-                                    }}>
-                                        <Copy className="mr-2 h-4 w-4" />
-                                        Copy Payer Name
-                                    </DropdownMenuItem>
-
-                                    {payment.contact_number && (
-                                        <DropdownMenuItem onClick={(e) => {
-                                            e.stopPropagation();
-                                            onCopyToClipboard(payment.contact_number!, 'Contact Number');
-                                        }}>
-                                            <Copy className="mr-2 h-4 w-4" />
-                                            Copy Contact
-                                        </DropdownMenuItem>
-                                    )}
-                                    
-                                    {isBulkMode && (
-                                        <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={(e) => {
-                                                e.stopPropagation();
-                                                onItemSelect(payment.id);
-                                            }}>
-                                                {isSelected ? (
-                                                    <>
-                                                        <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
-                                                        <span className="text-green-600">Deselect</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Square className="mr-2 h-4 w-4" />
-                                                        Select for Bulk
-                                                    </>
-                                                )}
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
-                                    
-                                    <DropdownMenuSeparator />
-                                    
-                                    {payment.status !== 'completed' && (
-                                        <DropdownMenuItem 
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onDelete(payment);
-                                            }}
-                                            className="text-red-600 focus:text-red-700 focus:bg-red-50"
-                                        >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Delete Payment
-                                        </DropdownMenuItem>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        <CardContent className={`p-3 ${isCompactView && !isExpanded ? 'pb-1' : ''} bg-white dark:bg-gray-900`}>
-                            {/* Header row with icon and OR number */}
-                            <div className="flex items-start justify-between mb-2 pr-6">
-                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                    <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex-shrink-0">
-                                        <Receipt className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        <CardContent className="p-4">
+                            {/* Header */}
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                                        <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                     </div>
-                                    <span 
-                                        className="font-medium text-xs text-blue-600 dark:text-blue-400 truncate hover:text-blue-700 dark:hover:text-blue-300 cursor-help"
-                                        title={`OR Number: ${payment.or_number}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onCopyToClipboard(payment.or_number, 'OR Number');
-                                        }}
-                                    >
-                                        {payment.or_number}
-                                    </span>
+                                    
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-gray-900 dark:text-white truncate">
+                                            {orNumber}
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                            {formatDate(payment.payment_date)}
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                {/* Status badge */}
-                                <div className="flex gap-1 flex-shrink-0">
-                                    <Badge 
-                                        variant="outline" 
-                                        className={`text-[10px] px-1.5 py-0 h-4 border ${getStatusColor(payment.status)} flex items-center gap-0.5`}
-                                    >
-                                        {getStatusIcon(payment.status)}
-                                        <span>{payment.status === 'completed' ? 'Completed' : 
-                                               payment.status === 'pending' ? 'Pending' :
-                                               payment.status === 'cancelled' ? 'Cancelled' : payment.status}</span>
-                                    </Badge>
+                                <div className="flex items-center gap-1 ml-2">
+                                    {isBulkMode && (
+                                        <Checkbox
+                                            checked={isSelected}
+                                            onCheckedChange={() => onItemSelect(payment.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                    )}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onViewDetails(payment);
+                                            }}>
+                                                <Eye className="h-4 w-4 mr-2" />
+                                                View Details
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onPrintReceipt(payment);
+                                            }}>
+                                                <Printer className="h-4 w-4 mr-2" />
+                                                Print Receipt
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuSeparator />
+                                            
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCopyToClipboard(orNumber, 'OR Number');
+                                            }}>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy OR Number
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onCopyToClipboard(payerName, 'Payer Name');
+                                            }}>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy Payer Name
+                                            </DropdownMenuItem>
+
+                                            {contactNumber && (
+                                                <DropdownMenuItem onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onCopyToClipboard(contactNumber, 'Contact Number');
+                                                }}>
+                                                    <Phone className="h-4 w-4 mr-2" />
+                                                    Copy Contact
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            {isBulkMode && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onItemSelect(payment.id);
+                                                    }}>
+                                                        {isSelected ? (
+                                                            <>
+                                                                <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
+                                                                <span className="text-green-600">Deselect</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Square className="h-4 w-4 mr-2" />
+                                                                Select for Bulk
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                            
+                                            {payment.status !== 'completed' && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onDelete(payment);
+                                                        }}
+                                                        className="text-red-600 dark:text-red-400"
+                                                    >
+                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                        Delete Payment
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
                             </div>
+
+                            {/* Status Badge */}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                                <Badge 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-0.5 ${getStatusColor(payment.status)} flex items-center gap-1`}
+                                >
+                                    {getStatusIcon(payment.status)}
+                                    <span>{payment.status === 'completed' ? 'Completed' : 
+                                           payment.status === 'pending' ? 'Pending' :
+                                           payment.status === 'cancelled' ? 'Cancelled' : payment.status}</span>
+                                </Badge>
+                            </div>
                             
-                            {/* Payer Name - always visible */}
+                            {/* Payer Name */}
                             <h3 
-                                className="font-semibold text-sm mb-1.5 line-clamp-2 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200 pr-6"
-                                title={payment.payer_name}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onViewDetails(payment);
-                                }}
+                                className="font-semibold text-sm mb-2 line-clamp-2 text-gray-900 dark:text-white"
+                                title={payerName}
                             >
-                                {payment.payer_name.substring(0, nameLength)}
-                                {payment.payer_name.length > nameLength ? '...' : ''}
+                                {truncateText(payerName, nameLength)}
                             </h3>
                             
                             {/* Primary Info - always visible */}
-                            <div className="space-y-1.5 mb-2">
+                            <div className="space-y-2 mb-2">
                                 {/* Payer Type */}
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                     {getPayerIcon(payment.payer_type)}
-                                    <span className="text-xs text-gray-700 dark:text-gray-300">
-                                        {getPayerLabel(payment.payer_type)}
-                                    </span>
+                                    <span>{getPayerLabel(payment.payer_type)}</span>
                                 </div>
                                 
                                 {/* Amount Paid */}
                                 <div className="flex items-center gap-1.5">
-                                    <DollarSign className="h-3 w-3 text-green-600 dark:text-green-400 flex-shrink-0" />
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                        {formatCurrency(payment.amount_paid || 0)}
+                                    <DollarSign className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                    <span className="font-semibold text-gray-900 dark:text-white">
+                                        {formatCurrency(amountPaid)}
                                     </span>
                                 </div>
                                 
                                 {/* Date and Method */}
-                                <div className="flex items-center gap-1.5 flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap text-sm text-gray-600 dark:text-gray-400">
                                     <div className="flex items-center gap-1">
-                                        <Calendar className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                        <span className="text-xs text-gray-700 dark:text-gray-300">
-                                            {payment.formatted_date || formatDate(payment.payment_date)}
-                                        </span>
+                                        <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                                        <span>{payment.formatted_date || formatDate(payment.payment_date)}</span>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         {getMethodIcon(payment.payment_method)}
-                                        <span className="text-xs text-gray-700 dark:text-gray-300 capitalize">
-                                            {payment.payment_method}
-                                        </span>
+                                        <span className="capitalize">{payment.payment_method}</span>
                                     </div>
                                 </div>
                                 
                                 {/* Discount/Surcharge/Penalty summary */}
                                 {(payment.discount > 0 || payment.surcharge > 0 || payment.penalty > 0) && (
-                                    <div className="text-[10px] text-gray-500 dark:text-gray-400 space-y-0.5 pt-1">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5 pt-1">
                                         {payment.discount > 0 && <div>Discount: -{formatCurrency(payment.discount)}</div>}
                                         {payment.surcharge > 0 && <div>Surcharge: +{formatCurrency(payment.surcharge)}</div>}
                                         {payment.penalty > 0 && <div>Penalty: +{formatCurrency(payment.penalty)}</div>}
@@ -417,59 +433,61 @@ export default function PaymentsGridView({
                             </div>
                             
                             {/* Expand/Collapse indicator */}
-                            {!isBulkMode && !isExpanded && (
+                            {!isBulkMode && (
                                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        Click to view details
+                                        {isExpanded ? 'Hide details' : 'Click to view details'}
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={(e) => toggleCardExpansion(payment.id, e)}
+                                    <button
+                                        className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={(e) => handleToggleExpand(payment.id, e)}
                                     >
-                                        <ChevronDown className="h-3 w-3" />
-                                    </Button>
+                                        {isExpanded ? (
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        ) : (
+                                            <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        )}
+                                    </button>
                                 </div>
                             )}
 
                             {/* Expanded Details */}
                             {isExpanded && (
-                                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-2 animate-in fade-in-50">
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50">
                                     {/* Contact Information */}
-                                    {payment.contact_number && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Phone className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                    {contactNumber && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Contact:</span>
-                                            <span className="text-gray-900 dark:text-white">{payment.contact_number}</span>
+                                            <span className="text-gray-900 dark:text-white">{contactNumber}</span>
                                         </div>
                                     )}
 
                                     {/* Address */}
-                                    {payment.address && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <MapPin className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                    {address && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Address:</span>
-                                            <span className="text-gray-900 dark:text-white truncate">{payment.address}</span>
+                                            <span className="text-gray-900 dark:text-white truncate">{address}</span>
                                         </div>
                                     )}
 
                                     {/* Purok */}
-                                    {payment.purok && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Home className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                    {purok && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Home className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Purok:</span>
-                                            <span className="text-gray-900 dark:text-white">{payment.purok}</span>
+                                            <span className="text-gray-900 dark:text-white">{purok}</span>
                                         </div>
                                     )}
 
                                     {/* Payment Items Summary */}
                                     {payment.items && payment.items.length > 0 && (
-                                        <div className="space-y-1 pt-1">
-                                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300">Payment Items:</div>
+                                        <div className="space-y-1">
+                                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Payment Items:</div>
                                             <div className="space-y-1 pl-2">
                                                 {payment.items.slice(0, 2).map((item) => (
-                                                    <div key={item.id} className="text-xs text-gray-600 dark:text-gray-400">
+                                                    <div key={item.id} className="text-sm text-gray-600 dark:text-gray-400">
                                                         • {item.fee_name}: {formatCurrency(item.total_amount)}
                                                     </div>
                                                 ))}
@@ -483,229 +501,114 @@ export default function PaymentsGridView({
                                     )}
 
                                     {/* Payment Details */}
-                                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Subtotal:</span>
                                             <span className="text-gray-900 dark:text-white ml-1">{formatCurrency(payment.subtotal || 0)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Discount:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Discount:</span>
                                             <span className="text-green-600 dark:text-green-400 ml-1">-{formatCurrency(payment.discount || 0)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Surcharge:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Surcharge:</span>
                                             <span className="text-amber-600 dark:text-amber-400 ml-1">+{formatCurrency(payment.surcharge || 0)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Penalty:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Penalty:</span>
                                             <span className="text-red-600 dark:text-red-400 ml-1">+{formatCurrency(payment.penalty || 0)}</span>
                                         </div>
                                     </div>
 
                                     {/* Total */}
                                     <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
-                                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Total Paid:</span>
-                                        <span className="text-sm font-bold text-gray-900 dark:text-white">
-                                            {formatCurrency(payment.amount_paid || 0)}
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Paid:</span>
+                                        <span className="text-base font-bold text-gray-900 dark:text-white">
+                                            {formatCurrency(amountPaid)}
                                         </span>
                                     </div>
 
                                     {/* Dates */}
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Payment Date:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Payment Date:</span>
                                             <span className="text-gray-900 dark:text-white ml-1">{formatDateTime(payment.payment_date)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Recorded:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Recorded:</span>
                                             <span className="text-gray-900 dark:text-white ml-1">{formatDateTime(payment.created_at)}</span>
                                         </div>
                                     </div>
 
                                     {/* Reference Number */}
-                                    {payment.reference_number && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Hash className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                    {referenceNumber && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Hash className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Reference:</span>
-                                            <span className="text-gray-900 dark:text-white truncate">{payment.reference_number}</span>
+                                            <span className="text-gray-900 dark:text-white truncate">{referenceNumber}</span>
                                         </div>
                                     )}
 
                                     {/* Period Covered */}
-                                    {payment.period_covered && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Calendar className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                    {periodCovered && (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Period:</span>
-                                            <span className="text-gray-900 dark:text-white">{payment.period_covered}</span>
+                                            <span className="text-gray-900 dark:text-white">{periodCovered}</span>
                                         </div>
                                     )}
 
                                     {/* Recorder */}
                                     {payment.recorder?.name && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <User className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <User className="h-4 w-4 text-gray-500 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Recorded by:</span>
                                             <span className="text-gray-900 dark:text-white">{payment.recorder.name}</span>
                                         </div>
                                     )}
 
-                                    {/* Notes if available */}
-                                    {payment.notes && (
-                                        <div className="text-xs text-gray-700 dark:text-gray-300">
+                                    {/* Notes */}
+                                    {notes && (
+                                        <div className="text-sm">
                                             <p className="font-medium mb-1 text-gray-600 dark:text-gray-400">Notes:</p>
                                             <p className="text-gray-600 dark:text-gray-400 italic">
-                                                "{payment.notes}"
+                                                "{notes}"
                                             </p>
                                         </div>
                                     )}
 
-                                    {/* Remarks if available */}
-                                    {payment.remarks && (
-                                        <div className="text-xs text-gray-700 dark:text-gray-300">
+                                    {/* Remarks */}
+                                    {remarks && (
+                                        <div className="text-sm">
                                             <p className="font-medium mb-1 text-gray-600 dark:text-gray-400">Remarks:</p>
                                             <p className="text-gray-600 dark:text-gray-400">
-                                                {payment.remarks}
+                                                {remarks}
                                             </p>
                                         </div>
                                     )}
 
-                                    {/* Collapse button */}
+                                    {/* View full details link */}
                                     <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                                        <Button
-                                            variant="link"
-                                            size="sm"
-                                            className="h-6 p-0 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                                        <button
+                                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 onViewDetails(payment);
                                             }}
                                         >
-                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            <ExternalLink className="h-3.5 w-3.5" />
                                             View full details
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                            onClick={(e) => toggleCardExpansion(payment.id, e)}
+                                        </button>
+                                        <button
+                                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                            onClick={(e) => handleToggleExpand(payment.id, e)}
                                         >
-                                            <ChevronUp className="h-3 w-3" />
-                                        </Button>
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        </button>
                                     </div>
                                 </div>
                             )}
                         </CardContent>
-
-                        {/* Footer Actions */}
-                        <CardFooter className={`px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 ${isCompactView ? 'py-1.5' : ''}`}>
-                            <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center gap-0.5">
-                                    {/* View Details */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onViewDetails(payment);
-                                                }}
-                                            >
-                                                <Eye className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">View Details</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Print Receipt */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onPrintReceipt(payment);
-                                                }}
-                                            >
-                                                <Printer className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Print Receipt</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Copy OR Number */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onCopyToClipboard(payment.or_number, 'OR Number');
-                                                }}
-                                            >
-                                                <Copy className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Copy OR</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Copy Contact if available */}
-                                    {payment.contact_number && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onCopyToClipboard(payment.contact_number!, 'Contact Number');
-                                                    }}
-                                                >
-                                                    <Phone className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                                <p className="text-xs">Copy Contact</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    )}
-                                </div>
-
-                                {/* Delete button - only for non-completed payments */}
-                                {payment.status !== 'completed' && (
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onDelete(payment);
-                                                }}
-                                            >
-                                                <Trash2 className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Delete</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                )}
-                            </div>
-                        </CardFooter>
                     </Card>
                 );
             })}

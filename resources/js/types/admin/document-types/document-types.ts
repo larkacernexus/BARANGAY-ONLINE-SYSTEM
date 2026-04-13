@@ -41,6 +41,7 @@ export interface PageProps extends Record<string, any> {
 }
 
 export interface DocumentType {
+    remarks: any;
     id: number;
     name: string;
     code: string;

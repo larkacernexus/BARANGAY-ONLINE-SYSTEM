@@ -57,7 +57,7 @@ export function TabSwitcher({ activeTab, handleTabChange, isCollapsed }: TabSwit
                 onClick={() => handleTabChange('operations')}
             >
                 <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
-                Operations
+                Ops
             </Button>
             <Button
                 variant="ghost"

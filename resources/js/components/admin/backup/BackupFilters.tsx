@@ -3,7 +3,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, Filter, Download, X, FilterX, Grid, List } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Search, Filter, Download, X, FilterX, Grid, List, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface BackupFiltersProps {
   search: string;
@@ -27,6 +34,12 @@ interface BackupFiltersProps {
   viewMode?: 'table' | 'grid';
   onViewModeChange?: (mode: 'table' | 'grid') => void;
   isMobile?: boolean;
+  // Sort props
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  onSortChange?: (value: string) => void;
+  onSortOrderToggle?: () => void;  // ✅ Added
+  getCurrentSortValue?: () => string;
 }
 
 export default function BackupFilters({
@@ -51,12 +64,29 @@ export default function BackupFilters({
   viewMode = 'table',
   onViewModeChange,
   isMobile = false,
+  sortBy = 'modified',
+  sortOrder = 'desc',
+  onSortChange,
+  onSortOrderToggle,  // ✅ Added
+  getCurrentSortValue,
 }: BackupFiltersProps) {
   
   // Convert hasActiveFilters to boolean
   const activeFilters = typeof hasActiveFilters === 'string' 
     ? hasActiveFilters === 'true' || hasActiveFilters === '1'
     : Boolean(hasActiveFilters);
+
+  // Sort options
+  const sortOptions = [
+    { value: 'filename-asc', label: 'Filename (A-Z)' },
+    { value: 'filename-desc', label: 'Filename (Z-A)' },
+    { value: 'size-asc', label: 'Size (Smallest)' },
+    { value: 'size-desc', label: 'Size (Largest)' },
+    { value: 'modified-desc', label: 'Newest First' },
+    { value: 'modified-asc', label: 'Oldest First' },
+    { value: 'type-asc', label: 'Type (A-Z)' },
+    { value: 'type-desc', label: 'Type (Z-A)' },
+  ];
 
   return (
     <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
@@ -86,6 +116,48 @@ export default function BackupFilters({
               )}
             </div>
             <div className="flex gap-2">
+              {/* Sort Controls */}
+              <div className="flex gap-1">
+                {/* Sort Dropdown */}
+                {onSortChange && getCurrentSortValue && (
+                  <Select
+                    value={getCurrentSortValue()}
+                    onValueChange={onSortChange}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
+                      <ArrowUpDown className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sortOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                
+                {/* Sort Order Toggle Button */}
+                {onSortOrderToggle && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700"
+                    onClick={onSortOrderToggle}
+                    disabled={isLoading}
+                    title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                  >
+                    {sortOrder === 'asc' ? (
+                      <ArrowUp className="h-4 w-4" />
+                    ) : (
+                      <ArrowDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
+
               {/* View Mode Toggle */}
               {onViewModeChange && (
                 <Button 
@@ -207,7 +279,7 @@ export default function BackupFilters({
                       className="text-xs"
                       onClick={() => {
                         onTypeFilterChange('full');
-                        setShowAdvancedFilters(false);
+                        onToggleAdvancedFilters();
                       }}
                       disabled={isLoading}
                     >
@@ -219,7 +291,7 @@ export default function BackupFilters({
                       className="text-xs"
                       onClick={() => {
                         onTypeFilterChange('database');
-                        setShowAdvancedFilters(false);
+                        onToggleAdvancedFilters();
                       }}
                       disabled={isLoading}
                     >
@@ -231,7 +303,7 @@ export default function BackupFilters({
                       className="text-xs"
                       onClick={() => {
                         onSizeFilterChange('small');
-                        setShowAdvancedFilters(false);
+                        onToggleAdvancedFilters();
                       }}
                       disabled={isLoading}
                     >
@@ -243,7 +315,7 @@ export default function BackupFilters({
                       className="text-xs"
                       onClick={() => {
                         onClearFilters();
-                        setShowAdvancedFilters(false);
+                        onToggleAdvancedFilters();
                       }}
                       disabled={isLoading}
                     >
@@ -275,10 +347,4 @@ export default function BackupFilters({
       </CardContent>
     </Card>
   );
-}
-
-// Helper function to handle setShowAdvancedFilters if needed
-function setShowAdvancedFilters(value: boolean) {
-  // This is handled by onToggleAdvancedFilters
-  console.warn('setShowAdvancedFilters called directly - use onToggleAdvancedFilters instead');
 }

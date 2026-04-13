@@ -1,6 +1,6 @@
 // components/admin/fees/FeesGridView.tsx
 
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,12 +11,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { 
     User,
     Home,
@@ -66,6 +65,8 @@ interface FeesGridViewProps {
     getCategoryLabel: (category: string) => string;
     statuses?: Record<string, string>;
     categories?: Record<string, string>;
+    windowWidth?: number;
+    isMobile?: boolean;
 }
 
 // Safe date formatting functions
@@ -141,6 +142,13 @@ const getStatusColorClass = (status: string, isFeeOverdue: boolean) => {
     }
 };
 
+// Truncate text helper
+const truncateText = (text: string | null | undefined, maxLength: number = 30): string => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+};
+
 export default function FeesGridView({
     fees,
     isBulkMode,
@@ -158,26 +166,40 @@ export default function FeesGridView({
     getCategoryColor,
     getCategoryLabel,
     statuses = {},
-    categories = {}
+    categories = {},
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024,
+    isMobile = false
 }: FeesGridViewProps) {
-    const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
     
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
+    
+    const isCompactView = isMobile;
+    
+    // Determine grid columns - 3 for laptops, 4 for wide screens
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;      // Mobile: 1 column
+        if (windowWidth < 1024) return 2;     // Tablet: 2 columns
+        if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
+        return 4;                              // Wide desktop: 4 columns
+    }, [windowWidth]);
+    
+    // Adjust text truncation based on grid columns
+    const nameLength = useMemo(() => {
+        if (gridCols >= 4) return 25;
+        if (gridCols === 3) return 22;
+        if (gridCols === 2) return 20;
+        return 18;
+    }, [gridCols]);
+
     // Toggle card expansion
-    const toggleCardExpansion = (id: number, e?: React.MouseEvent) => {
-        if (e) {
-            e.stopPropagation();
-            e.preventDefault();
-        }
-        setExpandedCards(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
-        });
-    };
+    const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedId(prev => prev === id ? null : id);
+    }, []);
 
     // Handle card click
     const handleCardClick = (feeId: number, e: React.MouseEvent) => {
@@ -186,7 +208,7 @@ export default function FeesGridView({
             return;
         }
         e.stopPropagation();
-        toggleCardExpansion(feeId);
+        handleToggleExpand(feeId, e);
     };
 
     const handleViewClick = (fee: Fee, e?: React.MouseEvent) => {
@@ -240,6 +262,9 @@ export default function FeesGridView({
         if (e) e.stopPropagation();
         window.open(`/admin/fees/${fee.id}/print`, '_blank');
     };
+    
+    // Memoize selected set for quick lookup
+    const selectedSet = useMemo(() => new Set(selectedFees), [selectedFees]);
 
     const emptyState = (
         <EmptyState
@@ -255,21 +280,24 @@ export default function FeesGridView({
         />
     );
 
+    // Early return for empty state
+    if (fees.length === 0) {
+        return emptyState;
+    }
+
     return (
         <GridLayout
-            isEmpty={fees.length === 0}
-            emptyState={emptyState}
-            gridCols={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+            isEmpty={false}
+            emptyState={null}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
             gap={{ base: '3', sm: '4' }}
             padding="p-4"
         >
             {fees.map((fee) => {
-                const isSelected = selectedFees.includes(fee.id);
-                const isExpanded = expandedCards.has(fee.id);
+                const isSelected = selectedSet.has(fee.id);
+                const isExpanded = expandedId === fee.id;
                 const isFeeOverdue = isOverdue(fee.due_date) && fee.status !== 'paid';
                 const daysOverdue = getDaysOverdue(fee.due_date);
-                const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-                const isCompactView = isMobile;
                 
                 // Safe amount calculations
                 const totalAmount = fee.total_amount ?? fee.amount ?? 0;
@@ -277,9 +305,6 @@ export default function FeesGridView({
                 const balance = fee.balance ?? (totalAmount - amountPaid);
                 const hasBalance = balance > 0;
                 const hasPaid = amountPaid > 0;
-                
-                // Truncation lengths based on view
-                const nameLength = isCompactView ? 20 : 30;
                 
                 // Check if fee can be edited
                 const canEdit = fee.status === 'pending' || fee.status === 'issued';
@@ -291,246 +316,203 @@ export default function FeesGridView({
                         key={fee.id}
                         className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
                             isSelected 
-                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400 dark:shadow-blue-400/20' 
-                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-gray-800/50'
+                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
                         } ${isFeeOverdue ? 'border-l-4 border-l-red-500 dark:border-l-red-600' : ''} ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
                         onClick={(e) => handleCardClick(fee.id, e)}
                     >
-                        {/* Bulk selection checkbox */}
-                        {isBulkMode && (
-                            <div 
-                                className="absolute top-2 left-2 z-20"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onItemSelect(fee.id);
-                                }}
-                            >
-                                <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={() => onItemSelect(fee.id)}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 shadow-sm h-4 w-4"
-                                />
-                            </div>
-                        )}
-
-                        {/* Dropdown Menu - 3 dots */}
-                        <div className="absolute top-2 right-2 z-20">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button 
-                                        variant="ghost" 
-                                        className="h-7 w-7 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
-                                    <DropdownMenuItem onClick={(e) => handleViewClick(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View Details
-                                    </DropdownMenuItem>
-                                    
-                                    {canEdit && (
-                                        <DropdownMenuItem onClick={(e) => handleEditClick(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
-                                            <Edit className="mr-2 h-4 w-4" />
-                                            Edit Fee
-                                        </DropdownMenuItem>
-                                    )}
-                                    
-                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
-                                    
-                                    <DropdownMenuItem onClick={(e) => handleCopyFeeCode(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
-                                        <Copy className="mr-2 h-4 w-4" />
-                                        Copy Fee Code
-                                    </DropdownMenuItem>
-                                    
-                                    <DropdownMenuItem onClick={(e) => handlePrint(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
-                                        <Printer className="mr-2 h-4 w-4" />
-                                        Print Invoice
-                                    </DropdownMenuItem>
-                                    
-                                    {fee.status !== 'paid' && hasBalance && (
-                                        <DropdownMenuItem onClick={(e) => handlePaymentClick(fee, e)} className="dark:text-gray-300 dark:hover:bg-gray-800">
-                                            <CreditCard className="mr-2 h-4 w-4" />
-                                            Pay Fee
-                                        </DropdownMenuItem>
-                                    )}
-                                    
-                                    {isBulkMode && (
-                                        <>
-                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
-                                            <DropdownMenuItem onClick={(e) => {
-                                                e.stopPropagation();
-                                                onItemSelect(fee.id);
-                                            }} className="dark:text-gray-300 dark:hover:bg-gray-800">
-                                                {isSelected ? (
-                                                    <>
-                                                        <CheckSquare className="mr-2 h-4 w-4 text-green-600" />
-                                                        <span className="text-green-600">Deselect</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Square className="mr-2 h-4 w-4" />
-                                                        Select for Bulk
-                                                    </>
-                                                )}
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
-                                    
-                                    {canDelete && (
-                                        <>
-                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
-                                            <DropdownMenuItem 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onDelete(fee);
-                                                }}
-                                                className="text-red-600 dark:text-red-400 dark:hover:bg-red-950/50"
-                                            >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Delete Fee
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        <CardContent className={`p-3 ${isCompactView && !isExpanded ? 'pb-1' : ''} bg-white dark:bg-gray-900`}>
-                            {/* Header row with icon and fee code */}
-                            <div className="flex items-start justify-between mb-2 pr-6">
-                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                    <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex-shrink-0">
-                                        <DollarSign className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                        <CardContent className="p-4">
+                            {/* Header */}
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                                        <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                     </div>
-                                    <span 
-                                        className="font-medium text-xs text-blue-600 dark:text-blue-400 truncate hover:text-blue-700 dark:hover:text-blue-300 cursor-help"
-                                        title={`Fee Code: ${fee.fee_code || fee.code}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleCopyFeeCode(fee, e);
-                                        }}
-                                    >
-                                        {fee.fee_code || fee.code}
-                                    </span>
+                                    
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-medium text-gray-900 dark:text-white truncate">
+                                            {fee.fee_code || fee.code}
+                                        </div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                            {formatDate(fee.created_at || fee.issue_date)}
+                                        </div>
+                                    </div>
                                 </div>
                                 
-                                {/* Status badge */}
-                                <div className="flex gap-1 flex-shrink-0">
-                                    <Badge 
-                                        variant="outline" 
-                                        className={`text-[10px] px-1.5 py-0 h-4 border ${getStatusColorClass(fee.status, isFeeOverdue)}`}
-                                    >
-                                        {isFeeOverdue ? `Overdue (${daysOverdue}d)` : 
-                                         fee.status === 'paid' ? 'Paid' :
-                                         fee.status === 'pending' ? 'Pending' :
-                                         fee.status === 'partial' ? 'Partial' :
-                                         fee.status === 'issued' ? 'Issued' : fee.status}
-                                    </Badge>
+                                <div className="flex items-center gap-1 ml-2">
+                                    {isBulkMode && (
+                                        <Checkbox
+                                            checked={isSelected}
+                                            onCheckedChange={() => onItemSelect(fee.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                    )}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                            <DropdownMenuItem onClick={(e) => handleViewClick(fee, e)}>
+                                                <Eye className="h-4 w-4 mr-2" />
+                                                View Details
+                                            </DropdownMenuItem>
+                                            
+                                            {canEdit && (
+                                                <DropdownMenuItem onClick={(e) => handleEditClick(fee, e)}>
+                                                    <Edit className="h-4 w-4 mr-2" />
+                                                    Edit Fee
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            <DropdownMenuSeparator />
+                                            
+                                            <DropdownMenuItem onClick={(e) => handleCopyFeeCode(fee, e)}>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy Fee Code
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuItem onClick={(e) => handlePrint(fee, e)}>
+                                                <Printer className="h-4 w-4 mr-2" />
+                                                Print Invoice
+                                            </DropdownMenuItem>
+                                            
+                                            {fee.status !== 'paid' && hasBalance && (
+                                                <DropdownMenuItem onClick={(e) => handlePaymentClick(fee, e)}>
+                                                    <CreditCard className="h-4 w-4 mr-2" />
+                                                    Process Payment
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            {isBulkMode && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onItemSelect(fee.id);
+                                                    }}>
+                                                        {isSelected ? (
+                                                            <>
+                                                                <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
+                                                                <span className="text-green-600">Deselect</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Square className="h-4 w-4 mr-2" />
+                                                                Select for Bulk
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                            
+                                            {canDelete && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onDelete(fee);
+                                                        }}
+                                                        className="text-red-600 dark:text-red-400"
+                                                    >
+                                                        <Trash2 className="h-4 w-4 mr-2" />
+                                                        Delete Fee
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
                             </div>
+
+                            {/* Status Badges */}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                                <Badge 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-0.5 ${getStatusColorClass(fee.status, isFeeOverdue)}`}
+                                >
+                                    {isFeeOverdue ? `Overdue (${daysOverdue}d)` : 
+                                     fee.status === 'paid' ? 'Paid' :
+                                     fee.status === 'pending' ? 'Pending' :
+                                     fee.status === 'partial' ? 'Partial' :
+                                     fee.status === 'issued' ? 'Issued' : fee.status}
+                                </Badge>
+                            </div>
                             
-                            {/* Fee Type/Payer Name - always visible */}
+                            {/* Fee Type */}
                             <h3 
-                                className="font-semibold text-sm mb-1.5 line-clamp-2 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200 pr-6"
+                                className="font-semibold text-sm mb-2 line-clamp-2 text-gray-900 dark:text-white"
                                 title={fee.fee_type?.name || 'Fee Assessment'}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewClick(fee, e);
-                                }}
                             >
                                 {fee.fee_type?.name || 'Fee Assessment'}
                             </h3>
                             
                             {/* Primary Info - always visible */}
-                            <div className="space-y-1.5 mb-2">
+                            <div className="space-y-2 mb-2">
                                 {/* Payer Info */}
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                     {getPayerIcon(fee.payer_type || fee.type)}
-                                    <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
-                                        {fee.payer_name ? fee.payer_name.substring(0, nameLength) : 
-                                         fee.resident?.full_name ? fee.resident.full_name.substring(0, nameLength) : 'N/A'}
-                                        {fee.payer_name && fee.payer_name.length > nameLength ? '...' : ''}
-                                    </span>
-                                </div>
-                                
-                                {/* Payer Type */}
-                                <div className="flex items-center gap-1.5">
-                                    <Info className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                    <span className="text-xs text-gray-700 dark:text-gray-300 capitalize">
-                                        {fee.payer_type || fee.type || 'Resident'}
+                                    <span className="truncate" title={fee.payer_name || fee.resident?.full_name || 'N/A'}>
+                                        {truncateText(fee.payer_name || fee.resident?.full_name || 'N/A', nameLength)}
                                     </span>
                                 </div>
                                 
                                 {/* Dates */}
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    <div className="flex items-center gap-1">
-                                        <Calendar className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                        <span className="text-xs text-gray-700 dark:text-gray-300">
-                                            {formatDate(fee.created_at || fee.issue_date)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Clock className={`h-3 w-3 ${isFeeOverdue ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'} flex-shrink-0`} />
-                                        <span className={`text-xs ${isFeeOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
-                                            {formatDate(fee.due_date)}
-                                        </span>
-                                    </div>
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span>Due: {formatDate(fee.due_date)}</span>
                                 </div>
                                 
                                 {/* Amount Summary */}
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">Total:</span>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">Total:</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">
                                         {formatCurrency(totalAmount)}
                                     </span>
                                 </div>
                                 
                                 {hasBalance && (
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">Balance:</span>
-                                        <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">Balance:</span>
+                                        <span className="font-medium text-red-600 dark:text-red-400">
                                             {formatCurrency(balance)}
-                                        </span>
-                                    </div>
-                                )}
-                                
-                                {hasPaid && (
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">Paid:</span>
-                                        <span className="text-xs font-medium text-green-600 dark:text-green-400">
-                                            {formatCurrency(amountPaid)}
                                         </span>
                                     </div>
                                 )}
                             </div>
                             
                             {/* Expand/Collapse indicator */}
-                            {!isBulkMode && !isExpanded && (
+                            {!isBulkMode && (
                                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        Click to view details
+                                        {isExpanded ? 'Hide details' : 'Click to view details'}
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={(e) => toggleCardExpansion(fee.id, e)}
+                                    <button
+                                        className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={(e) => handleToggleExpand(fee.id, e)}
                                     >
-                                        <ChevronDown className="h-3 w-3" />
-                                    </Button>
+                                        {isExpanded ? (
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        ) : (
+                                            <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        )}
+                                    </button>
                                 </div>
                             )}
 
                             {/* Expanded Details */}
                             {isExpanded && (
-                                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-2 animate-in fade-in-50">
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50">
                                     {/* Fee Type Category */}
                                     {fee.fee_type?.category && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Hash className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Hash className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Category:</span>
                                             <Badge variant="outline" className={getCategoryColor(fee.fee_type.category)}>
                                                 {getCategoryLabel(fee.fee_type.category)}
@@ -540,8 +522,8 @@ export default function FeesGridView({
 
                                     {/* Contact Information */}
                                     {(fee.contact_number || fee.resident?.phone) && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Phone className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Phone className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Contact:</span>
                                             <span className="text-gray-900 dark:text-white">{fee.contact_number || fee.resident?.phone}</span>
                                         </div>
@@ -549,8 +531,8 @@ export default function FeesGridView({
 
                                     {/* Address */}
                                     {(fee.address || fee.resident?.address) && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <MapPin className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Address:</span>
                                             <span className="text-gray-900 dark:text-white truncate">{fee.address || fee.resident?.address}</span>
                                         </div>
@@ -558,203 +540,79 @@ export default function FeesGridView({
 
                                     {/* Purok */}
                                     {(fee.purok || fee.resident?.purok) && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <Home className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Home className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                                             <span className="text-gray-600 dark:text-gray-400">Purok:</span>
                                             <span className="text-gray-900 dark:text-white">{fee.purok || fee.resident?.purok}</span>
                                         </div>
                                     )}
 
                                     {/* Payment Details */}
-                                    <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Total:</span>
                                             <span className="text-gray-900 dark:text-white ml-1 font-medium">{formatCurrency(totalAmount)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Paid:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Paid:</span>
                                             <span className="text-green-600 dark:text-green-400 ml-1 font-medium">{formatCurrency(amountPaid)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Balance:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Balance:</span>
                                             <span className="text-red-600 dark:text-red-400 ml-1 font-medium">{formatCurrency(balance)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Status:</span>
                                             <span className="text-gray-900 dark:text-white ml-1 capitalize">{fee.status || 'N/A'}</span>
                                         </div>
                                     </div>
 
                                     {/* Dates */}
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Created:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Created:</span>
                                             <span className="text-gray-900 dark:text-white ml-1">{formatDateTime(fee.created_at)}</span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600 dark:text-gray-400">Updated:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">Updated:</span>
                                             <span className="text-gray-900 dark:text-white ml-1">{formatDateTime(fee.updated_at)}</span>
                                         </div>
                                     </div>
 
                                     {/* Payment button for unpaid fees */}
                                     {fee.status !== 'paid' && hasBalance && (
-                                        <div className="pt-1">
-                                            <Button
-                                                size="sm"
-                                                className="w-full h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handlePaymentClick(fee, e);
-                                                }}
-                                            >
-                                                <CreditCard className="h-3 w-3 mr-1" />
-                                                Process Payment
-                                            </Button>
-                                        </div>
+                                        <Button
+                                            size="sm"
+                                            className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handlePaymentClick(fee, e);
+                                            }}
+                                        >
+                                            <CreditCard className="h-4 w-4 mr-2" />
+                                            Process Payment
+                                        </Button>
                                     )}
 
-                                    {/* Collapse button */}
+                                    {/* View full details link */}
                                     <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                                        <Button
-                                            variant="link"
-                                            size="sm"
-                                            className="h-6 p-0 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                                        <button
+                                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
                                             onClick={(e) => handleViewClick(fee, e)}
                                         >
-                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            <ExternalLink className="h-3.5 w-3.5" />
                                             View full details
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                            onClick={(e) => toggleCardExpansion(fee.id, e)}
+                                        </button>
+                                        <button
+                                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                            onClick={(e) => handleToggleExpand(fee.id, e)}
                                         >
-                                            <ChevronUp className="h-3 w-3" />
-                                        </Button>
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        </button>
                                     </div>
                                 </div>
                             )}
                         </CardContent>
-
-                        {/* Footer Actions */}
-                        <CardFooter className={`px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 ${isCompactView ? 'py-1.5' : ''}`}>
-                            <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center gap-0.5">
-                                    {/* View Details */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => handleViewClick(fee, e)}
-                                            >
-                                                <Eye className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">View Details</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Edit */}
-                                    {canEdit && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                    onClick={(e) => handleEditClick(fee, e)}
-                                                >
-                                                    <Edit className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                                <p className="text-xs">Edit</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    )}
-
-                                    {/* Pay - for unpaid fees */}
-                                    {fee.status !== 'paid' && hasBalance && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-950`}
-                                                    onClick={(e) => handlePaymentClick(fee, e)}
-                                                >
-                                                    <CreditCard className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                                <p className="text-xs">Process Payment</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    )}
-
-                                    {/* Print Invoice */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => handlePrint(fee, e)}
-                                            >
-                                                <Receipt className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Print Invoice</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Copy Fee Code */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => handleCopyFeeCode(fee, e)}
-                                            >
-                                                <Copy className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Copy Code</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </div>
-
-                                {/* Delete button - only show if pending */}
-                                {canDelete && (
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onDelete(fee);
-                                                }}
-                                            >
-                                                <Trash2 className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Delete</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                )}
-                            </div>
-                        </CardFooter>
                     </Card>
                 );
             })}

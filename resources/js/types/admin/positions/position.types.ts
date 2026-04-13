@@ -1,6 +1,7 @@
 // types/admin/position/position.types.ts
 
 export interface Position {
+    responsibilities: any;
     committee_id: number | null | undefined;
     id: number;
     code: string;

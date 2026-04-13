@@ -1,6 +1,9 @@
 // resources/js/types/blotter.ts
 
 export interface Blotter {
+    case_number: any;
+    respondent_contact: any;
+    narrative: any;
     id: number;
     blotter_number: string;
     incident_type: string;

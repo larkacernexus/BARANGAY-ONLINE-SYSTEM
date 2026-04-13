@@ -1,44 +1,10 @@
+// /components/residentui/records/record-utils.ts
+
 import { toast } from 'sonner';
-import React from 'react';
-import { 
-    FileIcon, 
-    FileText, 
-    FileImage, 
-    File as FilePdfIcon,
-    FileSpreadsheet, 
-    FileCode,
-    FileJson,
-    FolderOpen,
-    Heart,
-    GraduationCap,
-    Briefcase,
-    Award,
-    Shield,
-    Calendar,
-    Home,
-    User,
-    Users,
-    Building,
-    FileCheck,
-    FileSignature,
-    Receipt,
-    CreditCard,
-    BadgeCheck,
-    BookOpen,
-    MapPin,
-    Phone,
-    Mail,
-    Globe,
-    Link,
-    AlertCircle,
-    Lock,
-    CheckCircle
-} from 'lucide-react';
-import { FILE_TYPE_CONFIG, ICON_MAP } from './constants';
+import { FILE_TYPE_CONFIG } from './constants';
 
 // Type definitions
 interface FileTypeConfig {
-    icon: React.ComponentType<any>;
     color: string;
     name?: string;
 }
@@ -123,38 +89,6 @@ export const getRelativeTime = (dateString?: string): string => {
 // ==================== File Type Utilities ====================
 
 /**
- * Get file icon based on extension or mime type
- */
-export const getFileIcon = (extension: string, mimeType?: string): React.ComponentType<any> => {
-    const ext = extension?.toLowerCase() || '';
-    
-    // Check mime type first for better accuracy
-    if (mimeType) {
-        if (mimeType.startsWith('image/')) {
-            const config = FILE_TYPE_CONFIG['jpg'] as FileTypeConfig | undefined;
-            return config?.icon || FileImage;
-        }
-        if (mimeType.startsWith('video/')) {
-            const config = FILE_TYPE_CONFIG['mp4'] as FileTypeConfig | undefined;
-            return config?.icon || FileIcon;
-        }
-        if (mimeType.startsWith('audio/')) {
-            const config = FILE_TYPE_CONFIG['mp3'] as FileTypeConfig | undefined;
-            return config?.icon || FileIcon;
-        }
-        if (mimeType === 'application/pdf') return FilePdfIcon;
-        if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return FileSpreadsheet;
-        if (mimeType.includes('document') || mimeType.includes('word')) return FileText;
-        if (mimeType.includes('json')) return FileJson;
-        if (mimeType.includes('javascript') || mimeType.includes('typescript')) return FileCode;
-    }
-    
-    // Fallback to extension
-    const config = FILE_TYPE_CONFIG[ext] as FileTypeConfig | undefined;
-    return config?.icon || FileIcon;
-};
-
-/**
  * Get file color based on extension
  */
 export const getFileColor = (extension: string): string => {
@@ -198,83 +132,6 @@ export const getFileTypeDisplay = (extension: string): string => {
     return typeMap[ext] || `${ext.toUpperCase()} File`;
 };
 
-// ==================== Icon Utilities ====================
-
-/**
- * Get icon component by name with proper typing
- */
-export const getIconComponent = (
-    iconName: string, 
-    className: string = "h-5 w-5", 
-    color?: string
-): React.ReactNode => {
-    const normalizedName = iconName?.toLowerCase() || '';
-    
-    // Icon mapping with all available icons
-    const iconComponents: Record<string, React.ComponentType<any>> = {
-        'folder': FolderOpen,
-        'folder-open': FolderOpen,
-        'file': FileIcon,
-        'file-text': FileText,
-        'file-image': FileImage,
-        'file-pdf': FilePdfIcon,
-        'file-spreadsheet': FileSpreadsheet,
-        'heart': Heart,
-        'graduation-cap': GraduationCap,
-        'briefcase': Briefcase,
-        'award': Award,
-        'shield': Shield,
-        'calendar': Calendar,
-        'home': Home,
-        'user': User,
-        'users': Users,
-        'building': Building,
-        'file-check': FileCheck,
-        'file-signature': FileSignature,
-        'receipt': Receipt,
-        'credit-card': CreditCard,
-        'badge-check': BadgeCheck,
-        'book-open': BookOpen,
-        'map-pin': MapPin,
-        'phone': Phone,
-        'mail': Mail,
-        'globe': Globe,
-        'link': Link,
-        'alert-circle': AlertCircle,
-        'lock': Lock,
-        'check-circle': CheckCircle
-    };
-    
-    const IconComponent = iconComponents[normalizedName] || 
-                         (ICON_MAP[normalizedName] as React.ComponentType<any>) || 
-                         FileIcon;
-    
-    if (IconComponent && typeof IconComponent === 'function') {
-        const iconProps: React.ComponentProps<any> = { className };
-        if (color) {
-            iconProps.style = { color };
-        }
-        return React.createElement(IconComponent, iconProps);
-    }
-    
-    return React.createElement(FileIcon, { className });
-};
-
-/**
- * Get category icon with proper styling
- */
-export const getCategoryIcon = (
-    category: any, 
-    className: string = "h-5 w-5"
-): React.ReactNode => {
-    if (!category) return React.createElement(FolderOpen, { className });
-    
-    const iconName = category.icon || 'folder';
-    const color = category.color || 'text-gray-500';
-    
-    return getIconComponent(iconName, className, color);
-};
-
 // ==================== Document Status Utilities ====================
 
 /**
@@ -297,28 +154,24 @@ export const isDocumentExpired = (doc: any): boolean => {
 export const getDocumentStatus = (doc: any): {
     label: string;
     color: string;
-    icon: React.ReactNode;
 } => {
     if (isDocumentExpired(doc)) {
         return {
             label: 'Expired',
-            color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
-            icon: getIconComponent('alert-circle', 'h-3 w-3')
+            color: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
         };
     }
     
     if (doc?.requires_password) {
         return {
             label: 'Password Protected',
-            color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            icon: getIconComponent('lock', 'h-3 w-3')
+            color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
         };
     }
     
     return {
         label: 'Active',
-        color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
-        icon: getIconComponent('check-circle', 'h-3 w-3')
+        color: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
     };
 };
 
@@ -658,4 +511,31 @@ export const exportToCSV = (
     
     URL.revokeObjectURL(url);
     toast.success(`Exported ${documents.length} documents`);
+};
+
+// ==================== Export ====================
+
+export default {
+    formatDate,
+    formatDateTime,
+    getRelativeTime,
+    getFileColor,
+    getFileTypeDisplay,
+    isDocumentExpired,
+    getDocumentStatus,
+    getResidentName,
+    getResidentInitials,
+    copyToClipboard,
+    copyWithFallback,
+    getCsrfToken,
+    formatFileSize,
+    parseFileSize,
+    isValidFileType,
+    isValidFileSize,
+    getDownloadUrl,
+    getViewUrl,
+    calculateStorageStats,
+    getDocumentCountByCategory,
+    searchDocuments,
+    exportToCSV
 };

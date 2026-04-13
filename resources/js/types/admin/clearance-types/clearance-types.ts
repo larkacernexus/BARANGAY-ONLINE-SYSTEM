@@ -5,6 +5,7 @@ import { PageProps as InertiaPageProps } from '@inertiajs/core';
 // ========== CORE INTERFACES ==========
 
 export interface ClearanceType {
+    remarks: any;
     id: number;
     name: string;
     code: string;

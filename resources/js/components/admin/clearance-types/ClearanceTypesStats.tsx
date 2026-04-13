@@ -1,6 +1,6 @@
 // components/admin/clearance-types/ClearanceTypesStats.tsx
 
-import { FileText, CheckCircle, CreditCard, Shield, Globe } from 'lucide-react';
+import { FileText, CheckCircle, CreditCard, Shield } from 'lucide-react';
 import { StatCard } from '@/components/adminui/stats-grid';
 
 interface Stats {
@@ -26,11 +26,6 @@ export default function ClearanceTypesStats({ stats }: ClearanceTypesStatsProps)
         active: stats?.active || 0,
         requires_payment: stats?.requires_payment || 0,
         requires_approval: stats?.requires_approval || 0,
-        online_only: stats?.online_only || 0,
-        inactive: stats?.inactive || 0,
-        discountable: stats?.discountable || 0,
-        non_discountable: stats?.non_discountable || 0,
-        averageFee: stats?.averageFee || 0
     };
 
     const calculatePercentage = (value: number) => {
@@ -39,40 +34,33 @@ export default function ClearanceTypesStats({ stats }: ClearanceTypesStatsProps)
     };
 
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
                 title="Total Types"
                 value={safeStats.total.toLocaleString()}
-                icon={<FileText className="h-4 w-4 text-blue-500" />}
+                icon={<FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />}
                 description="All clearance types"
             />
             
             <StatCard
-                title="Active"
+                title="Active Types"
                 value={safeStats.active.toLocaleString()}
-                icon={<CheckCircle className="h-4 w-4 text-green-500" />}
+                icon={<CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400" />}
                 description={`${calculatePercentage(safeStats.active)}% of total`}
             />
 
             <StatCard
                 title="Paid Types"
                 value={safeStats.requires_payment.toLocaleString()}
-                icon={<CreditCard className="h-4 w-4 text-amber-500" />}
-                description={`${calculatePercentage(safeStats.requires_payment)}% of total`}
+                icon={<CreditCard className="h-5 w-5 text-amber-500 dark:text-amber-400" />}
+                description={`${calculatePercentage(safeStats.requires_payment)}% require payment`}
             />
 
             <StatCard
                 title="Needs Approval"
                 value={safeStats.requires_approval.toLocaleString()}
-                icon={<Shield className="h-4 w-4 text-purple-500" />}
-                description={`${calculatePercentage(safeStats.requires_approval)}% of total`}
-            />
-
-            <StatCard
-                title="Online Only"
-                value={safeStats.online_only.toLocaleString()}
-                icon={<Globe className="h-4 w-4 text-cyan-500" />}
-                description={`${calculatePercentage(safeStats.online_only)}% of total`}
+                icon={<Shield className="h-5 w-5 text-purple-500 dark:text-purple-400" />}
+                description={`${calculatePercentage(safeStats.requires_approval)}% require approval`}
             />
         </div>
     );

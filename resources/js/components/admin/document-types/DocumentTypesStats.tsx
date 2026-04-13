@@ -1,12 +1,10 @@
 // components/admin/document-types/DocumentTypesStats.tsx
+
 import { 
     FileText, 
     CheckCircle, 
-    XCircle, 
-    Folder,
-    AlertCircle,
+    FileType,
     HardDrive,
-    FileType
 } from 'lucide-react';
 import { StatCard } from '@/components/adminui/stats-grid';
 
@@ -28,61 +26,47 @@ export default function DocumentTypesStats({
     categoryCounts, 
     categories 
 }: DocumentTypesStatsProps) {
-    // Safe stats with fallbacks
     const safeStats = {
         total: stats?.total || 0,
-        active: stats?.active || 0,
         required: stats?.required || 0,
         optional: stats?.optional || 0,
+        has_formats: stats?.has_formats || 0,
         max_file_size_mb: stats?.max_file_size_mb || 0,
-        has_formats: stats?.has_formats || 0
     };
 
-    const safeCategories = categories || [];
-    const inactiveCount = safeStats.total - safeStats.active;
+    const calculatePercentage = (value: number) => {
+        if (safeStats.total === 0) return 0;
+        return Math.round((value / safeStats.total) * 100);
+    };
 
     return (
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
                 title="Total Types"
                 value={safeStats.total.toLocaleString()}
-                icon={<FileText className="h-4 w-4 text-blue-500" />}
-                description={`${safeStats.active} active • ${inactiveCount} inactive`}
+                icon={<FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />}
+                description="All document types"
             />
             
             <StatCard
-                title="Required"
+                title="Required Types"
                 value={safeStats.required.toLocaleString()}
-                icon={<CheckCircle className="h-4 w-4 text-green-500" />}
-                description={`${safeStats.optional} optional`}
+                icon={<CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400" />}
+                description={`${calculatePercentage(safeStats.required)}% required • ${safeStats.optional} optional`}
             />
 
             <StatCard
-                title="Categories"
-                value={safeCategories.length.toLocaleString()}
-                icon={<Folder className="h-4 w-4 text-purple-500" />}
-                description="Active categories"
-            />
-
-            <StatCard
-                title="Has Formats"
+                title="Format Restricted"
                 value={safeStats.has_formats.toLocaleString()}
-                icon={<FileType className="h-4 w-4 text-indigo-500" />}
-                description="With format restrictions"
+                icon={<FileType className="h-5 w-5 text-indigo-500 dark:text-indigo-400" />}
+                description={`${calculatePercentage(safeStats.has_formats)}% have format limits`}
             />
 
             <StatCard
-                title="Max Size"
+                title="Max File Size"
                 value={`${safeStats.max_file_size_mb} MB`}
-                icon={<HardDrive className="h-4 w-4 text-amber-500" />}
-                description="Maximum file size"
-            />
-
-            <StatCard
-                title="Inactive"
-                value={inactiveCount.toLocaleString()}
-                icon={<AlertCircle className="h-4 w-4 text-red-500" />}
-                description="Disabled document types"
+                icon={<HardDrive className="h-5 w-5 text-amber-500 dark:text-amber-400" />}
+                description="Maximum upload size"
             />
         </div>
     );

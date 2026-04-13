@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { route } from 'ziggy-js';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle } from 'lucide-react';
 
 // Import types
 import { PageProps, ReportType, UrgencyLevel, ReportFormData } from '@/types/portal/reports/community-report';
@@ -280,6 +279,12 @@ export default function CommunityReport() {
         }
     };
 
+    // Auto-advance handler for type selection
+    const handleAutoAdvanceFromTypeSelection = () => {
+        setActiveStep(2);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     // ========== HANDLER FUNCTIONS ==========
     const handleSaveDraft = async () => {
         if (isSavingDraft || isSubmitting || processing) return;
@@ -300,9 +305,10 @@ export default function CommunityReport() {
         setData('report_type_id', typeId);
         
         const selected = activeReportTypes.find(t => t.id === typeId);
-        if (selected && isMobile) {
+        if (selected) {
+            // Auto-advance to step 2
             setTimeout(() => {
-                nextStep();
+                handleAutoAdvanceFromTypeSelection();
             }, 100);
         }
     };
@@ -486,7 +492,7 @@ export default function CommunityReport() {
                                 <div className="flex items-center gap-4">
                                     <Link href="/portal/community-reports">
                                         <Button variant="ghost" size="sm" className="gap-2">
-                                            Back
+                                            ← Back
                                         </Button>
                                     </Link>
                                     <div className="flex items-center gap-3">
@@ -498,7 +504,7 @@ export default function CommunityReport() {
                                         </div>
                                         {currentDraftId && (
                                             <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-1 rounded text-xs">
-                                                Draft Auto-saved
+                                                💾 Draft Auto-saved
                                             </span>
                                         )}
                                     </div>
@@ -509,7 +515,7 @@ export default function CommunityReport() {
                                     size="sm"
                                     onClick={() => setShowEmergencyModal(true)}
                                 >
-                                    Emergency
+                                    🚨 Emergency
                                 </Button>
                             </div>
                         </div>
@@ -519,7 +525,7 @@ export default function CommunityReport() {
                     {Object.keys(errors).length > 0 && (
                         <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-6 mx-4 lg:mx-0">
                             <div className="flex items-start gap-3">
-                                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                <span className="text-red-600 flex-shrink-0 mt-0.5 text-lg">⚠️</span>
                                 <div>
                                     <h4 className="font-semibold text-red-700 mb-1">Please fix the following errors:</h4>
                                     <ul className="list-disc list-inside space-y-1 text-sm text-red-600">

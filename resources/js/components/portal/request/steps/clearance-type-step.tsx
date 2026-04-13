@@ -1,6 +1,6 @@
 // clearance-type-step.tsx
 import { RefObject, useState, useEffect, useRef } from 'react';
-import { Search, X, FileCheck, Check, ChevronDown, Filter, LayoutGrid, ListOrdered, Info, AlertCircle, Sparkles } from 'lucide-react';
+import { Search, X, Check, ChevronDown, Filter, AlertCircle, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ interface ClearanceTypeStepProps {
     setShowSearch: (show: boolean) => void;
     onClearanceTypeChange: (value: string) => void;
     onClearSelection: () => void;
+    onNext?: () => void;
 }
 
 export function ClearanceTypeStep({
@@ -53,7 +54,8 @@ export function ClearanceTypeStep({
     showSearch,
     setShowSearch,
     onClearanceTypeChange,
-    onClearSelection
+    onClearSelection,
+    onNext
 }: ClearanceTypeStepProps) {
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
     const [showTypeDropdown, setShowTypeDropdown] = useState(false);
@@ -126,13 +128,6 @@ export function ClearanceTypeStep({
         return 'Select clearance type';
     };
 
-    const getSelectedTypeIcon = () => {
-        if (selectedClearance) {
-            return <FileCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 transition-transform duration-200 group-hover:scale-110" />;
-        }
-        return <FileCheck className="h-4 w-4 text-gray-400 transition-transform duration-200 group-hover:scale-110" />;
-    };
-
     // Handle touch start for swipe to close on mobile
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartRef.current = e.touches[0].clientY;
@@ -152,14 +147,25 @@ export function ClearanceTypeStep({
         touchStartRef.current = null;
     };
 
-    const handleSelectType = (typeId: string) => {
-        setSelectedItemId(typeId);
-        setTimeout(() => {
-            onClearanceTypeChange(typeId);
-            handleCloseDropdown();
-            setSelectedItemId(null);
-        }, 150);
-    };
+   const handleSelectType = (typeId: string) => {
+    setSelectedItemId(typeId);
+    
+    // Update the clearance type
+    onClearanceTypeChange(typeId);
+    
+    // Close the dropdown
+    handleCloseDropdown();
+    
+    // Clear selected item state
+    setTimeout(() => {
+        setSelectedItemId(null);
+    }, 100);
+    
+    // Auto-advance to next step
+    if (onNext) {
+        onNext();
+    }
+};
 
     // Get category color
     const getCategoryColor = (category: string) => {
@@ -203,8 +209,20 @@ export function ClearanceTypeStep({
                                 onClick={() => setShowTypeDropdown(!showTypeDropdown)}
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="transition-transform duration-300 group-hover:scale-110">
-                                        {getSelectedTypeIcon()}
+                                    <div className={cn(
+                                        "w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300",
+                                        selectedClearance 
+                                            ? "bg-blue-100 dark:bg-blue-900/40" 
+                                            : "bg-gray-100 dark:bg-gray-700"
+                                    )}>
+                                        <span className={cn(
+                                            "text-xs font-bold",
+                                            selectedClearance 
+                                                ? "text-blue-600 dark:text-blue-400" 
+                                                : "text-gray-500 dark:text-gray-400"
+                                        )}>
+                                            📋
+                                        </span>
                                     </div>
                                     <span className={cn(
                                         "text-sm truncate transition-all duration-300",
@@ -407,12 +425,14 @@ export function ClearanceTypeStep({
                                                                         ? 'bg-blue-100 dark:bg-blue-900/40 scale-110 shadow-md'
                                                                         : 'bg-gray-100 dark:bg-gray-800 group-hover:scale-105 group-hover:shadow-sm'
                                                                 )}>
-                                                                    <FileCheck className={cn(
-                                                                        "h-4 w-4 transition-all duration-300",
+                                                                    <span className={cn(
+                                                                        "text-sm font-bold",
                                                                         dataClearanceTypeId === type.id.toString()
-                                                                            ? 'text-blue-600 dark:text-blue-400 scale-110'
-                                                                            : 'text-gray-500 group-hover:scale-110'
-                                                                    )} />
+                                                                            ? 'text-blue-600 dark:text-blue-400'
+                                                                            : 'text-gray-500 dark:text-gray-400'
+                                                                    )}>
+                                                                        📄
+                                                                    </span>
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center gap-2 flex-wrap">
@@ -525,7 +545,7 @@ export function ClearanceTypeStep({
                         <div className="flex items-start justify-between">
                             <div className="flex items-start gap-3 flex-1">
                                 <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-900/30 transition-all duration-300 hover:scale-110">
-                                    <FileCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                    <span className="text-xl">📋</span>
                                 </div>
                                 <div className="flex-1">
                                     <h4 className="font-semibold flex items-center gap-2 flex-wrap text-gray-900 dark:text-white">
@@ -560,12 +580,12 @@ export function ClearanceTypeStep({
                         {/* Details Grid with better styling */}
                         <div className="grid grid-cols-3 gap-2 mt-4">
                             {[
-                                { label: 'Processing', value: `${selectedClearance.processing_days} days`, icon: '⏱️' },
-                                { label: 'Validity', value: `${selectedClearance.validity_days} days`, icon: '📅' },
+                                { label: 'Processing', value: `${selectedClearance.processing_days} days` },
+                                { label: 'Validity', value: `${selectedClearance.validity_days} days` },
                                 { 
                                     label: 'Documents', 
-                                    value: `${selectedClearance.document_types?.filter(doc => doc.is_required).length || 0} required`,
-                                    isRequired: selectedClearance.document_types?.some(doc => doc.is_required)
+                                    value: `${selectedClearance.document_types?.filter((doc: any) => doc.is_required).length || 0} required`,
+                                    isRequired: selectedClearance.document_types?.some((doc: any) => doc.is_required)
                                 }
                             ].map((item, idx) => (
                                 <div 
@@ -585,11 +605,11 @@ export function ClearanceTypeStep({
                         </div>
 
                         {/* Document Requirements Hint */}
-                        {selectedClearance.document_types?.some(doc => doc.is_required) && (
+                        {selectedClearance.document_types?.some((doc: any) => doc.is_required) && (
                             <div className="mt-3 p-2.5 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800 animate-in fade-in-up duration-300 delay-200">
                                 <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                                    <Info className="h-3.5 w-3.5 animate-pulse" />
-                                    <span>This clearance requires {selectedClearance.document_types.filter(doc => doc.is_required).length} document(s) to be uploaded</span>
+                                    <AlertCircle className="h-3.5 w-3.5" />
+                                    <span>This clearance requires {selectedClearance.document_types.filter((doc: any) => doc.is_required).length} document(s) to be uploaded</span>
                                 </div>
                             </div>
                         )}

@@ -1,5 +1,5 @@
 // components/admin/residents/ResidentsGridView.tsx
-import React, { useCallback, useMemo, memo, useState } from 'react';
+import React, { useCallback, useMemo, memo, useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +65,7 @@ interface ResidentsGridViewProps {
     onGenerateId?: (resident: Resident) => void;
     onCreateClearance?: (resident: Resident) => void;
     onToggleStatus?: (resident: Resident) => void;
+    windowWidth?: number;
 }
 
 // Shared Resident Card Component
@@ -581,10 +582,25 @@ export default function ResidentsGridView({
     },
     onGenerateId,
     onCreateClearance,
-    onToggleStatus
+    onToggleStatus,
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
 }: ResidentsGridViewProps) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
     const { isOpen, selectedResident, openModal, closeModal } = usePhotoModal();
+    
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
+    
+    // Determine grid columns based on actual available width and scaling
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;  // Mobile: 1 column
+        if (windowWidth < 900) return 2;   // Small tablets: 2 columns
+        if (windowWidth < 1280) return 3;  // Laptops/tablets landscape: 3 columns
+        if (windowWidth < 1600) return 3;  // Standard laptops with scaling: 3 columns
+        return 4;                           // Large desktop displays: 4 columns
+    }, [windowWidth, devicePixelRatio]);
     
     // Memoized handlers
     const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
@@ -610,18 +626,15 @@ export default function ResidentsGridView({
         return <EmptyStateComponent hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />;
     }
 
-    // Grid layout configuration
-    const gridLayoutProps = {
-        isEmpty: false,
-        emptyState: null,
-        gridCols: { base: 1, sm: 2, lg: 3, xl: 4 } as const,
-        gap: { base: '3', sm: '4' } as const,
-        padding: "p-4" as const
-    };
-
     return (
         <>
-            <GridLayout {...gridLayoutProps}>
+            <GridLayout
+                isEmpty={false}
+                emptyState={null}
+                gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
+                gap={{ base: '3', sm: '4' }}
+                padding="p-4"
+            >
                 {residents.map((resident) => (
                     <ResidentCard
                         key={resident.id}

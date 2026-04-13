@@ -1,6 +1,16 @@
+// components/admin/role-permissions/RolePermissionsGridView.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
 import {
@@ -15,25 +25,34 @@ import {
     Trash2,
     Eye,
     MoreVertical,
-    ArrowRight
+    ArrowRight,
+    ChevronDown,
+    ChevronUp,
+    ExternalLink,
+    CheckSquare,
+    Square,
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { RolePermission } from '@/admin-utils/rolePermissionsUtils';
-import { useState, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
-// Define helper functions locally or import them
+interface RolePermissionsGridViewProps {
+    permissions: RolePermission[];
+    isBulkMode: boolean;
+    selectedPermissions: number[];
+    onItemSelect: (id: number) => void;
+    hasActiveFilters: boolean;
+    onClearFilters: () => void;
+    onRevokePermission: (permission: RolePermission) => void;
+    onCopyToClipboard: (text: string, label: string) => void;
+    windowWidth?: number;
+}
+
+// Helper functions
 const truncateText = (text: string | null | undefined, maxLength: number): string => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
-};
-
-const getTruncationLength = (type: 'name' | 'email' | 'description', width: number): number => {
-    if (width < 640) return type === 'name' ? 15 : 20;
-    if (width < 768) return type === 'name' ? 20 : 25;
-    if (width < 1024) return type === 'name' ? 25 : 30;
-    return type === 'name' ? 30 : 40;
 };
 
 const formatDate = (dateString: string | null | undefined): string => {
@@ -61,178 +80,45 @@ const formatTimeAgo = (dateString: string | null | undefined): string => {
     return formatDate(dateString);
 };
 
-const getModuleBadgeVariant = (module: string): { text: string; className: string } => {
-    const moduleMap: Record<string, { text: string; className: string }> = {
-        'users': { text: 'Users', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800' },
-        'roles': { text: 'Roles', className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800' },
-        'permissions': { text: 'Permissions', className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800' },
-        'settings': { text: 'Settings', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700' },
+const getModuleColor = (module: string): string => {
+    const moduleMap: Record<string, string> = {
+        'users': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+        'roles': 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+        'permissions': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+        'settings': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+        'residents': 'bg-cyan-100 text-cyan-800 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800',
+        'households': 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800',
+        'clearances': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+        'fees': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+        'payments': 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800',
+        'reports': 'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800',
+        'announcements': 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800',
     };
-    return moduleMap[module.toLowerCase()] || { 
-        text: module || 'Unknown', 
-        className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700' 
-    };
+    return moduleMap[module.toLowerCase()] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
 };
 
-interface RolePermissionsGridViewProps {
-    permissions: RolePermission[];
-    isBulkMode: boolean;
-    selectedPermissions: number[];
-    onItemSelect: (id: number) => void;
-    hasActiveFilters: boolean;
-    onClearFilters: () => void;
-    onRevokePermission: (permission: RolePermission) => void;
-    onCopyToClipboard: (text: string, label: string) => void;
-    windowWidth: number;
-}
+const getModuleDisplay = (module: string): string => {
+    const moduleMap: Record<string, string> = {
+        'users': 'Users',
+        'roles': 'Roles',
+        'permissions': 'Permissions',
+        'settings': 'Settings',
+        'residents': 'Residents',
+        'households': 'Households',
+        'clearances': 'Clearances',
+        'fees': 'Fees',
+        'payments': 'Payments',
+        'reports': 'Reports',
+        'announcements': 'Announcements',
+    };
+    return moduleMap[module.toLowerCase()] || module || 'Unknown';
+};
 
-// Three Dots Menu Component - Optimized with useCallback
-function ThreeDotsMenu({ 
-    permission,
-    isSelected,
-    onItemSelect,
-    onRevokePermission,
-    onCopyToClipboard
-}: { 
-    permission: RolePermission;
-    isSelected: boolean;
-    onItemSelect: (id: number) => void;
-    onRevokePermission: (permission: RolePermission) => void;
-    onCopyToClipboard: (text: string, label: string) => void;
-}) {
-    const [open, setOpen] = useState(false);
-
-    const handleClose = useCallback(() => setOpen(false), []);
-    const handleToggle = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        setOpen(prev => !prev);
-    }, []);
-
-    const handleCopyAssignment = useCallback(() => {
-        onCopyToClipboard(
-            `${permission.permission?.display_name || permission.permission?.name || 'Permission'} → ${permission.role?.name || 'Role'}`, 
-            'Permission Assignment'
-        );
-        setOpen(false);
-    }, [permission, onCopyToClipboard]);
-
-    const handleCopyPermissionName = useCallback(() => {
-        onCopyToClipboard(permission.permission?.name || 'N/A', 'Permission Name');
-        setOpen(false);
-    }, [permission, onCopyToClipboard]);
-
-    const handleCopyRoleName = useCallback(() => {
-        onCopyToClipboard(permission.role?.name || 'N/A', 'Role Name');
-        setOpen(false);
-    }, [permission, onCopyToClipboard]);
-
-    const handleSelect = useCallback(() => {
-        onItemSelect(permission.id);
-        setOpen(false);
-    }, [permission.id, onItemSelect]);
-
-    const handleRevoke = useCallback(() => {
-        onRevokePermission(permission);
-        setOpen(false);
-    }, [permission, onRevokePermission]);
-
-    return (
-        <div className="relative">
-            <button
-                className="h-8 w-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-                onClick={handleToggle}
-                aria-label="Actions menu"
-                aria-expanded={open}
-            >
-                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            </button>
-            
-            {open && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={handleClose} />
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50 py-1">
-                        {permission.permission_id && (
-                            <Link
-                                href={`/admin/permissions/${permission.permission_id}`}
-                                className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300"
-                                onClick={handleClose}
-                            >
-                                <Eye className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                <span>View Permission</span>
-                            </Link>
-                        )}
-                        
-                        {permission.role_id && (
-                            <Link
-                                href={`/admin/roles/${permission.role_id}`}
-                                className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300"
-                                onClick={handleClose}
-                            >
-                                <Shield className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                <span>View Role</span>
-                            </Link>
-                        )}
-                        
-                        <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-                        
-                        <button
-                            onClick={handleCopyAssignment}
-                            className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300"
-                        >
-                            <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                            <span>Copy Assignment</span>
-                        </button>
-                        
-                        <button
-                            onClick={handleCopyPermissionName}
-                            className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300"
-                        >
-                            <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                            <span>Copy Permission Name</span>
-                        </button>
-                        
-                        <button
-                            onClick={handleCopyRoleName}
-                            className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3 text-gray-700 dark:text-gray-300"
-                        >
-                            <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                            <span>Copy Role Name</span>
-                        </button>
-                        
-                        <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-                        
-                        <button
-                            onClick={handleSelect}
-                            className="w-full px-4 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-3"
-                        >
-                            {isSelected ? (
-                                <>
-                                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                    <span className="text-green-600 dark:text-green-400">Deselect</span>
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                    <span className="text-gray-700 dark:text-gray-300">Select for Bulk</span>
-                                </>
-                            )}
-                        </button>
-                        
-                        <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-                        
-                        <button
-                            onClick={handleRevoke}
-                            className="w-full px-4 py-2 text-sm text-left hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-red-600 dark:text-red-400"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                            <span>Revoke Permission</span>
-                        </button>
-                    </div>
-                </>
-            )}
-        </div>
-    );
-}
+const getStatusColor = (isActive: boolean): string => {
+    return isActive 
+        ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
+        : 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
+};
 
 export default function RolePermissionsGridView({
     permissions,
@@ -243,9 +129,50 @@ export default function RolePermissionsGridView({
     onClearFilters,
     onRevokePermission,
     onCopyToClipboard,
-    windowWidth
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
 }: RolePermissionsGridViewProps) {
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
     
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
+    
+    // Determine grid columns - 3 for laptops, 4 for wide screens
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;      // Mobile: 1 column
+        if (windowWidth < 1024) return 2;     // Tablet: 2 columns
+        if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
+        return 4;                              // Wide desktop: 4 columns
+    }, [windowWidth, devicePixelRatio]);
+    
+    // Adjust text truncation based on grid columns
+    const truncationLengths = useMemo(() => {
+        if (gridCols >= 4) return { name: 25, code: 30 };
+        if (gridCols === 3) return { name: 22, code: 25 };
+        if (gridCols === 2) return { name: 20, code: 22 };
+        return { name: 18, code: 20 };
+    }, [gridCols]);
+
+    // Toggle card expansion
+    const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedId(prev => prev === id ? null : id);
+    }, []);
+
+    // Handle card click
+    const handleCardClick = (permissionId: number, e: React.MouseEvent) => {
+        if (isBulkMode) {
+            e.stopPropagation();
+            return;
+        }
+        e.stopPropagation();
+        handleToggleExpand(permissionId, e);
+    };
+    
+    // Memoize selected set for quick lookup
+    const selectedSet = useMemo(() => new Set(selectedPermissions), [selectedPermissions]);
+
     const emptyState = useMemo(() => (
         <EmptyState
             title="No permission assignments found"
@@ -258,215 +185,328 @@ export default function RolePermissionsGridView({
         />
     ), [hasActiveFilters, onClearFilters]);
 
-    // Pre-calculate truncation lengths for performance
-    const truncationLengths = useMemo(() => ({
-        name: getTruncationLength('name', windowWidth),
-        description: getTruncationLength('description', windowWidth)
-    }), [windowWidth]);
+    // Early return for empty state
+    if (permissions.length === 0) {
+        return emptyState;
+    }
 
     return (
         <GridLayout
-            isEmpty={permissions.length === 0}
-            emptyState={emptyState}
-            gridCols={{ base: 1, sm: 2, lg: 3 }}
+            isEmpty={false}
+            emptyState={null}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
             gap={{ base: '3', sm: '4' }}
             padding="p-4"
         >
             {permissions.map((permission) => {
-                const isSelected = selectedPermissions.includes(permission.id);
+                const isSelected = selectedSet.has(permission.id);
+                const isExpanded = expandedId === permission.id;
                 const permissionName = permission.permission?.display_name || permission.permission?.name || 'N/A';
                 const permissionCode = permission.permission?.name || 'N/A';
                 const roleName = permission.role?.name || 'N/A';
-                const moduleBadge = getModuleBadgeVariant(permission.permission?.module || 'Unknown');
+                const moduleName = permission.permission?.module || 'Unknown';
+                const moduleColor = getModuleColor(moduleName);
+                const moduleDisplay = getModuleDisplay(moduleName);
                 const relativeTime = formatTimeAgo(permission.granted_at);
                 const granterName = permission.granter?.name || 'System';
                 const granterEmail = permission.granter?.email;
+                const isPermissionActive = permission.permission?.is_active ?? true;
                 
                 return (
                     <Card 
                         key={permission.id}
-                        className={`overflow-hidden transition-all hover:shadow-md relative bg-white dark:bg-gray-950 border ${
+                        className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
                             isSelected 
-                                ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/20' 
-                                : 'border-gray-200 dark:border-gray-700'
-                        }`}
-                        onClick={(e) => {
-                            if (isBulkMode && e.target instanceof HTMLElement && 
-                                !e.target.closest('a') && 
-                                !e.target.closest('button')) {
-                                onItemSelect(permission.id);
-                            }
-                        }}
+                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
+                        } ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
+                        onClick={(e) => handleCardClick(permission.id, e)}
                     >
-                        <div className="absolute top-3 right-3 z-10">
-                            <ThreeDotsMenu 
-                                permission={permission}
-                                isSelected={isSelected}
-                                onItemSelect={onItemSelect}
-                                onRevokePermission={onRevokePermission}
-                                onCopyToClipboard={onCopyToClipboard}
-                            />
-                        </div>
-
                         <CardContent className="p-4">
                             {/* Header */}
-                            <div className="flex items-start justify-between mb-3 pr-8">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                        permission.permission?.is_active
+                                        isPermissionActive
                                             ? 'bg-green-100 dark:bg-green-900/30' 
-                                            : 'bg-gray-100 dark:bg-gray-800'
+                                            : 'bg-red-100 dark:bg-red-900/30'
                                     }`}>
                                         <Key className={`h-5 w-5 ${
-                                            permission.permission?.is_active
+                                            isPermissionActive
                                                 ? 'text-green-600 dark:text-green-400' 
-                                                : 'text-gray-600 dark:text-gray-400'
+                                                : 'text-red-600 dark:text-red-400'
                                         }`} />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                        <div className="font-medium text-gray-900 dark:text-white truncate">
                                             {truncateText(permissionName, truncationLengths.name)}
                                         </div>
                                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                            {truncateText(permissionCode, truncationLengths.description)}
+                                            {truncateText(permissionCode, truncationLengths.code)}
                                         </div>
                                     </div>
                                 </div>
                                 
-                                {isBulkMode && (
-                                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                <div className="flex items-center gap-1 ml-2">
+                                    {isBulkMode && (
                                         <Checkbox
                                             checked={isSelected}
                                             onCheckedChange={() => onItemSelect(permission.id)}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                         />
-                                    </div>
+                                    )}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                            {permission.permission_id && (
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/admin/permissions/${permission.permission_id}`} className="flex items-center">
+                                                        <Eye className="h-4 w-4 mr-2" />
+                                                        View Permission
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            {permission.role_id && (
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/admin/roles/${permission.role_id}`} className="flex items-center">
+                                                        <Shield className="h-4 w-4 mr-2" />
+                                                        View Role
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                            )}
+                                            
+                                            <DropdownMenuSeparator />
+                                            
+                                            <DropdownMenuItem onClick={() => {
+                                                onCopyToClipboard(
+                                                    `${permissionName} → ${roleName}`, 
+                                                    'Permission Assignment'
+                                                );
+                                            }}>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy Assignment
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuItem onClick={() => {
+                                                onCopyToClipboard(permissionCode, 'Permission Name');
+                                            }}>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy Permission
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuItem onClick={() => {
+                                                onCopyToClipboard(roleName, 'Role Name');
+                                            }}>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy Role
+                                            </DropdownMenuItem>
+
+                                            {isBulkMode && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => onItemSelect(permission.id)}>
+                                                        {isSelected ? (
+                                                            <>
+                                                                <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
+                                                                <span className="text-green-600">Deselect</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Square className="h-4 w-4 mr-2" />
+                                                                Select for Bulk
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                            
+                                            <DropdownMenuSeparator />
+                                            
+                                            <DropdownMenuItem 
+                                                className="text-red-600 dark:text-red-400"
+                                                onClick={() => onRevokePermission(permission)}
+                                            >
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Revoke Permission
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </div>
+
+                            {/* Status Badges */}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                                <Badge 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-0.5 ${getStatusColor(isPermissionActive)}`}
+                                >
+                                    {isPermissionActive ? 
+                                        <CheckCircle className="h-3 w-3 mr-1" /> : 
+                                        <XCircle className="h-3 w-3 mr-1" />
+                                    }
+                                    {isPermissionActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                                
+                                <Badge 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-0.5 ${moduleColor}`}
+                                >
+                                    {moduleDisplay}
+                                </Badge>
+                                
+                                {permission.role?.is_system_role && (
+                                    <Badge variant="outline" className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                                        System Role
+                                    </Badge>
                                 )}
                             </div>
 
-                            {/* Compact Permission to Role Flow */}
-                            <div className="flex items-center justify-between gap-2 py-2 px-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg mb-3">
-                                <div className="flex items-center gap-1 min-w-0">
-                                    <Badge variant="outline" className="text-xs bg-white dark:bg-gray-900 border-green-200 dark:border-green-800">
-                                        <Key className="h-3 w-3 mr-1 text-green-600 dark:text-green-400" />
-                                        <span className="truncate max-w-[80px]">{truncateText(permission.permission?.name || 'N/A', 10)}</span>
-                                    </Badge>
-                                    <ArrowRight className="h-3 w-3 text-gray-400 dark:text-gray-500 flex-shrink-0 mx-1" />
-                                    <Badge variant="outline" className="text-xs bg-white dark:bg-gray-900 border-purple-200 dark:border-purple-800">
-                                        <Shield className="h-3 w-3 mr-1 text-purple-600 dark:text-purple-400" />
-                                        <span className="truncate max-w-[80px]">{truncateText(permission.role?.name || 'N/A', 10)}</span>
-                                    </Badge>
-                                </div>
-                                <Badge 
-                                    variant={permission.role?.is_system_role ? 'default' : 'secondary'}
-                                    className="text-xs flex-shrink-0"
-                                >
-                                    {permission.role?.is_system_role ? 'System' : 'Custom'}
+                            {/* Permission to Role Flow */}
+                            <div className="flex items-center justify-center gap-2 py-2 px-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg mb-3">
+                                <Badge variant="outline" className="text-xs bg-white dark:bg-gray-900">
+                                    <Key className="h-3 w-3 mr-1 text-green-600 dark:text-green-400" />
+                                    {truncateText(permissionCode, 12)}
+                                </Badge>
+                                <ArrowRight className="h-4 w-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                <Badge variant="outline" className="text-xs bg-white dark:bg-gray-900">
+                                    <Shield className="h-3 w-3 mr-1 text-purple-600 dark:text-purple-400" />
+                                    {truncateText(roleName, 12)}
                                 </Badge>
                             </div>
 
-                            {/* Two-column layout for better space utilization */}
-                            <div className="grid grid-cols-2 gap-3">
-                                {/* Left Column */}
-                                <div className="space-y-2">
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Module</div>
-                                        <Badge variant="outline" className={moduleBadge.className}>
-                                            {moduleBadge.text}
-                                        </Badge>
+                            {/* Primary Info */}
+                            <div className="space-y-2 mb-2">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span>Assigned: {formatDate(permission.granted_at)}</span>
+                                </div>
+                                
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                                    <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span>{relativeTime}</span>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                                    <User className="h-3.5 w-3.5 flex-shrink-0" />
+                                    <span className="truncate">{granterName}</span>
+                                </div>
+                            </div>
+
+                            {/* Expand/Collapse indicator */}
+                            {!isBulkMode && (
+                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        {isExpanded ? 'Hide details' : 'Click to view details'}
                                     </div>
-                                    
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status</div>
-                                        {permission.permission?.is_active ? (
-                                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-xs">
-                                                <CheckCircle className="h-3 w-3 mr-1" />
-                                                Active
-                                            </Badge>
+                                    <button
+                                        className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={(e) => handleToggleExpand(permission.id, e)}
+                                    >
+                                        {isExpanded ? (
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                         ) : (
-                                            <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-xs">
-                                                <XCircle className="h-3 w-3 mr-1" />
-                                                Inactive
-                                            </Badge>
+                                            <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                         )}
-                                    </div>
+                                    </button>
                                 </div>
+                            )}
 
-                                {/* Right Column */}
-                                <div className="space-y-2">
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Assigned</div>
-                                        <div className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
-                                            <Calendar className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                            <span>{formatDate(permission.granted_at)}</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div>
-                                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Relative</div>
-                                        <div className="flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
-                                            <Clock className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                            <span>{relativeTime}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Granter Info - Compact */}
-                            <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-                                <div className="flex items-center gap-2">
-                                    <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
-                                        <User className="h-3 w-3 text-gray-600 dark:text-gray-400" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
-                                            {granterName}
-                                        </div>
-                                        {granterEmail && (
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                {granterEmail}
+                            {/* Expanded Details */}
+                            {isExpanded && (
+                                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50">
+                                    {/* Granter Details */}
+                                    {granterEmail && (
+                                        <div className="text-sm">
+                                            <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Granted By:</p>
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                                    <User className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{granterName}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">{granterEmail}</p>
+                                                </div>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* Role Users Count */}
+                                    {permission.role?.users_count !== undefined && (
+                                        <div className="text-sm">
+                                            <span className="text-gray-500 dark:text-gray-400">Users with this role:</span>
+                                            <span className="text-gray-900 dark:text-white ml-1 font-medium">
+                                                {permission.role.users_count}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Quick Actions */}
+                                    <div className="flex gap-2 pt-1">
+                                        {permission.permission_id && (
+                                            <Link
+                                                href={`/admin/permissions/${permission.permission_id}`}
+                                                className="flex-1"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <button className="w-full text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 py-1.5 px-3 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center gap-1">
+                                                    <Key className="h-3 w-3" />
+                                                    View Permission
+                                                </button>
+                                            </Link>
+                                        )}
+                                        {permission.role_id && (
+                                            <Link
+                                                href={`/admin/roles/${permission.role_id}`}
+                                                className="flex-1"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <button className="w-full text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 py-1.5 px-3 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center gap-1">
+                                                    <Shield className="h-3 w-3" />
+                                                    View Role
+                                                </button>
+                                            </Link>
                                         )}
                                     </div>
-                                    <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300 flex-shrink-0">
-                                        {permission.role?.users_count || 0} users
-                                    </Badge>
+
+                                    {/* Permission ID */}
+                                    <div className="text-xs text-gray-400 dark:text-gray-600">
+                                        Permission ID: {permission.id}
+                                    </div>
+
+                                    {/* Revoke button in expanded view */}
+                                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                                        <button
+                                            className="w-full text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 py-1.5 px-3 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center justify-center gap-1"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onRevokePermission(permission);
+                                            }}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                            Revoke Permission
+                                        </button>
+                                    </div>
+
+                                    {/* Collapse button */}
+                                    <div className="flex items-center justify-end pt-2">
+                                        <button
+                                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                            onClick={(e) => handleToggleExpand(permission.id, e)}
+                                        >
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-
-                            {/* Quick Action Buttons - Compact */}
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                {permission.permission_id && (
-                                    <Link href={`/admin/permissions/${permission.permission_id}`} className="w-full">
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            className="w-full justify-center h-7 text-xs border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        >
-                                            <Key className="h-3 w-3 mr-1" />
-                                            Permission
-                                        </Button>
-                                    </Link>
-                                )}
-                                {permission.role_id && (
-                                    <Link href={`/admin/roles/${permission.role_id}`} className="w-full">
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            className="w-full justify-center h-7 text-xs border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        >
-                                            <Shield className="h-3 w-3 mr-1" />
-                                            Role
-                                        </Button>
-                                    </Link>
-                                )}
-                            </div>
-
-                            {/* Permission ID - Minimal */}
-                            <div className="mt-2 text-xs text-gray-400 dark:text-gray-600 text-right">
-                                ID: {permission.id}
-                            </div>
+                            )}
                         </CardContent>
                     </Card>
                 );

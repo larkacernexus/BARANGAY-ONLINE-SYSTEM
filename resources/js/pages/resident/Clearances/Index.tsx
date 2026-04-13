@@ -1,5 +1,3 @@
-// pages/resident/MyClearances.tsx (Fixed Type Issues)
-
 import { useState, useEffect, useMemo } from 'react';
 import { Head, usePage, Link } from '@inertiajs/react';
 import { toast } from 'sonner';

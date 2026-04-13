@@ -201,6 +201,31 @@ export default function Dashboard({
     const currentTab = TAB_OPTIONS.find(tab => tab.id === activeTab) || TAB_OPTIONS[0];
     const CurrentTabIcon = currentTab.icon;
 
+    // Desktop Tabs Navigation
+    const DesktopTabs = () => (
+        <div className="hidden lg:flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+            {TAB_OPTIONS.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={cn(
+                            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                            isActive
+                                ? "bg-white dark:bg-gray-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                        )}
+                    >
+                        <Icon className="h-4 w-4" />
+                        <span>{tab.label}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+
     // Mobile dropdown selector
     const MobileTabDropdown = () => (
         <div className="lg:hidden relative tab-dropdown">
@@ -308,8 +333,11 @@ export default function Dashboard({
                     </div>
                 </div>
 
-                {/* Mobile Tab Dropdown */}
-                <MobileTabDropdown />
+                {/* Tabs Navigation */}
+                <div className="mb-2 sm:mb-4">
+                    <DesktopTabs />
+                    <MobileTabDropdown />
+                </div>
 
                 {/* Stats Grid - Only show on overview */}
                 {activeTab === 'overview' && (

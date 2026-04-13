@@ -1,28 +1,6 @@
-import { 
-    FileText, File, Image, FileDigit, Lock, Calendar, User, 
-    Download, Eye, Trash2, MoreVertical, Grid, List, Folder, 
-    FolderOpen, Shield, Heart, GraduationCap, Briefcase, Award,
-    Type, Clock, AlertCircle, CheckCircle, XCircle 
-} from 'lucide-react';
-import type { StorageStats } from '@/types/portal/records/records';
+// /components/residentui/records/constants.ts
 
-// Icon mapping
-export const ICON_MAP: Record<string, any> = {
-    'user': User,
-    'heart': Heart,
-    'file-text': FileText,
-    'graduation-cap': GraduationCap,
-    'briefcase': Briefcase,
-    'award': Award,
-    'shield': Shield,
-    'folder': Folder,
-    'folder-open': FolderOpen,
-    'file': File,
-    'calendar': Calendar,
-    'image': Image,
-    'file-digit': FileDigit,
-    'type': Type,
-};
+import type { StorageStats } from '@/types/portal/records/records';
 
 // Color mappings
 export const COLOR_MAP: Record<string, string> = {
@@ -48,21 +26,21 @@ export const BG_COLOR_MAP: Record<string, string> = {
 };
 
 // File type configurations
-export const FILE_TYPE_CONFIG: Record<string, { icon: any; color: string }> = {
-    'pdf': { icon: FileText, color: 'text-red-500 dark:text-red-400' },
-    'doc': { icon: Type, color: 'text-blue-500 dark:text-blue-400' },
-    'docx': { icon: Type, color: 'text-blue-500 dark:text-blue-400' },
-    'xls': { icon: FileDigit, color: 'text-green-500 dark:text-green-400' },
-    'xlsx': { icon: FileDigit, color: 'text-green-500 dark:text-green-400' },
-    'csv': { icon: FileDigit, color: 'text-green-500 dark:text-green-400' },
-    'jpg': { icon: Image, color: 'text-purple-500 dark:text-purple-400' },
-    'jpeg': { icon: Image, color: 'text-purple-500 dark:text-purple-400' },
-    'png': { icon: Image, color: 'text-purple-500 dark:text-purple-400' },
-    'gif': { icon: Image, color: 'text-purple-500 dark:text-purple-400' },
-    'webp': { icon: Image, color: 'text-purple-500 dark:text-purple-400' },
+export const FILE_TYPE_CONFIG: Record<string, { color: string }> = {
+    'pdf': { color: 'text-red-500 dark:text-red-400' },
+    'doc': { color: 'text-blue-500 dark:text-blue-400' },
+    'docx': { color: 'text-blue-500 dark:text-blue-400' },
+    'xls': { color: 'text-green-500 dark:text-green-400' },
+    'xlsx': { color: 'text-green-500 dark:text-green-400' },
+    'csv': { color: 'text-green-500 dark:text-green-400' },
+    'jpg': { color: 'text-purple-500 dark:text-purple-400' },
+    'jpeg': { color: 'text-purple-500 dark:text-purple-400' },
+    'png': { color: 'text-purple-500 dark:text-purple-400' },
+    'gif': { color: 'text-purple-500 dark:text-purple-400' },
+    'webp': { color: 'text-purple-500 dark:text-purple-400' },
 };
 
-// Stats cards configuration - UPDATED to match ModernStatsCards expected structure
+// Stats cards configuration
 export const getRecordStatsCards = (stats: StorageStats) => {
     const documentCount = stats?.document_count || 0;
     const usedPercentage = stats?.percentage || 0;
@@ -71,7 +49,6 @@ export const getRecordStatsCards = (stats: StorageStats) => {
         {
             title: 'Total Documents',
             value: documentCount.toLocaleString(),
-            icon: Folder,
             iconColor: 'text-blue-600 dark:text-blue-400',
             iconBgColor: 'bg-blue-50 dark:bg-blue-900/20',
             trend: {
@@ -83,7 +60,6 @@ export const getRecordStatsCards = (stats: StorageStats) => {
         {
             title: 'Storage Used',
             value: stats?.used || '0 MB',
-            icon: File,
             iconColor: 'text-purple-600 dark:text-purple-400',
             iconBgColor: 'bg-purple-50 dark:bg-purple-900/20',
             trend: {
@@ -95,7 +71,6 @@ export const getRecordStatsCards = (stats: StorageStats) => {
         {
             title: 'Categories',
             value: stats?.categories_count || 0,
-            icon: FolderOpen,
             iconColor: 'text-green-600 dark:text-green-400',
             iconBgColor: 'bg-green-50 dark:bg-green-900/20',
             footer: 'Active categories'
@@ -103,7 +78,6 @@ export const getRecordStatsCards = (stats: StorageStats) => {
         {
             title: 'Available Space',
             value: stats?.available || '100 MB',
-            icon: Shield,
             iconColor: 'text-amber-600 dark:text-amber-400',
             iconBgColor: 'bg-amber-50 dark:bg-amber-900/20',
             footer: usedPercentage > 90 ? 'Almost full' : `${100 - usedPercentage}% remaining`
@@ -111,7 +85,7 @@ export const getRecordStatsCards = (stats: StorageStats) => {
     ];
 };
 
-// Alternative: If you prefer to have trend only on some cards
+// Alternative stats cards with trends
 export const getRecordStatsCardsWithTrends = (stats: StorageStats) => {
     const documentCount = stats?.document_count || 0;
     const usedPercentage = stats?.percentage || 0;
@@ -120,7 +94,6 @@ export const getRecordStatsCardsWithTrends = (stats: StorageStats) => {
         {
             title: 'Total Documents',
             value: documentCount.toLocaleString(),
-            icon: Folder,
             iconColor: 'text-blue-600 dark:text-blue-400',
             iconBgColor: 'bg-blue-50 dark:bg-blue-900/20',
             trend: {
@@ -132,7 +105,6 @@ export const getRecordStatsCardsWithTrends = (stats: StorageStats) => {
         {
             title: 'Storage Used',
             value: stats?.used || '0 MB',
-            icon: File,
             iconColor: 'text-purple-600 dark:text-purple-400',
             iconBgColor: 'bg-purple-50 dark:bg-purple-900/20',
             footer: `${stats?.used || '0 MB'} of ${stats?.limit || '0 MB'} used`
@@ -140,7 +112,6 @@ export const getRecordStatsCardsWithTrends = (stats: StorageStats) => {
         {
             title: 'Categories',
             value: stats?.categories_count || 0,
-            icon: FolderOpen,
             iconColor: 'text-green-600 dark:text-green-400',
             iconBgColor: 'bg-green-50 dark:bg-green-900/20',
             footer: 'Document categories'
@@ -148,7 +119,6 @@ export const getRecordStatsCardsWithTrends = (stats: StorageStats) => {
         {
             title: 'Available Space',
             value: stats?.available || '100 MB',
-            icon: Shield,
             iconColor: 'text-amber-600 dark:text-amber-400',
             iconBgColor: 'bg-amber-50 dark:bg-amber-900/20',
             trend: usedPercentage > 90 ? {

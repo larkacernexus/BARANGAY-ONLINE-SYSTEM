@@ -137,17 +137,18 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
         setData('clearance_type_id', value);
         const type = clearanceTypes.find(t => t.id.toString() === value);
         setSelectedClearance(type || null);
-        if (isMobile && value) {
-            setTimeout(() => nextStep(), 100);
-        }
     };
 
-    // FIXED: Handle purpose selection properly
+    // Auto-advance handler specifically for type selection - bypasses validation
+    const handleAutoAdvanceFromTypeSelection = useCallback(() => {
+        setActiveStep(2);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, []);
+
+    // Handle purpose selection properly
     const onPurposeSelect = (value: string, label: string) => {
-        // Call handlePurposeSelect which updates the hook's state
         const result = handlePurposeSelect(value, label);
         
-        // Update form data based on selection
         if (value === 'custom') {
             setData('purpose', '');
             setData('purpose_custom', '');
@@ -156,7 +157,6 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
             setData('purpose_custom', '');
         }
         
-        // Clear specific purpose when purpose changes
         setData('specific_purpose', '');
     };
 
@@ -276,8 +276,13 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
     }, [data.clearance_type_id, data.purpose, data.purpose_custom, data.needed_date, isCustomPurpose, documentRequirements.met]);
 
     const nextStep = useCallback(() => {
-        if (activeStep === 1 && !data.clearance_type_id) {
-            toast.error('Please select a clearance type');
+        if (activeStep === 1) {
+            if (!data.clearance_type_id) {
+                toast.error('Please select a clearance type');
+                return;
+            }
+            setActiveStep(2);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             return;
         }
         
@@ -360,6 +365,7 @@ export default function RequestClearance({ clearanceTypes, resident }: PageProps
                                             setSelectedClearance(null);
                                             setData('clearance_type_id', '');
                                         }}
+                                        onNext={handleAutoAdvanceFromTypeSelection}
                                     />
                                 )}
 

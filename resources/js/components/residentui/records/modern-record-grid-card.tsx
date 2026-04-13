@@ -12,7 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatDate, getFileIcon, getFileColor, getDocumentStatus } from './record-utils';
+import { formatDate, getFileColor, getDocumentStatus } from './record-utils';
 
 interface ModernRecordGridCardProps {
     document: any;
@@ -37,7 +37,6 @@ export const ModernRecordGridCard = ({
     onDelete,
     onCopyReference
 }: ModernRecordGridCardProps) => {
-    const FileIcon = getFileIcon(doc.file_extension, doc.mime_type);
     const fileColor = getFileColor(doc.file_extension);
     const status = getDocumentStatus(doc);
     const residentName = getResidentName(doc.resident_id, doc);
@@ -81,7 +80,6 @@ export const ModernRecordGridCard = ({
                                         "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full",
                                         status.color
                                     )}>
-                                        {status.icon}
                                         {status.label}
                                     </span>
                                 </div>
@@ -145,10 +143,9 @@ export const ModernRecordGridCard = ({
                         <div>
                             <p className="text-xs text-gray-500 dark:text-gray-400">Type</p>
                             <div className="flex items-center gap-1 mt-1">
-                                <FileIcon className={cn("h-3 w-3", fileColor)} />
-                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                    {doc.file_extension?.toUpperCase() || 'N/A'}
-                                </p>
+                                <span className={cn("text-sm font-medium uppercase", fileColor)}>
+                                    {doc.file_extension || 'FILE'}
+                                </span>
                             </div>
                         </div>
                         <div>

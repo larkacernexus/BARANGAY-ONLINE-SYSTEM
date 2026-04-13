@@ -1,6 +1,6 @@
 // components/admin/clearances/ClearancesGridView.tsx
 
-import React, { useCallback, useMemo, memo, useState } from 'react';
+import React, { useCallback, useMemo, memo, useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +21,7 @@ import {
     CheckCircle, XCircle, AlertCircle, Zap, AlertTriangle,
     Eye, Edit, Printer, Trash2, Copy, MoreVertical,
     CreditCard, Home, Building, Calendar, Receipt,
-    ChevronDown, ChevronUp, Hash, FileCheck
+    ChevronDown, ChevronUp, Hash, FileCheck, Square, CheckSquare
 } from 'lucide-react';
 import { ClearanceRequest } from '@/types/admin/clearances/clearance';
 import { JSX } from 'react';
@@ -50,42 +50,44 @@ interface ClearancesGridViewProps {
     onDelete: (clearance: ClearanceRequest) => void;
     onViewPhoto: (clearance: ClearanceRequest) => void;
     handleRecordPayment: (clearance: ClearanceRequest) => void;
+    windowWidth?: number;
+    isMobile?: boolean;
 }
 
 // Helper functions
 const getStatusIcon = (status: string) => {
     const icons: Record<string, JSX.Element> = {
-        'pending': <Clock className="h-4 w-4 text-amber-500" />,
-        'pending_payment': <DollarSign className="h-4 w-4 text-amber-500" />,
-        'processing': <RefreshCw className="h-4 w-4 text-blue-500" />,
-        'approved': <CheckCircle className="h-4 w-4 text-green-500" />,
-        'issued': <CheckCircle className="h-4 w-4 text-green-500" />,
-        'rejected': <XCircle className="h-4 w-4 text-red-500" />,
-        'cancelled': <XCircle className="h-4 w-4 text-gray-500" />,
-        'expired': <AlertCircle className="h-4 w-4 text-gray-500" />
+        'pending': <Clock className="h-3 w-3" />,
+        'pending_payment': <DollarSign className="h-3 w-3" />,
+        'processing': <RefreshCw className="h-3 w-3" />,
+        'approved': <CheckCircle className="h-3 w-3" />,
+        'issued': <CheckCircle className="h-3 w-3" />,
+        'rejected': <XCircle className="h-3 w-3" />,
+        'cancelled': <XCircle className="h-3 w-3" />,
+        'expired': <AlertCircle className="h-3 w-3" />
     };
-    return icons[status] || <Clock className="h-4 w-4 text-gray-500" />;
+    return icons[status] || <Clock className="h-3 w-3" />;
 };
 
-const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-        'pending': 'secondary',
-        'pending_payment': 'outline',
-        'processing': 'outline',
-        'approved': 'outline',
-        'issued': 'default',
-        'rejected': 'destructive',
-        'cancelled': 'outline',
-        'expired': 'outline'
+const getStatusColor = (status: string): string => {
+    const colors: Record<string, string> = {
+        'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
+        'pending_payment': 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+        'processing': 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800',
+        'approved': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+        'issued': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+        'rejected': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+        'cancelled': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+        'expired': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
     };
-    return variants[status] || 'outline';
+    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
 };
 
 const getStatusDisplay = (status: string): string => {
     const statusMap: Record<string, string> = {
-        'pending': 'Pending Review',
-        'pending_payment': 'Pending Payment',
-        'processing': 'Under Processing',
+        'pending': 'Pending',
+        'pending_payment': 'Awaiting Payment',
+        'processing': 'Processing',
         'approved': 'Approved',
         'issued': 'Issued',
         'rejected': 'Rejected',
@@ -95,13 +97,13 @@ const getStatusDisplay = (status: string): string => {
     return statusMap[status] || status;
 };
 
-const getUrgencyVariant = (urgency: string): "default" | "secondary" | "destructive" | "outline" => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-        'normal': 'outline',
-        'rush': 'secondary',
-        'express': 'default'
+const getUrgencyColor = (urgency: string): string => {
+    const colors: Record<string, string> = {
+        'normal': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+        'rush': 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800',
+        'express': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
     };
-    return variants[urgency] || 'outline';
+    return colors[urgency] || colors.normal;
 };
 
 const getUrgencyDisplay = (urgency: string): string => {
@@ -121,9 +123,9 @@ const getUrgencyIcon = (urgency: string) => {
 
 const getPayerIcon = (payerType?: string) => {
     switch (payerType) {
-        case 'household': return <Home className="h-4 w-4 text-gray-500" />;
-        case 'business': return <Building className="h-4 w-4 text-gray-500" />;
-        default: return <User className="h-4 w-4 text-gray-500" />;
+        case 'household': return <Home className="h-3.5 w-3.5" />;
+        case 'business': return <Building className="h-3.5 w-3.5" />;
+        default: return <User className="h-3.5 w-3.5" />;
     }
 };
 
@@ -192,6 +194,7 @@ const ClearanceCard = memo(({
     handleRecordPayment,
     onToggleExpand,
     onViewDetails,
+    truncateLengths,
     isMobile = false
 }: {
     clearance: ClearanceRequest;
@@ -204,6 +207,7 @@ const ClearanceCard = memo(({
     handleRecordPayment: (clearance: ClearanceRequest) => void;
     onToggleExpand: (id: number, e: React.MouseEvent) => void;
     onViewDetails: (id: number, e: React.MouseEvent) => void;
+    truncateLengths: { purpose: number; name: number };
     isMobile?: boolean;
 }) => {
     const anyClearance = clearance as any;
@@ -238,31 +242,36 @@ const ClearanceCard = memo(({
                 isSelected 
                     ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
-            } ${isExpanded ? 'shadow-lg' : ''} ${isPriority ? 'border-l-4 border-l-amber-500' : ''} cursor-pointer group`}
+            } ${isExpanded ? 'shadow-lg' : ''} ${isPriority ? 'border-l-4 border-l-amber-500' : ''} cursor-pointer`}
             onClick={handleCardClick}
         >
             <CardContent className="p-4">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        
+                        <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900 dark:text-white truncate">
+                                {clearance.reference_number}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {clearance.clearance_number ? `#${clearance.clearance_number}` : formatDate(clearance.created_at)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 ml-2">
                         {isBulkMode && (
                             <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={() => onItemSelect(clearance.id)}
                                 onClick={(e) => e.stopPropagation()}
-                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 flex-shrink-0"
+                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                             />
                         )}
-                        <Badge 
-                            variant={getStatusVariant(clearance.status)}
-                            className="flex items-center gap-1 flex-shrink-0"
-                        >
-                            {getStatusIcon(clearance.status)}
-                            <span>{getStatusDisplay(clearance.status)}</span>
-                        </Badge>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 ml-2">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button
@@ -280,24 +289,11 @@ const ClearanceCard = memo(({
                                 
                                 {['pending', 'processing', 'approved'].includes(clearance.status) && (
                                     <DropdownMenuItem asChild>
-                                        <Link href={`/admin/clearances/${clearance.id}/edit`} className="flex items-center cursor-pointer">
+                                        <Link href={`/admin/clearances/${clearance.id}/edit`} className="flex items-center">
                                             <Edit className="h-4 w-4 mr-2" />
                                             Edit Request
                                         </Link>
                                     </DropdownMenuItem>
-                                )}
-                                
-                                {clearance.status === 'pending_payment' && (
-                                    <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem 
-                                            onClick={handlePaymentClick}
-                                            className="flex items-center cursor-pointer"
-                                        >
-                                            <CreditCard className="h-4 w-4 mr-2 text-green-600" />
-                                            <span className="text-green-600 font-medium">Record Payment</span>
-                                        </DropdownMenuItem>
-                                    </>
                                 )}
                                 
                                 <DropdownMenuSeparator />
@@ -309,18 +305,47 @@ const ClearanceCard = memo(({
                                 
                                 {clearance.status === 'issued' && (
                                     <DropdownMenuItem asChild>
-                                        <Link href={`/admin/clearances/${clearance.id}/print`} className="flex items-center cursor-pointer">
+                                        <Link href={`/admin/clearances/${clearance.id}/print`} className="flex items-center">
                                             <Printer className="h-4 w-4 mr-2" />
                                             Print Clearance
                                         </Link>
                                     </DropdownMenuItem>
                                 )}
                                 
+                                {clearance.status === 'pending_payment' && (
+                                    <DropdownMenuItem onClick={handlePaymentClick}>
+                                        <CreditCard className="h-4 w-4 mr-2" />
+                                        Record Payment
+                                    </DropdownMenuItem>
+                                )}
+                                
+                                {isBulkMode && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            onItemSelect(clearance.id);
+                                        }}>
+                                            {isSelected ? (
+                                                <>
+                                                    <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
+                                                    <span className="text-green-600">Deselect</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Square className="h-4 w-4 mr-2" />
+                                                    Select for Bulk
+                                                </>
+                                            )}
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                                
                                 {['pending', 'pending_payment', 'processing'].includes(clearance.status) && (
                                     <>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem 
-                                            className="text-red-600 dark:text-red-400 focus:text-red-700 focus:bg-red-50"
+                                            className="text-red-600 dark:text-red-400"
                                             onClick={handleDelete}
                                         >
                                             <Trash2 className="h-4 w-4 mr-2" />
@@ -333,96 +358,61 @@ const ClearanceCard = memo(({
                     </div>
                 </div>
 
-                {/* Reference Number */}
-                <div className="mb-3">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-                        <Hash className="h-3.5 w-3.5 flex-shrink-0" />
-                        <span className="font-mono font-medium text-gray-900 dark:text-gray-100 truncate">
-                            {clearance.reference_number}
-                        </span>
-                    </div>
-                    {clearance.clearance_number && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate ml-5">
-                            #{clearance.clearance_number}
-                        </div>
+                {/* Status Badges */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                    <Badge 
+                        variant="outline" 
+                        className={`text-xs px-2 py-0.5 ${getStatusColor(clearance.status)}`}
+                    >
+                        {getStatusIcon(clearance.status)}
+                        <span className="ml-1">{getStatusDisplay(clearance.status)}</span>
+                    </Badge>
+                    
+                    <Badge 
+                        variant="outline" 
+                        className={`text-xs px-2 py-0.5 ${getUrgencyColor(clearance.urgency)}`}
+                    >
+                        {getUrgencyIcon(clearance.urgency)}
+                        <span className="ml-1">{getUrgencyDisplay(clearance.urgency)}</span>
+                    </Badge>
+                    
+                    {clearance.clearance_type?.name && (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5">
+                            <FileCheck className="h-3 w-3 mr-1" />
+                            {truncateText(clearance.clearance_type.name, 15)}
+                        </Badge>
                     )}
                 </div>
 
                 {/* Payer Info */}
-                <div className="flex items-start gap-2 mb-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                        {getPayerIcon(anyClearance.payer_type)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                            {truncateText(payerName, 25)}
-                        </div>
-                        {anyClearance.payer_type && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {anyClearance.payer_type.charAt(0).toUpperCase() + anyClearance.payer_type.slice(1)}
-                            </div>
-                        )}
-                    </div>
+                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    {getPayerIcon(anyClearance.payer_type)}
+                    <span className="truncate" title={payerName}>
+                        {truncateText(payerName, truncateLengths.name)}
+                    </span>
                 </div>
 
-                {/* Purpose & Type */}
-                <div className="mb-3">
-                    <div className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-1.5">
-                        {clearance.purpose}
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                        <FileCheck className="h-3 w-3 mr-1" />
-                        {clearance.clearance_type?.name || 'N/A'}
-                    </Badge>
-                </div>
+                {/* Purpose */}
+                <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 mb-2">
+                    {truncateText(clearance.purpose, truncateLengths.purpose)}
+                </p>
 
-                {/* Fee & Urgency */}
-                <div className="flex items-center justify-between mb-3">
+                {/* Fee & Date */}
+                <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-1.5">
                         <Receipt className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        <span className="font-semibold text-gray-900 dark:text-white">
                             ₱{Number(clearance.fee_amount || 0).toLocaleString('en-PH', {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2
                             })}
                         </span>
                     </div>
-                    <Badge 
-                        variant={getUrgencyVariant(clearance.urgency)}
-                        className={`flex items-center gap-1 ${isPriority ? 'font-semibold' : ''}`}
-                    >
-                        {getUrgencyIcon(clearance.urgency)}
-                        {getUrgencyDisplay(clearance.urgency)}
-                    </Badge>
-                </div>
-
-                {/* Date Info */}
-                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>Created: {formatDate(clearance.created_at)}</span>
-                </div>
-
-                {/* Priority Badge */}
-                {isPriority && (
-                    <div className="mb-2">
-                        <Badge 
-                            variant={clearance.urgency === 'express' ? "destructive" : "secondary"} 
-                            className="text-xs w-full justify-center"
-                        >
-                            {clearance.urgency === 'express' ? (
-                                <>
-                                    <Zap className="h-3 w-3 mr-1" />
-                                    Express Priority
-                                </>
-                            ) : (
-                                <>
-                                    <AlertTriangle className="h-3 w-3 mr-1" />
-                                    Rush Priority
-                                </>
-                            )}
-                        </Badge>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        <Calendar className="h-3 w-3" />
+                        <span>{formatDate(clearance.created_at)}</span>
                     </div>
-                )}
+                </div>
 
                 {/* Expand/Collapse indicator */}
                 {!isBulkMode && (
@@ -445,7 +435,7 @@ const ClearanceCard = memo(({
 
                 {/* Expanded Details */}
                 {isExpanded && (
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50 duration-200">
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50">
                         {/* Additional Info */}
                         {anyClearance.valid_until && (
                             <div className="flex items-center gap-2 text-sm">
@@ -468,7 +458,7 @@ const ClearanceCard = memo(({
                         {anyClearance.remarks && (
                             <div className="text-sm">
                                 <p className="text-gray-500 dark:text-gray-400 mb-1">Remarks:</p>
-                                <p className="text-gray-700 dark:text-gray-300 line-clamp-2 italic">
+                                <p className="text-gray-700 dark:text-gray-300 italic">
                                     "{truncateText(anyClearance.remarks, 100)}"
                                 </p>
                             </div>
@@ -478,12 +468,11 @@ const ClearanceCard = memo(({
                         <div className="flex items-center gap-2 pt-2">
                             {clearance.status === 'pending_payment' && (
                                 <Button
-                                    variant="default"
                                     size="sm"
-                                    className="flex-1 text-xs bg-green-600 hover:bg-green-700"
+                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                                     onClick={handlePaymentClick}
                                 >
-                                    <CreditCard className="h-3 w-3 mr-1" />
+                                    <CreditCard className="h-4 w-4 mr-2" />
                                     Record Payment
                                 </Button>
                             )}
@@ -492,25 +481,32 @@ const ClearanceCard = memo(({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="flex-1 text-xs"
+                                    className="flex-1"
                                     asChild
                                 >
                                     <Link href={`/admin/clearances/${clearance.id}/print`}>
-                                        <Printer className="h-3 w-3 mr-1" />
+                                        <Printer className="h-4 w-4 mr-2" />
                                         Print
                                     </Link>
                                 </Button>
                             )}
-                            
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 text-xs"
+                        </div>
+
+                        {/* View full details link */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
                                 onClick={(e) => onViewDetails(clearance.id, e)}
                             >
-                                <Eye className="h-3 w-3 mr-1" />
-                                View Full Details
-                            </Button>
+                                <Eye className="h-3.5 w-3.5" />
+                                View full details
+                            </button>
+                            <button
+                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                onClick={(e) => onToggleExpand(clearance.id, e)}
+                            >
+                                <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            </button>
                         </div>
                     </div>
                 )}
@@ -544,9 +540,34 @@ export default function ClearancesGridView({
     onClearFilters,
     onDelete,
     onViewPhoto,
-    handleRecordPayment
+    handleRecordPayment,
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024,
+    isMobile = false
 }: ClearancesGridViewProps) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
+    
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
+    
+    // Determine grid columns - 3 for laptops, 4 for wide screens
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;      // Mobile: 1 column
+        if (windowWidth < 1024) return 2;     // Tablet: 2 columns
+        if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
+        return 4;                              // Wide desktop: 4 columns
+    }, [windowWidth]);
+    
+    // Adjust text truncation based on grid columns
+    const getTruncateLengths = useMemo(() => {
+        if (gridCols >= 4) return { purpose: 60, name: 25 };
+        if (gridCols === 3) return { purpose: 50, name: 22 };
+        if (gridCols === 2) return { purpose: 45, name: 20 };
+        return { purpose: 40, name: 18 };
+    }, [gridCols]);
+
+    const truncateLengths = getTruncateLengths;
     
     // Memoized handlers
     const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
@@ -567,17 +588,14 @@ export default function ClearancesGridView({
         return <EmptyStateComponent hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />;
     }
 
-    // Grid layout configuration
-    const gridLayoutProps = {
-        isEmpty: false,
-        emptyState: null,
-        gridCols: { base: 1, sm: 2, lg: 3, xl: 4 } as const,
-        gap: { base: '3', sm: '4' } as const,
-        padding: "p-4" as const
-    };
-
     return (
-        <GridLayout {...gridLayoutProps}>
+        <GridLayout
+            isEmpty={false}
+            emptyState={null}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
+            gap={{ base: '3', sm: '4' }}
+            padding="p-4"
+        >
             {clearances.map((clearance) => (
                 <ClearanceCard
                     key={clearance.id}
@@ -591,6 +609,8 @@ export default function ClearancesGridView({
                     handleRecordPayment={handleRecordPayment}
                     onToggleExpand={handleToggleExpand}
                     onViewDetails={handleViewDetails}
+                    truncateLengths={truncateLengths}
+                    isMobile={isMobile}
                 />
             ))}
         </GridLayout>

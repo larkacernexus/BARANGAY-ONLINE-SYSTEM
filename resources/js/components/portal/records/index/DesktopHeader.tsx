@@ -1,4 +1,3 @@
-// /components/residentui/records/DesktopHeader.tsx
 import React from 'react';
 
 interface DesktopHeaderProps {

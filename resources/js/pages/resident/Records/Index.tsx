@@ -1,4 +1,4 @@
-// pages/resident/MyRecords.tsx (Fixed Order Version - with Mobile List View)
+// pages/resident/MyRecords.tsx (Fixed Order Version - with Mobile List View + Add Record Button)
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Head, Link } from '@inertiajs/react';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import ResidentLayout from '@/layouts/resident-app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, FolderIcon, UserIcon, HardDrive, CalendarIcon, FileTextIcon, AlertCircleIcon } from 'lucide-react';
+import { Loader2, FolderIcon, UserIcon, HardDrive, CalendarIcon, FileTextIcon, AlertCircleIcon, Plus } from 'lucide-react';
 
 // Reusable Components
 import { ModernFilterModal } from '@/components/residentui/modern-filter-modal';
@@ -23,7 +23,7 @@ import { PasswordModal } from '@/components/portal/records/index/PasswordModal';
 import { StorageCard } from '@/components/portal/records/index/StorageCard';
 import { ModernRecordGridView } from '@/components/residentui/records/modern-record-grid-view';
 import { ModernRecordListView } from '@/components/residentui/records/modern-record-list-view';
-import { ModernRecordMobileListView } from '@/components/residentui/records/modern-record-mobile-list-view'; // New import
+import { ModernRecordMobileListView } from '@/components/residentui/records/modern-record-mobile-list-view';
 import { ModernRecordFilters } from '@/components/residentui/records/modern-record-filters';
 import { ModernCardHeader } from '@/components/residentui/modern/card-header';
 import { ViewToggle } from '@/components/residentui/modern/view-toggle';
@@ -328,6 +328,10 @@ export default function MyRecords({
     
     const handleSearchClear = () => handleFilterChange('search', '');
     
+    const handleAddRecord = () => {
+        window.location.href = '/portal/my-records/create';
+    };
+    
     const triggerDirectDownload = (doc: Document) => {
         setActionStatus({ type: 'success', message: `Starting download for "${doc.name}"...` });
         const csrfToken = getCsrfToken();
@@ -498,19 +502,41 @@ export default function MyRecords({
             
             <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
                 {isMobile ? (
-                    <MobileHeader
-                        title="My Records"
-                        subtitle={`Household: ${household?.household_number || 'N/A'}`}
-                        showStats={showStats}
-                        onToggleStats={() => setShowStats(!showStats)}
-                        onOpenFilters={() => setShowMobileFilters(true)}
-                        hasActiveFilters={hasActiveFilters}
-                    />
+                    <>
+                        <MobileHeader
+                            title="My Records"
+                            subtitle={`Household: ${household?.household_number || 'N/A'}`}
+                            showStats={showStats}
+                            onToggleStats={() => setShowStats(!showStats)}
+                            onOpenFilters={() => setShowMobileFilters(true)}
+                            hasActiveFilters={hasActiveFilters}
+                        />
+                        <div className="px-4">
+                            <Button
+                                onClick={handleAddRecord}
+                                className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add New Record
+                            </Button>
+                        </div>
+                    </>
                 ) : (
                     <DesktopHeader
                         title="My Records"
                         description={`Household: ${household?.household_number || 'N/A'}`}
-                        actions={<ActionButtons onPrint={handlePrintRecords} onExport={handleExportCSV} isExporting={isExporting} />}
+                        actions={
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    onClick={handleAddRecord}
+                                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add Record
+                                </Button>
+                                <ActionButtons onPrint={handlePrintRecords} onExport={handleExportCSV} isExporting={isExporting} />
+                            </div>
+                        }
                     />
                 )}
                 
@@ -607,8 +633,8 @@ export default function MyRecords({
                                     icon={FolderIcon} 
                                     title={searchQuery ? `No documents match "${searchQuery}"` : 'No documents found'} 
                                     message="Upload your first document to get started" 
-                                    actionLabel="Upload Document" 
-                                    onAction={() => window.location.href = '/portal/my-records/create'} 
+                                    actionLabel="Add Record" 
+                                    onAction={handleAddRecord} 
                                 />
                             ) : (
                                 // Mobile-specific rendering

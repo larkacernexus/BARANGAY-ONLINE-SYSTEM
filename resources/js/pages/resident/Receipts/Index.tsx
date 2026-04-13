@@ -1,4 +1,4 @@
-// pages/resident/Receipts/Index.tsx (Updated with mobile list view)
+// pages/resident/Receipts/Index.tsx (Updated with receiptsData prop)
 
 import { useState, useMemo } from 'react';
 import { Head, usePage } from '@inertiajs/react';
@@ -22,8 +22,10 @@ import { ModernSelect } from '@/components/residentui/modern-select';
 import { CustomTabs } from '@/components/residentui/CustomTabs';
 import { ModernReceiptGridView } from '@/components/residentui/receipts/modern-receipt-grid-view';
 import { ModernReceiptListView } from '@/components/residentui/receipts/modern-receipt-list-view';
-import { ModernReceiptMobileListView } from '@/components/residentui/receipts/modern-receipt-mobile-list-view'; // New import
-import { ReceiptStatsCards } from '@/components/residentui/receipts/receipt-stats-cards';
+import { ModernReceiptMobileListView } from '@/components/residentui/receipts/modern-receipt-mobile-list-view';
+import { ModernStatsCards } from '@/components/residentui/modern-stats-cards';
+import { CollapsibleStats } from '@/components/residentui/receipts/CollapsibleStats';
+import { getReceiptStatsCards } from '@/components/residentui/receipts/constants';
 import { ModernReceiptFilters } from '@/components/residentui/receipts/modern-receipt-filters';
 import { useMobile } from '@/components/residentui/hooks/use-mobile';
 import { Receipt, List, Clock, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
@@ -503,12 +505,26 @@ export default function ReceiptsIndex() {
                         />
                     )}
                     
-                    {showStats && stats && (
-                        <div className="animate-slide-down">
-                            <ReceiptStatsCards 
-                                stats={stats}
+                    {/* Stats Section - Mobile: Collapsible, Desktop: Always visible */}
+                    {isMobile && stats && (
+                        <CollapsibleStats
+                            showStats={showStats}
+                            setShowStats={setShowStats}
+                            stats={stats}
+                            receiptsData={allReceipts}
+                            loading={loading}
+                            formatCurrency={formatCurrency}
+                            variant="mobile"
+                        />
+                    )}
+                    
+                    {!isMobile && stats && (
+                        <div>
+                            <ModernStatsCards
+                                cards={getReceiptStatsCards(stats, allReceipts, formatCurrency)}
                                 loading={loading}
-                                formatCurrency={formatCurrency}
+                                gridCols="grid-cols-2 lg:grid-cols-4"
+                                variant="default"
                             />
                         </div>
                     )}

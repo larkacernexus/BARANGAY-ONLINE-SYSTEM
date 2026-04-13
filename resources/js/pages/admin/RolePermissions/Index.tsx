@@ -110,8 +110,8 @@ const useWindowResize = () => {
     return { windowWidth, isMobile };
 };
 
-// ✅ Helper function to check date range
-const checkDateRange = (grantedAt: string | null, range: string): boolean => {
+// Helper function to check date range
+const checkDateRange = (grantedAt: string | null | undefined, range: string): boolean => {
     if (!grantedAt && range) return false;
     if (!grantedAt) return true;
     
@@ -132,7 +132,7 @@ const checkDateRange = (grantedAt: string | null, range: string): boolean => {
     }
 };
 
-// ✅ Helper function to check roles count range
+// Helper function to check roles count range
 const checkRolesCountRange = (permission: RolePermission, range: string): boolean => {
     const rolesCount = permission?.roles_count || permission?.permission?.roles_count || 0;
     
@@ -156,7 +156,7 @@ export default function RolePermissions() {
     const safeModules = modules || [];
     const safeGranters = granters || [];
     
-    // ✅ Safe filters extraction with proper typing
+    // Safe filters extraction with proper typing
     const safeFilters = (initialFilters || {}) as {
         search?: string;
         role?: string;
@@ -168,7 +168,7 @@ export default function RolePermissions() {
         sort_order?: string;
     };
     
-    // ✅ Filter states - client-side only
+    // Filter states - client-side only
     const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
     const [roleFilter, setRoleFilter] = useState<string>(getSafeString(safeFilters.role, 'all'));
     const [moduleFilter, setModuleFilter] = useState<string>(getSafeString(safeFilters.module, 'all'));
@@ -176,7 +176,7 @@ export default function RolePermissions() {
     const [dateRangePreset, setDateRangePreset] = useState<string>(getSafeString(safeFilters.date_range, ''));
     const [rolesCountRange, setRolesCountRange] = useState<string>(getSafeString(safeFilters.roles_count_range, ''));
     
-    // ✅ Separate sort states for table header
+    // Separate sort states for table header
     const [sortBy, setSortBy] = useState<string>('granted_at');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     
@@ -198,6 +198,9 @@ export default function RolePermissions() {
     const [showBulkRevokeDialog, setShowBulkRevokeDialog] = useState(false);
     const [showRevokeDialog, setShowRevokeDialog] = useState<RolePermission | null>(null);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
+    
+    // Expand/collapse state for table rows
+    const [expandedPermission, setExpandedPermission] = useState<number | null>(null);
 
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -248,19 +251,19 @@ export default function RolePermissions() {
             filtered = filtered.filter(permission => permission?.granter_id?.toString() === granterFilter);
         }
         
-        // ✅ Date range filter
+        // Date range filter
         if (dateRangePreset) {
             filtered = filtered.filter(permission => 
                 checkDateRange(permission?.granted_at || permission?.created_at, dateRangePreset)
             );
         }
         
-        // ✅ Roles count range filter
+        // Roles count range filter
         if (rolesCountRange) {
             filtered = filtered.filter(permission => checkRolesCountRange(permission, rolesCountRange));
         }
         
-        // ✅ Apply sorting (for table header)
+        // Apply sorting
         if (filtered.length > 0) {
             filtered.sort((a, b) => {
                 let valueA: any;
@@ -312,6 +315,11 @@ export default function RolePermissions() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
     const paginatedPermissions = filteredPermissions.slice(startIndex, endIndex);
+
+    // Toggle permission expansion
+    const togglePermissionExpansion = useCallback((id: number) => {
+        setExpandedPermission(prev => prev === id ? null : id);
+    }, []);
 
     // Selection handlers
     const handleSelectAllOnPage = useCallback(() => {
@@ -372,7 +380,7 @@ export default function RolePermissions() {
         return getSelectionStats(selectedPermissionsData);
     }, [selectedPermissionsData]);
 
-    // ✅ Handle sort from table header
+    // Handle sort from table header
     const handleSort = useCallback((column: string) => {
         const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
         setSortBy(column);
@@ -554,30 +562,17 @@ export default function RolePermissions() {
         handleBulkOperation('export');
     }, [handleBulkOperation]);
 
-const hasActiveFilters = useMemo(() => 
-    !!(search || 
-        roleFilter !== 'all' || 
-        moduleFilter !== 'all' ||
-        granterFilter !== 'all' ||
-        dateRangePreset ||
-        rolesCountRange),
-    [search, roleFilter, moduleFilter, granterFilter, dateRangePreset, rolesCountRange]
-);
+    const hasActiveFilters = useMemo(() => 
+        !!(search || 
+            roleFilter !== 'all' || 
+            moduleFilter !== 'all' ||
+            granterFilter !== 'all' ||
+            dateRangePreset ||
+            rolesCountRange),
+        [search, roleFilter, moduleFilter, granterFilter, dateRangePreset, rolesCountRange]
+    );
 
-    // Create normalized data structure for compatibility
-    const normalizedData = {
-        data: paginatedPermissions,
-        meta: {
-            total: totalItems,
-            last_page: totalPages,
-            current_page: currentPage,
-            per_page: itemsPerPage,
-            from: startIndex + 1,
-            to: endIndex
-        }
-    };
-
-    // ✅ Create filters object for the Filters component (removed sort fields)
+    // Create filters object for the Filters component
     const filtersStateForComponent: FilterState = {
         role: roleFilter,
         module: moduleFilter,
@@ -594,6 +589,7 @@ const hasActiveFilters = useMemo(() =>
         if (isMobile) return;
         
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl/Cmd + A: Select all on page
             if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
                 e.preventDefault();
                 if (e.shiftKey) {
@@ -602,25 +598,27 @@ const hasActiveFilters = useMemo(() =>
                     handleSelectAllOnPage();
                 }
             }
+            // Escape: Clear selection or exit bulk mode
             if (e.key === 'Escape') {
                 if (isBulkMode) {
                     if (selectedPermissions.length > 0) {
-                        setSelectedPermissions([]);
+                        handleClearSelection();
                     } else {
                         setIsBulkMode(false);
                     }
                 }
             }
+            // Ctrl/Cmd + Shift + B: Toggle bulk mode
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
-                setIsBulkMode(!isBulkMode);
+                setIsBulkMode(prev => !prev);
             }
+            // Ctrl/Cmd + F: Focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
                 e.preventDefault();
-                if (searchInputRef.current) {
-                    searchInputRef.current.focus();
-                }
+                searchInputRef.current?.focus();
             }
+            // Delete: Bulk revoke
             if (e.key === 'Delete' && isBulkMode && selectedPermissions.length > 0) {
                 e.preventDefault();
                 setShowBulkRevokeDialog(true);
@@ -629,7 +627,7 @@ const hasActiveFilters = useMemo(() =>
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedPermissions, isMobile]);
+    }, [isBulkMode, selectedPermissions, isMobile, handleSelectAllFiltered, handleSelectAllOnPage, handleClearSelection]);
 
     return (
         <AdminLayout
@@ -708,8 +706,8 @@ const hasActiveFilters = useMemo(() =>
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
                         windowWidth={windowWidth}
-                        expandedPermission={null}
-                        togglePermissionExpansion={() => {}}
+                        expandedPermission={expandedPermission}
+                        togglePermissionExpansion={togglePermissionExpansion}
                         sortBy={sortBy}
                         sortOrder={sortOrder}
                         // onSort={handleSort}

@@ -1,4 +1,5 @@
 // components/admin/users/UsersGridView.tsx
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,10 +32,13 @@ import {
   MoreVertical,
   MessageSquare,
   CheckSquare,
-  Square
+  Square,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
 } from 'lucide-react';
 import { User } from '@/types/admin/users/user-types';
-import { JSX } from 'react';
+import { JSX, useState, useMemo, useCallback, useEffect } from 'react';
 
 interface UsersGridViewProps {
   users: User[];
@@ -52,6 +56,7 @@ interface UsersGridViewProps {
   onUserEdit?: (user: User) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+  windowWidth?: number;
 }
 
 export default function UsersGridView({
@@ -69,8 +74,26 @@ export default function UsersGridView({
   onUserClick,
   onUserEdit,
   canEdit = true,
-  canDelete = true
+  canDelete = true,
+  windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
 }: UsersGridViewProps) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [devicePixelRatio, setDevicePixelRatio] = useState(1);
+  
+  useEffect(() => {
+    setDevicePixelRatio(window.devicePixelRatio || 1);
+  }, []);
+  
+  const isCompactView = isMobile;
+  
+  // Determine grid columns - 3 for laptops, 4 for wide screens
+  const gridCols = useMemo(() => {
+    if (windowWidth < 640) return 1;      // Mobile: 1 column
+    if (windowWidth < 1024) return 2;     // Tablet: 2 columns
+    if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
+    return 4;                              // Wide desktop: 4 columns
+  }, [windowWidth, devicePixelRatio]);
+
   const getStringValue = (value: unknown, defaultValue: string = ''): string => {
     if (typeof value === 'string') {
       return value;
@@ -85,37 +108,33 @@ export default function UsersGridView({
     return 'unknown';
   };
 
-  const getStatusBadgeVariant = (status: unknown): "default" | "secondary" | "destructive" | "outline" => {
+  const getStatusColor = (status: unknown): string => {
     const statusStr = getStringValue(status, 'unknown');
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      'active': 'default',
-      'inactive': 'secondary',
-      'suspended': 'destructive',
-      'pending': 'outline',
-      'unknown': 'outline'
+    const colors: Record<string, string> = {
+      'active': 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+      'inactive': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+      'suspended': 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
+      'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800',
+      'unknown': 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
     };
-    return variants[statusStr] || 'outline';
+    return colors[statusStr] || colors.unknown;
   };
 
   const getStatusIcon = (status: unknown): JSX.Element | null => {
     const statusStr = getStringValue(status, 'unknown');
     const icons: Record<string, JSX.Element> = {
-      'active': <CheckCircle className="h-3.5 w-3.5 text-green-500 dark:text-green-400" />,
-      'inactive': <XCircle className="h-3.5 w-3.5 text-gray-500 dark:text-gray-400" />,
+      'active': <CheckCircle className="h-3 w-3" />,
+      'inactive': <XCircle className="h-3 w-3" />,
     };
     return icons[statusStr] || null;
   };
 
-  const getRoleBadgeVariant = (roleName: unknown): "default" | "secondary" | "destructive" | "outline" => {
+  const getRoleColor = (roleName: unknown): string => {
     const roleStr = getStringValue(roleName, '');
-    if (!roleStr) return 'outline';
-    
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      'Administrator': 'destructive',
-      'Admin': 'destructive',
-      'Super Admin': 'destructive',
-    };
-    return variants[roleStr] || 'outline';
+    if (roleStr === 'Administrator' || roleStr === 'Admin' || roleStr === 'Super Admin') {
+      return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800';
+    }
+    return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
   };
 
   const formatDate = (dateString: unknown): string => {
@@ -186,6 +205,25 @@ export default function UsersGridView({
     return typeof twoFactor === 'string' ? twoFactor : null;
   };
 
+  // Toggle card expansion
+  const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedId(prev => prev === id ? null : id);
+  }, []);
+
+  // Handle card click
+  const handleCardClick = (user: User, e: React.MouseEvent) => {
+    if (isBulkMode) {
+      e.stopPropagation();
+      return;
+    }
+    e.stopPropagation();
+    handleToggleExpand(user.id, e);
+  };
+  
+  // Memoize selected set for quick lookup
+  const selectedSet = useMemo(() => new Set(selectedUsers), [selectedUsers]);
+
   const emptyState = (
     <EmptyState
       title="No users found"
@@ -200,28 +238,22 @@ export default function UsersGridView({
     />
   );
 
-  const handleCardClick = (user: User, e: React.MouseEvent) => {
-    if (isBulkMode && e.target instanceof HTMLElement && 
-        !e.target.closest('a') && 
-        !e.target.closest('button') &&
-        !e.target.closest('[role="menuitem"]') &&
-        !e.target.closest('[data-radix-menu-content]')) {
-      onItemSelect(user.id);
-    } else if (!isBulkMode && onUserClick) {
-      onUserClick(user);
-    }
-  };
+  // Early return for empty state
+  if (users.length === 0) {
+    return emptyState;
+  }
 
   return (
     <GridLayout
-      isEmpty={users.length === 0}
-      emptyState={emptyState}
-      gridCols={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+      isEmpty={false}
+      emptyState={null}
+      gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
       gap={{ base: '3', sm: '4' }}
       padding="p-4"
     >
       {users.map((user) => {
-        const isSelected = selectedUsers.includes(user.id);
+        const isSelected = selectedSet.has(user.id);
+        const isExpanded = expandedId === user.id;
         const fullName = getFullName(user);
         const roleName = getRoleName(user);
         const departmentName = getDepartmentName(user);
@@ -229,40 +261,45 @@ export default function UsersGridView({
         const contactNumber = getContactNumber(user);
         const twoFactorConfirmedAt = getTwoFactorConfirmedAt(user);
         const status = getStatusString(user.status);
+        
+        // Truncation lengths based on view
+        const nameLength = isCompactView ? 18 : 22;
+        const emailLength = isCompactView ? 20 : 25;
 
         return (
           <Card 
             key={user.id}
-            className={`overflow-hidden transition-all hover:shadow-md bg-white dark:bg-gray-900 border cursor-pointer ${
+            className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
               isSelected 
-                ? 'border-blue-500 border-2 bg-blue-50 dark:bg-blue-900/20' 
-                : 'border-gray-200 dark:border-gray-700'
-            }`}
+                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
+            } ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
             onClick={(e) => handleCardClick(user, e)}
           >
             <CardContent className="p-4">
+              {/* Header */}
               <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                     <UserIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {truncateText(fullName, isMobile ? 15 : 20)}
+                    <div className="font-medium text-gray-900 dark:text-white truncate">
+                      {truncateText(fullName, nameLength)}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {user.email}
+                      {truncateText(user.email, emailLength)}
                     </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 ml-2">
                   {isBulkMode && (
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => onItemSelect(user.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
+                      className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                     />
                   )}
                   <DropdownMenu>
@@ -271,101 +308,77 @@ export default function UsersGridView({
                         className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                        <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem asChild>
-                        <Link href={`/admin/users/${user.id}`} className="flex items-center gap-2 cursor-pointer">
-                          <Eye className="h-4 w-4" />
-                          <span>View Profile</span>
+                        <Link href={`/admin/users/${user.id}`} className="flex items-center">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Profile
                         </Link>
                       </DropdownMenuItem>
                       
                       {canEdit && onUserEdit && (
                         <DropdownMenuItem asChild>
-                          <Link 
-                            href={`/admin/users/${user.id}/edit`} 
-                            className="flex items-center gap-2 cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span>Edit User</span>
+                          <Link href={`/admin/users/${user.id}/edit`} className="flex items-center">
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit User
                           </Link>
                         </DropdownMenuItem>
                       )}
                       
                       <DropdownMenuSeparator />
                       
-                      <DropdownMenuItem 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onCopyToClipboard(user.email, 'Email');
-                        }}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <Copy className="h-4 w-4" />
-                        <span>Copy Email</span>
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation();
+                        onCopyToClipboard(user.email, 'Email');
+                      }}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Email
                       </DropdownMenuItem>
                       
-                      <DropdownMenuItem 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onCopyToClipboard(fullName, 'Name');
-                        }}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <Copy className="h-4 w-4" />
-                        <span>Copy Name</span>
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation();
+                        onCopyToClipboard(fullName, 'Name');
+                      }}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Name
                       </DropdownMenuItem>
 
                       <DropdownMenuItem asChild>
-                        <a 
-                          href={`mailto:${user.email}`}
-                          className="flex items-center gap-2 cursor-pointer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Mail className="h-4 w-4" />
-                          <span>Send Email</span>
+                        <a href={`mailto:${user.email}`} className="flex items-center">
+                          <Mail className="h-4 w-4 mr-2" />
+                          Send Email
                         </a>
                       </DropdownMenuItem>
 
                       {onSendMessage && (
-                        <DropdownMenuItem 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onSendMessage(user);
-                          }}
-                          className="flex items-center gap-2 cursor-pointer"
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                          <span>Send Message</span>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          onSendMessage(user);
+                        }}>
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Send Message
                         </DropdownMenuItem>
                       )}
 
                       {isBulkMode && (
                         <>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onItemSelect(user.id);
-                            }}
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            onItemSelect(user.id);
+                          }}>
                             {isSelected ? (
                               <>
-                                <CheckSquare className="h-4 w-4 text-green-600" />
+                                <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
                                 <span className="text-green-600">Deselect</span>
                               </>
                             ) : (
                               <>
-                                <Square className="h-4 w-4" />
-                                <span>Select for Bulk</span>
+                                <Square className="h-4 w-4 mr-2" />
+                                Select for Bulk
                               </>
                             )}
                           </DropdownMenuItem>
@@ -374,23 +387,21 @@ export default function UsersGridView({
                       
                       <DropdownMenuSeparator />
                       
-                      <DropdownMenuItem 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onToggleStatus(user);
-                        }}
-                        className={`flex items-center gap-2 cursor-pointer ${
-                          status === 'active' 
-                            ? 'text-amber-600 dark:text-amber-400 focus:text-amber-700 dark:focus:text-amber-300 focus:bg-amber-50 dark:focus:bg-amber-950/30' 
-                            : 'text-green-600 dark:text-green-400 focus:text-green-700 dark:focus:text-green-300 focus:bg-green-50 dark:focus:bg-green-950/30'
-                        }`}
-                      >
-                        {status === 'active' 
-                          ? <Lock className="h-4 w-4" /> 
-                          : <Unlock className="h-4 w-4" />
-                        }
-                        <span>{status === 'active' ? 'Deactivate User' : 'Activate User'}</span>
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleStatus(user);
+                      }}>
+                        {status === 'active' ? (
+                          <>
+                            <Lock className="h-4 w-4 mr-2" />
+                            Deactivate User
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="h-4 w-4 mr-2" />
+                            Activate User
+                          </>
+                        )}
                       </DropdownMenuItem>
                       
                       {canDelete && (
@@ -398,14 +409,13 @@ export default function UsersGridView({
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onClick={(e) => {
-                              e.preventDefault();
                               e.stopPropagation();
                               onDelete(user);
                             }}
-                            className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
+                            className="text-red-600 dark:text-red-400"
                           >
-                            <Trash2 className="h-4 w-4" />
-                            <span>Delete User</span>
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete User
                           </DropdownMenuItem>
                         </>
                       )}
@@ -414,81 +424,138 @@ export default function UsersGridView({
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  <Badge 
-                    variant={getStatusBadgeVariant(status)} 
-                    className={`text-xs flex items-center gap-1 ${
-                      status === 'active' 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                        : status === 'inactive'
-                        ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
-                        : status === 'suspended'
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                    }`}
-                  >
-                    {getStatusIcon(status)}
-                    <span className="capitalize">{status}</span>
-                  </Badge>
-                  <Badge 
-                    variant={getRoleBadgeVariant(roleName)}
-                    className={`text-xs ${
-                      roleName === 'Administrator' || roleName === 'Admin' || roleName === 'Super Admin'
-                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                    }`}
-                  >
-                    {truncateText(roleName, 12)}
-                  </Badge>
+              {/* Status Badges */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs px-2 py-0.5 ${getStatusColor(status)}`}
+                >
+                  {getStatusIcon(status)}
+                  <span className="ml-1 capitalize">{status}</span>
+                </Badge>
+                <Badge 
+                  variant="outline"
+                  className={`text-xs px-2 py-0.5 ${getRoleColor(roleName)}`}
+                >
+                  {truncateText(roleName, 15)}
+                </Badge>
+              </div>
+
+              {/* Primary Info */}
+              <div className="space-y-2 mb-2">
+                {position && (
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                    <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="truncate">{truncateText(position, 25)}</span>
+                  </div>
+                )}
+                
+                {contactNumber && (
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                    <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>{truncateText(contactNumber, 15)}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                  <Shield className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="truncate">{truncateText(departmentName, 20)}</span>
                 </div>
 
-                <div className="space-y-2 text-sm">
-                  {position && (
-                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                      <Briefcase className="h-3.5 w-3.5" />
-                      <span className="truncate">
-                        {truncateText(position, 25)}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {contactNumber && (
-                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                      <Phone className="h-3.5 w-3.5" />
-                      <span>{truncateText(contactNumber, 15)}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                    <Shield className="h-3.5 w-3.5" />
-                    <span className="truncate">
-                      {truncateText(departmentName, 25)}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span>Joined {formatDate(user.created_at)}</span>
-                  </div>
-
-                  {twoFactorConfirmedAt && (
-                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                      <Key className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                      <span className="text-green-600 dark:text-green-400">2FA Enabled</span>
-                    </div>
-                  )}
+                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                  <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>Joined {formatDate(user.created_at)}</span>
                 </div>
 
-                {isMobile && (
-                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                      <span>{truncateText(departmentName, 15)}</span>
-                      <span>{formatDate(user.created_at)}</span>
-                    </div>
+                {twoFactorConfirmedAt && (
+                  <div className="flex items-center gap-1.5 text-sm">
+                    <Key className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    <span className="text-green-600 dark:text-green-400">2FA Enabled</span>
                   </div>
                 )}
               </div>
+
+              {/* Expand/Collapse indicator */}
+              {!isBulkMode && (
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {isExpanded ? 'Hide details' : 'Click to view details'}
+                  </div>
+                  <button
+                    className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    onClick={(e) => handleToggleExpand(user.id, e)}
+                  >
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Expanded Details */}
+              {isExpanded && (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50">
+                  {/* Email Verified Status */}
+                  <div className="flex items-center gap-2 text-sm">
+                    {user.email_verified_at ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-green-600 dark:text-green-400">Email Verified</span>
+                        <span className="text-gray-500 dark:text-gray-400 text-xs ml-auto">
+                          {formatDate(user.email_verified_at)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-gray-400" />
+                        <span className="text-gray-500 dark:text-gray-400">Email Not Verified</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Last Login */}
+                  {(user as any).last_login_at && (
+                    <div className="text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Last Login:</span>
+                      <span className="text-gray-900 dark:text-white ml-1">
+                        {formatDate((user as any).last_login_at)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Created/Updated Dates */}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Created:</span>
+                      <span className="text-gray-700 dark:text-gray-300 ml-1">{formatDate(user.created_at)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Updated:</span>
+                      <span className="text-gray-700 dark:text-gray-300 ml-1">{formatDate(user.updated_at)}</span>
+                    </div>
+                  </div>
+
+                  {/* View full details link */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <Link
+                      href={`/admin/users/${user.id}`}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      View full profile
+                    </Link>
+                    <button
+                      className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      onClick={(e) => handleToggleExpand(user.id, e)}
+                    >
+                      <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         );

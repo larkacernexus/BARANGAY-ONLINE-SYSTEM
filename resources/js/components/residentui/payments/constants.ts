@@ -1,36 +1,4 @@
 // components/residentui/payments/payment-constants.ts
-import {
-    Receipt,
-    Banknote,
-    AlertCircle,
-    Clock,
-    CheckCircle,
-    XCircle,
-    CreditCard,
-    FileText,
-    ShieldCheck,
-    CheckCircle2,
-    Undo2,
-    TrendingUp,
-    TrendingDown,
-    Building,
-    Smartphone,
-    Landmark,
-    Calendar,
-    DollarSign,
-    Tag,
-    Briefcase,
-    Heart,
-    Eye,
-    Printer,
-    Download,
-    Copy,
-    Share2,
-    MoreVertical,
-    FileCheck,
-    Home,
-    LucideIcon
-} from 'lucide-react';
 import { Payment, PaymentStats } from '@/types/portal/payments/payment.types';
 
 // ============================================================================
@@ -53,7 +21,6 @@ export const getPaymentStatsCards = (
         {
             title: 'Total Payments',
             value: totalPayments,
-            icon: Receipt,
             iconColor: 'text-blue-600 dark:text-blue-400',
             iconBgColor: 'bg-blue-100 dark:bg-blue-900/20',
             trend: {
@@ -65,7 +32,6 @@ export const getPaymentStatsCards = (
         {
             title: 'Total Paid',
             value: formatCurrency(totalPaid),
-            icon: Banknote,
             iconColor: 'text-emerald-600 dark:text-emerald-400',
             iconBgColor: 'bg-emerald-100 dark:bg-emerald-900/20',
             trend: {
@@ -77,7 +43,6 @@ export const getPaymentStatsCards = (
         {
             title: 'Balance Due',
             value: formatCurrency(balanceDue),
-            icon: AlertCircle,
             iconColor: 'text-amber-600 dark:text-amber-400',
             iconBgColor: 'bg-amber-100 dark:bg-amber-900/20',
             trend: {
@@ -89,14 +54,13 @@ export const getPaymentStatsCards = (
         {
             title: 'Pending',
             value: pendingPayments,
-            icon: Clock,
             iconColor: 'text-purple-600 dark:text-purple-400',
             iconBgColor: 'bg-purple-100 dark:bg-purple-900/20',
             trend: {
                 value: pendingPayments > 0 ? `${pendingPayments} awaiting` : 'All processed',
                 positive: pendingPayments === 0
             },
-            footer: 'Awaiting confirmation'
+            footer: 'In progress'
         }
     ];
 };
@@ -110,7 +74,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
     color: string;
     textColor: string;
     variant: string;
-    icon: LucideIcon;
     gradient?: string;
     borderColor?: string;
     badgeColor?: string;
@@ -120,7 +83,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
         color: 'bg-green-100 dark:bg-green-900/30',
         textColor: 'text-green-800 dark:text-green-300',
         variant: 'paid',
-        icon: CheckCircle,
         gradient: 'from-green-500 to-green-600',
         borderColor: 'border-green-500',
         badgeColor: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
@@ -130,7 +92,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
         color: 'bg-green-100 dark:bg-green-900/30',
         textColor: 'text-green-800 dark:text-green-300',
         variant: 'paid',
-        icon: CheckCircle,
         gradient: 'from-green-500 to-green-600',
         borderColor: 'border-green-500',
         badgeColor: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
@@ -140,7 +101,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
         color: 'bg-amber-100 dark:bg-amber-900/30',
         textColor: 'text-amber-800 dark:text-amber-300',
         variant: 'pending',
-        icon: Clock,
         gradient: 'from-amber-500 to-amber-600',
         borderColor: 'border-amber-500',
         badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
@@ -150,7 +110,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
         color: 'bg-red-100 dark:bg-red-900/30',
         textColor: 'text-red-800 dark:text-red-300',
         variant: 'overdue',
-        icon: AlertCircle,
         gradient: 'from-red-500 to-red-600',
         borderColor: 'border-red-500',
         badgeColor: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
@@ -160,7 +119,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
         color: 'bg-gray-100 dark:bg-gray-900',
         textColor: 'text-gray-800 dark:text-gray-300',
         variant: 'cancelled',
-        icon: XCircle,
         gradient: 'from-gray-500 to-gray-600',
         borderColor: 'border-gray-500',
         badgeColor: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
@@ -170,7 +128,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
         color: 'bg-purple-100 dark:bg-purple-900/30',
         textColor: 'text-purple-800 dark:text-purple-300',
         variant: 'refunded',
-        icon: Undo2,
         gradient: 'from-purple-500 to-purple-600',
         borderColor: 'border-purple-500',
         badgeColor: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'
@@ -180,7 +137,6 @@ export const PAYMENT_STATUS_CONFIG: Record<string, {
         color: 'bg-blue-100 dark:bg-blue-900/30',
         textColor: 'text-blue-800 dark:text-blue-300',
         variant: 'partially_paid',
-        icon: Receipt,
         gradient: 'from-blue-500 to-blue-600',
         borderColor: 'border-blue-500',
         badgeColor: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
@@ -195,7 +151,6 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
     label: string;
     color: string;
     textColor: string;
-    icon: LucideIcon;
     requiresReference?: boolean;
     description?: string;
     sortOrder?: number;
@@ -204,7 +159,6 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
         label: 'Cash',
         color: 'bg-green-100 dark:bg-green-900/30',
         textColor: 'text-green-800 dark:text-green-300',
-        icon: Banknote,
         requiresReference: false,
         description: 'Pay with cash at the barangay hall',
         sortOrder: 1
@@ -213,7 +167,6 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
         label: 'GCash',
         color: 'bg-blue-100 dark:bg-blue-900/30',
         textColor: 'text-blue-800 dark:text-blue-300',
-        icon: Smartphone,
         requiresReference: true,
         description: 'Pay via GCash mobile wallet',
         sortOrder: 2
@@ -222,7 +175,6 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
         label: 'Maya',
         color: 'bg-purple-100 dark:bg-purple-900/30',
         textColor: 'text-purple-800 dark:text-purple-300',
-        icon: Smartphone,
         requiresReference: true,
         description: 'Pay via Maya (formerly PayMaya)',
         sortOrder: 3
@@ -231,7 +183,6 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
         label: 'Bank Transfer',
         color: 'bg-indigo-100 dark:bg-indigo-900/30',
         textColor: 'text-indigo-800 dark:text-indigo-300',
-        icon: Landmark,
         requiresReference: true,
         description: 'Pay via bank transfer',
         sortOrder: 4
@@ -240,7 +191,6 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
         label: 'Check',
         color: 'bg-gray-100 dark:bg-gray-900/30',
         textColor: 'text-gray-800 dark:text-gray-300',
-        icon: FileText,
         requiresReference: true,
         description: 'Pay via check',
         sortOrder: 5
@@ -249,7 +199,6 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
         label: 'Online Payment',
         color: 'bg-teal-100 dark:bg-teal-900/30',
         textColor: 'text-teal-800 dark:text-teal-300',
-        icon: CreditCard,
         requiresReference: true,
         description: 'Pay via online payment gateway',
         sortOrder: 6
@@ -261,11 +210,11 @@ export const PAYMENT_METHOD_CONFIG: Record<string, {
 // ============================================================================
 
 export const PAYMENT_TABS = [
-    { value: 'all', label: 'All', icon: Receipt, description: 'View all payments' },
-    { value: 'paid', label: 'Paid', icon: CheckCircle, description: 'Completed and paid payments' },
-    { value: 'pending', label: 'Pending', icon: Clock, description: 'Awaiting payment' },
-    { value: 'overdue', label: 'Overdue', icon: AlertCircle, description: 'Past due date payments' },
-    { value: 'cancelled', label: 'Cancelled', icon: XCircle, description: 'Cancelled payments' }
+    { value: 'all', label: 'All', description: 'View all payments' },
+    { value: 'paid', label: 'Paid', description: 'Completed and paid payments' },
+    { value: 'pending', label: 'Pending', description: 'Awaiting payment' },
+    { value: 'overdue', label: 'Overdue', description: 'Past due date payments' },
+    { value: 'cancelled', label: 'Cancelled', description: 'Cancelled payments' }
 ];
 
 // ============================================================================
@@ -275,37 +224,31 @@ export const PAYMENT_TABS = [
 export const PAYMENT_ACTIONS = {
     view: {
         label: 'View Details',
-        icon: Eye,
         color: 'text-blue-600 dark:text-blue-400',
         hoverColor: 'hover:text-blue-700 dark:hover:text-blue-300'
     },
     print: {
         label: 'Print Receipt',
-        icon: Printer,
         color: 'text-gray-600 dark:text-gray-400',
         hoverColor: 'hover:text-gray-700 dark:hover:text-gray-300'
     },
     download: {
         label: 'Download Receipt',
-        icon: Download,
         color: 'text-emerald-600 dark:text-emerald-400',
         hoverColor: 'hover:text-emerald-700 dark:hover:text-emerald-300'
     },
     copy: {
         label: 'Copy OR Number',
-        icon: Copy,
         color: 'text-purple-600 dark:text-purple-400',
         hoverColor: 'hover:text-purple-700 dark:hover:text-purple-300'
     },
     share: {
         label: 'Share Receipt',
-        icon: Share2,
         color: 'text-indigo-600 dark:text-indigo-400',
         hoverColor: 'hover:text-indigo-700 dark:hover:text-indigo-300'
     },
     more: {
         label: 'More Options',
-        icon: MoreVertical,
         color: 'text-gray-600 dark:text-gray-400',
         hoverColor: 'hover:text-gray-700 dark:hover:text-gray-300'
     }
@@ -317,27 +260,26 @@ export const PAYMENT_ACTIONS = {
 
 export const PAYMENT_FILTER_OPTIONS = {
     status: [
-        { value: 'all', label: 'All Statuses', icon: Receipt },
-        { value: 'paid', label: 'Paid', icon: CheckCircle },
-        { value: 'pending', label: 'Pending', icon: Clock },
-        { value: 'overdue', label: 'Overdue', icon: AlertCircle },
-        { value: 'cancelled', label: 'Cancelled', icon: XCircle }
+        { value: 'all', label: 'All Statuses' },
+        { value: 'paid', label: 'Paid' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'overdue', label: 'Overdue' },
+        { value: 'cancelled', label: 'Cancelled' }
     ],
     sortBy: [
-        { value: 'date', label: 'Date', icon: Calendar },
-        { value: 'amount', label: 'Amount', icon: DollarSign },
-        { value: 'status', label: 'Status', icon: AlertCircle },
-        { value: 'or_number', label: 'OR Number', icon: Receipt }
+        { value: 'date', label: 'Date' },
+        { value: 'amount', label: 'Amount' },
+        { value: 'status', label: 'Status' },
+        { value: 'or_number', label: 'OR Number' }
     ],
     sortOrder: [
-        { value: 'desc', label: 'Newest First', icon: TrendingDown },
-        { value: 'asc', label: 'Oldest First', icon: TrendingUp }
+        { value: 'desc', label: 'Newest First' },
+        { value: 'asc', label: 'Oldest First' }
     ],
     years: (years: number[]) => years.map(year => ({ value: year.toString(), label: year.toString() })),
     paymentMethods: (methods: any[]) => methods.map(method => ({
         value: method.type,
-        label: method.display_name,
-        icon: PAYMENT_METHOD_CONFIG[method.type]?.icon || CreditCard
+        label: method.display_name
     }))
 };
 
@@ -385,7 +327,6 @@ export const getPaymentStatusOptions = () => {
     return Object.entries(PAYMENT_STATUS_CONFIG).map(([value, config]) => ({
         value,
         label: config.label,
-        icon: config.icon,
         color: config.color
     }));
 };
@@ -396,7 +337,6 @@ export const getPaymentMethodOptions = () => {
         .map(([value, config]) => ({
             value,
             label: config.label,
-            icon: config.icon,
             description: config.description,
             requiresReference: config.requiresReference
         }));

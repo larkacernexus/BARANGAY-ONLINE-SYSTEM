@@ -49,7 +49,7 @@ export const useBackupOperations = () => {
     
     // Make actual API call
     router.post(
-      route('backup.create'),
+      route('admin.backup.create'),
       {
         type: backupType,
         description: backupDescription,
@@ -65,7 +65,8 @@ export const useBackupOperations = () => {
             percentage: 100,
             status: 'completed',
             message: 'Backup created successfully!',
-            currentStep: 'Complete'
+            currentStep: 'Complete',
+            estimatedTimeRemaining: 0, // ✅ Added required property
           });
           
           // Short delay to show completion
@@ -88,7 +89,9 @@ export const useBackupOperations = () => {
           setBackupProgress({
             percentage: 100,
             status: 'failed',
-            message: errors?.message || 'Failed to create backup. Please check the logs.'
+            message: errors?.message || 'Failed to create backup. Please check the logs.',
+            currentStep: 'Error',
+            estimatedTimeRemaining: 0, // ✅ Added required property
           });
           
           setCreatingBackup(false);
@@ -113,7 +116,6 @@ export const useBackupOperations = () => {
       document.body.removeChild(link);
   }, []);
 
-  // Already accepts BackupFile - good
   const handleDeleteBackup = useCallback((backup: BackupFile) => {
     const filename = backup.filename || backup.name;
     if (confirm(`Are you sure you want to delete backup "${filename}"? This action cannot be undone.`)) {
@@ -166,7 +168,7 @@ export const useBackupOperations = () => {
           // Download backups one by one
           selectedBackupsData.forEach((backup, index) => {
             setTimeout(() => {
-              handleDownloadBackup(backup); // Now passing BackupFile directly
+              handleDownloadBackup(backup);
             }, index * 500);
           });
           toast.success(`Downloading ${selectedIds.length} backup(s)`);
@@ -281,7 +283,6 @@ export const useBackupOperations = () => {
     });
   }, []);
 
-  // Updated to accept BackupFile
   const toggleProtection = useCallback((backup: BackupFile) => {
     const filename = backup.filename || backup.name;
     router.post(
@@ -330,13 +331,13 @@ export const useBackupOperations = () => {
     setBackupDescription,
     setCopied,
     
-    // Operations - all accept BackupFile
+    // Operations
     handleCreateBackup,
-    handleDownloadBackup,  // Now accepts BackupFile
-    handleDeleteBackup,     // Accepts BackupFile
+    handleDownloadBackup,
+    handleDeleteBackup,
     handleBulkOperation,
     handleCopySelectedData,
-    toggleProtection,       // Now accepts BackupFile
+    toggleProtection,
     cleanupProgress,
     
     // Progress management

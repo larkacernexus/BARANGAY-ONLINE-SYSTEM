@@ -1,6 +1,6 @@
 // components/admin/forms/FormsGridView.tsx
 
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { 
@@ -23,7 +22,7 @@ import {
 import { GridLayout } from '@/components/adminui/grid-layout';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { Form } from '@/types/admin/forms/forms.types';
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import { formUtils } from '@/admin-utils/form-utils';
 
@@ -38,10 +37,10 @@ interface FormsGridViewProps {
     onDownload: (form: Form) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
-    // Add missing props
     formatFileSize?: (bytes: number) => string;
     categories?: string[];
     agencies?: string[];
+    windowWidth?: number;
 }
 
 // Helper function to get file icon based on mime type
@@ -61,7 +60,7 @@ const getFileIcon = (mimeType?: string) => {
     return <FileText className="h-4 w-4 text-gray-500 dark:text-gray-400" />;
 };
 
-// Status color classes matching community reports pattern
+// Status color classes
 const getStatusColor = (isActive: boolean) => {
     return isActive
         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
@@ -81,6 +80,13 @@ const formatDate = (dateString?: string) => {
     }
 };
 
+// Truncate text helper
+const truncateText = (text: string, maxLength: number = 30): string => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+};
+
 export default function FormsGridView({
     forms,
     isBulkMode,
@@ -92,30 +98,33 @@ export default function FormsGridView({
     onDownload,
     hasActiveFilters,
     onClearFilters,
-    formatFileSize = formUtils.formatFileSize, // Default to formUtils if not provided
+    formatFileSize = formUtils.formatFileSize,
     categories = [],
-    agencies = []
+    agencies = [],
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
 }: FormsGridViewProps) {
-    const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
+    
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
     
     const isCompactView = isMobile;
+    
+    // Determine grid columns - 3 for laptops, 4 for wide screens
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;      // Mobile: 1 column
+        if (windowWidth < 1024) return 2;     // Tablet: 2 columns
+        if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
+        return 4;                              // Wide desktop: 4 columns
+    }, [windowWidth]);
 
     // Toggle card expansion
-    const toggleCardExpansion = (id: number, e?: React.MouseEvent) => {
-        if (e) {
-            e.stopPropagation();
-            e.preventDefault();
-        }
-        setExpandedCards(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
-        });
-    };
+    const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedId(prev => prev === id ? null : id);
+    }, []);
 
     // Handle card click
     const handleCardClick = (formId: number, e: React.MouseEvent) => {
@@ -124,7 +133,7 @@ export default function FormsGridView({
             return;
         }
         e.stopPropagation();
-        toggleCardExpansion(formId);
+        handleToggleExpand(formId, e);
     };
 
     // Handle view details
@@ -138,6 +147,9 @@ export default function FormsGridView({
         e.stopPropagation();
         router.get(route('admin.forms.edit', formId));
     };
+    
+    // Memoize selected set for quick lookup
+    const selectedSet = useMemo(() => new Set(selectedForms), [selectedForms]);
 
     const emptyState = (
         <EmptyState
@@ -153,59 +165,64 @@ export default function FormsGridView({
         />
     );
 
+    // Early return for empty state
+    if (forms.length === 0) {
+        return emptyState;
+    }
+
     return (
         <GridLayout
-            isEmpty={forms.length === 0}
-            emptyState={emptyState}
-            gridCols={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+            isEmpty={false}
+            emptyState={null}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
             gap={{ base: '3', sm: '4' }}
             padding="p-4"
         >
             {forms.map(form => {
-                const isSelected = selectedForms.includes(form.id);
-                const isExpanded = expandedCards.has(form.id);
+                const isSelected = selectedSet.has(form.id);
+                const isExpanded = expandedId === form.id;
                 const isActive = form.is_active;
                 
                 // Truncation lengths based on view
-                const titleLength = isCompactView ? 25 : 40;
-                const descriptionLength = isCompactView ? 60 : 120;
+                const titleLength = isCompactView ? 25 : 35;
+                const agencyLength = isCompactView ? 20 : 30;
+                const filenameLength = isCompactView ? 20 : 25;
                 
                 return (
                     <Card 
                         key={form.id}
                         className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
                             isSelected 
-                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400 dark:shadow-blue-400/20' 
-                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-gray-800/50'
+                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
                         } ${!isActive ? 'opacity-60' : ''} ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
                         onClick={(e) => handleCardClick(form.id, e)}
                     >
                         <CardContent className="p-4">
-                            {/* Header with Icon and DropdownMenu */}
+                            {/* Header */}
                             <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    {/* Icon */}
-                                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 flex-shrink-0">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                                         {getFileIcon(form.file_type)}
                                     </div>
                                     
                                     <div className="min-w-0 flex-1">
-                                        <div className="font-medium text-gray-900 dark:text-white truncate flex items-center gap-1">
-                                            {formUtils.truncateText(form.title || 'Untitled', titleLength)}
+                                        <div className="font-medium text-gray-900 dark:text-white truncate">
+                                            {truncateText(form.title || 'Untitled', titleLength)}
                                         </div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                            #{form.id}
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                            ID: #{form.id}
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1 ml-2">
                                     {isBulkMode && (
                                         <Checkbox
                                             checked={isSelected}
                                             onCheckedChange={() => onItemSelect(form.id)}
                                             onClick={(e) => e.stopPropagation()}
-                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 border-gray-300 dark:border-gray-600"
+                                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                         />
                                     )}
                                     <DropdownMenu>
@@ -214,125 +231,98 @@ export default function FormsGridView({
                                                 className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                                                <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                             </button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
-                                            <DropdownMenuItem 
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    handleViewDetails(form.id, e);
-                                                }}
-                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                                <span>View Details</span>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                            <DropdownMenuItem onClick={(e) => handleViewDetails(form.id, e)}>
+                                                <Eye className="h-4 w-4 mr-2" />
+                                                View Details
                                             </DropdownMenuItem>
                                             
-                                            <DropdownMenuItem 
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    handleEdit(form.id, e);
-                                                }}
-                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                                <span>Edit Form</span>
+                                            <DropdownMenuItem onClick={(e) => handleEdit(form.id, e)}>
+                                                <Edit className="h-4 w-4 mr-2" />
+                                                Edit Form
                                             </DropdownMenuItem>
 
-                                            <DropdownMenuItem 
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    onDownload(form);
-                                                }}
-                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
-                                            >
-                                                <DownloadIcon className="h-4 w-4" />
-                                                <span>Download File</span>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDownload(form);
+                                            }}>
+                                                <DownloadIcon className="h-4 w-4 mr-2" />
+                                                Download File
                                             </DropdownMenuItem>
                                             
-                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                            <DropdownMenuSeparator />
                                             
-                                            <DropdownMenuItem 
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    onToggleStatus(form);
-                                                }}
-                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
-                                            >
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                onToggleStatus(form);
+                                            }}>
                                                 {isActive ? (
                                                     <>
-                                                        <PauseCircle className="h-4 w-4" />
-                                                        <span>Deactivate</span>
+                                                        <PauseCircle className="h-4 w-4 mr-2" />
+                                                        Deactivate
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <PlayCircle className="h-4 w-4" />
-                                                        <span>Activate</span>
+                                                        <PlayCircle className="h-4 w-4 mr-2" />
+                                                        Activate
                                                     </>
                                                 )}
                                             </DropdownMenuItem>
                                             
-                                            <DropdownMenuItem 
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    navigator.clipboard.writeText(form.id.toString());
-                                                }}
-                                                className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
-                                            >
-                                                <Copy className="h-4 w-4" />
-                                                <span>Copy Form ID</span>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigator.clipboard.writeText(form.id.toString());
+                                            }}>
+                                                <Copy className="h-4 w-4 mr-2" />
+                                                Copy Form ID
                                             </DropdownMenuItem>
 
                                             {form.file_name && (
-                                                <DropdownMenuItem 
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        navigator.clipboard.writeText(form.file_name);
-                                                    }}
-                                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
-                                                >
-                                                    <FileText className="h-4 w-4" />
-                                                    <span>Copy Filename</span>
+                                                <DropdownMenuItem onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigator.clipboard.writeText(form.file_name);
+                                                }}>
+                                                    <FileText className="h-4 w-4 mr-2" />
+                                                    Copy Filename
                                                 </DropdownMenuItem>
                                             )}
 
                                             {isBulkMode && (
                                                 <>
-                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
-                                                    <DropdownMenuItem 
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            onItemSelect(form.id);
-                                                        }}
-                                                        className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
-                                                    >
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onItemSelect(form.id);
+                                                    }}>
                                                         {isSelected ? (
                                                             <>
-                                                                <CheckSquare className="h-4 w-4 text-green-600" />
+                                                                <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
                                                                 <span className="text-green-600">Deselect</span>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <Square className="h-4 w-4" />
-                                                                <span>Select for Bulk</span>
+                                                                <Square className="h-4 w-4 mr-2" />
+                                                                Select for Bulk
                                                             </>
                                                         )}
                                                     </DropdownMenuItem>
                                                 </>
                                             )}
                                             
-                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
+                                            <DropdownMenuSeparator />
                                             
                                             <DropdownMenuItem 
                                                 onClick={(e) => {
-                                                    e.preventDefault();
+                                                    e.stopPropagation();
                                                     onDelete(form);
                                                 }}
-                                                className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
+                                                className="text-red-600 dark:text-red-400"
                                             >
-                                                <Trash2 className="h-4 w-4" />
-                                                <span>Delete Form</span>
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                Delete Form
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -343,7 +333,7 @@ export default function FormsGridView({
                             <div className="flex flex-wrap gap-1.5 mb-3">
                                 <Badge 
                                     variant="outline" 
-                                    className={`text-xs px-2 py-0.5 border ${getStatusColor(isActive)}`}
+                                    className={`text-xs px-2 py-0.5 ${getStatusColor(isActive)}`}
                                 >
                                     {isActive ? 'Active' : 'Inactive'}
                                 </Badge>
@@ -355,7 +345,7 @@ export default function FormsGridView({
                                 {form.download_count > 0 && (
                                     <Badge variant="outline" className="text-xs px-2 py-0.5">
                                         <DownloadIcon className="h-3 w-3 mr-1" />
-                                        {form.download_count.toLocaleString()} downloads
+                                        {form.download_count.toLocaleString()}
                                     </Badge>
                                 )}
                             </div>
@@ -364,44 +354,48 @@ export default function FormsGridView({
                             <div className="space-y-2 mb-2">
                                 {/* Agency */}
                                 {form.issuing_agency && (
-                                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                         <Building className="h-3.5 w-3.5 flex-shrink-0" />
                                         <span 
                                             className="truncate"
                                             title={form.issuing_agency}
                                         >
-                                            {formUtils.truncateText(form.issuing_agency, 30)}
+                                            {truncateText(form.issuing_agency, agencyLength)}
                                         </span>
                                     </div>
                                 )}
 
                                 {/* File Info */}
-                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                     <FileText className="h-3.5 w-3.5 flex-shrink-0" />
                                     <span className="truncate">
-                                        {formUtils.truncateText(form.file_name || 'No file', 25)}
+                                        {truncateText(form.file_name || 'No file', filenameLength)}
                                         {form.file_size && ` (${formatFileSize(form.file_size)})`}
                                     </span>
                                 </div>
 
                                 {/* Date */}
-                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                     <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
                                     <span>{formatDate(form.created_at)}</span>
                                 </div>
                             </div>
 
                             {/* Expand/Collapse indicator */}
-                            {!isBulkMode && !isExpanded && (
+                            {!isBulkMode && (
                                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        Click to view details
+                                        {isExpanded ? 'Hide details' : 'Click to view details'}
                                     </div>
                                     <button
                                         className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                        onClick={(e) => toggleCardExpansion(form.id, e)}
+                                        onClick={(e) => handleToggleExpand(form.id, e)}
                                     >
-                                        <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        {isExpanded ? (
+                                            <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        ) : (
+                                            <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        )}
                                     </button>
                                 </div>
                             )}
@@ -435,7 +429,7 @@ export default function FormsGridView({
                                     {form.file_name && (
                                         <div className="text-sm">
                                             <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">File Details:</p>
-                                            <div className="space-y-1 text-gray-600 dark:text-gray-400">
+                                            <div className="space-y-1 text-gray-600 dark:text-gray-400 pl-2">
                                                 <div>Name: {form.file_name}</div>
                                                 {form.file_size && <div>Size: {formatFileSize(form.file_size)}</div>}
                                                 {form.file_type && <div>Type: {form.file_type}</div>}
@@ -458,7 +452,7 @@ export default function FormsGridView({
                                     {/* View full details link and collapse button */}
                                     <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
                                         <button
-                                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1"
+                                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
                                             onClick={(e) => handleViewDetails(form.id, e)}
                                         >
                                             <ExternalLink className="h-3.5 w-3.5" />
@@ -466,7 +460,7 @@ export default function FormsGridView({
                                         </button>
                                         <button
                                             className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                            onClick={(e) => toggleCardExpansion(form.id, e)}
+                                            onClick={(e) => handleToggleExpand(form.id, e)}
                                         >
                                             <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                         </button>

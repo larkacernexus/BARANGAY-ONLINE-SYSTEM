@@ -127,15 +127,6 @@ export default function RolePermissionsTableView({
                                             className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                                 isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
                                             }`}
-                                            onClick={(e) => {
-                                                if (isBulkMode && e.target instanceof HTMLElement && 
-                                                    !e.target.closest('a') && 
-                                                    !e.target.closest('button') &&
-                                                    !e.target.closest('.dropdown-menu-content') &&
-                                                    !e.target.closest('input[type="checkbox"]')) {
-                                                    onItemSelect(permission.id);
-                                                }
-                                            }}
                                         >
                                             {isBulkMode && (
                                                 <TableCell className="px-4 py-3 text-center">
@@ -155,7 +146,10 @@ export default function RolePermissionsTableView({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => togglePermissionExpansion(permission.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            togglePermissionExpansion(permission.id);
+                                                        }}
                                                         className="h-8 w-8 p-0"
                                                         disabled={isBulkMode}
                                                         aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
@@ -246,13 +240,12 @@ export default function RolePermissionsTableView({
                                                 </div>
                                             </TableCell>
                                             <TableCell className="px-4 py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
-                                                <div className="flex items-center justify-end gap-1">
+                                                <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button 
                                                                 variant="ghost" 
-                                                                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900"
-                                                                onClick={(e) => e.stopPropagation()}
+                                                                className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
                                                             >
                                                                 <span className="sr-only">Open menu</span>
                                                                 <MoreVertical className="h-4 w-4" />
@@ -261,7 +254,7 @@ export default function RolePermissionsTableView({
                                                         <DropdownMenuContent align="end" className="w-48">
                                                             {permission.permission_id && (
                                                                 <DropdownMenuItem asChild>
-                                                                    <Link href={`/admin/role-permissions/${permission.permission_id}`} className="flex items-center cursor-pointer">
+                                                                    <Link href={`/admin/permissions/${permission.permission_id}`} className="flex items-center cursor-pointer">
                                                                         <Eye className="mr-2 h-4 w-4" />
                                                                         <span>View Permission</span>
                                                                     </Link>

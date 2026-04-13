@@ -1,19 +1,24 @@
 // resources/js/components/admin/community-reports/CommunityReportsGridView.tsx
 
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { GridLayout } from '@/components/adminui/grid-layout';
+import { EmptyState } from '@/components/adminui/empty-state';
+import { Link, router } from '@inertiajs/react';
 import {
     Eye,
+    Edit,
+    Trash2,
     Copy,
-    FileText,
-    User,
+    MoreVertical,
     MapPin,
     Calendar,
     Clock,
@@ -21,13 +26,17 @@ import {
     CheckCircle,
     Zap,
     ShieldAlert,
-    Home,
     Phone,
     ChevronDown,
     ChevronUp,
     AlertCircle,
     ExternalLink,
-    MessageSquare
+    MessageSquare,
+    User,
+    Home,
+    FileText,
+    CheckSquare,
+    Square,
 } from 'lucide-react';
 import { 
     formatDate, 
@@ -36,7 +45,7 @@ import {
     getStatusIcon,
     getPriorityIcon,
 } from '@/admin-utils/communityReportHelpers';
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 
 // Import types from the correct path
 import type { CommunityReport } from '@/types/admin/reports/community-report';
@@ -50,11 +59,14 @@ interface CommunityReportsGridViewProps {
     onViewDetails: (report: CommunityReport) => void;
     onCopyToClipboard: (text: string, label: string) => void;
     onMarkResolved?: (report: CommunityReport) => void;
+    onPrintReport?: (report: CommunityReport) => void;
     safeStatuses: Record<string, string>;
     safePriorities: Record<string, string>;
     safeUrgencies: Record<string, string>;
     windowWidth: number;
     isMobile?: boolean;
+    hasActiveFilters: boolean;
+    onClearFilters: () => void;
 }
 
 // Helper function for phone number formatting
@@ -80,61 +92,42 @@ const getDisplayName = (item: any): string => {
     return String(item);
 };
 
-export default function CommunityReportsGridView({
-    reports,
-    isBulkMode,
-    selectedReports,
+// Shared Report Card Component
+const ReportCard = memo(({ 
+    report, 
+    isBulkMode, 
+    isSelected, 
+    isExpanded,
     onItemSelect,
     onDelete,
     onViewDetails,
     onCopyToClipboard,
     onMarkResolved,
+    onPrintReport,
+    onToggleExpand,
     safeStatuses,
     safePriorities,
     safeUrgencies,
-    windowWidth,
+    truncateLengths,
     isMobile = false
-}: CommunityReportsGridViewProps) {
-    const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
-    
-    const isCompactView = isMobile || windowWidth < 768;
-    
-    // Toggle card expansion
-    const toggleCardExpansion = (id: number, e?: React.MouseEvent) => {
-        if (e) {
-            e.stopPropagation();
-            e.preventDefault();
-        }
-        setExpandedCards(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
-        });
-    };
-
-    // Handle card click
-    const handleCardClick = (reportId: number, e: React.MouseEvent) => {
-        if (isBulkMode) {
-            e.stopPropagation();
-            return;
-        }
-        e.stopPropagation();
-        toggleCardExpansion(reportId);
-    };
-
-    // Get grid columns based on screen size
-    const getGridColumns = (): string => {
-        if (windowWidth < 640) return "grid-cols-1";
-        if (windowWidth < 768) return "grid-cols-2";
-        if (windowWidth < 1024) return "grid-cols-3";
-        if (windowWidth < 1280) return "grid-cols-4";
-        return "grid-cols-4";
-    };
-
+}: {
+    report: CommunityReport;
+    isBulkMode: boolean;
+    isSelected: boolean;
+    isExpanded: boolean;
+    onItemSelect: (id: number) => void;
+    onDelete: (report: CommunityReport) => void;
+    onViewDetails: (report: CommunityReport) => void;
+    onCopyToClipboard: (text: string, label: string) => void;
+    onMarkResolved?: (report: CommunityReport) => void;
+    onPrintReport?: (report: CommunityReport) => void;
+    onToggleExpand: (id: number, e: React.MouseEvent) => void;
+    safeStatuses: Record<string, string>;
+    safePriorities: Record<string, string>;
+    safeUrgencies: Record<string, string>;
+    truncateLengths: { title: number; location: number; userName: number };
+    isMobile?: boolean;
+}) => {
     // Status color
     const getStatusColor = (status: string): string => {
         switch (status?.toLowerCase()) {
@@ -185,419 +178,489 @@ export default function CommunityReportsGridView({
         }
     };
 
-    if (reports.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center py-8 text-center bg-white dark:bg-gray-900">
-                <FileText className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
-                <h3 className="text-base font-medium text-gray-900 dark:text-white mb-1">No reports found</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 px-4">
-                    {isMobile ? "No reports available" : "Try changing filters"}
-                </p>
-            </div>
-        );
-    }
+    const handleCardClick = useCallback((e: React.MouseEvent) => {
+        if (isBulkMode) return;
+        onToggleExpand(report.id, e);
+    }, [isBulkMode, report.id, onToggleExpand]);
+
+    const handleCopyReportNumber = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onCopyToClipboard(report.report_number, 'Report ID');
+    }, [onCopyToClipboard, report.report_number]);
+
+    const handleViewDetails = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onViewDetails(report);
+    }, [onViewDetails, report]);
+
+    const handleMarkResolved = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onMarkResolved?.(report);
+    }, [onMarkResolved, report]);
+
+    const handlePrint = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onPrintReport?.(report);
+    }, [onPrintReport, report]);
+
+    const handleDelete = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onDelete(report);
+    }, [onDelete, report]);
+
+    const handleCopyContact = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        const phone = report.user?.phone || report.reporter_contact;
+        if (phone) {
+            onCopyToClipboard(phone, 'Phone Number');
+        }
+    }, [onCopyToClipboard, report]);
+
+    const handleCopyEmail = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        const email = report.user?.email;
+        if (email) {
+            onCopyToClipboard(email, 'Email');
+        }
+    }, [onCopyToClipboard, report]);
+
+    // Safe access to user properties
+    const userName = report.user?.name || report.reporter_name || 'Unknown';
+    const userPhone = report.user?.phone || report.reporter_contact;
+    const userPurok = report.user?.purok;
+    const userEmail = report.user?.email;
+    const assignedToName = report.assigned_user?.name || report.assigned_to_name;
+    const hasEvidence = report.evidences && report.evidences.length > 0;
+    const reportCategory = (report.report_type as any)?.category || report.category;
+    const reportTypeName = (report.report_type as any)?.name;
 
     return (
-        <div className={`grid ${getGridColumns()} gap-3 p-3 bg-gray-50 dark:bg-gray-950`}>
-            {reports.map((report) => {
-                const isSelected = selectedReports.includes(report.id);
-                const isExpanded = expandedCards.has(report.id);
-                
-                // Mobile-optimized truncation
-                const titleLength = isCompactView ? 25 : 40;
-                const locationLength = isCompactView ? 15 : 25;
-                const userNameLength = isCompactView ? 12 : 20;
-                
-                // Safe access to user properties
-                const userName = report.user?.name || report.reporter_name || 'Unknown';
-                const userPhone = report.user?.phone || report.reporter_contact;
-                const userPurok = report.user?.purok;
-                const userEmail = report.user?.email;
-                const assignedToName = report.assigned_user?.name || report.assigned_to_name;
-                const hasEvidence = report.evidences && report.evidences.length > 0;
-                const reportCategory = (report.report_type as any)?.category || report.category;
-                const reportTypeName = (report.report_type as any)?.name;
-                
-                return (
-                    <Card 
-                        key={report.id} 
-                        className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
-                            isSelected 
-                                ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400 dark:shadow-blue-400/20' 
-                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-gray-800/50'
-                        } ${isCompactView ? 'min-h-0' : ''} ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
-                        onClick={(e) => handleCardClick(report.id, e)}
-                    >
-                        {/* Bulk selection checkbox - top left */}
+        <Card 
+            className={`overflow-hidden border relative transition-all duration-200 bg-white dark:bg-gray-900 ${
+                isSelected 
+                    ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
+            } ${isExpanded ? 'shadow-lg' : ''} cursor-pointer group`}
+            onClick={handleCardClick}
+        >
+            <CardContent className="p-4">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        
+                        <div className="min-w-0 flex-1">
+                            <div className="font-medium text-gray-900 dark:text-white truncate">
+                                {report.report_number}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {formatDate(report.created_at)}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 ml-2">
                         {isBulkMode && (
-                            <div 
-                                className="absolute top-2 left-2 z-20"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onItemSelect(report.id);
-                                }}
-                            >
-                                <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={() => onItemSelect(report.id)}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 shadow-sm h-4 w-4"
-                                />
+                            <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => onItemSelect(report.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            />
+                        )}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={handleViewDetails}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                </DropdownMenuItem>
+                                
+                                {onPrintReport && (
+                                    <DropdownMenuItem onClick={handlePrint}>
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Print Report
+                                    </DropdownMenuItem>
+                                )}
+                                
+                                <DropdownMenuItem onClick={handleCopyReportNumber}>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copy Report #
+                                </DropdownMenuItem>
+                                
+                                {userName && !report.is_anonymous && (
+                                    <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        onCopyToClipboard(userName, 'Reporter Name');
+                                    }}>
+                                        <Copy className="h-4 w-4 mr-2" />
+                                        Copy Reporter
+                                    </DropdownMenuItem>
+                                )}
+                                
+                                {userPhone && !report.is_anonymous && (
+                                    <DropdownMenuItem onClick={handleCopyContact}>
+                                        <Phone className="h-4 w-4 mr-2" />
+                                        Copy Contact
+                                    </DropdownMenuItem>
+                                )}
+                                
+                                <DropdownMenuSeparator />
+                                
+                                {onMarkResolved && report.status !== 'resolved' && report.status !== 'rejected' && (
+                                    <DropdownMenuItem onClick={handleMarkResolved}>
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        Mark Resolved
+                                    </DropdownMenuItem>
+                                )}
+                                
+                                {isBulkMode && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            onItemSelect(report.id);
+                                        }}>
+                                            {isSelected ? (
+                                                <>
+                                                    <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
+                                                    <span className="text-green-600">Deselect</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Square className="h-4 w-4 mr-2" />
+                                                    Select for Bulk
+                                                </>
+                                            )}
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                                
+                                <DropdownMenuSeparator />
+                                
+                                <DropdownMenuItem onClick={handleDelete} className="text-red-600 dark:text-red-400">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Report
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+
+                {/* Status Badges */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                    <Badge 
+                        variant="outline" 
+                        className={`text-xs px-2 py-0.5 ${getStatusColor(report.status)}`}
+                    >
+                        {getStatusIcon(report.status)}
+                        <span className="ml-1">{safeStatuses[report.status] || report.status}</span>
+                    </Badge>
+                    
+                    <Badge 
+                        variant="outline" 
+                        className={`text-xs px-2 py-0.5 ${getPriorityColor(report.priority)}`}
+                    >
+                        {getPriorityIcon(report.priority)}
+                        <span className="ml-1">{safePriorities[report.priority] || report.priority}</span>
+                    </Badge>
+                </div>
+
+                {/* Title */}
+                <h3 
+                    className="font-semibold text-sm mb-2 line-clamp-2 text-gray-900 dark:text-white"
+                    title={report.title}
+                >
+                    {truncateText(report.title, truncateLengths.title)}
+                </h3>
+
+                {/* Always visible info */}
+                <div className="space-y-2 mb-2">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span 
+                            className="truncate"
+                            title={report.location}
+                        >
+                            {truncateText(report.location, truncateLengths.location)}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                        <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span>{formatDate(report.incident_date)}</span>
+                        <Clock className="h-3.5 w-3.5 flex-shrink-0 ml-2" />
+                        <span>{getTimeAgo(report.created_at)} ago</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                        <User className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="truncate">
+                            {report.is_anonymous ? 'Anonymous' : truncateText(userName, truncateLengths.userName)}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Expand/Collapse indicator */}
+                {!isBulkMode && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {isExpanded ? 'Hide details' : 'Click to view details'}
+                        </div>
+                        <button
+                            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            onClick={(e) => onToggleExpand(report.id, e)}
+                        >
+                            {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            ) : (
+                                <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            )}
+                        </button>
+                    </div>
+                )}
+
+                {/* Expanded Details */}
+                {isExpanded && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50 duration-200">
+                        {/* Category and Type */}
+                        {(reportCategory || reportTypeName) && (
+                            <div className="flex flex-wrap gap-1">
+                                {reportCategory && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {getDisplayName(reportCategory)}
+                                    </Badge>
+                                )}
+                                {reportTypeName && (
+                                    <Badge variant="outline" className="text-xs">
+                                        {getDisplayName(reportTypeName)}
+                                    </Badge>
+                                )}
                             </div>
                         )}
                         
-                        <CardContent className={`p-3 ${isCompactView && !isExpanded ? 'pb-1' : ''} bg-white dark:bg-gray-900`}>
-                            {/* Header row with Report ID and Status */}
-                            <div className="flex items-start justify-between mb-2">
-                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                    <FileText className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                                    <span 
-                                        className="font-medium text-xs text-blue-600 dark:text-blue-400 truncate hover:text-blue-700 dark:hover:text-blue-300 cursor-help"
-                                        title={`Click to copy: ${report.report_number}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onCopyToClipboard(report.report_number, 'Report ID');
-                                        }}
-                                    >
-                                        {report.report_number}
-                                    </span>
-                                </div>
-                                
-                                {/* Status and Priority badges - compact */}
-                                <div className="flex gap-1 flex-shrink-0">
-                                    <Badge 
-                                        variant="outline" 
-                                        className={`text-[10px] px-1.5 py-0 h-4 border ${getStatusColor(report.status)}`}
-                                        title={safeStatuses[report.status] || report.status}
-                                    >
-                                        {getStatusIcon(report.status)}
-                                        <span className="ml-0.5 hidden xs:inline">
-                                            {safeStatuses[report.status]?.substring(0, 3) || 'N/A'}
-                                        </span>
-                                    </Badge>
-                                    <Badge 
-                                        variant="outline" 
-                                        className={`text-[10px] px-1.5 py-0 h-4 border ${getPriorityColor(report.priority)}`}
-                                        title={safePriorities[report.priority] || report.priority}
-                                    >
-                                        {getPriorityIcon(report.priority)}
-                                    </Badge>
-                                </div>
+                        {/* Assigned to */}
+                        {assignedToName && (
+                            <div className="flex items-center gap-2 text-sm">
+                                <User className="h-4 w-4 text-green-500 dark:text-green-400 flex-shrink-0" />
+                                <span className="text-gray-600 dark:text-gray-400">Assigned to:</span>
+                                <span className="font-medium text-gray-900 dark:text-white truncate">
+                                    {assignedToName}
+                                </span>
                             </div>
-                            
-                            {/* Title - always visible */}
-                            <h3 
-                                className="font-semibold text-sm mb-1.5 line-clamp-2 text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200"
-                                title={report.title}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onViewDetails(report);
-                                }}
-                            >
-                                {truncateText(report.title, titleLength)}
-                            </h3>
-                            
-                            {/* Primary Info - always visible */}
-                            <div className="space-y-1.5 mb-2">
-                                {/* Location */}
-                                <div className="flex items-center gap-1.5">
-                                    <MapPin className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                    <span 
-                                        className="text-xs text-gray-700 dark:text-gray-300 truncate"
-                                        title={report.location}
-                                    >
-                                        {truncateText(report.location, locationLength)}
-                                    </span>
-                                </div>
-                                
-                                {/* Date */}
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    <div className="flex items-center gap-1">
-                                        <Calendar className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                        <span 
-                                            className="text-xs text-gray-700 dark:text-gray-300"
-                                            title={`Incident: ${formatDate(report.incident_date)}`}
-                                        >
-                                            {formatDate(report.incident_date)}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                        <span 
-                                            className="text-xs text-gray-700 dark:text-gray-300"
-                                            title={`Created: ${getTimeAgo(report.created_at)} ago`}
-                                        >
-                                            {getTimeAgo(report.created_at)}
-                                        </span>
-                                    </div>
-                                </div>
-                                
-                                {/* Reporter - compact */}
-                                <div className="flex items-center gap-1.5">
-                                    <User className="h-3 w-3 text-blue-500 dark:text-blue-400 flex-shrink-0" />
-                                    <span 
-                                        className="text-xs text-gray-700 dark:text-gray-300 truncate"
-                                        title={report.is_anonymous ? 'Anonymous report' : `Reporter: ${userName}`}
-                                    >
-                                        {report.is_anonymous 
-                                            ? 'Anonymous' 
-                                            : truncateText(userName, userNameLength)}
-                                    </span>
-                                </div>
-                            </div>
-                            
-                            {/* Expand/Collapse indicator area */}
-                            {!isBulkMode && !isExpanded && (
-                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        Click to view details
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={(e) => toggleCardExpansion(report.id, e)}
-                                    >
-                                        <ChevronDown className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            )}
-                            
-                            {/* EXPANDED DETAILS SECTION */}
-                            {isExpanded && (
-                                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-2 animate-in fade-in-50">
-                                    {/* Category and Type */}
-                                    {(reportCategory || reportTypeName) && (
-                                        <div className="flex flex-wrap gap-1">
-                                            {reportCategory && (
-                                                <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                                    {getDisplayName(reportCategory)}
-                                                </Badge>
-                                            )}
-                                            {reportTypeName && (
-                                                <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300">
-                                                    {getDisplayName(reportTypeName)}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    )}
-                                    
-                                    {/* Assigned to */}
-                                    {assignedToName && (
-                                        <div className="flex items-center gap-1.5 text-xs">
-                                            <User className="h-3 w-3 text-green-500 dark:text-green-400 flex-shrink-0" />
-                                            <span className="text-gray-600 dark:text-gray-400">Assigned to:</span>
-                                            <span className="font-medium text-gray-900 dark:text-white truncate" title={assignedToName}>
-                                                {assignedToName}
-                                            </span>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Special flags */}
-                                    <div className="flex flex-wrap gap-1">
-                                        {report.safety_concern && (
-                                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800">
-                                                <ShieldAlert className="h-2.5 w-2.5 mr-1" />
-                                                Safety Concern
-                                            </Badge>
-                                        )}
-                                        {report.urgency_level && (
-                                            <Badge 
-                                                variant="outline" 
-                                                className={`text-[10px] px-2 py-0.5 ${getUrgencyColor(report.urgency_level)} border-gray-200 dark:border-gray-700`}
-                                            >
-                                                <Zap className="h-2.5 w-2.5 mr-1" />
-                                                {report.urgency_level.charAt(0).toUpperCase() + report.urgency_level.slice(1)} Urgency
-                                            </Badge>
-                                        )}
-                                        {report.recurring_issue && (
-                                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                                                <AlertCircle className="h-2.5 w-2.5 mr-1" />
-                                                Recurring Issue
-                                            </Badge>
-                                        )}
-                                        {report.environmental_impact && (
-                                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-                                                🌿 Environmental
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Contact info for non-anonymous */}
-                                    {!report.is_anonymous && (
-                                        <div className="space-y-1.5 text-xs text-gray-700 dark:text-gray-300">
-                                            {userPhone && (
-                                                <div 
-                                                    className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onCopyToClipboard(userPhone!, 'Phone Number');
-                                                    }}
-                                                    title="Click to copy phone number"
-                                                >
-                                                    <Phone className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                    <span className="truncate">{formatPhoneNumber(userPhone)}</span>
-                                                </div>
-                                            )}
-                                            
-                                            {userPurok && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <Home className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                    <span>Purok {userPurok}</span>
-                                                </div>
-                                            )}
-                                            
-                                            {userEmail && (
-                                                <div 
-                                                    className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onCopyToClipboard(userEmail!, 'Email');
-                                                    }}
-                                                    title="Click to copy email"
-                                                >
-                                                    <MessageSquare className="h-3 w-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                    <span className="truncate">{userEmail}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                    
-                                    {/* Description snippet */}
-                                    {report.description && (
-                                        <div className="text-xs text-gray-700 dark:text-gray-300">
-                                            <p className="font-medium mb-1 text-gray-600 dark:text-gray-400">Description:</p>
-                                            <p className="line-clamp-3 italic text-gray-600 dark:text-gray-400">
-                                                "{truncateText(report.description, 120)}"
-                                            </p>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Evidence count */}
-                                    {hasEvidence && (
-                                        <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                                            <span className="font-medium">📎</span>
-                                            <span>{report.evidences!.length} evidence file(s)</span>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Collapse button for expanded view */}
-                                    <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
-                                        <Button
-                                            variant="link"
-                                            size="sm"
-                                            className="h-6 p-0 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onViewDetails(report);
-                                            }}
-                                        >
-                                            <ExternalLink className="h-3 w-3 mr-1" />
-                                            View full details
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                            onClick={(e) => toggleCardExpansion(report.id, e)}
-                                        >
-                                            <ChevronUp className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
+                        )}
                         
-                        {/* Footer with actions */}
-                        <CardFooter className={`px-3 py-2 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 ${isCompactView ? 'py-1.5' : ''}`}>
-                            <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center gap-0.5">
-                                    {/* View Details */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onViewDetails(report);
-                                                }}
-                                            >
-                                                <Eye className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">View Details</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                    
-                                    {/* Copy Report ID */}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onCopyToClipboard(report.report_number, 'Report ID');
-                                                }}
-                                            >
-                                                <Copy className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs">Copy ID</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                    
-                                    {/* Mark as Resolved */}
-                                    {report.status !== 'resolved' && report.status !== 'rejected' && onMarkResolved && (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-green-950`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onMarkResolved(report);
-                                                    }}
-                                                >
-                                                    <CheckCircle className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                                </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                                <p className="text-xs">Mark Resolved</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    )}
-                                </div>
+                        {/* Special flags */}
+                        <div className="flex flex-wrap gap-1">
+                            {report.safety_concern && (
+                                <Badge variant="outline" className="text-xs bg-red-50 dark:bg-red-950/30">
+                                    <ShieldAlert className="h-3 w-3 mr-1" />
+                                    Safety Concern
+                                </Badge>
+                            )}
+                            {report.urgency_level && (
+                                <Badge variant="outline" className={`text-xs ${getUrgencyColor(report.urgency_level)}`}>
+                                    <Zap className="h-3 w-3 mr-1" />
+                                    {report.urgency_level} Urgency
+                                </Badge>
+                            )}
+                            {report.recurring_issue && (
+                                <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950/30">
+                                    <AlertCircle className="h-3 w-3 mr-1" />
+                                    Recurring
+                                </Badge>
+                            )}
+                            {report.environmental_impact && (
+                                <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-950/30">
+                                    🌿 Environmental
+                                </Badge>
+                            )}
+                        </div>
+                        
+                        {/* Contact info for non-anonymous */}
+                        {!report.is_anonymous && (
+                            <div className="space-y-1.5">
+                                {userPhone && (
+                                    <div 
+                                        className="flex items-center gap-2 text-sm cursor-pointer hover:text-blue-600"
+                                        onClick={handleCopyContact}
+                                    >
+                                        <Phone className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                        <span>{formatPhoneNumber(userPhone)}</span>
+                                    </div>
+                                )}
                                 
-                                {/* Delete button */}
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className={`${isCompactView ? 'h-6 w-6 p-0' : 'h-7 w-7 p-0'} text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onDelete(report);
-                                            }}
-                                        >
-                                            <AlertTriangle className={`${isCompactView ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700">
-                                        <p className="text-xs">Delete Report</p>
-                                    </TooltipContent>
-                                </Tooltip>
+                                {userPurok && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Home className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                        <span>Purok {userPurok}</span>
+                                    </div>
+                                )}
+                                
+                                {userEmail && (
+                                    <div 
+                                        className="flex items-center gap-2 text-sm cursor-pointer hover:text-blue-600"
+                                        onClick={handleCopyEmail}
+                                    >
+                                        <MessageSquare className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                        <span className="truncate">{userEmail}</span>
+                                    </div>
+                                )}
                             </div>
-                        </CardFooter>
-                    </Card>
-                );
-            })}
-        </div>
+                        )}
+                        
+                        {/* Description snippet */}
+                        {report.description && (
+                            <div className="text-sm">
+                                <p className="text-gray-500 dark:text-gray-400 mb-1">Description:</p>
+                                <p className="text-gray-700 dark:text-gray-300 line-clamp-3 italic">
+                                    "{truncateText(report.description, 120)}"
+                                </p>
+                            </div>
+                        )}
+                        
+                        {/* Evidence count */}
+                        {hasEvidence && (
+                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <span className="font-medium">📎</span>
+                                <span>{report.evidences!.length} evidence file(s)</span>
+                            </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                                className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
+                                onClick={handleViewDetails}
+                            >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                View full details
+                            </button>
+                            <button
+                                className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                onClick={(e) => onToggleExpand(report.id, e)}
+                            >
+                                <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+});
+
+ReportCard.displayName = 'ReportCard';
+
+// Empty State Component
+const EmptyStateComponent = ({ hasActiveFilters, onClearFilters }: { hasActiveFilters: boolean; onClearFilters: () => void }) => (
+    <EmptyState
+        title="No reports found"
+        description={hasActiveFilters 
+            ? 'Try changing your filters or search criteria.'
+            : 'No community reports have been filed yet.'}
+        icon={<FileText className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
+        hasFilters={hasActiveFilters}
+        onClearFilters={onClearFilters}
+    />
+);
+
+// Main Grid View Component
+export default function CommunityReportsGridView({
+    reports,
+    isBulkMode,
+    selectedReports,
+    onItemSelect,
+    onDelete,
+    onViewDetails,
+    onCopyToClipboard,
+    onMarkResolved,
+    onPrintReport,
+    safeStatuses,
+    safePriorities,
+    safeUrgencies,
+    windowWidth,
+    isMobile = false,
+    hasActiveFilters,
+    onClearFilters
+}: CommunityReportsGridViewProps) {
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
+    
+    useEffect(() => {
+        setDevicePixelRatio(window.devicePixelRatio || 1);
+    }, []);
+    
+    // Determine grid columns based on actual available width and scaling
+    const gridCols = useMemo(() => {
+        if (windowWidth < 640) return 1;
+        if (windowWidth < 900) return 2;
+        if (windowWidth < 1280) return 3;
+        if (windowWidth < 1600) return 3;
+        return 4;
+    }, [windowWidth, devicePixelRatio]);
+    
+    // Adjust text truncation based on grid columns
+    const getTruncateLengths = useMemo(() => {
+        if (gridCols >= 4) return { title: 40, location: 25, userName: 20 };
+        if (gridCols === 3) return { title: 35, location: 20, userName: 18 };
+        if (gridCols === 2) return { title: 30, location: 18, userName: 15 };
+        return { title: 25, location: 15, userName: 12 };
+    }, [gridCols]);
+
+    const truncateLengths = getTruncateLengths;
+    
+    // Memoized handlers
+    const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedId(prev => prev === id ? null : id);
+    }, []);
+
+    // Memoize selected set for quick lookup
+    const selectedSet = useMemo(() => new Set(selectedReports), [selectedReports]);
+
+    // Early return for empty state
+    if (reports.length === 0) {
+        return <EmptyStateComponent hasActiveFilters={hasActiveFilters} onClearFilters={onClearFilters} />;
+    }
+
+    return (
+        <GridLayout
+            isEmpty={false}
+            emptyState={null}
+            gridCols={{ base: 1, sm: 2, lg: 3, xl: gridCols as 1 | 2 | 3 | 4 }}
+            gap={{ base: '3', sm: '4' }}
+            padding="p-4"
+        >
+            {reports.map((report) => (
+                <ReportCard
+                    key={report.id}
+                    report={report}
+                    isBulkMode={isBulkMode}
+                    isSelected={selectedSet.has(report.id)}
+                    isExpanded={expandedId === report.id}
+                    onItemSelect={onItemSelect}
+                    onDelete={onDelete}
+                    onViewDetails={onViewDetails}
+                    onCopyToClipboard={onCopyToClipboard}
+                    onMarkResolved={onMarkResolved}
+                    onPrintReport={onPrintReport}
+                    onToggleExpand={handleToggleExpand}
+                    safeStatuses={safeStatuses}
+                    safePriorities={safePriorities}
+                    safeUrgencies={safeUrgencies}
+                    truncateLengths={truncateLengths}
+                    isMobile={isMobile}
+                />
+            ))}
+        </GridLayout>
     );
 }

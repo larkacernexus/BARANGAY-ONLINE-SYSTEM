@@ -6,7 +6,7 @@ import { Check, ChevronDown, Eye, Download, Copy, Trash2, Lock, FileText, Calend
 import { Link } from '@inertiajs/react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatDate, getFileIcon, getFileColor, getDocumentStatus } from './record-utils';
+import { formatDate, getFileColor, getDocumentStatus, getFileTypeDisplay } from './record-utils';
 
 interface ModernRecordCardProps {
     document: any;
@@ -34,8 +34,8 @@ export const ModernRecordCard = ({
     isMobile = true
 }: ModernRecordCardProps) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const FileIcon = getFileIcon(doc.file_extension, doc.mime_type);
     const fileColor = getFileColor(doc.file_extension);
+    const fileTypeDisplay = getFileTypeDisplay(doc.file_extension);
     const status = getDocumentStatus(doc);
 
     // Format date with year
@@ -95,7 +95,6 @@ export const ModernRecordCard = ({
                                         "inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0 rounded-full",
                                         status.color
                                     )}>
-                                        {status.icon}
                                         <span>{status.label}</span>
                                     </span>
                                 </div>
@@ -109,9 +108,11 @@ export const ModernRecordCard = ({
                     {/* File Info Summary */}
                     <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-1.5">
-                            <FileIcon className={cn("h-2.5 w-2.5", fileColor)} />
+                            <span className={cn("text-[9px] font-medium uppercase", fileColor)}>
+                                {doc.file_extension || 'FILE'}
+                            </span>
                             <span className="text-[9px] text-gray-500 dark:text-gray-400">
-                                {doc.file_extension?.toUpperCase()} • {doc.file_size_human}
+                                • {doc.file_size_human}
                             </span>
                         </div>
                         <div className="flex items-center gap-1 text-[9px] text-gray-500 dark:text-gray-400">
