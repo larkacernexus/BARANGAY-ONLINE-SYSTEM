@@ -1,4 +1,4 @@
-import { type BreadcrumbItem, type SharedData } from '@/types';
+// import { type BreadcrumbItem} from '@/types/breadcrumbs';
 
 // ========== DYNAMIC PRIVILEGE TYPES ==========
 

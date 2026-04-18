@@ -71,6 +71,10 @@ interface BlottersContentProps {
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkStatusDialog?: (show: boolean) => void;
     filtersState: BlotterFilters;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
     isPerformingBulkAction: boolean;
     selectionMode: 'page' | 'filtered' | 'all';
     selectionStats?: any;

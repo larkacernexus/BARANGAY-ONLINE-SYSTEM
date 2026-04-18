@@ -1,7 +1,7 @@
 // components/admin/officials/shared/resident-selection.tsx
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Home, Mail, Phone, Users, Check, ChevronsUpDown, Search, X, Filter, MapPin, Calendar, UserCircle, Clock } from 'lucide-react';
+import { Home, Mail, Phone, Users, Check, ChevronsUpDown, Search, X, Filter, MapPin, Calendar, UserCircle, Clock, Loader2 } from 'lucide-react';
 import { Resident } from '@/components/admin/officials/shared/types/official';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ interface ResidentSelectionProps {
     onResidentSelect: (residentId: number) => void;
     error?: string;
     isLoading?: boolean;
+    disabled?: boolean;
 }
 
 // Get initials from name
@@ -48,7 +49,8 @@ export function ResidentSelection({
     selectedResident, 
     onResidentSelect,
     error,
-    isLoading = false
+    isLoading = false,
+    disabled = false
 }: ResidentSelectionProps) {
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -57,12 +59,12 @@ export function ResidentSelection({
 
     // Focus input when popover opens
     useEffect(() => {
-        if (open) {
+        if (open && !disabled) {
             setTimeout(() => {
                 inputRef.current?.focus();
             }, 100);
         }
-    }, [open]);
+    }, [open, disabled]);
 
     // Track recently selected residents (max 3)
     useEffect(() => {
@@ -79,8 +81,6 @@ export function ResidentSelection({
         if (!searchTerm.trim()) return residents;
         
         const searchLower = searchTerm.toLowerCase().trim();
-        
-        // Split search term into words for better matching
         const searchWords = searchLower.split(/\s+/).filter(word => word.length > 0);
         
         return residents.filter(resident => {
@@ -90,7 +90,6 @@ export function ResidentSelection({
             const age = resident.age?.toString() || '';
             const gender = resident.gender?.toLowerCase() || '';
             
-            // Check if all search words match any of the fields
             return searchWords.every(word => 
                 fullName.includes(word) || 
                 fullNameReversed.includes(word) ||
@@ -134,10 +133,10 @@ export function ResidentSelection({
         <div className="space-y-4">
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                    <Label htmlFor="resident" className="dark:text-gray-300">
+                    <Label className="dark:text-gray-300">
                         Resident <span className="text-red-500">*</span>
                     </Label>
-                    {selectedResident && (
+                    {selectedResident && !disabled && (
                         <Button
                             type="button"
                             variant="ghost"
@@ -151,13 +150,13 @@ export function ResidentSelection({
                     )}
                 </div>
                 
-                {/* Searchable Combobox */}
-                <Popover open={open} onOpenChange={setOpen}>
+                <Popover open={open && !disabled} onOpenChange={setOpen}>
                     <PopoverTrigger asChild>
                         <Button
                             variant="outline"
                             role="combobox"
                             aria-expanded={open}
+                            disabled={disabled}
                             className={cn(
                                 "w-full justify-between h-auto min-h-10 py-2 px-3",
                                 "dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300",
@@ -228,7 +227,6 @@ export function ResidentSelection({
                             </div>
                             
                             <CommandList className="max-h-[400px]">
-                                {/* Recent Residents Section */}
                                 {recentResidents.length > 0 && !searchTerm && (
                                     <>
                                         <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1">
@@ -260,11 +258,6 @@ export function ResidentSelection({
                                                                 ({resident.age} yrs)
                                                             </span>
                                                         </div>
-                                                        {resident.photo_url && (
-                                                            <Badge variant="outline" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                                                Photo
-                                                            </Badge>
-                                                        )}
                                                     </div>
                                                 </CommandItem>
                                             ))}
@@ -273,7 +266,6 @@ export function ResidentSelection({
                                     </>
                                 )}
 
-                                {/* Search Results */}
                                 <CommandEmpty className="py-8 text-center">
                                     <div className="space-y-3">
                                         <div className="bg-gray-100 dark:bg-gray-800 rounded-full w-12 h-12 mx-auto flex items-center justify-center">
@@ -289,108 +281,70 @@ export function ResidentSelection({
                                 </CommandEmpty>
 
                                 <CommandGroup className="overflow-y-auto">
-                                    {filteredResidents.length === 0 ? (
-                                        residents.length === 0 && (
-                                            <div className="px-2 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-                                                <div className="space-y-2">
-                                                    <p>No available residents.</p>
-                                                    <p className="text-xs">All active residents may already hold positions.</p>
+                                    {filteredResidents.map((resident, index) => (
+                                        <CommandItem
+                                            key={resident.id}
+                                            value={`${resident.last_name} ${resident.first_name}`}
+                                            onSelect={() => handleSelect(resident.id)}
+                                            className={cn(
+                                                "dark:text-gray-300 dark:hover:bg-gray-800",
+                                                "border-b dark:border-gray-800 last:border-0"
+                                            )}
+                                        >
+                                            <div className="flex items-start gap-3 w-full py-1">
+                                                <div className="relative">
+                                                    <Avatar className="h-10 w-10 border dark:border-gray-700">
+                                                        {resident.photo_url ? (
+                                                            <AvatarImage 
+                                                                src={resident.photo_url} 
+                                                                alt={formatFullName(resident)}
+                                                            />
+                                                        ) : null}
+                                                        <AvatarFallback className="bg-gradient-to-br from-gray-600 to-gray-700 text-white text-xs">
+                                                            {getInitials(resident.first_name, resident.last_name)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    {selectedResidentId === resident.id && (
+                                                        <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-0.5">
+                                                            <Check className="h-3 w-3 text-white" />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        )
-                                    ) : (
-                                        filteredResidents.map((resident, index) => (
-                                            <CommandItem
-                                                key={resident.id}
-                                                value={`${resident.last_name} ${resident.first_name} ${resident.middle_name || ''} ${resident.purok?.name || ''}`}
-                                                onSelect={() => handleSelect(resident.id)}
-                                                className={cn(
-                                                    "dark:text-gray-300 dark:hover:bg-gray-800",
-                                                    "border-b dark:border-gray-800 last:border-0",
-                                                    index === 0 && "border-t dark:border-gray-800"
-                                                )}
-                                            >
-                                                <div className="flex items-start gap-3 w-full py-1">
-                                                    <div className="relative">
-                                                        <Avatar className="h-10 w-10 border dark:border-gray-700">
-                                                            {resident.photo_url ? (
-                                                                <AvatarImage 
-                                                                    src={resident.photo_url} 
-                                                                    alt={formatFullName(resident)}
-                                                                />
-                                                            ) : null}
-                                                            <AvatarFallback className="bg-gradient-to-br from-gray-600 to-gray-700 text-white text-xs">
-                                                                {getInitials(resident.first_name, resident.last_name)}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        {selectedResidentId === resident.id && (
-                                                            <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-0.5">
-                                                                <Check className="h-3 w-3 text-white" />
-                                                            </div>
-                                                        )}
+                                                
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-semibold dark:text-gray-200">
+                                                            {formatFullName(resident)}
+                                                        </span>
                                                     </div>
                                                     
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <span className="font-semibold dark:text-gray-200">
-                                                                {formatFullName(resident)}
-                                                            </span>
-                                                            {resident.photo_url && (
-                                                                <Badge variant="outline" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                                                    Has photo
-                                                                </Badge>
-                                                            )}
+                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
+                                                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                                            <Calendar className="h-3 w-3" />
+                                                            {resident.age} years
                                                         </div>
-                                                        
-                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
-                                                            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                                                <Calendar className="h-3 w-3" />
-                                                                {resident.age} years
-                                                            </div>
-                                                            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                                                                <UserCircle className="h-3 w-3" />
-                                                                {resident.gender}
-                                                            </div>
-                                                            {resident.purok && (
-                                                                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 col-span-2">
-                                                                    <MapPin className="h-3 w-3" />
-                                                                    Purok {resident.purok.name}
-                                                                </div>
-                                                            )}
+                                                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                                            <UserCircle className="h-3 w-3" />
+                                                            {resident.gender}
                                                         </div>
-                                                        
-                                                        {(resident.contact_number || resident.email) && (
-                                                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                                                                {resident.contact_number && (
-                                                                    <div className="flex items-center gap-1">
-                                                                        <Phone className="h-3 w-3" />
-                                                                        {resident.contact_number}
-                                                                    </div>
-                                                                )}
-                                                                {resident.email && (
-                                                                    <div className="flex items-center gap-1">
-                                                                        <Mail className="h-3 w-3" />
-                                                                        {resident.email}
-                                                                    </div>
-                                                                )}
+                                                        {resident.purok && (
+                                                            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 col-span-2">
+                                                                <MapPin className="h-3 w-3" />
+                                                                Purok {resident.purok.name}
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
-                                            </CommandItem>
-                                        ))
-                                    )}
+                                            </div>
+                                        </CommandItem>
+                                    ))}
                                 </CommandGroup>
 
-                                {/* Results count */}
                                 {filteredResidents.length > 0 && (
                                     <div className="border-t dark:border-gray-700 px-3 py-2 text-xs text-gray-500 dark:text-gray-400 flex justify-between items-center">
                                         <span>
                                             Showing {filteredResidents.length} of {residents.length} residents
                                         </span>
-                                        <Badge variant="outline" className="text-[10px]">
-                                            {Math.round((filteredResidents.length / residents.length) * 100)}% match
-                                        </Badge>
                                     </div>
                                 )}
                             </CommandList>
@@ -406,10 +360,8 @@ export function ResidentSelection({
                 )}
             </div>
 
-            {/* Selected Resident Details Card */}
             {selectedResident && (
                 <div className="relative group">
-                    {/* Decorative gradient border */}
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg opacity-20 group-hover:opacity-30 transition duration-300 blur"></div>
                     
                     <div className="relative p-4 border rounded-lg bg-white dark:bg-gray-900 dark:border-gray-700 shadow-sm">
@@ -431,7 +383,7 @@ export function ResidentSelection({
                                     <h4 className="font-bold text-lg dark:text-gray-200">
                                         {formatFullName(selectedResident)}
                                     </h4>
-                                    <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                                         <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
                                             {selectedResident.age} years old
                                         </Badge>
@@ -489,7 +441,6 @@ export function ResidentSelection({
                 </div>
             )}
 
-            {/* Quick Stats and Filters */}
             {residents.length > 0 && (
                 <div className="flex flex-wrap items-center gap-3 text-xs">
                     <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-1.5 rounded-full">
@@ -503,13 +454,6 @@ export function ResidentSelection({
                             <Filter className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                             <span className="font-medium text-amber-600 dark:text-amber-400">{filteredResidents.length}</span>
                             <span className="text-amber-600 dark:text-amber-400">filtered</span>
-                        </div>
-                    )}
-                    
-                    {recentResidents.length > 0 && (
-                        <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                            <span>•</span>
-                            <span>{recentResidents.length} recent</span>
                         </div>
                     )}
                 </div>

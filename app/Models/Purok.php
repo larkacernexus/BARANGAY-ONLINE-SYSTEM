@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
 
@@ -16,8 +17,7 @@ class Purok extends Model
         'name',
         'slug',
         'description',
-        'leader_name',
-        'leader_contact',
+        'leader_id',
         'total_households',
         'total_residents',
         'status',
@@ -31,6 +31,12 @@ class Purok extends Model
         'total_residents' => 'integer',
         'latitude' => 'float',
         'longitude' => 'float',
+        'leader_id' => 'integer',
+    ];
+
+    protected $appends = [
+        'leader_name',
+        'leader_contact',
     ];
 
     protected static function boot()
@@ -52,12 +58,13 @@ class Purok extends Model
         });
     }
 
-    public function households()
+    // Relationships
+    public function households(): HasMany
     {
         return $this->hasMany(Household::class, 'purok_id');
     }
 
-    public function residents()
+    public function residents(): HasMany
     {
         return $this->hasMany(Resident::class, 'purok_id');
     }
@@ -67,6 +74,23 @@ class Purok extends Model
         return $this->hasMany(Business::class, 'purok_id');
     }
 
+    public function leader(): BelongsTo
+    {
+        return $this->belongsTo(Resident::class, 'leader_id');
+    }
+
+    // Accessors for backward compatibility
+    public function getLeaderNameAttribute(): ?string
+    {
+        return $this->leader?->full_name ?? null;
+    }
+
+    public function getLeaderContactAttribute(): ?string
+    {
+        return $this->leader?->contact_number ?? null;
+    }
+
+    // Scopes
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
@@ -77,11 +101,12 @@ class Purok extends Model
         return $query->where('status', 'inactive');
     }
 
+    // Methods
     public function updateStatistics()
     {
         $this->total_households = $this->households()->count();
         $this->total_residents = $this->residents()->count();
-        $this->save();
+        $this->saveQuietly();
     }
 
     public function extractCoordinatesFromUrl()

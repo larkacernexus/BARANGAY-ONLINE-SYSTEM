@@ -1,18 +1,34 @@
+// hooks/useCommunityReportsManagement.ts
+
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import { toast } from 'sonner';
 import { 
     CommunityReport, 
-    PaginationData, 
     Filters, 
     Stats, 
     BulkOperation 
 } from '@/types/admin/reports/communityReportTypes';
 import { 
     formatDate, 
-    formatDateTime, 
-    getTruncationLength 
+    formatDateTime 
 } from '@/admin-utils/communityReportHelpers';
+
+// Debounce utility
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
+}
+
+// Helper for parsing boolean values from URL/filters
+const parseBoolean = (value: any): boolean => {
+    if (value === true || value === 'true' || value === '1' || value === 1) return true;
+    return false;
+};
 
 interface UseCommunityReportsManagementProps {
     reports: any;
@@ -29,7 +45,7 @@ interface UseCommunityReportsManagementProps {
 
 export function useCommunityReportsManagement({
     reports: rawReports,
-    filters,
+    filters: initialFilters,
     statuses: rawStatuses,
     priorities: rawPriorities,
     urgencies: rawUrgencies,
@@ -39,32 +55,69 @@ export function useCommunityReportsManagement({
     staff: rawStaff,
     stats: rawStats
 }: UseCommunityReportsManagementProps) {
-    // Filter states
-    const [search, setSearch] = useState(filters.search || '');
-    const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
-    const [priorityFilter, setPriorityFilter] = useState(filters.priority || 'all');
-    const [urgencyFilter, setUrgencyFilter] = useState(filters.urgency || 'all');
-    const [reportTypeFilter, setReportTypeFilter] = useState(filters.report_type || 'all');
-    const [categoryFilter, setCategoryFilter] = useState(filters.category || 'all');
-    const [impactFilter, setImpactFilter] = useState(filters.impact_level || 'all');
-    const [purokFilter, setPurokFilter] = useState(filters.purok || 'all');
-    const [assignedFilter, setAssignedFilter] = useState(filters.assigned_to || 'all');
-    const [sourceFilter, setSourceFilter] = useState(filters.source || 'all');
-    const [fromDateFilter, setFromDateFilter] = useState(filters.from_date || '');
-    const [toDateFilter, setToDateFilter] = useState(filters.to_date || '');
-    const [hasEvidencesFilter, setHasEvidencesFilter] = useState(filters.has_evidences || false);
-    const [safetyConcernFilter, setSafetyConcernFilter] = useState(filters.safety_concern || false);
-    const [environmentalFilter, setEnvironmentalFilter] = useState(filters.environmental_impact || false);
-    const [recurringFilter, setRecurringFilter] = useState(filters.recurring_issue || false);
-    const [anonymousFilter, setAnonymousFilter] = useState(filters.is_anonymous || false);
-    const [affectedPeopleFilter, setAffectedPeopleFilter] = useState(filters.affected_people || 'all');
     
-    const [sortBy, setSortBy] = useState(filters.sort_by || 'created_at');
-    const [sortOrder, setSortOrder] = useState(filters.sort_order || 'desc');
+    // SAFE initialization with proper fallbacks
+    const safeReports = useMemo(() => {
+        if (rawReports && typeof rawReports === 'object' && !Array.isArray(rawReports)) {
+            const data = Array.isArray(rawReports.data) ? rawReports.data : [];
+            return {
+                data,
+                total: rawReports.total || data.length || 0,
+                current_page: rawReports.current_page || 1,
+                per_page: rawReports.per_page || 15,
+                last_page: rawReports.last_page || 1,
+                from: rawReports.from || 0,
+                to: rawReports.to || data.length,
+                links: rawReports.links || [],
+            };
+        }
+        return {
+            data: [],
+            total: 0,
+            current_page: 1,
+            per_page: 15,
+            last_page: 1,
+            from: 0,
+            to: 0,
+            links: [],
+        };
+    }, [rawReports]);
+
+    // ============================================
+    // SERVER-SIDE FILTER STATES
+    // ============================================
+    const [search, setSearch] = useState(initialFilters.search || '');
+    const [statusFilter, setStatusFilter] = useState(initialFilters.status || 'all');
+    const [priorityFilter, setPriorityFilter] = useState(initialFilters.priority || 'all');
+    const [urgencyFilter, setUrgencyFilter] = useState(initialFilters.urgency || 'all');
+    const [reportTypeFilter, setReportTypeFilter] = useState(initialFilters.report_type || 'all');
+    const [categoryFilter, setCategoryFilter] = useState(initialFilters.category || 'all');
+    const [impactFilter, setImpactFilter] = useState(initialFilters.impact_level || 'all');
+    const [purokFilter, setPurokFilter] = useState(initialFilters.purok || 'all');
+    const [assignedFilter, setAssignedFilter] = useState(initialFilters.assigned_to || 'all');
+    const [sourceFilter, setSourceFilter] = useState(initialFilters.source || 'all');
+    const [fromDateFilter, setFromDateFilter] = useState(initialFilters.from_date || '');
+    const [toDateFilter, setToDateFilter] = useState(initialFilters.to_date || '');
+    const [hasEvidencesFilter, setHasEvidencesFilter] = useState(parseBoolean(initialFilters.has_evidences));
+    const [safetyConcernFilter, setSafetyConcernFilter] = useState(parseBoolean(initialFilters.safety_concern));
+    const [environmentalFilter, setEnvironmentalFilter] = useState(parseBoolean(initialFilters.environmental_impact));
+    const [recurringFilter, setRecurringFilter] = useState(parseBoolean(initialFilters.recurring_issue));
+    const [anonymousFilter, setAnonymousFilter] = useState(parseBoolean(initialFilters.is_anonymous));
+    const [affectedPeopleFilter, setAffectedPeopleFilter] = useState(initialFilters.affected_people || 'all');
+    
+    // Sorting states (client-side for current page only)
+    const [sortBy, setSortBy] = useState(initialFilters.sort_by || 'created_at');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
+        (initialFilters.sort_order as 'asc' | 'desc') || 'desc'
+    );
+    
+    // UI states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(15);
-    const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+    const [isLoading, setIsLoading] = useState(false);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [windowWidth, setWindowWidth] = useState<number>(
+        typeof window !== 'undefined' ? window.innerWidth : 1024
+    );
     
     // Bulk selection states
     const [selectedReports, setSelectedReports] = useState<number[]>([]);
@@ -76,111 +129,50 @@ export function useCommunityReportsManagement({
     const [showBulkPriorityDialog, setShowBulkPriorityDialog] = useState(false);
     const [showBulkAssignDialog, setShowBulkAssignDialog] = useState(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState(false);
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
     const [selectionMode, setSelectionMode] = useState<'page' | 'filtered' | 'all'>('page');
     const [showSelectionOptions, setShowSelectionOptions] = useState(false);
     const [copied, setCopied] = useState(false);
     const [expandedReport, setExpandedReport] = useState<number | null>(null);
     
+    // Refs
     const bulkActionRef = useRef<HTMLDivElement>(null);
     const selectionRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const isFirstMount = useRef(true);
+    
+    // Debounce filters
+    const debouncedSearch = useDebounce(search, 300);
+    const debouncedFromDate = useDebounce(fromDateFilter, 500);
+    const debouncedToDate = useDebounce(toDateFilter, 500);
 
-    // SAFE initialization with proper fallbacks
-    const safeReports = useMemo(() => {
-        if (Array.isArray(rawReports)) {
-            return {
-                data: rawReports,
-                total: rawReports.length,
-                current_page: 1,
-                per_page: 10,
-                last_page: 1,
-                from: 1,
-                to: rawReports.length,
-            };
-        }
-        
-        if (rawReports && typeof rawReports === 'object') {
-            const data = Array.isArray(rawReports.data) 
-                ? rawReports.data 
-                : [];
-            
-            return {
-                data,
-                total: rawReports.total || data.length || 0,
-                current_page: rawReports.current_page || 1,
-                per_page: rawReports.per_page || 10,
-                last_page: rawReports.last_page || 1,
-                from: rawReports.from || 0,
-                to: rawReports.to || data.length,
-            };
-        }
-        
-        return {
-            data: [],
-            total: 0,
-            current_page: 1,
-            per_page: 10,
-            last_page: 1,
-            from: 0,
-            to: 0,
-        };
-    }, [rawReports]);
-
-    // SAFE props with defaults
+    // Safe data with defaults
     const safeStatuses = useMemo(() => {
-        if (rawStatuses && typeof rawStatuses === 'object' && Object.keys(rawStatuses).length > 0) {
-            return rawStatuses;
-        }
-        return {
-            pending: 'Pending',
-            under_review: 'Under Review',
-            assigned: 'Assigned',
-            in_progress: 'In Progress',
-            resolved: 'Resolved',
-            rejected: 'Rejected'
+        if (rawStatuses && Object.keys(rawStatuses).length > 0) return rawStatuses;
+        return { 
+            pending: 'Pending', 
+            under_review: 'Under Review', 
+            assigned: 'Assigned', 
+            in_progress: 'In Progress', 
+            resolved: 'Resolved', 
+            rejected: 'Rejected' 
         };
     }, [rawStatuses]);
 
     const safePriorities = useMemo(() => {
-        if (rawPriorities && typeof rawPriorities === 'object' && Object.keys(rawPriorities).length > 0) {
-            return rawPriorities;
-        }
-        return {
-            critical: 'Critical',
-            high: 'High',
-            medium: 'Medium',
-            low: 'Low'
-        };
+        if (rawPriorities && Object.keys(rawPriorities).length > 0) return rawPriorities;
+        return { critical: 'Critical', high: 'High', medium: 'Medium', low: 'Low' };
     }, [rawPriorities]);
 
     const safeUrgencies = useMemo(() => {
-        if (rawUrgencies && typeof rawUrgencies === 'object' && Object.keys(rawUrgencies).length > 0) {
-            return rawUrgencies;
-        }
-        return {
-            high: 'High',
-            medium: 'Medium',
-            low: 'Low'
-        };
+        if (rawUrgencies && Object.keys(rawUrgencies).length > 0) return rawUrgencies;
+        return { high: 'High', medium: 'Medium', low: 'Low' };
     }, [rawUrgencies]);
 
-    const safeReportTypes = useMemo(() => {
-        return Array.isArray(rawReportTypes) ? rawReportTypes : [];
-    }, [rawReportTypes]);
-
-    const safeCategories = useMemo(() => {
-        return Array.isArray(rawCategories) ? rawCategories : [];
-    }, [rawCategories]);
-
-    const safePuroks = useMemo(() => {
-        return Array.isArray(rawPuroks) ? rawPuroks : [];
-    }, [rawPuroks]);
-
-    const safeStaff = useMemo(() => {
-        return Array.isArray(rawStaff) ? rawStaff : [];
-    }, [rawStaff]);
+    const safeReportTypes = useMemo(() => Array.isArray(rawReportTypes) ? rawReportTypes : [], [rawReportTypes]);
+    const safeCategories = useMemo(() => Array.isArray(rawCategories) ? rawCategories : [], [rawCategories]);
+    const safePuroks = useMemo(() => Array.isArray(rawPuroks) ? rawPuroks : [], [rawPuroks]);
+    const safeStaff = useMemo(() => Array.isArray(rawStaff) ? rawStaff : [], [rawStaff]);
 
     const safeStats = useMemo(() => ({
         total: rawStats?.total || safeReports.total || 0,
@@ -208,69 +200,97 @@ export function useCommunityReportsManagement({
         average_resolution_time: rawStats?.average_resolution_time || '0 days',
     }), [rawStats, safeReports.total]);
 
-    // Filter reports client-side
-    const filteredReports = useMemo(() => {
-        let result = [...safeReports.data];
+    // ============================================
+    // GET CURRENT FILTERS FOR SERVER REQUEST
+    // ============================================
+    const getCurrentFilters = useCallback((): Record<string, any> => {
+        const filters: Record<string, any> = {};
+        
+        if (debouncedSearch) filters.search = debouncedSearch;
+        if (statusFilter !== 'all') filters.status = statusFilter;
+        if (priorityFilter !== 'all') filters.priority = priorityFilter;
+        if (urgencyFilter !== 'all') filters.urgency = urgencyFilter;
+        if (reportTypeFilter !== 'all') filters.report_type = reportTypeFilter;
+        if (categoryFilter !== 'all') filters.category = categoryFilter;
+        if (impactFilter !== 'all') filters.impact_level = impactFilter;
+        if (purokFilter !== 'all') filters.purok = purokFilter;
+        if (assignedFilter !== 'all') filters.assigned_to = assignedFilter;
+        if (sourceFilter !== 'all') filters.source = sourceFilter;
+        if (debouncedFromDate) filters.from_date = debouncedFromDate;
+        if (debouncedToDate) filters.to_date = debouncedToDate;
+        if (hasEvidencesFilter) filters.has_evidences = 'true';
+        if (safetyConcernFilter) filters.safety_concern = 'true';
+        if (environmentalFilter) filters.environmental_impact = 'true';
+        if (recurringFilter) filters.recurring_issue = 'true';
+        if (anonymousFilter) filters.is_anonymous = 'true';
+        if (affectedPeopleFilter !== 'all') filters.affected_people = affectedPeopleFilter;
+        
+        return filters;
+    }, [
+        debouncedSearch, statusFilter, priorityFilter, urgencyFilter, reportTypeFilter,
+        categoryFilter, impactFilter, purokFilter, assignedFilter, sourceFilter,
+        debouncedFromDate, debouncedToDate, hasEvidencesFilter, safetyConcernFilter,
+        environmentalFilter, recurringFilter, anonymousFilter, affectedPeopleFilter
+    ]);
 
-        // Search filter
-        if (search) {
-            const searchLower = search.toLowerCase();
-            result = result.filter(report => 
-                report.report_number?.toLowerCase().includes(searchLower) ||
-                report.title?.toLowerCase().includes(searchLower) ||
-                report.description?.toLowerCase().includes(searchLower) ||
-                report.detailed_description?.toLowerCase().includes(searchLower) ||
-                report.location?.toLowerCase().includes(searchLower) ||
-                report.report_type?.name?.toLowerCase().includes(searchLower) ||
-                report.report_type?.category?.toLowerCase().includes(searchLower) ||
-                report.tags?.some((tag: string) => tag.toLowerCase().includes(searchLower)) ||
-                report.resolution_notes?.toLowerCase().includes(searchLower) ||
-                (!report.is_anonymous && report.user?.name?.toLowerCase().includes(searchLower)) ||
-                (!report.is_anonymous && report.user?.email?.toLowerCase().includes(searchLower)) ||
-                (!report.is_anonymous && report.user?.phone?.includes(search)) ||
-                report.reporter_name?.toLowerCase().includes(searchLower) ||
-                report.reporter_contact?.includes(search)
-            );
-        }
-
-        // Apply all other filters...
-        if (statusFilter !== 'all') result = result.filter(report => report.status === statusFilter);
-        if (priorityFilter !== 'all') result = result.filter(report => report.priority === priorityFilter);
-        if (urgencyFilter !== 'all') result = result.filter(report => report.urgency_level === urgencyFilter);
-        if (reportTypeFilter !== 'all') result = result.filter(report => report.report_type_id.toString() === reportTypeFilter);
-        if (categoryFilter !== 'all') result = result.filter(report => report.report_type?.category === categoryFilter);
-        if (impactFilter !== 'all') result = result.filter(report => report.impact_level === impactFilter);
-        if (purokFilter !== 'all') result = result.filter(report => !report.is_anonymous && report.user?.purok === purokFilter);
-        if (assignedFilter !== 'all') {
-            if (assignedFilter === 'unassigned') {
-                result = result.filter(report => !report.assigned_to);
-            } else {
-                const assignedId = parseInt(assignedFilter);
-                result = result.filter(report => report.assigned_to?.id === assignedId);
+    // ============================================
+    // RELOAD DATA FROM SERVER
+    // ============================================
+    const reloadData = useCallback((page = 1) => {
+        setIsLoading(true);
+        
+        const filters: Record<string, any> = { ...getCurrentFilters(), page };
+            
+            Object.keys(filters).forEach(key => {
+                if (filters[key] === 'all') {
+                    delete filters[key];
+                }
+            });
+        
+        router.get('/admin/community-reports', filters, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsLoading(false);
+                setSelectedReports([]);
+                setIsSelectAll(false);
+            },
+            onError: () => {
+                setIsLoading(false);
+                toast.error('Failed to load reports');
             }
-        }
-        if (sourceFilter !== 'all') result = result.filter(report => report.source === sourceFilter);
-        if (fromDateFilter) {
-            try {
-                const fromDate = new Date(fromDateFilter);
-                result = result.filter(report => new Date(report.incident_date) >= fromDate);
-            } catch {}
-        }
-        if (toDateFilter) {
-            try {
-                const toDate = new Date(toDateFilter);
-                result = result.filter(report => new Date(report.incident_date) <= toDate);
-            } catch {}
-        }
-        if (hasEvidencesFilter) result = result.filter(report => (report.evidences && report.evidences.length > 0));
-        if (safetyConcernFilter) result = result.filter(report => report.safety_concern === true);
-        if (environmentalFilter) result = result.filter(report => report.environmental_impact === true);
-        if (recurringFilter) result = result.filter(report => report.recurring_issue === true);
-        if (anonymousFilter) result = result.filter(report => report.is_anonymous === true);
-        if (affectedPeopleFilter !== 'all') result = result.filter(report => report.affected_people === affectedPeopleFilter);
+        });
+    }, [getCurrentFilters]);
 
-        // Sorting
-        result.sort((a, b) => {
+    // ============================================
+    // SERVER-SIDE FILTERING EFFECT
+    // ============================================
+    useEffect(() => {
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            return;
+        }
+        
+        reloadData();
+    }, [
+        debouncedSearch, statusFilter, priorityFilter, urgencyFilter, reportTypeFilter,
+        categoryFilter, impactFilter, purokFilter, assignedFilter, sourceFilter,
+        debouncedFromDate, debouncedToDate, hasEvidencesFilter, safetyConcernFilter,
+        environmentalFilter, recurringFilter, anonymousFilter, affectedPeopleFilter
+    ]);
+
+    // ============================================
+    // CURRENT PAGE DATA (from server)
+    // ============================================
+    const currentReports = useMemo(() => safeReports.data, [safeReports.data]);
+    
+    // ============================================
+    // CLIENT-SIDE SORTING (for current page only)
+    // ============================================
+    const sortedReports = useMemo(() => {
+        const sorted = [...currentReports];
+        
+        sorted.sort((a, b) => {
             let aValue: any, bValue: any;
             
             try {
@@ -291,10 +311,6 @@ export function useCommunityReportsManagement({
                         aValue = new Date(a.created_at).getTime();
                         bValue = new Date(b.created_at).getTime();
                         break;
-                    case 'updated_at':
-                        aValue = new Date(a.updated_at).getTime();
-                        bValue = new Date(b.updated_at).getTime();
-                        break;
                     case 'status':
                         aValue = a.status || '';
                         bValue = b.status || '';
@@ -308,15 +324,6 @@ export function useCommunityReportsManagement({
                         const urgencyOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
                         aValue = urgencyOrder[a.urgency_level as keyof typeof urgencyOrder] || 0;
                         bValue = urgencyOrder[b.urgency_level as keyof typeof urgencyOrder] || 0;
-                        break;
-                    case 'impact_level':
-                        const impactOrder: Record<string, number> = { severe: 4, major: 3, moderate: 2, minor: 1 };
-                        aValue = impactOrder[a.impact_level as keyof typeof impactOrder] || 0;
-                        bValue = impactOrder[b.impact_level as keyof typeof impactOrder] || 0;
-                        break;
-                    case 'estimated_affected_count':
-                        aValue = a.estimated_affected_count || 0;
-                        bValue = b.estimated_affected_count || 0;
                         break;
                     default:
                         aValue = new Date(a.created_at).getTime();
@@ -333,40 +340,33 @@ export function useCommunityReportsManagement({
                 return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
             }
         });
+        
+        return sorted;
+    }, [currentReports, sortBy, sortOrder]);
 
-        return result;
-    }, [
-        safeReports.data, search, statusFilter, priorityFilter, urgencyFilter, reportTypeFilter, 
-        categoryFilter, impactFilter, purokFilter, assignedFilter, sourceFilter,
-        fromDateFilter, toDateFilter, hasEvidencesFilter, safetyConcernFilter, environmentalFilter,
-        recurringFilter, anonymousFilter, affectedPeopleFilter, sortBy, sortOrder
-    ]);
+    // ============================================
+    // PAGINATION DATA
+    // ============================================
+    const paginationData = useMemo(() => ({
+        current_page: safeReports.current_page,
+        last_page: safeReports.last_page,
+        total: safeReports.total,
+        from: safeReports.from,
+        to: safeReports.to,
+        per_page: safeReports.per_page,
+        path: typeof window !== 'undefined' ? window.location.pathname : '/admin/community-reports',
+        links: safeReports.links || [],
+    }), [safeReports]);
 
-    // Calculate pagination
-    const totalItems = filteredReports.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedReports = filteredReports.slice(startIndex, endIndex);
-
-    // Reset to first page when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [
-        search, statusFilter, priorityFilter, urgencyFilter, reportTypeFilter, categoryFilter, 
-        impactFilter, purokFilter, assignedFilter, sourceFilter,
-        fromDateFilter, toDateFilter, hasEvidencesFilter, safetyConcernFilter, environmentalFilter,
-        recurringFilter, anonymousFilter, affectedPeopleFilter, sortBy, sortOrder
-    ]);
+    const totalItems = paginationData.total;
+    const totalPages = paginationData.last_page;
+    const startIndex = paginationData.from;
+    const endIndex = paginationData.to;
 
     // Track window resize
     useEffect(() => {
         if (typeof window === 'undefined') return;
-
-        const handleResize = () => {
-            setWindowWidth(window.innerWidth);
-        };
-
+        const handleResize = () => setWindowWidth(window.innerWidth);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
@@ -381,52 +381,11 @@ export function useCommunityReportsManagement({
                 setShowSelectionOptions(false);
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedReports.length > 0) {
-                        setSelectedReports([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-                if (showBulkActions) setShowBulkActions(false);
-                if (showSelectionOptions) setShowSelectionOptions(false);
-            }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            if (e.key === 'Delete' && isBulkMode && selectedReports.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedReports, showBulkActions, showSelectionOptions, expandedReport]);
-
-    // Reset selection when bulk mode is turned off or filters change
+    // Reset selection when bulk mode is turned off
     useEffect(() => {
         if (!isBulkMode) {
             setSelectedReports([]);
@@ -436,95 +395,95 @@ export function useCommunityReportsManagement({
 
     // Check if all items on current page are selected
     useEffect(() => {
-        const allPageIds = paginatedReports.map(report => report.id);
-        const allSelected = allPageIds.every(id => selectedReports.includes(id));
+        const allPageIds = sortedReports.map(report => report.id);
+        const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedReports.includes(id));
         setIsSelectAll(allSelected);
-    }, [selectedReports, paginatedReports]);
+    }, [selectedReports, sortedReports]);
 
-    // Get selected reports data
-    const selectedReportsData = useMemo(() => {
-        return filteredReports.filter(report => selectedReports.includes(report.id));
-    }, [selectedReports, filteredReports]);
-
-    // Calculate selection stats
-    const selectionStats = useMemo(() => {
-        const selectedData = selectedReportsData;
-        const evidenceCount = selectedData.filter(report => 
-            (report.evidences && report.evidences.length > 0)
-        ).length;
-        
-        const communityImpactCount = selectedData.filter(report => 
-            report.affected_people === 'community' || report.affected_people === 'multiple'
-        ).length;
-        
-        return {
-            total: selectedData.length,
-            pending: selectedData.filter(c => c.status === 'pending').length,
-            under_review: selectedData.filter(c => c.status === 'under_review').length,
-            assigned: selectedData.filter(c => c.status === 'assigned').length,
-            in_progress: selectedData.filter(c => c.status === 'in_progress').length,
-            resolved: selectedData.filter(c => c.status === 'resolved').length,
-            rejected: selectedData.filter(c => c.status === 'rejected').length,
-            critical: selectedData.filter(c => c.priority === 'critical').length,
-            high_priority: selectedData.filter(c => c.priority === 'high').length,
-            medium_priority: selectedData.filter(c => c.priority === 'medium').length,
-            low_priority: selectedData.filter(c => c.priority === 'low').length,
-            high_urgency: selectedData.filter(c => c.urgency_level === 'high').length,
-            anonymous: selectedData.filter(c => c.is_anonymous).length,
-            withEvidence: evidenceCount,
-            assignedCount: selectedData.filter(c => c.assigned_to).length,
-            safetyConcern: selectedData.filter(c => c.safety_concern).length,
-            environmentalImpact: selectedData.filter(c => c.environmental_impact).length,
-            recurringIssue: selectedData.filter(c => c.recurring_issue).length,
-            communityImpact: communityImpactCount,
-            totalEstimatedAffected: selectedData.reduce((sum, c) => sum + (c.estimated_affected_count || 0), 0),
-        };
-    }, [selectedReportsData]);
-
-    // Handlers
+    // ============================================
+    // SELECTION HANDLERS
+    // ============================================
     const handleSelectAllOnPage = useCallback(() => {
-        const pageIds = paginatedReports.map(report => report.id);
+        const pageIds = sortedReports.map(report => report.id);
         if (isSelectAll) {
             setSelectedReports(prev => prev.filter(id => !pageIds.includes(id)));
         } else {
-            const newSelected = [...new Set([...selectedReports, ...pageIds])];
-            setSelectedReports(newSelected);
+            setSelectedReports(prev => [...new Set([...prev, ...pageIds])]);
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    }, [paginatedReports, isSelectAll, selectedReports]);
-
-    const handleSelectAllFiltered = useCallback(() => {
-        const allIds = filteredReports.map(report => report.id);
-        if (selectedReports.length === allIds.length && allIds.every(id => selectedReports.includes(id))) {
-            setSelectedReports(prev => prev.filter(id => !allIds.includes(id)));
-        } else {
-            const newSelected = [...new Set([...selectedReports, ...allIds])];
-            setSelectedReports(newSelected);
-            setSelectionMode('filtered');
-        }
-    }, [filteredReports, selectedReports]);
-
-    const handleSelectAll = useCallback(() => {
-        if (confirm(`This will select ALL ${safeReports.total} reports. This action may take a moment.`)) {
-            const pageIds = paginatedReports.map(report => report.id);
-            setSelectedReports(pageIds);
-            setSelectionMode('all');
-            toast.info('Selected all items on current page. For full selection, implement server-side API.');
-        }
-    }, [safeReports.total, paginatedReports]);
+    }, [sortedReports, isSelectAll]);
 
     const handleItemSelect = useCallback((id: number) => {
-        setSelectedReports(prev => {
-            if (prev.includes(id)) {
-                return prev.filter(itemId => itemId !== id);
-            } else {
-                return [...prev, id];
-            }
-        });
+        setSelectedReports(prev => 
+            prev.includes(id) ? prev.filter(itemId => itemId !== id) : [...prev, id]
+        );
     }, []);
 
-    const handleBulkOperation = async (operation: BulkOperation, customData?: any) => {
+    // Get selected reports data
+    const selectedReportsData = useMemo(() => {
+        return sortedReports.filter(report => selectedReports.includes(report.id));
+    }, [selectedReports, sortedReports]);
+
+    // Selection stats
+    const selectionStats = useMemo(() => {
+        if (!selectedReportsData.length) {
+            return { 
+                total: 0, pending: 0, under_review: 0, assigned: 0, in_progress: 0, 
+                resolved: 0, rejected: 0, critical: 0, high_priority: 0, medium_priority: 0, 
+                low_priority: 0, high_urgency: 0, anonymous: 0, withEvidence: 0, 
+                assignedCount: 0, safetyConcern: 0, environmentalImpact: 0, 
+                recurringIssue: 0, communityImpact: 0, totalEstimatedAffected: 0 
+            };
+        }
+        return {
+            total: selectedReportsData.length,
+            pending: selectedReportsData.filter(c => c.status === 'pending').length,
+            under_review: selectedReportsData.filter(c => c.status === 'under_review').length,
+            assigned: selectedReportsData.filter(c => c.status === 'assigned').length,
+            in_progress: selectedReportsData.filter(c => c.status === 'in_progress').length,
+            resolved: selectedReportsData.filter(c => c.status === 'resolved').length,
+            rejected: selectedReportsData.filter(c => c.status === 'rejected').length,
+            critical: selectedReportsData.filter(c => c.priority === 'critical').length,
+            high_priority: selectedReportsData.filter(c => c.priority === 'high').length,
+            medium_priority: selectedReportsData.filter(c => c.priority === 'medium').length,
+            low_priority: selectedReportsData.filter(c => c.priority === 'low').length,
+            high_urgency: selectedReportsData.filter(c => c.urgency_level === 'high').length,
+            anonymous: selectedReportsData.filter(c => c.is_anonymous).length,
+            withEvidence: selectedReportsData.filter(c => c.evidences?.length > 0).length,
+            assignedCount: selectedReportsData.filter(c => c.assigned_to).length,
+            safetyConcern: selectedReportsData.filter(c => c.safety_concern).length,
+            environmentalImpact: selectedReportsData.filter(c => c.environmental_impact).length,
+            recurringIssue: selectedReportsData.filter(c => c.recurring_issue).length,
+            communityImpact: selectedReportsData.filter(c => c.affected_people === 'community' || c.affected_people === 'multiple').length,
+            totalEstimatedAffected: selectedReportsData.reduce((sum, c) => sum + (c.estimated_affected_count || 0), 0),
+        };
+    }, [selectedReportsData]);
+
+    // ============================================
+    // PAGE CHANGE HANDLER
+    // ============================================
+    const handlePageChange = useCallback((page: number) => {
+        reloadData(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [reloadData]);
+
+    // ============================================
+    // SORT HANDLER (client-side only)
+    // ============================================
+    const handleSort = useCallback((column: string) => {
+        if (sortBy === column) {
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(column);
+            setSortOrder('asc');
+        }
+    }, [sortBy]);
+
+    // ============================================
+    // BULK OPERATIONS
+    // ============================================
+    const handleBulkOperation = useCallback(async (operation: BulkOperation | string, customData?: any) => {
         if (selectedReports.length === 0) {
             toast.error('Please select at least one report');
             return;
@@ -546,184 +505,154 @@ export function useCommunityReportsManagement({
                         'Priority': safePriorities[report.priority] || report.priority || 'N/A',
                         'Urgency': safeUrgencies[report.urgency_level] || report.urgency_level || 'N/A',
                         'Status': safeStatuses[report.status] || report.status || 'N/A',
-                        'Impact Level': report.impact_level ? report.impact_level.replace('_', ' ').toUpperCase() : 'N/A',
-                        'Anonymous': report.is_anonymous ? 'Yes' : 'No',
-                        'Resident Name': report.is_anonymous ? 'Anonymous' : report.user?.name || 'N/A',
-                        'Purok': report.is_anonymous ? 'N/A' : report.user?.purok || 'N/A',
-                        'Contact': report.is_anonymous ? 'N/A' : report.user?.phone || report.user?.email || 'N/A',
                         'Assigned To': report.assigned_to?.name || 'Unassigned',
                         'Created At': formatDateTime(report.created_at),
-                        'Updated At': formatDateTime(report.updated_at),
-                        'Resolution Date': report.resolved_at ? formatDateTime(report.resolved_at) : 'N/A',
-                        'Safety Concern': report.safety_concern ? 'Yes' : 'No',
-                        'Environmental Impact': report.environmental_impact ? 'Yes' : 'No',
-                        'Recurring Issue': report.recurring_issue ? 'Yes' : 'No',
-                        'Affected People': report.affected_people || 'N/A',
-                        'Estimated Affected Count': report.estimated_affected_count || 'N/A',
-                        'Evidence Files': report.evidences ? report.evidences.length : 0,
                     }));
                     
                     const headers = Object.keys(exportData[0]);
                     const csv = [
                         headers.join(','),
-                        ...exportData.map(row => 
-                            headers.map(header => {
-                                const value = row[header as keyof typeof row];
-                                return typeof value === 'string' && value.includes(',') 
-                                    ? `"${value}"` 
-                                    : value;
-                            }).join(',')
-                        )
+                        ...exportData.map(row => headers.map(h => {
+                            const v = row[h as keyof typeof row];
+                            return typeof v === 'string' && v.includes(',') ? `"${v}"` : v;
+                        }).join(','))
                     ].join('\n');
                     
                     const blob = new Blob([csv], { type: 'text/csv' });
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `community-reports-export-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
+                    a.download = `community-reports-${new Date().toISOString().split('T')[0]}.csv`;
                     a.click();
-                    document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                     
-                    toast.success(`Exported ${selectedReports.length} reports successfully`);
+                    toast.success(`Exported ${selectedReports.length} reports`);
                     break;
 
                 case 'delete':
-                    await router.post('/admin/community-reports/bulk-action', {
-                        action: 'delete',
-                        report_ids: selectedReports,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            toast.success(`${selectedReports.length} report(s) deleted successfully`);
-                            setSelectedReports([]);
-                            setShowBulkDeleteDialog(false);
-                        },
-                        onError: (errors) => {
-                            toast.error('Failed to delete reports');
-                            console.error('Delete errors:', errors);
-                        }
-                    });
+                    setShowBulkDeleteDialog(true);
                     break;
 
                 case 'update_status':
-                    await router.post('/admin/community-reports/bulk-action', {
-                        action: 'update_status',
-                        report_ids: selectedReports,
-                        status: bulkEditValue
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            toast.success(`${selectedReports.length} report(s) status updated`);
-                            setShowBulkStatusDialog(false);
-                            setBulkEditValue('');
-                            setSelectedReports([]);
-                        },
-                        onError: (errors) => {
-                            toast.error('Failed to update status');
-                            console.error('Status update errors:', errors);
-                        }
-                    });
+                    setShowBulkStatusDialog(true);
                     break;
 
                 case 'update_priority':
-                    await router.post('/admin/community-reports/bulk-action', {
-                        action: 'update_priority',
-                        report_ids: selectedReports,
-                        priority: bulkEditValue
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            toast.success(`${selectedReports.length} report(s) priority updated`);
-                            setShowBulkPriorityDialog(false);
-                            setBulkEditValue('');
-                            setSelectedReports([]);
-                        },
-                        onError: (errors) => {
-                            toast.error('Failed to update priority');
-                            console.error('Priority update errors:', errors);
-                        }
-                    });
+                    setShowBulkPriorityDialog(true);
                     break;
 
                 case 'assign_to':
-                    await router.post('/admin/community-reports/bulk-action', {
-                        action: 'assign_to',
-                        report_ids: selectedReports,
-                        assigned_to: bulkEditValue
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            toast.success(`${selectedReports.length} report(s) assigned successfully`);
-                            setShowBulkAssignDialog(false);
-                            setBulkEditValue('');
-                            setSelectedReports([]);
-                        },
-                        onError: (errors) => {
-                            toast.error('Failed to assign reports');
-                            console.error('Assignment errors:', errors);
-                        }
-                    });
+                    setShowBulkAssignDialog(true);
                     break;
 
                 default:
-                    toast.error('Operation not supported yet');
+                    toast.error('Operation not supported');
             }
         } catch (error) {
             console.error('Bulk operation error:', error);
-            toast.error('An error occurred during bulk operation');
+            toast.error('An error occurred');
         } finally {
             setIsPerformingBulkAction(false);
         }
-    };
+    }, [selectedReports, selectedReportsData, safeStatuses, safePriorities, safeUrgencies]);
 
-    const handleCopySelectedData = useCallback(() => {
-        if (selectedReportsData.length === 0) {
-            toast.error('No data to copy');
-            return;
+    // ============================================
+    // BULK ACTION CONFIRMATION HANDLERS
+    // ============================================
+    const handleBulkStatusUpdate = useCallback(async (status: string) => {
+        setIsPerformingBulkAction(true);
+        
+        try {
+            await router.post('/admin/community-reports/bulk-action', {
+                action: 'update_status',
+                report_ids: selectedReports,
+                status: status
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    reloadData(paginationData.current_page);
+                    setSelectedReports([]);
+                    setShowBulkStatusDialog(false);
+                    toast.success(`Status updated for ${selectedReports.length} reports`);
+                },
+                onError: () => toast.error('Failed to update status')
+            });
+        } finally {
+            setIsPerformingBulkAction(false);
         }
-        
-        const data = selectedReportsData.map(report => ({
-            'Report ID': report.report_number || 'N/A',
-            'Title': report.title || 'N/A',
-            'Type': report.report_type?.name || 'N/A',
-            'Status': safeStatuses[report.status] || report.status || 'N/A',
-            'Priority': safePriorities[report.priority] || report.priority || 'N/A',
-            'Urgency': safeUrgencies[report.urgency_level] || report.urgency_level || 'N/A',
-            'Incident Date': formatDate(report.incident_date),
-            'Resident': report.is_anonymous ? 'Anonymous' : report.user?.name || 'N/A',
-            'Assigned To': report.assigned_to?.name || 'Unassigned',
-        }));
-        
-        const csv = [
-            Object.keys(data[0]).join(','),
-            ...data.map(row => Object.values(row).join(','))
-        ].join('\n');
-        
-        navigator.clipboard.writeText(csv).then(() => {
-            setCopied(true);
-            toast.success('Selected data copied to clipboard as CSV');
-            setTimeout(() => setCopied(false), 2000);
-        }).catch(() => {
-            toast.error('Failed to copy to clipboard');
-        });
-    }, [selectedReportsData, safeStatuses, safePriorities, safeUrgencies]);
+    }, [selectedReports, paginationData.current_page, reloadData]);
 
-    const handleCopyToClipboard = useCallback((text: string, label: string) => {
-        navigator.clipboard.writeText(text).then(() => {
-            toast.success(`${label} copied to clipboard`);
-        }).catch(() => {
-            toast.error('Failed to copy to clipboard');
-        });
-    }, []);
+    const handleBulkPriorityUpdate = useCallback(async (priority: string) => {
+        setIsPerformingBulkAction(true);
+        
+        try {
+            await router.post('/admin/community-reports/bulk-action', {
+                action: 'update_priority',
+                report_ids: selectedReports,
+                priority: priority
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    reloadData(paginationData.current_page);
+                    setSelectedReports([]);
+                    setShowBulkPriorityDialog(false);
+                    toast.success(`Priority updated for ${selectedReports.length} reports`);
+                },
+                onError: () => toast.error('Failed to update priority')
+            });
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    }, [selectedReports, paginationData.current_page, reloadData]);
 
-    const handleSort = useCallback((column: string) => {
-        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
-        setSortBy(column);
-        setSortOrder(newSortOrder);
-    }, [sortBy, sortOrder]);
+    const handleBulkAssign = useCallback(async (assignedTo: string) => {
+        setIsPerformingBulkAction(true);
+        
+        try {
+            await router.post('/admin/community-reports/bulk-action', {
+                action: 'assign_to',
+                report_ids: selectedReports,
+                assigned_to: assignedTo
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    reloadData(paginationData.current_page);
+                    setSelectedReports([]);
+                    setShowBulkAssignDialog(false);
+                    toast.success(`Assigned ${selectedReports.length} reports`);
+                },
+                onError: () => toast.error('Failed to assign reports')
+            });
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    }, [selectedReports, paginationData.current_page, reloadData]);
 
+    const handleBulkDelete = useCallback(async () => {
+        setIsPerformingBulkAction(true);
+        
+        try {
+            await router.post('/admin/community-reports/bulk-action', {
+                action: 'delete',
+                report_ids: selectedReports
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    reloadData(paginationData.current_page);
+                    setSelectedReports([]);
+                    setShowBulkDeleteDialog(false);
+                    toast.success(`${selectedReports.length} reports deleted`);
+                },
+                onError: () => toast.error('Failed to delete reports')
+            });
+        } finally {
+            setIsPerformingBulkAction(false);
+        }
+    }, [selectedReports, paginationData.current_page, reloadData]);
+
+    // ============================================
+    // OTHER HANDLERS
+    // ============================================
     const handleClearFilters = useCallback(() => {
         setSearch('');
         setStatusFilter('all');
@@ -743,36 +672,64 @@ export function useCommunityReportsManagement({
         setRecurringFilter(false);
         setAnonymousFilter(false);
         setAffectedPeopleFilter('all');
-        setSortBy('created_at');
-        setSortOrder('desc');
     }, []);
 
     const handleDelete = useCallback((report: CommunityReport) => {
-        if (confirm(`Are you sure you want to delete report ${report.report_number}? This action cannot be undone.`)) {
+        if (confirm(`Delete report ${report.report_number}?`)) {
             router.delete(`/admin/community-reports/${report.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
-                    setSelectedReports(selectedReports.filter(id => id !== report.id));
-                    toast.success('Report deleted successfully');
+                    reloadData(paginationData.current_page);
+                    setSelectedReports(prev => prev.filter(id => id !== report.id));
+                    toast.success('Report deleted');
                 },
-                onError: (errors) => {
-                    toast.error('Failed to delete report');
-                }
+                onError: () => toast.error('Failed to delete report')
             });
         }
-    }, [selectedReports]);
+    }, [paginationData.current_page, reloadData]);
 
-    const toggleReportExpansion = useCallback((reportId: number) => {
-        setExpandedReport(expandedReport === reportId ? null : reportId);
-    }, [expandedReport]);
-
-    const handleExport = useCallback(() => {
-        // Export logic here
-        toast.info('Export functionality to be implemented');
+    const handleCopyToClipboard = useCallback((text: string, label: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            toast.success(`${label} copied`);
+        }).catch(() => toast.error('Failed to copy'));
     }, []);
 
+    const handleCopySelectedData = useCallback(() => {
+        if (selectedReportsData.length === 0) {
+            toast.error('No data to copy');
+            return;
+        }
+        
+        const data = selectedReportsData.map(report => ({
+            'Report ID': report.report_number || 'N/A',
+            'Title': report.title || 'N/A',
+            'Type': report.report_type?.name || 'N/A',
+            'Status': safeStatuses[report.status] || report.status || 'N/A',
+            'Priority': safePriorities[report.priority] || report.priority || 'N/A',
+        }));
+        
+        const csv = [
+            Object.keys(data[0]).join('\t'),
+            ...data.map(row => Object.values(row).join('\t'))
+        ].join('\n');
+        
+        navigator.clipboard.writeText(csv).then(() => {
+            setCopied(true);
+            toast.success('Copied to clipboard');
+            setTimeout(() => setCopied(false), 2000);
+        }).catch(() => toast.error('Failed to copy'));
+    }, [selectedReportsData, safeStatuses, safePriorities]);
+
+    const toggleReportExpansion = useCallback((reportId: number) => {
+        setExpandedReport(prev => prev === reportId ? null : reportId);
+    }, []);
+
+    const handleExport = useCallback(() => {
+        handleBulkOperation('export');
+    }, [handleBulkOperation]);
+
     const hasActiveFilters = useMemo(() => {
-        return search || 
+        return Boolean(search || 
             statusFilter !== 'all' || 
             priorityFilter !== 'all' || 
             urgencyFilter !== 'all' ||
@@ -789,13 +746,54 @@ export function useCommunityReportsManagement({
             environmentalFilter ||
             recurringFilter ||
             anonymousFilter ||
-            affectedPeopleFilter !== 'all';
+            affectedPeopleFilter !== 'all');
     }, [
         search, statusFilter, priorityFilter, urgencyFilter, reportTypeFilter,
         categoryFilter, impactFilter, purokFilter, assignedFilter, sourceFilter,
         fromDateFilter, toDateFilter, hasEvidencesFilter, safetyConcernFilter,
         environmentalFilter, recurringFilter, anonymousFilter, affectedPeopleFilter
     ]);
+
+    // Placeholder handlers for compatibility
+    const handleSelectAllFiltered = useCallback(() => {
+        toast.info('Select all filtered is handled server-side');
+    }, []);
+    
+    const handleSelectAll = useCallback(() => {
+        toast.info(`Total ${safeReports.total} reports available`);
+    }, [safeReports.total]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+                e.preventDefault();
+                handleSelectAllOnPage();
+            }
+            if (e.key === 'Escape') {
+                if (isBulkMode) {
+                    selectedReports.length > 0 ? setSelectedReports([]) : setIsBulkMode(false);
+                }
+                setShowBulkActions(false);
+                setShowSelectionOptions(false);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                setIsBulkMode(prev => !prev);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            if (e.key === 'Delete' && isBulkMode && selectedReports.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isBulkMode, selectedReports, handleSelectAllOnPage]);
 
     return {
         // State
@@ -820,8 +818,9 @@ export function useCommunityReportsManagement({
         sortBy, setSortBy,
         sortOrder, setSortOrder,
         showAdvancedFilters, setShowAdvancedFilters,
-        currentPage, setCurrentPage,
-        itemsPerPage,
+        currentPage: paginationData.current_page,
+        setCurrentPage: handlePageChange,
+        itemsPerPage: safeReports.per_page,
         windowWidth,
         selectedReports, setSelectedReports,
         isBulkMode, setIsBulkMode,
@@ -838,6 +837,7 @@ export function useCommunityReportsManagement({
         showSelectionOptions, setShowSelectionOptions,
         copied, setCopied,
         expandedReport, setExpandedReport,
+        isLoading,
         
         // Refs
         bulkActionRef,
@@ -845,8 +845,8 @@ export function useCommunityReportsManagement({
         searchInputRef,
         
         // Computed values
-        filteredReports,
-        paginatedReports,
+        filteredReports: sortedReports,
+        paginatedReports: sortedReports,
         safeStats,
         safeStatuses,
         safePriorities,
@@ -868,12 +868,17 @@ export function useCommunityReportsManagement({
         handleSelectAll,
         handleItemSelect,
         handleBulkOperation,
+        handleBulkStatusUpdate,
+        handleBulkPriorityUpdate,
+        handleBulkAssign,
+        handleBulkDelete,
         handleCopySelectedData,
         handleCopyToClipboard,
         handleClearFilters,
         handleSort,
         handleDelete,
         toggleReportExpansion,
-        handleExport
+        handleExport,
+        reloadData,
     };
 }

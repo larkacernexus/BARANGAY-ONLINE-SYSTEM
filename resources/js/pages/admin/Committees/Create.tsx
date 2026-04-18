@@ -1,87 +1,303 @@
 // pages/admin/committees/create.tsx
-
+import { router, usePage } from '@inertiajs/react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { 
-    ArrowLeft,
-    Save,
-    Users,
-    Target,
-    CheckCircle,
-    Lock,
-    Hash,
-    AlertCircle,
-    BookOpen
-} from 'lucide-react';
-import { Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types/admin/committees/committees';
-import { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Target, Settings, Sparkles, Copy, RefreshCw, Info, BookOpen, Tag, Lock, Unlock, Hash } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/committees/create/basic-info-tab';
+import { SettingsTab } from '@/components/admin/committees/create/settings-tab';
+import { route } from 'ziggy-js';
+import type { Committee } from '@/types/admin/committees/committees';
 
-interface CreateCommitteeProps extends PageProps {
-    nextOrder: number;
+// Types
+interface CommitteeTemplate {
+    name: string;
+    code: string;
+    description: string;
+    order: number;
+    is_active: boolean;
 }
 
-export default function CreateCommittee({ nextOrder }: CreateCommitteeProps) {
-    const { data, setData, post, processing, errors } = useForm({
-        code: '',
-        name: '',
-        description: '',
-        order: nextOrder,
-        is_active: true,
-    });
+interface FormData {
+    code: string;
+    name: string;
+    description: string;
+    order: number;
+    is_active: boolean;
+}
 
+interface PageProps {
+    nextOrder: number;
+    templates?: CommitteeTemplate[];
+    [key: string]: any;
+}
+
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: Target, requiredFields: ['name', 'code'] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
+
+const requiredFieldsMap = {
+    basic: ['name', 'code'],
+    settings: []
+};
+
+export default function CreateCommittee() {
+    const { props } = usePage<PageProps>();
+    const { nextOrder = 0, templates = [] } = props;
+    
+    const [showPreview, setShowPreview] = useState(true);
     const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post('/admin/committees'); // Make sure this is the correct route
-    };
-
-    // Function to generate code from name
-    const generateCode = (name: string) => {
+    // Generate code from name
+    const generateCodeFromName = useCallback((name: string): string => {
+        if (!name) return '';
         return name
             .toLowerCase()
-            .replace(/[^a-zA-Z0-9\s]+/g, '') // Remove special characters
+            .replace(/[^a-z0-9\s]/g, '')
             .trim()
-            .replace(/\s+/g, '_') // Replace spaces with underscores
-            .replace(/_+/g, '_') // Remove duplicate underscores
-            .replace(/^_+|_+$/g, ''); // Remove leading/trailing underscores
-    };
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+    }, []);
+
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm
+    } = useFormManager<FormData>({
+        initialData: {
+            code: '',
+            name: '',
+            description: '',
+            order: nextOrder,
+            is_active: true,
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            // Validate before submit
+            const newErrors: Record<string, string> = {};
+            
+            if (!data.name?.trim()) {
+                newErrors.name = 'Committee name is required';
+            }
+            if (!data.code?.trim()) {
+                newErrors.code = 'Committee code is required';
+            } else if (!/^[a-z0-9_]+$/.test(data.code)) {
+                newErrors.code = 'Code must contain only lowercase letters, numbers, and underscores';
+            }
+            if (data.order < 0) {
+                newErrors.order = 'Display order cannot be negative';
+            }
+            
+            if (Object.keys(newErrors).length > 0) {
+                setValidationErrors(newErrors);
+                toast.error('Please fix the validation errors');
+                return;
+            }
+            
+            router.post(route('admin.committees.store'), data as any, {
+                onSuccess: () => {
+                    toast.success('Committee created successfully');
+                    router.visit(route('admin.committees.index'));
+                },
+                onError: (errs) => {
+                    setValidationErrors(errs);
+                    toast.error('Failed to create committee');
+                }
+            });
+        }
+    });
+
+    // Combine errors from server and validation
+    const allErrors = { ...errors, ...validationErrors };
 
     // Auto-generate code when name changes
     useEffect(() => {
-        if (data.name && !isCodeManuallyEdited) {
-            const generatedCode = generateCode(data.name);
-            setData('code', generatedCode);
+        if (formData.name && !isCodeManuallyEdited) {
+            const generatedCode = generateCodeFromName(formData.name);
+            if (generatedCode !== formData.code) {
+                updateFormData({ code: generatedCode });
+            }
         }
-    }, [data.name, isCodeManuallyEdited]);
+    }, [formData.name, isCodeManuallyEdited, generateCodeFromName, formData.code, updateFormData]);
 
-    const handleNameChange = (value: string) => {
-        setData('name', value);
-        if (!isCodeManuallyEdited) {
-            const generatedCode = generateCode(value);
-            setData('code', generatedCode);
+    // Handle name change
+    const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const newName = e.target.value;
+        updateFormData({ name: newName });
+        
+        // Clear validation error if exists
+        if (validationErrors.name) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors.name;
+                return newErrors;
+            });
         }
-    };
+    }, [updateFormData, validationErrors]);
 
-    const handleCodeChange = (value: string) => {
-        setData('code', value);
+    // Handle code change
+    const handleCodeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        const processedValue = value.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        updateFormData({ code: processedValue });
         setIsCodeManuallyEdited(true);
+        
+        // Clear validation error if exists
+        if (validationErrors.code) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors.code;
+                return newErrors;
+            });
+        }
+    }, [updateFormData, validationErrors]);
+
+    // Reset to auto-generated code
+    const resetToAutoGenerated = useCallback(() => {
+        if (formData.name) {
+            const generatedCode = generateCodeFromName(formData.name);
+            updateFormData({ code: generatedCode });
+            setIsCodeManuallyEdited(false);
+            toast.success('Code reset to auto-generated value');
+        } else {
+            toast.error('Please enter a committee name first');
+        }
+    }, [formData.name, generateCodeFromName, updateFormData]);
+
+    // Handle number input changes
+    const handleNumberChange = useCallback((name: string, value: number) => {
+        updateFormData({ [name]: value });
+        
+        // Clear validation error if exists
+        if (validationErrors[name]) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
+        }
+    }, [updateFormData, validationErrors]);
+
+    // Handle switch changes
+    const handleSwitchChange = useCallback((name: string, checked: boolean) => {
+        updateFormData({ [name]: checked });
+    }, [updateFormData]);
+
+    // Apply template
+    const applyTemplate = useCallback((template: CommitteeTemplate) => {
+        updateFormData({
+            name: template.name,
+            code: template.code,
+            description: template.description,
+            order: template.order,
+            is_active: template.is_active,
+        });
+        setIsCodeManuallyEdited(true);
+        toast.success(`${template.name} template applied`);
+    }, [updateFormData]);
+
+    // Reset form
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
+            resetForm();
+            setValidationErrors({});
+            setIsCodeManuallyEdited(false);
+            setActiveTab('basic');
+            toast.info('Form reset');
+        }
+    }, [resetForm, setActiveTab]);
+
+    const handleCancel = useCallback(() => {
+        if (formData.name || formData.code || formData.description) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.committees.index'));
+            }
+        } else {
+            router.visit(route('admin.committees.index'));
+        }
+    }, [formData]);
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        settings: getTabStatus('settings')
     };
 
-    const resetCodeToAutoGenerate = () => {
-        if (data.name) {
-            const generatedCode = generateCode(data.name);
-            setData('code', generatedCode);
-            setIsCodeManuallyEdited(false);
-        }
-    };
+    const missingFields = getMissingFields();
+    const requiredFieldsList = [
+        { label: 'Committee Name', value: !!formData.name, tabId: 'basic' },
+        { label: 'Committee Code', value: !!formData.code, tabId: 'basic' }
+    ];
+
+    const tabOrder = ['basic', 'settings'];
+
+    // Default templates if none provided
+    const defaultTemplates: CommitteeTemplate[] = [
+        {
+            name: 'Peace and Order',
+            code: 'peace_and_order',
+            description: 'Maintains peace, order, and public safety in the barangay',
+            order: 1,
+            is_active: true,
+        },
+        {
+            name: 'Health and Sanitation',
+            code: 'health_and_sanitation',
+            description: 'Oversees health programs and sanitation initiatives',
+            order: 2,
+            is_active: true,
+        },
+        {
+            name: 'Education and Culture',
+            code: 'education_and_culture',
+            description: 'Promotes education, literacy, and cultural activities',
+            order: 3,
+            is_active: true,
+        },
+        {
+            name: 'Infrastructure and Public Works',
+            code: 'infrastructure_and_public_works',
+            description: 'Manages barangay infrastructure projects and maintenance',
+            order: 4,
+            is_active: true,
+        },
+        {
+            name: 'Agriculture and Livelihood',
+            code: 'agriculture_and_livelihood',
+            description: 'Supports agricultural development and livelihood programs',
+            order: 5,
+            is_active: true,
+        },
+    ];
+
+    const displayTemplates = templates.length > 0 ? templates : defaultTemplates;
 
     return (
         <AppLayout
@@ -89,356 +305,290 @@ export default function CreateCommittee({ nextOrder }: CreateCommitteeProps) {
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Committees', href: '/admin/committees' },
-                { title: 'Create Committee', href: '/admin/committees/create' }
+                { title: 'Create', href: '/admin/committees/create' }
             ]}
         >
-            <form onSubmit={handleSubmit}>
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Link href="/admin/committees">
-                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                    <Target className="h-6 w-6 text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
-                                        Create New Committee
-                                    </h1>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Add a new committee for barangay officials
-                                    </p>
+            <div className="space-y-6">
+                <FormHeader
+                    title="Create Committee"
+                    description="Add a new committee for barangay officials"
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    backLabel="Back"
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Reset
+                            </button>
+                        </div>
+                    }
+                />
+
+                {/* Quick Templates Card */}
+                <Card className="border-l-4 border-l-purple-500 dark:bg-gray-900">
+                    <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                            <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+                            <div className="flex-1">
+                                <h3 className="font-medium text-purple-800 dark:text-purple-300">Quick start with templates</h3>
+                                <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                                    Choose from common committee templates to get started quickly.
+                                </p>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {displayTemplates.map((template) => (
+                                        <Button
+                                            key={template.code}
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => applyTemplate(template)}
+                                            className="gap-2 dark:border-gray-600 dark:text-gray-300"
+                                            type="button"
+                                        >
+                                            <Copy className="h-3 w-3" />
+                                            {template.name}
+                                        </Button>
+                                    ))}
                                 </div>
                             </div>
                         </div>
-                        <Button 
-                            type="submit" 
-                            disabled={processing}
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white dark:from-purple-700 dark:to-pink-700"
-                        >
-                            <Save className="h-4 w-4 mr-2" />
-                            {processing ? 'Saving...' : 'Save Committee'}
-                        </Button>
+                    </CardContent>
+                </Card>
+
+                <FormErrors errors={allErrors} />
+
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer 
+                                    title="Basic Information" 
+                                    description="Enter the core details for this committee"
+                                >
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        onNameChange={handleNameChange}
+                                        onCodeChange={handleCodeChange}
+                                        onOrderChange={handleNumberChange}
+                                        onDescriptionChange={handleInputChange}
+                                        onResetCode={resetToAutoGenerated}
+                                        isSubmitting={isSubmitting}
+                                        nextOrder={nextOrder}
+                                        isCodeManuallyEdited={isCodeManuallyEdited}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    showPrevious={false}
+                                    nextLabel="Next: Settings"
+                                    submitLabel="Create Committee"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer 
+                                    title="Committee Settings" 
+                                    description="Configure committee behavior and visibility (optional)"
+                                >
+                                    <SettingsTab
+                                        formData={formData}
+                                        onSwitchChange={handleSwitchChange}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    previousLabel="Back: Basic Info"
+                                    showNext={false}
+                                    submitLabel="Create Committee"
+                                />
+                            </>
+                        )}
                     </div>
 
-                    {/* Error Messages */}
-                    {Object.keys(errors).length > 0 && (
-                        <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
-                            <CardContent className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
-                                    <div>
-                                        <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
-                                        <ul className="list-disc list-inside mt-2 space-y-1">
-                                            {Object.entries(errors).map(([field, error]) => (
-                                                <li key={field} className="text-sm text-red-600 dark:text-red-400">
-                                                    <span className="font-medium capitalize">{field.replace('_', ' ')}:</span> {error}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
 
-                    <div className="grid gap-6 lg:grid-cols-2">
-                        {/* Left Column - Committee Details */}
-                        <div className="space-y-6">
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
-                                            <Target className="h-3 w-3 text-white" />
-                                        </div>
-                                        Committee Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Enter committee details
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="name" className="dark:text-gray-300">
-                                                Committee Name <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Input 
-                                                id="name" 
-                                                placeholder="e.g., Peace and Order" 
-                                                value={data.name}
-                                                onChange={(e) => handleNameChange(e.target.value)}
-                                                required
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                            {errors.name && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <Label htmlFor="code" className="dark:text-gray-300">
-                                                    Code <span className="text-red-500">*</span>
-                                                </Label>
-                                                {isCodeManuallyEdited && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={resetCodeToAutoGenerate}
-                                                        className="h-6 text-xs dark:text-gray-400 dark:hover:text-white"
-                                                    >
-                                                        Auto-generate
-                                                    </Button>
-                                                )}
+                                {/* Committee Summary Preview Card */}
+                                <Card className="dark:bg-gray-900 border-2 border-purple-200 dark:border-purple-800">
+                                    <div className="p-4 border-b dark:border-gray-700">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <Target className="h-4 w-4" />
+                                            Committee Summary
+                                        </h3>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 flex items-center justify-center">
+                                                <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                                             </div>
-                                            <div className="relative">
-                                                <Input 
-                                                    id="code" 
-                                                    placeholder="peace_and_order" 
-                                                    value={data.code}
-                                                    onChange={(e) => handleCodeChange(e.target.value)}
-                                                    required
-                                                    readOnly={!isCodeManuallyEdited}
-                                                    className={`${!isCodeManuallyEdited ? "bg-gray-50 dark:bg-gray-700 pr-10" : "dark:bg-gray-900"} dark:border-gray-700 dark:text-gray-300`}
-                                                />
-                                                {!isCodeManuallyEdited && (
-                                                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                                                        <Lock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-1 text-xs">
-                                                {isCodeManuallyEdited ? (
-                                                    <>
-                                                        <Lock className="h-3 w-3 text-amber-500 dark:text-amber-400" />
-                                                        <span className="text-gray-500 dark:text-gray-400">Code is manually edited</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <CheckCircle className="h-3 w-3 text-green-500 dark:text-green-400" />
-                                                        <span className="text-gray-500 dark:text-gray-400">Auto-generated from name</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                            {errors.code && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="order" className="dark:text-gray-300">Display Order</Label>
-                                            <div className="relative">
-                                                <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input 
-                                                    id="order" 
-                                                    type="number" 
-                                                    min="0"
-                                                    value={data.order}
-                                                    onChange={(e) => setData('order', parseInt(e.target.value) || 0)}
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                />
-                                            </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Determines sorting order in lists
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
-                                        <Textarea 
-                                            id="description" 
-                                            placeholder="Describe the committee's responsibilities and purpose..."
-                                            rows={4}
-                                            value={data.description}
-                                            onChange={(e) => setData('description', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center space-x-2 p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <Checkbox 
-                                            id="is_active" 
-                                            checked={data.is_active}
-                                            onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                            className="dark:border-gray-600"
-                                        />
-                                        <Label htmlFor="is_active" className="cursor-pointer dark:text-gray-300">
-                                            Committee is active
-                                        </Label>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Right Column - Preview & Tips */}
-                        <div className="space-y-6">
-                            {/* Preview Card */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
-                                            <Target className="h-3 w-3 text-white" />
-                                        </div>
-                                        Preview
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {data.name ? (
-                                        <>
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 flex items-center justify-center border border-purple-200 dark:border-purple-800">
-                                                    <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
                                                 </div>
-                                                <div>
-                                                    <h4 className="font-medium dark:text-gray-100">{data.name}</h4>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                        Committee
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="pt-4 border-t dark:border-gray-700 space-y-2">
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <code className="font-mono font-medium bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-xs dark:text-gray-300">
-                                                            {data.code || 'Not set'}
-                                                        </code>
-                                                        {!isCodeManuallyEdited && (
-                                                            <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                                                                Auto
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Order:</span>
-                                                    <span className="font-medium dark:text-gray-300">{data.order}</span>
-                                                </div>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                                    <span className={`font-medium ${data.is_active ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                        {data.is_active ? 'Active' : 'Inactive'}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Badge className={formData.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}>
+                                                        {formData.is_active ? 'Active' : 'Inactive'}
+                                                    </Badge>
+                                                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                                                        {formData.code || 'No code'}
                                                     </span>
                                                 </div>
                                             </div>
+                                        </div>
 
-                                            {data.description && (
-                                                <div className="pt-4 border-t dark:border-gray-700">
-                                                    <h5 className="font-medium mb-2 dark:text-gray-300">Description:</h5>
-                                                    <p className="text-sm text-gray-600 dark:text-gray-400">{data.description}</p>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Display Order:</span>
+                                                <span className="font-medium dark:text-gray-300">{formData.order}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Code Source:</span>
+                                                <span className="font-medium dark:text-gray-300 flex items-center gap-1">
+                                                    {isCodeManuallyEdited ? (
+                                                        <>
+                                                            <Unlock className="h-3 w-3 text-amber-500" />
+                                                            Manual
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Lock className="h-3 w-3 text-green-500" />
+                                                            Auto-generated
+                                                        </>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {formData.description && (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
+                                                    {formData.description}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <Separator className="dark:bg-gray-700" />
+
+                                        <div className="space-y-2">
+                                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Settings</h4>
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-2 h-2 rounded-full ${formData.is_active ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                                    {formData.is_active ? 'Active - Available for assignment' : 'Inactive - Hidden from selection'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Summary Card */}
+                                        <Card className="dark:bg-gray-800 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20">
+                                            <div className="p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Info className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                                                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                        {allRequiredFieldsFilled && !!formData.name && !!formData.code
+                                                            ? `"${formData.name}" committee is ready to be created`
+                                                            : `${missingFields.length} required field${missingFields.length !== 1 ? 's' : ''} remaining`}
+                                                    </p>
                                                 </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">
-                                            <Target className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                            <p>Enter committee details to see preview</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                            </div>
+                                        </Card>
+                                    </div>
+                                </Card>
 
-                            {/* Quick Tips */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
-                                            <BookOpen className="h-3 w-3 text-white" />
+                                {/* Quick Tips Card */}
+                                <Card className="dark:bg-gray-900">
+                                    <div className="p-4 border-b dark:border-gray-700">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-700 dark:to-cyan-700 flex items-center justify-center">
+                                                <BookOpen className="h-3 w-3 text-white" />
+                                            </div>
+                                            Quick Tips
+                                        </h3>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Tag className="h-3 w-3 text-purple-500" />
+                                                Committee Naming
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Use clear, descriptive names (e.g., "Peace and Order")</li>
+                                                <li>Include "Committee" for clarity if needed</li>
+                                                <li>Keep names concise but informative</li>
+                                            </ul>
                                         </div>
-                                        Quick Tips
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-3 text-sm">
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Committee Name:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Should be clear and descriptive (e.g., "Peace and Order")</p>
-                                            </div>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Code Generation:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Auto-generated from name (lowercase with underscores)</p>
-                                            </div>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Display Order:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Lower numbers appear first in dropdowns and lists</p>
-                                            </div>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Active Status:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Inactive committees won't appear in selection lists</p>
-                                            </div>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Manual Override:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Click on the code field to edit manually if needed</p>
-                                            </div>
-                                        </li>
-                                    </ul>
-                                </CardContent>
-                            </Card>
+                                        
+                                        <Separator className="dark:bg-gray-700" />
+                                        
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Lock className="h-3 w-3 text-green-500" />
+                                                Code Generation
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Auto-generated from name (lowercase with underscores)</li>
+                                                <li>Manually edit code by typing in the field</li>
+                                                <li>Codes must be unique across all committees</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <Separator className="dark:bg-gray-700" />
+                                        
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Hash className="h-3 w-3 text-amber-500" />
+                                                Display Order
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Lower numbers appear first in dropdowns</li>
+                                                <li>Helps organize committees logically</li>
+                                                <li>Can be reordered later if needed</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
-                        <Link href="/admin/committees">
-                            <Button variant="outline" type="button" className="dark:border-gray-600 dark:text-gray-300">
-                                Cancel
-                            </Button>
-                        </Link>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                variant="outline" 
-                                type="button"
-                                onClick={() => {
-                                    setData({
-                                        code: '',
-                                        name: '',
-                                        description: '',
-                                        order: nextOrder,
-                                        is_active: true,
-                                    });
-                                    setIsCodeManuallyEdited(false);
-                                }}
-                                className="dark:border-gray-600 dark:text-gray-300"
-                            >
-                                Reset Form
-                            </Button>
-                            <Button 
-                                type="submit" 
-                                disabled={processing}
-                                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white dark:from-purple-700 dark:to-pink-700"
-                            >
-                                <Save className="h-4 w-4 mr-2" />
-                                {processing ? 'Saving...' : 'Save Committee'}
-                            </Button>
-                        </div>
-                    </div>
+                    )}
                 </div>
-            </form>
+            </div>
         </AppLayout>
     );
 }

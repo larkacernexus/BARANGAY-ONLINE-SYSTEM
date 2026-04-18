@@ -12,6 +12,8 @@ use App\Models\Household;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules;
 use Carbon\Carbon;
 
@@ -22,8 +24,23 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
+        // Use caching for statistics
+        $stats = Cache::remember('users.statistics', 300, function () {
+            return [
+                ['label' => 'Total Users', 'value' => User::count()],
+                ['label' => 'Active Users', 'value' => User::where('status', 'active')->count()],
+                ['label' => 'Household Accounts', 'value' => User::whereNotNull('household_id')->count()],
+                ['label' => 'Official Accounts', 'value' => User::whereNotNull('position')
+                    ->whereNull('household_id')
+                    ->count()],
+                ['label' => 'With 2FA', 'value' => User::whereNotNull('two_factor_confirmed_at')->count()],
+                ['label' => 'Inactive Users', 'value' => User::where('status', 'inactive')->count()],
+            ];
+        });
+        
+        // Build query with eager loading
         $query = User::query()
-            ->with(['role', 'currentResident'])
+            ->with(['role', 'currentResident', 'household.currentHeadResident'])
             ->select([
                 'id',
                 'username',
@@ -45,76 +62,142 @@ class UserController extends Controller
                 'current_resident_id'
             ]);
         
-        // Search filter
-        if ($request->has('search') && !empty($search = $request->input('search'))) {
+        // Apply filters (your existing filter logic is great!)
+        $this->applyFilters($query, $request);
+        
+        // Apply sorting
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        $allowedSortColumns = [
+            'username', 'email', 'created_at', 'last_login_at', 
+            'login_count', 'status', 'role_id', 'position'
+        ];
+        
+        if (in_array($sortBy, $allowedSortColumns)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+        
+        // Pagination
+        $perPage = min($request->input('per_page', 20), 100);
+        $users = $query->paginate($perPage)->withQueryString();
+        
+        // Format users efficiently
+        $formattedUsers = $users->through(fn($user) => $this->formatUser($user));
+        
+        // Get roles for filter dropdown (cached)
+        $roles = Cache::remember('users.roles', 3600, function () {
+            return Role::select(['id', 'name', 'description'])
+                ->withCount(['users' => fn($q) => $q->where('status', 'active')])
+                ->get()
+                ->map(fn($role) => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'description' => $role->description,
+                    'count' => $role->users_count,
+                    'color' => $this->getRoleColor($role->name),
+                ]);
+        });
+        
+        // Account type options
+        $accountTypeOptions = [
+            ['value' => 'all', 'label' => 'All Types'],
+            ['value' => 'household', 'label' => 'Household Accounts'],
+            ['value' => 'official', 'label' => 'Official Accounts'],
+            ['value' => 'administrative', 'label' => 'Administrative'],
+        ];
+        
+        // Log for monitoring
+        Log::info('Users index (Server-Side)', [
+            'total_users' => $users->total(),
+            'current_page' => $users->currentPage(),
+            'filters' => $request->only(['search', 'role_id', 'status'])
+        ]);
+        
+        return Inertia::render('admin/Users/Index', [
+            'users' => $formattedUsers,
+            'stats' => $stats,
+            'roles' => $roles,
+            'accountTypeOptions' => $accountTypeOptions,
+            'filters' => $request->only([
+                'search', 'role_id', 'status', 'account_type', 'two_factor', 
+                'email_verified', 'date_from', 'date_to', 'last_login', 
+                'sort_by', 'sort_order', 'per_page'
+            ]),
+        ]);
+    }
+    
+    /**
+     * Apply all filters to the query
+     */
+    private function applyFilters($query, Request $request)
+    {
+        // Search filter (your existing logic)
+        if ($request->filled('search')) {
+            $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('username', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhere('contact_number', 'like', "%{$search}%")
                   ->orWhere('position', 'like', "%{$search}%")
-                  ->orWhereHas('currentResident', function ($residentQuery) use ($search) {
-                      $residentQuery->where('first_name', 'like', "%{$search}%")
-                                   ->orWhere('last_name', 'like', "%{$search}%")
-                                   ->orWhere('middle_name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('role', function ($roleQuery) use ($search) {
-                      $roleQuery->where('name', 'like', "%{$search}%");
-                  });
+                  ->orWhereHas('currentResident', fn($q) => $q
+                      ->where('first_name', 'like', "%{$search}%")
+                      ->orWhere('last_name', 'like', "%{$search}%")
+                  )
+                  ->orWhereHas('role', fn($q) => $q
+                      ->where('name', 'like', "%{$search}%")
+                  );
             });
         }
         
         // Role filter
-        if ($request->has('role_id') && $request->input('role_id') !== 'all') {
+        if ($request->filled('role_id') && $request->input('role_id') !== 'all') {
             $query->where('role_id', $request->input('role_id'));
         }
         
         // Status filter
-        if ($request->has('status') && $request->input('status') !== 'all') {
+        if ($request->filled('status') && $request->input('status') !== 'all') {
             $query->where('status', $request->input('status'));
         }
         
         // Account type filter
-        if ($request->has('account_type') && $request->input('account_type') !== 'all') {
-            if ($request->input('account_type') === 'household') {
-                $query->whereNotNull('household_id');
-            } elseif ($request->input('account_type') === 'official') {
-                $query->whereNull('household_id')
-                      ->whereNotNull('position');
-            } elseif ($request->input('account_type') === 'administrative') {
-                $query->whereNull('household_id')
-                      ->where('position', 'Administrator');
-            }
+        if ($request->filled('account_type') && $request->input('account_type') !== 'all') {
+            match($request->input('account_type')) {
+                'household' => $query->whereNotNull('household_id'),
+                'official' => $query->whereNull('household_id')->whereNotNull('position'),
+                'administrative' => $query->whereNull('household_id')
+                    ->where('position', 'Administrator'),
+                default => null
+            };
         }
         
         // 2FA filter
-        if ($request->has('two_factor') && $request->input('two_factor') !== 'all') {
-            if ($request->input('two_factor') === 'enabled') {
-                $query->whereNotNull('two_factor_confirmed_at');
-            } else {
-                $query->whereNull('two_factor_confirmed_at');
-            }
+        if ($request->filled('two_factor') && $request->input('two_factor') !== 'all') {
+            $request->input('two_factor') === 'enabled' 
+                ? $query->whereNotNull('two_factor_confirmed_at')
+                : $query->whereNull('two_factor_confirmed_at');
         }
         
         // Email verification filter
-        if ($request->has('email_verified') && $request->input('email_verified') !== 'all') {
-            if ($request->input('email_verified') === 'verified') {
-                $query->whereNotNull('email_verified_at');
-            } else {
-                $query->whereNull('email_verified_at');
-            }
+        if ($request->filled('email_verified') && $request->input('email_verified') !== 'all') {
+            $request->input('email_verified') === 'verified'
+                ? $query->whereNotNull('email_verified_at')
+                : $query->whereNull('email_verified_at');
         }
         
         // Date range filters
-        if ($request->has('date_from')) {
+        if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->input('date_from'));
         }
         
-        if ($request->has('date_to')) {
+        if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', $request->input('date_to'));
         }
         
-        // Login activity filter
-        if ($request->has('last_login') && $request->input('last_login') !== 'all') {
+        // Last login filter
+        if ($request->filled('last_login') && $request->input('last_login') !== 'all') {
             $days = match($request->input('last_login')) {
                 'today' => 1,
                 'week' => 7,
@@ -124,143 +207,76 @@ class UserController extends Controller
                 default => 0
             };
             
-            if ($days > 0) {
-                $query->where('last_login_at', '>=', now()->subDays($days));
-            } else {
-                $query->whereNull('last_login_at');
+            $days > 0 
+                ? $query->where('last_login_at', '>=', now()->subDays($days))
+                : $query->whereNull('last_login_at');
+        }
+    }
+    
+    /**
+     * Format a single user for frontend
+     */
+    private function formatUser($user): array
+    {
+        // Get resident info
+        $residentName = null;
+        $householdInfo = null;
+        
+        if ($user->currentResident) {
+            $residentName = $user->currentResident->full_name;
+            if ($user->currentResident->household) {
+                $householdInfo = [
+                    'id' => $user->currentResident->household->id,
+                    'number' => $user->currentResident->household->household_number,
+                ];
             }
+        } elseif ($user->household?->currentHeadResident) {
+            $residentName = $user->household->currentHeadResident->full_name;
+            $householdInfo = [
+                'id' => $user->household->id,
+                'number' => $user->household->household_number,
+            ];
         }
         
-        // Sorting
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortOrder = $request->input('sort_order', 'desc');
+        // Permission counts
+        $rolePermissions = $user->role?->permissions()->count() ?? 0;
+        $userPermissions = method_exists($user, 'permissions') 
+            ? $user->permissions()->count() 
+            : 0;
         
-        // Validate sort column to prevent SQL injection
-        $allowedSortColumns = ['username', 'email', 'created_at', 'last_login_at', 'login_count', 'status', 'role_id', 'position'];
-        $sortBy = in_array($sortBy, $allowedSortColumns) ? $sortBy : 'created_at';
-        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? $sortOrder : 'desc';
-        
-        $query->orderBy($sortBy, $sortOrder);
-        
-        // Pagination
-        $perPage = min($request->input('per_page', 20), 100);
-        $users = $query->paginate($perPage)->withQueryString();
-        
-        // Format users for frontend
-        $formattedUsers = $users->through(function ($user) {
-            // Get the resident name from current resident relationship
-            $residentName = null;
-            $householdInfo = null;
-            
-            if ($user->currentResident) {
-                $residentName = $user->currentResident->full_name;
-                
-                // Get household info if available
-                if ($user->currentResident->household) {
-                    $householdInfo = [
-                        'id' => $user->currentResident->household->id,
-                        'number' => $user->currentResident->household->household_number,
-                    ];
-                }
-            } elseif ($user->household && $user->household->currentHeadResident) {
-                // For household accounts, get head resident name
-                $residentName = $user->household->currentHeadResident->full_name;
-                $householdInfo = [
-                    'id' => $user->household->id,
-                    'number' => $user->household->household_number,
-                ];
-            }
-            
-            // Get role permissions count safely
-            $rolePermissions = 0;
-            if ($user->role && method_exists($user->role, 'permissions')) {
-                $rolePermissions = $user->role->permissions()->count();
-            }
-            
-            // Get user permissions count safely
-            $userPermissions = 0;
-            if (method_exists($user, 'permissions')) {
-                $userPermissions = $user->permissions()->count();
-            }
-            
-            return [
-                'id' => $user->id,
-                'username' => $user->username,
-                'email' => $user->email,
-                'contact_number' => $user->contact_number,
-                'position' => $user->position,
-                'resident_name' => $residentName,
-                'household_info' => $householdInfo,
-                'is_household_account' => !is_null($user->household_id),
-                'is_official_account' => !is_null($user->position) && !in_array(strtolower($user->position), ['administrator', 'admin']),
-                'role_id' => $user->role_id,
-                'role' => $user->role ? [
-                    'id' => $user->role->id,
-                    'name' => $user->role->name,
-                    'color' => $this->getRoleColor($user->role->name),
-                ] : null,
-                'status' => $user->status,
-                'email_verified_at' => $user->email_verified_at,
-                'last_login_at' => $user->last_login_at,
-                'last_login_ip' => $user->last_login_ip,
-                'login_count' => $user->login_count,
-                'created_at' => $user->created_at,
-                'updated_at' => $user->updated_at,
-                'two_factor_enabled' => !is_null($user->two_factor_confirmed_at),
-                'require_password_change' => $user->require_password_change,
-                'is_online' => $user->last_login_at && $user->last_login_at->gt(now()->subMinutes(15)),
-                'total_permissions' => $rolePermissions + $userPermissions,
-                'account_type' => $this->getAccountType($user),
-            ];
-        });
-        
-        // Calculate statistics
-        $stats = [
-            ['label' => 'Total Users', 'value' => User::count()],
-            ['label' => 'Active Users', 'value' => User::where('status', 'active')->count()],
-            ['label' => 'Household Accounts', 'value' => User::whereNotNull('household_id')->count()],
-            ['label' => 'Official Accounts', 'value' => User::whereNotNull('position')
-                ->whereNull('household_id')
-                ->count()],
-            ['label' => 'With 2FA', 'value' => User::whereNotNull('two_factor_confirmed_at')->count()],
-            ['label' => 'Inactive Users', 'value' => User::where('status', 'inactive')->count()],
+        return [
+            'id' => $user->id,
+            'username' => $user->username,
+            'email' => $user->email,
+            'contact_number' => $user->contact_number,
+            'position' => $user->position,
+            'resident_name' => $residentName,
+            'household_info' => $householdInfo,
+            'is_household_account' => !is_null($user->household_id),
+            'is_official_account' => !is_null($user->position) 
+                && !in_array(strtolower($user->position), ['administrator', 'admin']),
+            'role_id' => $user->role_id,
+            'role' => $user->role ? [
+                'id' => $user->role->id,
+                'name' => $user->role->name,
+                'color' => $this->getRoleColor($user->role->name),
+            ] : null,
+            'status' => $user->status,
+            'email_verified_at' => $user->email_verified_at,
+            'last_login_at' => $user->last_login_at,
+            'last_login_ip' => $user->last_login_ip,
+            'login_count' => $user->login_count,
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+            'two_factor_enabled' => !is_null($user->two_factor_confirmed_at),
+            'require_password_change' => $user->require_password_change,
+            'is_online' => $user->last_login_at 
+                && $user->last_login_at->gt(now()->subMinutes(15)),
+            'total_permissions' => $rolePermissions + $userPermissions,
+            'account_type' => $this->getAccountType($user),
         ];
-        
-        // Get roles with user counts
-        $roles = Role::select(['id', 'name', 'description'])
-            ->withCount(['users' => function ($query) {
-                $query->where('status', 'active');
-            }])
-            ->get()
-            ->map(function ($role) {
-                return [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'description' => $role->description,
-                    'count' => $role->users_count,
-                    'color' => $this->getRoleColor($role->name),
-                ];
-            });
-        
-        // Get account type options
-        $accountTypeOptions = [
-            ['value' => 'all', 'label' => 'All Types'],
-            ['value' => 'household', 'label' => 'Household Accounts'],
-            ['value' => 'official', 'label' => 'Official Accounts'],
-            ['value' => 'administrative', 'label' => 'Administrative'],
-        ];
-        
-        return Inertia::render('admin/Users/Index', [
-            'users' => $formattedUsers,
-            'stats' => $stats,
-            'roles' => $roles,
-            'accountTypeOptions' => $accountTypeOptions,
-            'filters' => $request->only(['search', 'role_id', 'status', 'account_type', 'two_factor', 'email_verified', 'date_from', 'date_to', 'last_login', 'sort_by', 'sort_order', 'per_page']),
-            'sort_by' => $sortBy,
-            'sort_order' => $sortOrder,
-            'per_page' => $perPage,
-        ]);
     }
+    
     
     /**
      * Helper: Get account type

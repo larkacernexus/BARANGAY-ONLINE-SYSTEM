@@ -66,6 +66,7 @@ interface ResidentsGridViewProps {
     onCreateClearance?: (resident: Resident) => void;
     onToggleStatus?: (resident: Resident) => void;
     windowWidth?: number;
+    isLoading?: boolean;
 }
 
 // Shared Resident Card Component
@@ -84,7 +85,8 @@ const ResidentCard = memo(({
     onToggleExpand,
     onViewDetails,
     onEdit,
-    isMobile = false
+    isMobile = false,
+    isLoading = false
 }: {
     resident: Resident;
     isBulkMode: boolean;
@@ -101,6 +103,7 @@ const ResidentCard = memo(({
     onViewDetails: (id: number, e: React.MouseEvent) => void;
     onEdit: (id: number, e: React.MouseEvent) => void;
     isMobile?: boolean;
+    isLoading?: boolean;
 }) => {
     // Extract all display data using the centralized utility
     const displayData = extractResidentDisplayData(resident);
@@ -133,55 +136,67 @@ const ResidentCard = memo(({
     
     // Memoized handlers
     const handleCardClick = useCallback((e: React.MouseEvent) => {
+        if (isLoading) return;
         if (isBulkMode) return;
         onToggleExpand(resident.id, e);
-    }, [isBulkMode, resident.id, onToggleExpand]);
+    }, [isLoading, isBulkMode, resident.id, onToggleExpand]);
 
     const handleAvatarClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         if (onViewPhoto) {
             onViewPhoto(resident);
         }
-    }, [onViewPhoto, resident]);
+    }, [isLoading, onViewPhoto, resident]);
 
     const handleCopyName = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         onCopyToClipboard?.(fullName, 'Name');
-    }, [onCopyToClipboard, fullName]);
+    }, [isLoading, onCopyToClipboard, fullName]);
 
     const handleCopyContact = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         if (contactNumber) {
             onCopyToClipboard?.(contactNumber, 'Contact');
         }
-    }, [onCopyToClipboard, contactNumber]);
+    }, [isLoading, onCopyToClipboard, contactNumber]);
 
     const handleCall = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         if (contactNumber) {
             window.location.href = `tel:${contactNumber}`;
         }
-    }, [contactNumber]);
+    }, [isLoading, contactNumber]);
 
     const handleGenerateIdClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         onGenerateId?.(resident);
-    }, [onGenerateId, resident]);
+    }, [isLoading, onGenerateId, resident]);
 
     const handleCreateClearance = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         onCreateClearance?.(resident);
-    }, [onCreateClearance, resident]);
+    }, [isLoading, onCreateClearance, resident]);
 
     const handleToggleStatus = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         onToggleStatus?.(resident);
-    }, [onToggleStatus, resident]);
+    }, [isLoading, onToggleStatus, resident]);
 
     const handleDelete = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         onDelete(resident);
-    }, [onDelete, resident]);
+    }, [isLoading, onDelete, resident]);
+
+    // Check if resident can be deleted (example logic - adjust as needed)
+    const canDelete = resident.status === 'inactive' || resident.status === 'pending';
 
     return (
         <Card 
@@ -189,7 +204,9 @@ const ResidentCard = memo(({
                 isSelected 
                     ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
-            } ${isExpanded ? 'shadow-lg' : ''} cursor-pointer group`}
+            } ${isExpanded ? 'shadow-lg' : ''} ${
+                isLoading ? 'cursor-default opacity-60 pointer-events-none' : 'cursor-pointer'
+            } group`}
             onClick={handleCardClick}
         >
             <CardContent className="p-4">
@@ -227,6 +244,7 @@ const ResidentCard = memo(({
                                 checked={isSelected}
                                 onCheckedChange={() => onItemSelect(resident.id)}
                                 onClick={(e) => e.stopPropagation()}
+                                disabled={isLoading}
                                 className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                             />
                         )}
@@ -235,17 +253,18 @@ const ResidentCard = memo(({
                                 <button
                                     className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                     onClick={(e) => e.stopPropagation()}
+                                    disabled={isLoading}
                                 >
                                     <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem onClick={(e) => onViewDetails(resident.id, e)}>
+                            <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-800">
+                                <DropdownMenuItem onClick={(e) => onViewDetails(resident.id, e)} className="cursor-pointer">
                                     <Eye className="h-4 w-4 mr-2" />
                                     View Details
                                 </DropdownMenuItem>
                                 
-                                <DropdownMenuItem onClick={(e) => onEdit(resident.id, e)}>
+                                <DropdownMenuItem onClick={(e) => onEdit(resident.id, e)} className="cursor-pointer">
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Profile
                                 </DropdownMenuItem>
@@ -254,14 +273,14 @@ const ResidentCard = memo(({
                                     <DropdownMenuItem onClick={(e) => {
                                         e.stopPropagation();
                                         onViewPhoto(resident);
-                                    }}>
+                                    }} className="cursor-pointer">
                                         <Camera className="h-4 w-4 mr-2" />
                                         View Photo
                                     </DropdownMenuItem>
                                 )}
                                 
                                 {onToggleStatus && (
-                                    <DropdownMenuItem onClick={handleToggleStatus}>
+                                    <DropdownMenuItem onClick={handleToggleStatus} className="cursor-pointer">
                                         {resident.status === 'active' ? (
                                             <>
                                                 <UserX className="h-4 w-4 mr-2" />
@@ -278,33 +297,46 @@ const ResidentCard = memo(({
                                 
                                 <DropdownMenuSeparator />
                                 
-                                <DropdownMenuItem onClick={handleCopyName}>
+                                <DropdownMenuItem onClick={handleCopyName} className="cursor-pointer">
                                     <Clipboard className="h-4 w-4 mr-2" />
                                     Copy Name
                                 </DropdownMenuItem>
                                 
                                 {contactNumber && (
                                     <>
-                                        <DropdownMenuItem onClick={handleCall}>
+                                        <DropdownMenuItem onClick={handleCall} className="cursor-pointer">
                                             <Phone className="h-4 w-4 mr-2" />
                                             Call Resident
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={handleCopyContact}>
+                                        <DropdownMenuItem onClick={handleCopyContact} className="cursor-pointer">
                                             <Clipboard className="h-4 w-4 mr-2" />
                                             Copy Contact
                                         </DropdownMenuItem>
                                     </>
                                 )}
                                 
-                                {onGenerateId && (
-                                    <DropdownMenuItem onClick={handleGenerateIdClick}>
-                                        <QrCode className="h-4 w-4 mr-2" />
-                                        Generate ID
+                                {address && (
+                                    <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        onCopyToClipboard?.(address, 'Address');
+                                    }} className="cursor-pointer">
+                                        <Clipboard className="h-4 w-4 mr-2" />
+                                        Copy Address
                                     </DropdownMenuItem>
                                 )}
                                 
+                                {onGenerateId && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={handleGenerateIdClick} className="cursor-pointer">
+                                            <QrCode className="h-4 w-4 mr-2" />
+                                            Generate ID
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                                
                                 {onCreateClearance && (
-                                    <DropdownMenuItem onClick={handleCreateClearance}>
+                                    <DropdownMenuItem onClick={handleCreateClearance} className="cursor-pointer">
                                         <FileText className="h-4 w-4 mr-2" />
                                         Create Clearance
                                     </DropdownMenuItem>
@@ -316,7 +348,7 @@ const ResidentCard = memo(({
                                         <DropdownMenuItem onClick={(e) => {
                                             e.stopPropagation();
                                             onItemSelect(resident.id);
-                                        }}>
+                                        }} className="cursor-pointer">
                                             {isSelected ? (
                                                 <>
                                                     <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
@@ -332,16 +364,19 @@ const ResidentCard = memo(({
                                     </>
                                 )}
                                 
-                                <DropdownMenuSeparator />
-                                
-                                <DropdownMenuItem onClick={handleDelete} className="text-red-600 dark:text-red-400">
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Resident
-                                </DropdownMenuItem>
+                                {canDelete && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={handleDelete} className="text-red-600 dark:text-red-400 cursor-pointer">
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete Resident
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
                             </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </div>
+                                        </DropdownMenu>
+                                    </div>
+                                </div>
 
                 {/* Status Badges */}
                 <div className="flex flex-wrap gap-1.5 mb-3">
@@ -366,6 +401,13 @@ const ResidentCard = memo(({
                         <Badge variant="outline" className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                             <Crown className="h-3 w-3 mr-1" />
                             Head
+                        </Badge>
+                    )}
+                    
+                    {isVoter && (
+                        <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            Voter
                         </Badge>
                     )}
                 </div>
@@ -415,6 +457,7 @@ const ResidentCard = memo(({
                         <button
                             className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                             onClick={(e) => onToggleExpand(resident.id, e)}
+                            disabled={isLoading}
                         >
                             {isExpanded ? (
                                 <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -493,22 +536,6 @@ const ResidentCard = memo(({
                             </div>
                         )}
 
-                        {isVoter !== undefined && (
-                            <div className="flex items-center gap-2 text-sm">
-                                {isVoter ? (
-                                    <>
-                                        <UserCheck className="h-4 w-4 text-green-500 dark:text-green-400" />
-                                        <span className="text-green-700 dark:text-green-400">Registered Voter</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <UserX className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                        <span className="text-gray-600 dark:text-gray-400">Not a Voter</span>
-                                    </>
-                                )}
-                            </div>
-                        )}
-
                         {notes && (
                             <div className="text-sm">
                                 <p className="text-gray-500 dark:text-gray-400 mb-1">Notes:</p>
@@ -529,6 +556,7 @@ const ResidentCard = memo(({
                             <button
                                 className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5 transition-colors"
                                 onClick={(e) => onViewDetails(resident.id, e)}
+                                disabled={isLoading}
                             >
                                 <ExternalLink className="h-3.5 w-3.5" />
                                 View full profile
@@ -536,6 +564,7 @@ const ResidentCard = memo(({
                             <button
                                 className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                 onClick={(e) => onToggleExpand(resident.id, e)}
+                                disabled={isLoading}
                             >
                                 <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                             </button>
@@ -557,10 +586,10 @@ const EmptyStateComponent = ({ hasActiveFilters, onClearFilters }: { hasActiveFi
             ? 'Try changing your filters or search criteria.'
             : 'Get started by adding a resident.'}
         icon={<UserIcon className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
-        hasFilters={hasActiveFilters}
-        onClearFilters={onClearFilters}
-        onCreateNew={() => router.get('/admin/residents/create')}
-        createLabel="Add Resident"
+        action={hasActiveFilters ? {
+            label: "Clear Filters",
+            onClick: onClearFilters
+        } : undefined}
     />
 );
 
@@ -583,40 +612,39 @@ export default function ResidentsGridView({
     onGenerateId,
     onCreateClearance,
     onToggleStatus,
-    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024,
+    isLoading = false
 }: ResidentsGridViewProps) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
-    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
     const { isOpen, selectedResident, openModal, closeModal } = usePhotoModal();
     
-    useEffect(() => {
-        setDevicePixelRatio(window.devicePixelRatio || 1);
-    }, []);
-    
-    // Determine grid columns based on actual available width and scaling
+    // Determine grid columns based on actual available width
     const gridCols = useMemo(() => {
-        if (windowWidth < 640) return 1;  // Mobile: 1 column
+        if (windowWidth < 640) return 1;   // Mobile: 1 column
         if (windowWidth < 900) return 2;   // Small tablets: 2 columns
         if (windowWidth < 1280) return 3;  // Laptops/tablets landscape: 3 columns
         if (windowWidth < 1600) return 3;  // Standard laptops with scaling: 3 columns
         return 4;                           // Large desktop displays: 4 columns
-    }, [windowWidth, devicePixelRatio]);
+    }, [windowWidth]);
     
     // Memoized handlers
     const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         setExpandedId(prev => prev === id ? null : id);
-    }, []);
+    }, [isLoading]);
 
     const handleViewDetails = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         router.get(`/admin/residents/${id}`);
-    }, []);
+    }, [isLoading]);
 
     const handleEdit = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         router.get(`/admin/residents/${id}/edit`);
-    }, []);
+    }, [isLoading]);
 
     // Memoize selected set for quick lookup
     const selectedSet = useMemo(() => new Set(selectedResidents), [selectedResidents]);
@@ -653,6 +681,7 @@ export default function ResidentsGridView({
                         onViewDetails={handleViewDetails}
                         onEdit={handleEdit}
                         isMobile={isMobile}
+                        isLoading={isLoading}
                     />
                 ))}
             </GridLayout>

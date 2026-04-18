@@ -3,7 +3,6 @@ import { router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -26,39 +25,38 @@ import {
     Copy,
     AlertTriangle,
     RefreshCw,
-    Settings,
-    Plus,
     FileText,
     Target,
     Clock,
     BarChart,
     Tag,
     Hash,
-    Award,
+    Sparkles,
     Zap,
     CheckCircle,
     XCircle,
-    Link as LinkIcon,
     Printer,
     Check,
-    X,
+    AlertCircle,
+    Users,
+    Heart,
+    Shield,
 } from 'lucide-react';
 import { route } from 'ziggy-js';
-import { Progress } from '@/components/ui/progress';
+import { PageProps as InertiaPageProps } from '@inertiajs/core';
 
 // Import components
 import { ReportTypeHeader } from '@/components/admin/report-types/show/components/report-type-header';
 import { StatusBanner } from '@/components/admin/report-types/show/components/status-banner';
 import { RequirementBadges } from '@/components/admin/report-types/show/components/requirement-badges';
-    import { StatisticsCards } from '@/components/admin/report-types/show/components/statistics-cards';
-    import { ReportTypeTabs } from '@/components/admin/report-types/show/components/report-type-tabs';
+import { StatisticsCards } from '@/components/admin/report-types/show/components/statistics-cards';
+import { ReportTypeTabs } from '@/components/admin/report-types/show/components/report-type-tabs';
 import { DangerZone } from '@/components/admin/report-types/show/components/danger-zone';
 import { DeleteConfirmationDialog } from '@/components/admin/report-types/show/components/delete-confirmation-dialog';
 import { DuplicateConfirmationDialog } from '@/components/admin/report-types/show/components/duplicate-confirmation-dialog';
 import { StatusToggleDialog } from '@/components/admin/report-types/show/components/status-toggle-dialog';
 
 // Import types and utilities
-import { PageProps } from '@/components/admin/report-types/show/types';
 import { 
     getIconComponent, 
     getPriorityIcon, 
@@ -74,8 +72,75 @@ import {
     getPriorityColor
 } from '@/components/admin/report-types/show/utils/helpers';
 
+interface RecentReport {
+    id: number;
+    report_number: string;
+    title: string;
+    status: string;
+    created_at: string;
+    resident?: {
+        full_name: string;
+    };
+}
+
+interface ReportStats {
+    total: number;
+    pending: number;
+    processing: number;
+    resolved: number;
+    rejected: number;
+    byStatus: Record<string, number>;
+    averageResolutionDays: number;
+}
+
+// Define ReportTypeWithRelations with all required properties
+interface ReportTypeWithRelations {
+    id: number;
+    code: string;
+    name: string;
+    description: string | null;
+    category: string | null;
+    subcategory: string | null;
+    icon: string;
+    color: string;
+    priority_level: number;
+    resolution_days: number;
+    is_active: boolean;
+    requires_immediate_action: boolean;
+    requires_evidence: boolean;
+    allows_anonymous: boolean;
+    assigned_to_roles: string[];
+    created_at: string;
+    updated_at: string;
+    community_reports_count: number;
+    priority_label: string;
+    expected_resolution_date: string;
+    priority_color?: string;
+    priority_icon?: string;
+    required_fields: Array<{
+        key: string;
+        label: string;
+        type: string;
+        required: boolean;
+        options?: string[];
+    }>;
+    resolution_steps: Array<{
+        step: number;
+        action: string;
+        description: string;
+    }>;
+}
+
+// Extend InertiaPageProps with index signature
+interface ShowPageProps extends InertiaPageProps {
+    reportType: ReportTypeWithRelations;
+    recentReports: RecentReport[];
+    reportStats: ReportStats;
+    [key: string]: unknown;
+}
+
 export default function ReportTypeShow() {
-    const { props } = usePage<PageProps>();
+    const { props } = usePage<ShowPageProps>();
     const { reportType, recentReports = [], reportStats } = props;
 
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -86,7 +151,8 @@ export default function ReportTypeShow() {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
 
-    const IconComponent = getIconComponent(reportType.icon);
+    // Get the icon component
+    const IconComponent = getIconComponent(reportType.icon || 'alert-circle');
 
     // Handle back navigation
     const handleBack = () => {
@@ -177,6 +243,11 @@ export default function ReportTypeShow() {
         });
     };
 
+    // Calculate resolution rate
+    const resolutionRate = reportStats?.total 
+        ? Math.round((reportStats.resolved / reportStats.total) * 100) 
+        : 0;
+
     // Statistics for cards
     const statistics = [
         { 
@@ -188,21 +259,21 @@ export default function ReportTypeShow() {
         },
         { 
             label: 'Priority Level', 
-            value: reportType.priority_label, 
+            value: reportType.priority_label || `Level ${reportType.priority_level}`, 
             icon: Target,
-            description: `Level ${reportType.priority_level}`,
+            description: `Priority ${reportType.priority_level} of 4`,
             color: getPriorityColor(reportType.priority_level)
         },
         { 
             label: 'Resolution Time', 
             value: `${reportType.resolution_days} days`, 
             icon: Clock,
-            description: `Expected: ${reportType.expected_resolution_date}`,
+            description: `Expected resolution time`,
             color: 'purple'
         },
         { 
             label: 'Resolution Rate', 
-            value: reportStats?.total ? Math.round((reportStats?.resolved / reportStats.total) * 100) + '%' : '0%', 
+            value: `${resolutionRate}%`, 
             icon: BarChart,
             description: `${reportStats?.resolved || 0} of ${reportStats?.total || 0} resolved`,
             color: 'green'
@@ -222,9 +293,8 @@ export default function ReportTypeShow() {
                 <div className="space-y-6">
                     {/* Header with Actions */}
                     <ReportTypeHeader
-                        reportType={reportType}
+                        reportType={reportType as any}
                         isNew={isNew(reportType.created_at)}
-                        IconComponent={IconComponent}
                         onBack={handleBack}
                         onCopyLink={handleCopyLink}
                         onEdit={handleEdit}
@@ -239,11 +309,11 @@ export default function ReportTypeShow() {
 
                     {/* Status Banner - For report types with no reports or immediate action required */}
                     {reportType.requires_immediate_action && (
-                        <StatusBanner reportType={reportType} />
+                        <StatusBanner reportType={reportType as any} />
                     )}
 
                     {/* Requirement Badges */}
-                    <RequirementBadges reportType={reportType} />
+                    <RequirementBadges reportType={reportType as any} />
 
                     {/* Statistics Cards */}
                     <StatisticsCards 

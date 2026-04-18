@@ -1,5 +1,5 @@
 // utils/reportTypesUtils.ts
-import { ReportType, FilterState, SelectionStats } from '@/types/report-types';
+import { ReportType, FilterState, SelectionStats } from '@/types/admin/report-types/report-types';
 
 export const formatDate = (dateString: string): string => {
     if (!dateString) return 'N/A';

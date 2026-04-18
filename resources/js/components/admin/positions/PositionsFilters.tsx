@@ -4,6 +4,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     Search,
     Filter,
@@ -12,7 +20,10 @@ import {
     X,
     Users,
     BadgeCheck,
-    Clock
+    Clock,
+    Shield,
+    TrendingUp,
+    UserPlus
 } from 'lucide-react';
 import { PositionFilters } from '@/types/admin/positions/position.types';
 import { RefObject } from 'react';
@@ -95,28 +106,71 @@ export default function PositionsFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
+    // Helper to get active filter count
+    const getActiveFilterCount = () => {
+        let count = 0;
+        if (currentStatus !== 'all') count++;
+        if (currentRequiresAccount !== 'all') count++;
+        if (currentOfficialsRange && currentOfficialsRange !== '') count++;
+        return count;
+    };
+
+    const activeFilterCount = getActiveFilterCount();
+
     // Officials count range options
     const officialsRanges = [
-        { value: '', label: 'All Positions' },
-        { value: '0', label: 'Vacant (0 officials)' },
-        { value: '1', label: '1 official' },
-        { value: '2-3', label: '2-3 officials' },
-        { value: '4-5', label: '4-5 officials' },
-        { value: '6+', label: '6+ officials' }
+        { value: '', label: 'All Positions', color: 'gray' },
+        { value: '0', label: 'Vacant (0 officials)', color: 'red' },
+        { value: '1', label: '1 official', color: 'blue' },
+        { value: '2-3', label: '2-3 officials', color: 'emerald' },
+        { value: '4-5', label: '4-5 officials', color: 'amber' },
+        { value: '6+', label: '6+ officials', color: 'purple' }
     ];
 
+    // Get status color
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'active': return 'emerald';
+            case 'inactive': return 'gray';
+            default: return 'gray';
+        }
+    };
+
+    // Get account requirement label
+    const getAccountRequirementLabel = (value: string) => {
+        switch (value) {
+            case 'yes': return 'Requires Account';
+            case 'no': return 'No Account Needed';
+            default: return value;
+        }
+    };
+
+    // Get officials range label
+    const getOfficialsRangeLabel = (value: string) => {
+        const range = officialsRanges.find(r => r.value === value);
+        return range?.label || value;
+    };
+
+    // Get officials range color
+    const getOfficialsRangeColor = (value: string) => {
+        const range = officialsRanges.find(r => r.value === value);
+        return range?.color || 'gray';
+    };
+
     return (
-        <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-            <CardContent className="pt-6">
-                <div className="flex flex-col space-y-4">
-                    {/* Search Bar */}
+        <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-900 rounded-xl">
+            <CardContent className="p-5 md:p-6">
+                <div className="flex flex-col space-y-5">
+                    {/* Search Bar - Enhanced */}
                     <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
+                        <div className="flex-1 relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-indigo-500 dark:group-focus-within:text-indigo-400 transition-colors" />
+                            </div>
                             <Input
                                 ref={searchInputRef}
-                                placeholder="Search positions by name, code, or committee..."
-                                className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                                placeholder="Search positions by name, code, committee, or description..."
+                                className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 value={search}
                                 onChange={(e) => handleSearch(e.target.value)}
                                 disabled={isLoading}
@@ -125,10 +179,10 @@ export default function PositionsFilters({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                                     onClick={() => handleSearch('')}
                                 >
-                                    <X className="h-3 w-3" />
+                                    <X className="h-3.5 w-3.5" />
                                 </Button>
                             )}
                         </div>
@@ -136,121 +190,201 @@ export default function PositionsFilters({
                             <Button 
                                 variant="outline" 
                                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all"
                                 disabled={isLoading}
                             >
                                 <Filter className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">
+                                <span className="hidden sm:inline font-medium">
                                     {showAdvancedFilters ? 'Hide Filters' : 'More Filters'}
                                 </span>
                                 <span className="sm:hidden">
                                     {showAdvancedFilters ? 'Hide' : 'Filters'}
                                 </span>
+                                {!showAdvancedFilters && activeFilterCount > 0 && (
+                                    <Badge variant="secondary" className="ml-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full px-1.5 py-0 text-xs">
+                                        +{activeFilterCount}
+                                    </Badge>
+                                )}
                             </Button>
                             <Button 
                                 variant="outline"
-                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all"
                                 onClick={exportData}
                                 disabled={isLoading}
                             >
                                 <Download className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Export</span>
+                                <span className="hidden sm:inline font-medium">Export</span>
                             </Button>
                         </div>
                     </div>
 
-                    {/* Active Filters Info and Clear Button */}
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} positions
-                            {search && ` matching "${search}"`}
+                    {/* Results Info & Active Filters Bar */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 px-3 py-1.5 rounded-lg">
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{startIndex + 1}-{Math.min(endIndex, totalItems)}</span>
+                            <span className="mx-1">of</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{totalItems}</span>
+                            <span className="ml-1">positions</span>
+                            {search && (
+                                <span className="ml-1">
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                </span>
+                            )}
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Active filter badges */}
+                            {activeFilters && (
+                                <>
+                                    {currentStatus !== 'all' && (
+                                        <Badge variant="secondary" className={`${
+                                            getStatusColor(currentStatus) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                            'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                        } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
+                                            <Shield className="h-3 w-3 mr-1 inline" />
+                                            Status: {currentStatus === 'active' ? 'Active' : 'Inactive'}
+                                        </Badge>
+                                    )}
+                                    {currentRequiresAccount !== 'all' && (
+                                        <Badge variant="secondary" className={`${
+                                            currentRequiresAccount === 'yes' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' :
+                                            'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                                        } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
+                                            <UserPlus className="h-3 w-3 mr-1 inline" />
+                                            {getAccountRequirementLabel(currentRequiresAccount)}
+                                        </Badge>
+                                    )}
+                                    {currentOfficialsRange && currentOfficialsRange !== '' && (
+                                        <Badge variant="secondary" className={`${
+                                            getOfficialsRangeColor(currentOfficialsRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                            getOfficialsRangeColor(currentOfficialsRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                            getOfficialsRangeColor(currentOfficialsRange) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                            getOfficialsRangeColor(currentOfficialsRange) === 'amber' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                            'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                        } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
+                                            <Users className="h-3 w-3 mr-1 inline" />
+                                            {getOfficialsRangeLabel(currentOfficialsRange)}
+                                        </Badge>
+                                    )}
+                                </>
+                            )}
+                            
                             {activeFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleClearFilters}
-                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-7 px-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-xs"
                                     disabled={isLoading}
                                 >
-                                    <FilterX className="h-3.5 w-3.5 mr-1" />
-                                    Clear Filters
+                                    <FilterX className="h-3 w-3 mr-1" />
+                                    Clear all
                                 </Button>
                             )}
                         </div>
                     </div>
 
-                    {/* Basic Filters - Status + Account Required + Officials Count */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    {/* Basic Filters - Modern Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                        {/* Status Filter */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <BadgeCheck className="h-3 w-3" />
                                 Status
                             </Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                            <Select
                                 value={currentStatus}
-                                onChange={(e) => handleStatusFilter(e.target.value)}
+                                onValueChange={handleStatusFilter}
                                 disabled={isLoading}
                             >
-                                <option value="all">All Statuses</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-indigo-500">
+                                    <SelectValue placeholder="All Statuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="inactive">Inactive</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                <Users className="h-3 w-3" />
+                        {/* Account Required Filter */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                                <UserPlus className="h-3 w-3" />
                                 Account Required
                             </Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                            <Select
                                 value={currentRequiresAccount}
-                                onChange={(e) => handleAccountFilter(e.target.value)}
+                                onValueChange={handleAccountFilter}
                                 disabled={isLoading}
                             >
-                                <option value="all">All Types</option>
-                                <option value="yes">Requires Account</option>
-                                <option value="no">No Account Needed</option>
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                    <SelectValue placeholder="All Types" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Types</SelectItem>
+                                    <SelectItem value="yes">Requires Account</SelectItem>
+                                    <SelectItem value="no">No Account Needed</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
+                        {/* Officials Count Filter */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                                <Users className="h-3 w-3" />
                                 Officials Count
                             </Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                            <Select
                                 value={currentOfficialsRange}
-                                onChange={(e) => handleOfficialsRange(e.target.value)}
+                                onValueChange={handleOfficialsRange}
                                 disabled={isLoading}
                             >
-                                {officialsRanges.map(range => (
-                                    <option key={range.value} value={range.value}>
-                                        {range.label}
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                    <SelectValue placeholder="All Positions" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {officialsRanges.map(range => (
+                                        <SelectItem key={range.value} value={range.value}>
+                                            <span className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${
+                                                    range.color === 'red' ? 'bg-red-500' :
+                                                    range.color === 'blue' ? 'bg-blue-500' :
+                                                    range.color === 'emerald' ? 'bg-emerald-500' :
+                                                    range.color === 'amber' ? 'bg-amber-500' :
+                                                    range.color === 'purple' ? 'bg-purple-500' :
+                                                    'bg-gray-400'
+                                                }`} />
+                                                {range.label}
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 
-                    {/* Advanced Filters */}
+                    {/* Advanced Filters - Modern Accordion Style */}
                     {showAdvancedFilters && (
-                        <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
-                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Quick Filters</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="border-t border-gray-100 dark:border-gray-800 pt-5 mt-2 space-y-5">
+                            <div className="flex items-center gap-2">
+                                <div className="h-5 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
+                                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Quick Filters</h3>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {/* Quick Status Filters */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Status</Label>
+                                <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <Shield className="h-4 w-4 text-emerald-500" />
+                                        Quick Status
+                                    </Label>
                                     <div className="flex flex-wrap gap-2">
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleStatusFilter('active');
                                                 setShowAdvancedFilters(false);
@@ -262,7 +396,7 @@ export default function PositionsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleStatusFilter('inactive');
                                                 setShowAdvancedFilters(false);
@@ -274,7 +408,7 @@ export default function PositionsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleStatusFilter('all');
                                                 setShowAdvancedFilters(false);
@@ -287,13 +421,16 @@ export default function PositionsFilters({
                                 </div>
 
                                 {/* Quick Account Filters */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Account Type</Label>
+                                <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <UserPlus className="h-4 w-4 text-purple-500" />
+                                        Quick Account Type
+                                    </Label>
                                     <div className="flex flex-wrap gap-2">
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleAccountFilter('yes');
                                                 setShowAdvancedFilters(false);
@@ -305,7 +442,7 @@ export default function PositionsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleAccountFilter('no');
                                                 setShowAdvancedFilters(false);
@@ -317,7 +454,7 @@ export default function PositionsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleAccountFilter('all');
                                                 setShowAdvancedFilters(false);
@@ -330,13 +467,16 @@ export default function PositionsFilters({
                                 </div>
 
                                 {/* Quick Officials Count Filters */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Officials Count</Label>
+                                <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                                        Quick Officials Count
+                                    </Label>
                                     <div className="flex flex-wrap gap-2">
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleOfficialsRange('0');
                                                 setShowAdvancedFilters(false);
@@ -348,7 +488,7 @@ export default function PositionsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleOfficialsRange('1');
                                                 setShowAdvancedFilters(false);
@@ -360,7 +500,7 @@ export default function PositionsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleOfficialsRange('2-3');
                                                 setShowAdvancedFilters(false);
@@ -372,7 +512,7 @@ export default function PositionsFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 handleOfficialsRange('6+');
                                                 setShowAdvancedFilters(false);
@@ -383,53 +523,54 @@ export default function PositionsFilters({
                                         </Button>
                                     </div>
                                 </div>
-
-                                {/* Reset All Filters */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Reset Options</Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-xs"
-                                            onClick={() => {
-                                                handleOfficialsRange('');
-                                                setShowAdvancedFilters(false);
-                                            }}
-                                            disabled={isLoading}
-                                        >
-                                            Clear Count Filter
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-xs"
-                                            onClick={handleClearFilters}
-                                            disabled={isLoading}
-                                        >
-                                            Clear All Filters
-                                        </Button>
-                                    </div>
-                                </div>
                             </div>
 
-                            {/* Information Section */}
-                            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                                <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Information</h4>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                                    <p>• <span className="font-medium">Vacant positions</span> - No current officials assigned</p>
-                                    <p>• <span className="font-medium">Account required</span> - Positions that need system access</p>
-                                    <p>• <span className="font-medium">Officials count</span> - Number of people holding this position</p>
-                                    <p>• Use the table header to sort by any column</p>
+                            {/* Information Section - Modern */}
+                            <div className="mt-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-800/10 rounded-xl border border-gray-100 dark:border-gray-800">
+                                <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide flex items-center gap-2">
+                                    <BadgeCheck className="h-3 w-3" />
+                                    Position Information
+                                </h4>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                    <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Vacant positions</span> - No current officials assigned</p>
+                                    <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Account required</span> - Positions that need system access</p>
+                                    <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Officials count</span> - Number of people holding this position</p>
+                                    <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Search</span> - Searches by name, code, committee, or description</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
+                                        onClick={() => {
+                                            handleOfficialsRange('');
+                                            setShowAdvancedFilters(false);
+                                        }}
+                                        disabled={isLoading}
+                                    >
+                                        <FilterX className="h-3 w-3 mr-1" />
+                                        Clear Count Filter
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
+                                        onClick={handleClearFilters}
+                                        disabled={isLoading}
+                                    >
+                                        <FilterX className="h-3 w-3 mr-1" />
+                                        Clear All Filters
+                                    </Button>
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
                 
-                {/* Loading indicator */}
+                {/* Loading indicator - Modern */}
                 {isLoading && (
-                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 animate-pulse">
+                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                         Updating...
                     </div>
                 )}

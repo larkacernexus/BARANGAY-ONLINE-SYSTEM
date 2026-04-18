@@ -52,12 +52,12 @@ export default function HouseholdsHeader({
                         <p className="text-xs text-gray-500">Select multiple households for batch operations</p>
                     </TooltipContent>
                 </Tooltip>
+                
+                {/* ✅ FIX: Remove asChild and nested <a> tag */}
                 <Link href="/admin/households/create">
-                    <Button asChild>
-                        <a>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Household
-                        </a>
+                    <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Household
                     </Button>
                 </Link>
             </div>

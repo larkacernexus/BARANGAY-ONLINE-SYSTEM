@@ -1,39 +1,57 @@
-// pages/admin/officials/edit/[id].tsx
-
-import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Link, router, useForm } from '@inertiajs/react';
+// pages/admin/officials/edit.tsx
+import { router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Save, UserPlus, Shield, Phone, Info, Camera } from 'lucide-react';
+import AppLayout from '@/layouts/admin-app-layout';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { UserPlus, Shield, Info, Settings, History } from 'lucide-react';
+import { Resident, Position, Committee, User, Official } from '@/types/admin/officials/officials';
+import { BasicInfoTab } from '@/components/admin/officials/create/basic-info-tab';
+import { PositionTab } from '@/components/admin/officials/create/position-tab';
+import { DetailsTab } from '@/components/admin/officials/create/details-tab';
+import { SettingsTab } from '@/components/admin/officials/create/settings-tab';
+import { route } from 'ziggy-js';
 
-// Import types from shared officials types
-import { 
-    Resident, 
-    Position, 
-    Committee, 
-    Role, 
-    Official, 
-    User,
-    OfficialFormData 
-} from '@/types/admin/officials/officials';
+interface FormData {
+    resident_id: number | null;
+    position_id: number | null;
+    committee_id: number | null;
+    term_start: string;
+    term_end: string;
+    status: 'active' | 'inactive' | 'former';
+    order: number;
+    responsibilities: string;
+    contact_number: string;
+    email: string;
+    achievements: string;
+    photo: File | string | null;
+    use_resident_photo: boolean;
+    is_regular: boolean;
+    user_id: number | null;
+}
 
-// Import shared components
-import { OfficialFormHeader } from '@/components/admin/officials/shared/official-form-header';
-import { ErrorMessages } from '@/components/admin/officials/shared/error-messages';
-import { ResidentSelection } from '@/components/admin/officials/shared/resident-selection';
-import { PositionInformation } from '@/components/admin/officials/shared/position-information';
-import { ContactInformation } from '@/components/admin/officials/shared/contact-information';
-import { UserAssignment } from '@/components/admin/officials/shared/user-assignment';
-import { PhotoUpload } from '@/components/admin/officials/shared/photo-upload';
-import { PreviewCard } from '@/components/admin/officials/shared/preview-card';
-import { QuickStats } from '@/components/admin/officials/shared/quick-stats';
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Resident', icon: UserPlus, requiredFields: ['resident_id'] },
+    { id: 'position', label: 'Position & Account', icon: Shield, requiredFields: ['position_id', 'term_start', 'term_end'] },
+    { id: 'details', label: 'Details', icon: Info, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
 
-interface EditOfficialProps {
+const requiredFieldsMap = {
+    basic: ['resident_id'],
+    position: ['position_id', 'term_start', 'term_end'],
+    details: [],
+    settings: []
+};
+
+interface PageProps {
     official: Official & {
         resident: Resident;
         positionData: Position;
@@ -44,25 +62,205 @@ interface EditOfficialProps {
     committees: Committee[];
     availableResidents: Resident[];
     availableUsers: User[];
-    roles: Role[];
-    statusOptions: Array<{ value: string; label: string }>;
+    [key: string]: any;
 }
 
-export default function EditOfficial({ 
-    official,
-    positions, 
-    committees, 
-    availableResidents,
-    availableUsers = [],
-    roles,
-    statusOptions,
-}: EditOfficialProps) {
-    // Initialize form with EXISTING official data
+export default function EditOfficial() {
+    const { props } = usePage<PageProps>();
+    const {
+        official,
+        positions = [],
+        committees = [],
+        availableResidents = [],
+        availableUsers = []
+    } = props;
 
-        const initialFormData: OfficialFormData = {
+    const [showPreview, setShowPreview] = useState(true);
+    const [selectedResident, setSelectedResident] = useState<Resident | null>(official.resident || null);
+    const [selectedPosition, setSelectedPosition] = useState<Position | null>(
+        positions.find(p => p.id === official.position_id) || null
+    );
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // Safe date formatting functions
+    const formatDate = (dateString?: string | null): string => {
+        if (!dateString) return 'Not set';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Invalid date';
+            return date.toLocaleDateString();
+        } catch {
+            return 'Invalid date';
+        }
+    };
+
+    const formatDateTime = (dateString?: string | null): string => {
+        if (!dateString) return 'Never';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Invalid date';
+            return date.toLocaleString();
+        } catch {
+            return 'Invalid date';
+        }
+    };
+
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm
+    } = useFormManager<FormData>({
+        initialData: {
+            resident_id: official.resident_id ?? null,
+            position_id: official.position_id ?? null,
+            committee_id: official.committee_id ?? null,
+            term_start: official.term_start ?? '',
+            term_end: official.term_end ?? '',
+            status: official.status ?? 'active',
+            order: official.order ?? 0,
+            responsibilities: official.responsibilities ?? '',
+            contact_number: official.contact_number ?? official.resident?.contact_number ?? '',
+            email: official.email ?? official.resident?.email ?? '',
+            achievements: official.achievements ?? '',
+            photo: null,
+            use_resident_photo: !official.photo_url && !!official.resident?.photo_url,
+            is_regular: official.is_regular ?? true,
+            user_id: official.user_id ?? null,
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            const submitData = new FormData();
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== null && value !== undefined && value !== '') {
+                    if (key === 'photo' && value instanceof File) {
+                        submitData.append(key, value);
+                    } else if (typeof value === 'boolean') {
+                        submitData.append(key, value ? '1' : '0');
+                    } else if (typeof value !== 'object') {
+                        submitData.append(key, value.toString());
+                    }
+                }
+            });
+            submitData.append('_method', 'PUT');
+
+            router.post(route('admin.officials.update', official.id), submitData, {
+                onSuccess: () => {
+                    toast.success('Official updated successfully');
+                    router.visit(route('admin.officials.show', official.id));
+                },
+                onError: (errs) => {
+                    toast.error('Failed to update official');
+                }
+            });
+        }
+    });
+
+    // Wrapper functions for different value types
+    const handleFileChange = (name: string, file: File | null) => {
+        if (file instanceof File) {
+            updateFormData({ [name]: file } as any);
+        } else {
+            updateFormData({ [name]: null } as any);
+        }
+    };
+
+    const handleBooleanChange = (name: string, checked: boolean) => {
+        updateFormData({ [name]: checked } as any);
+    };
+
+    const handleTextChange = (name: string, value: string) => {
+        updateFormData({ [name]: value } as any);
+    };
+
+    const handleNumberChange = (name: string, value: number) => {
+        updateFormData({ [name]: value } as any);
+    };
+
+    // Helper to check if position requires account
+    const requiresAccount = selectedPosition?.requires_account === true;
+    
+    // Helper to check if position requires committee
+    const requiresCommittee = selectedPosition?.code === 'KAGAWAD' || 
+        selectedPosition?.name?.toLowerCase().includes('kagawad') ||
+        selectedPosition?.committee_id !== undefined;
+
+    // Dynamic required fields based on selections
+    const dynamicRequiredFields = [...requiredFieldsMap.position];
+    if (requiresCommittee) dynamicRequiredFields.push('committee_id');
+    if (requiresAccount) dynamicRequiredFields.push('user_id');
+
+    // Get dynamic tab status
+    const getDynamicTabStatus = (tabId: string) => {
+        if (tabId === 'position') {
+            const hasError = dynamicRequiredFields.some(field => errors[field as keyof FormData]);
+            if (hasError) return 'error';
+            
+            const isComplete = dynamicRequiredFields.every(field => {
+                const value = formData[field as keyof FormData];
+                return value !== null && value !== undefined && value !== '';
+            });
+            return isComplete ? 'complete' : 'incomplete';
+        }
+        return getTabStatus(tabId);
+    };
+
+    // Handle resident selection with auto-fill
+    const handleResidentSelect = (residentId: number | null) => {
+        handleSelectChange('resident_id', residentId);
+        const resident = availableResidents.find(r => r.id === residentId);
+        setSelectedResident(resident || null);
+        
+        if (resident) {
+            if (!formData.contact_number && resident.contact_number) {
+                handleTextChange('contact_number', resident.contact_number);
+            }
+            if (!formData.email && resident.email) {
+                handleTextChange('email', resident.email);
+            }
+            if (resident.photo_url && !formData.use_resident_photo) {
+                handleBooleanChange('use_resident_photo', true);
+            }
+        }
+    };
+
+    // Handle position selection
+    const handlePositionSelect = (positionId: number | null) => {
+        handleSelectChange('position_id', positionId);
+        const position = positions.find(p => p.id === positionId);
+        setSelectedPosition(position || null);
+        
+        if (position) {
+            handleNumberChange('order', position.order);
+            if (position.committee_id) {
+                handleSelectChange('committee_id', position.committee_id);
+            } else {
+                handleSelectChange('committee_id', null);
+            }
+            if (!position.requires_account) {
+                handleSelectChange('user_id', null);
+            }
+        }
+    };
+
+    // Check for unsaved changes
+    useEffect(() => {
+        const originalData = {
             resident_id: official.resident_id,
             position_id: official.position_id,
-            committee_id: official.committee_id ?? null,  // Convert undefined to null
+            committee_id: official.committee_id || null,
             term_start: official.term_start,
             term_end: official.term_end,
             status: official.status,
@@ -71,396 +269,372 @@ export default function EditOfficial({
             contact_number: official.contact_number || official.resident?.contact_number || '',
             email: official.email || official.resident?.email || '',
             achievements: official.achievements || '',
-            photo: null,
-            use_resident_photo: !official.photo_path && !!official.resident?.photo_path,
             is_regular: official.is_regular ?? true,
-            user_id: official.user_id ?? null,  // Convert undefined to null
+            user_id: official.user_id || null,
         };
-    const { data, setData, processing, errors } = useForm<OfficialFormData>(initialFormData);
 
-    const [selectedResident, setSelectedResident] = useState<Resident | null>(official.resident || null);
-    const [selectedUser, setSelectedUser] = useState<User | null>(official.user || null);
-    const [currentPosition, setCurrentPosition] = useState<Position | null>(
-        positions.find(p => p.id === official.position_id) || null
-    );
-    const [photoPreview, setPhotoPreview] = useState<string | null>(
-        official.photo_url || official.resident?.photo_url || null
-    );
-
-    // Effect to handle position changes
-    useEffect(() => {
-        if (data.position_id) {
-            const positionData = positions.find(p => p.id === data.position_id);
-            setCurrentPosition(positionData || null);
+        const hasChanges = Object.keys(originalData).some(key => {
+            const originalValue = originalData[key as keyof typeof originalData];
+            const currentValue = formData[key as keyof FormData];
             
-            // Only update order if position changed
-            if (positionData && positionData.order !== official.order) {
-                setData('order', positionData.order);
+            if (key === 'photo') return formData.photo !== null;
+            if (key === 'use_resident_photo') {
+                return formData.use_resident_photo !== (!official.photo_url && !!official.resident?.photo_url);
             }
-        }
-    }, [data.position_id]);
-
-    // Effect to handle photo preview
-    useEffect(() => {
-        if (data.use_resident_photo && selectedResident?.photo_url) {
-            setPhotoPreview(selectedResident.photo_url);
-        } else if (data.photo && data.photo instanceof File) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPhotoPreview(reader.result as string);
-            };
-            reader.readAsDataURL(data.photo);
-        } else {
-            setPhotoPreview(official.photo_url || null);
-        }
-    }, [selectedResident, data.use_resident_photo, data.photo]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        // Create FormData
-        const formData = new FormData();
-        
-        // Add method spoofing
-        formData.append('_method', 'PUT');
-        
-        // Add ALL fields
-        formData.append('resident_id', String(data.resident_id || ''));
-        formData.append('position_id', String(data.position_id || ''));
-        formData.append('committee_id', data.committee_id ? String(data.committee_id) : '');
-        formData.append('term_start', data.term_start || '');
-        formData.append('term_end', data.term_end || '');
-        formData.append('status', data.status || '');
-        formData.append('order', String(data.order || 0));
-        formData.append('responsibilities', data.responsibilities || '');
-        formData.append('contact_number', data.contact_number || '');
-        formData.append('email', data.email || '');
-        formData.append('achievements', data.achievements || '');
-        
-        // Send boolean fields as 1/0
-        formData.append('is_regular', data.is_regular ? '1' : '0');
-        formData.append('user_id', data.user_id ? String(data.user_id) : '');
-        formData.append('use_resident_photo', data.use_resident_photo ? '1' : '0');
-        
-        // Handle photo - ONLY append if it's a File
-        if (data.photo && data.photo instanceof File) {
-            formData.append('photo', data.photo);
-        }
-        
-        // Use POST with _method=PUT
-        router.post(`/admin/officials/${official.id}`, formData, {
-            preserveScroll: true,
-            forceFormData: true,
-            onError: (errors) => {
-                console.log('Submission errors:', errors);
-                toast.error('Failed to update official');
-            },
-            onSuccess: (response) => {
-                toast.success('Official updated successfully');
-                router.visit('/admin/officials');
-            },
+            
+            if (originalValue === null && currentValue === null) return false;
+            if (originalValue === undefined && currentValue === undefined) return false;
+            if (originalValue === '' && currentValue === '') return false;
+            
+            return String(originalValue) !== String(currentValue);
         });
-    };
 
-    const handleResidentSelect = (residentId: number) => {
-        setData('resident_id', residentId);
-        const resident = availableResidents.find(r => r.id === residentId);
-        setSelectedResident(resident || null);
-        
-        if (resident) {
-            // Only update contact fields if they're empty
-            if (!data.contact_number && resident.contact_number) {
-                setData('contact_number', resident.contact_number);
+        setHasUnsavedChanges(hasChanges || formData.photo !== null);
+    }, [formData, official]);
+
+    // Handle cancel with unsaved changes check
+    const handleCancel = () => {
+        if (hasUnsavedChanges) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.officials.show', official.id));
             }
-            
-            if (!data.email && resident.email) {
-                setData('email', resident.email);
-            }
+        } else {
+            router.visit(route('admin.officials.show', official.id));
         }
     };
 
-    const handleUserSelect = (userId: number) => {
-        setData('user_id', userId);
-        const user = availableUsers.find(u => u.id === userId);
-        setSelectedUser(user || null);
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] || null;
-        setData('photo', file);
-        if (file) {
-            setData('use_resident_photo', false);
+    // Handle reset
+    const handleReset = () => {
+        if (confirm('Reset all changes to the original values?')) {
+            resetForm();
+            setSelectedResident(official.resident || null);
+            setSelectedPosition(positions.find(p => p.id === official.position_id) || null);
+            setHasUnsavedChanges(false);
+            toast.info('Form reset to original values');
         }
     };
 
-    const handleUseResidentPhoto = (checked: boolean) => {
-        setData('use_resident_photo', checked);
-        if (checked && selectedResident?.photo_url) {
-            setData('photo', null);
+    // Get status badge color
+    const getStatusColor = (status: string) => {
+        switch(status) {
+            case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+            case 'inactive': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
+            case 'former': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
         }
     };
 
-    const clearPhoto = () => {
-        setData('photo', null);
-        setData('use_resident_photo', false);
-        setPhotoPreview(null);
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        position: getDynamicTabStatus('position'),
+        details: getTabStatus('details'),
+        settings: getTabStatus('settings')
     };
 
-    const isCaptain = currentPosition?.code === 'CAPTAIN';
-    const isKeyPosition = currentPosition && ['CAPTAIN', 'SECRETARY', 'TREASURER', 'SK-CHAIRMAN'].includes(currentPosition.code);
+    const missingFields = getMissingFields();
+    
+    const requiredFieldsList = [
+        { label: 'Resident', value: !!formData.resident_id, tabId: 'basic' },
+        { label: 'Position', value: !!formData.position_id, tabId: 'position' },
+        ...(requiresCommittee ? [{ label: 'Committee', value: !!formData.committee_id, tabId: 'position' }] : []),
+        { label: 'Term Start Date', value: !!formData.term_start, tabId: 'position' },
+        { label: 'Term End Date', value: !!formData.term_end, tabId: 'position' },
+        ...(requiresAccount ? [{ label: 'System Account', value: !!formData.user_id, tabId: 'position' }] : [])
+    ];
+
+    const tabOrder = ['basic', 'position', 'details', 'settings'];
+
+    // Count changed fields
+    const changedFieldsCount = () => {
+        let count = 0;
+        if (formData.resident_id !== official.resident_id) count++;
+        if (formData.position_id !== official.position_id) count++;
+        if (formData.committee_id !== official.committee_id) count++;
+        if (formData.term_start !== official.term_start) count++;
+        if (formData.term_end !== official.term_end) count++;
+        if (formData.status !== official.status) count++;
+        if (formData.order !== official.order) count++;
+        if (formData.responsibilities !== (official.responsibilities || '')) count++;
+        if (formData.contact_number !== (official.contact_number || '')) count++;
+        if (formData.email !== (official.email || '')) count++;
+        if (formData.achievements !== (official.achievements || '')) count++;
+        if (formData.is_regular !== official.is_regular) count++;
+        if (formData.user_id !== official.user_id) count++;
+        if (formData.photo !== null) count++;
+        return count;
+    };
 
     return (
         <AppLayout
-            title="Edit Official"
+            title={`Edit Official: ${official.resident?.first_name || ''} ${official.resident?.last_name || ''}`}
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Officials', href: '/admin/officials' },
-                { title: 'Edit Official', href: `/admin/officials/${official.id}/edit` }
+                { title: `${official.resident?.first_name || ''} ${official.resident?.last_name || ''}`, href: route('admin.officials.show', official.id) },
+                { title: 'Edit', href: route('admin.officials.edit', official.id) }
             ]}
         >
-            <form onSubmit={handleSubmit} encType="multipart/form-data">
-                <div className="space-y-6">
-                    <OfficialFormHeader
-                        title={`Edit Official: ${official.resident?.last_name || ''}, ${official.resident?.first_name || ''}`}
-                        subtitle="Update position account assignment"
-                        processing={processing}
-                        submitButtonText="Update Official"
-                    />
+            <div className="space-y-6">
+                <FormHeader
+                    title="Edit Official"
+                    description={`Editing ${official.resident?.first_name || ''} ${official.resident?.last_name || ''} as ${official.positionData?.name || official.position || 'Unknown Position'}`}
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            {hasUnsavedChanges && (
+                                <button
+                                    type="button"
+                                    onClick={handleReset}
+                                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                                >
+                                    <History className="h-4 w-4" />
+                                    Reset
+                                </button>
+                            )}
+                            <div className="px-2 py-1 rounded-md text-xs bg-gray-100 dark:bg-gray-800">
+                                ID: {official.id}
+                            </div>
+                            <div className={`px-2 py-1 rounded-md text-xs ${getStatusColor(formData.status)}`}>
+                                {formData.status}
+                            </div>
+                        </div>
+                    }
+                />
 
-                    <ErrorMessages errors={errors} />
+                {/* Unsaved Changes Banner */}
+                {hasUnsavedChanges && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse"></div>
+                                <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                                    {changedFieldsCount()} field{changedFieldsCount() !== 1 ? 's' : ''} modified
+                                </span>
+                            </div>
+                            <button 
+                                type="button" 
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                            >
+                                Reset All
+                            </button>
+                        </div>
+                    </div>
+                )}
 
-                    <div className="grid gap-6 lg:grid-cols-3">
-                        {/* Left Column - Official Information */}
-                        <div className="lg:col-span-2 space-y-6">
-                            {/* Resident Selection */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
-                                            <UserPlus className="h-3 w-3 text-white" />
-                                        </div>
-                                        Resident
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        The resident holding this position
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ResidentSelection
-                                        residents={availableResidents}
-                                        selectedResidentId={data.resident_id}
+                <FormErrors errors={errors} />
+
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer title="Resident Assignment" description="Select the resident who will hold the position">
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={errors}
+                                        availableResidents={availableResidents}
                                         selectedResident={selectedResident}
                                         onResidentSelect={handleResidentSelect}
-                                        error={errors.resident_id}
+                                        isSubmitting={isSubmitting}
                                     />
-                                </CardContent>
-                            </Card>
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.resident_id}
+                                    showPrevious={false}
+                                    nextLabel="Next: Position & Account"
+                                />
+                            </>
+                        )}
 
-                            {/* Position Information */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
-                                            <Shield className="h-3 w-3 text-white" />
-                                        </div>
-                                        Position Details
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Position and term information
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <PositionInformation
+                        {activeTab === 'position' && (
+                            <>
+                                <FormContainer 
+                                    title="Position Information" 
+                                    description="Select the position, committee, and assign system account"
+                                >
+                                    <PositionTab
+                                        formData={formData}
+                                        errors={errors}
                                         positions={positions}
                                         committees={committees}
-                                        selectedPositionId={data.position_id}
-                                        selectedCommitteeId={data.committee_id}
-                                        termStart={data.term_start}
-                                        termEnd={data.term_end}
-                                        status={data.status}
-                                        order={data.order}
-                                        responsibilities={data.responsibilities}
-                                        onPositionChange={(value) => setData('position_id', parseInt(value))}
-                                        onCommitteeChange={(value) => setData('committee_id', value ? parseInt(value) : null)}
-                                        onTermStartChange={(value) => setData('term_start', value)}
-                                        onTermEndChange={(value) => setData('term_end', value)}
-                                        onStatusChange={(value) => setData('status', value as 'active' | 'inactive' | 'former')}
-                                        onOrderChange={(value) => setData('order', value)}
-                                        onResponsibilitiesChange={(value) => setData('responsibilities', value)}
-                                        errors={{
-                                            position_id: errors.position_id,
-                                            term_start: errors.term_start,
-                                            term_end: errors.term_end,
-                                            status: errors.status
-                                        }}
-                                    />
-                                </CardContent>
-                            </Card>
-
-                            {/* Position Account Assignment */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-700 dark:to-blue-700 flex items-center justify-center">
-                                            <Shield className="h-3 w-3 text-white" />
-                                        </div>
-                                        Position Account
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        The position account assigned to this resident
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <UserAssignment
                                         availableUsers={availableUsers}
                                         selectedResident={selectedResident}
-                                        selectedPosition={currentPosition}
-                                        selectedUserId={data.user_id}
-                                        selectedUser={selectedUser}
-                                        onUserSelect={handleUserSelect}
-                                        error={errors.user_id}
+                                        selectedPosition={selectedPosition}
+                                        requiresAccount={requiresAccount}
+                                        requiresCommittee={requiresCommittee}
+                                        onPositionChange={handlePositionSelect}
+                                        onCommitteeChange={(id) => handleSelectChange('committee_id', id)}
+                                        onTermStartChange={(value) => handleSelectChange('term_start', value)}
+                                        onTermEndChange={(value) => handleSelectChange('term_end', value)}
+                                        onStatusChange={(value) => handleSelectChange('status', value)}
+                                        onOrderChange={(value) => handleNumberChange('order', value)}
+                                        onResponsibilitiesChange={(value) => handleTextChange('responsibilities', value)}
+                                        onUserSelect={(id) => handleSelectChange('user_id', id)}
+                                        isSubmitting={isSubmitting}
                                     />
-                                </CardContent>
-                            </Card>
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.position_id}
+                                    previousLabel="Back: Resident"
+                                    nextLabel="Next: Details"
+                                />
+                            </>
+                        )}
 
-                            {/* Contact Information */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
-                                            <Phone className="h-3 w-3 text-white" />
-                                        </div>
-                                        Contact Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Contact details for this official
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <ContactInformation
-                                        contactNumber={data.contact_number}
-                                        email={data.email}
+                        {activeTab === 'details' && (
+                            <>
+                                <FormContainer title="Official Details" description="Additional information about the official">
+                                    <DetailsTab
+                                        formData={formData}
+                                        errors={errors}
                                         selectedResident={selectedResident}
-                                        onContactNumberChange={(value) => setData('contact_number', value)}
-                                        onEmailChange={(value) => setData('email', value)}
+                                        existingPhotoUrl={official.photo_url}
+                                        onInputChange={handleInputChange}
+                                        onContactNumberChange={(value) => handleTextChange('contact_number', value)}
+                                        onEmailChange={(value) => handleTextChange('email', value)}
+                                        onAchievementsChange={(value) => handleTextChange('achievements', value)}
+                                        onPhotoChange={(file) => handleFileChange('photo', file)}
+                                        onUseResidentPhotoChange={(checked) => handleBooleanChange('use_resident_photo', checked)}
+                                        onClearPhoto={() => handleFileChange('photo', null)}
+                                        isSubmitting={isSubmitting}
                                     />
-                                </CardContent>
-                            </Card>
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Position & Account"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
 
-                            {/* Additional Information */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
-                                            <Info className="h-3 w-3 text-white" />
-                                        </div>
-                                        Additional Information
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="achievements" className="dark:text-gray-300">Achievements & Recognition</Label>
-                                        <Textarea 
-                                            id="achievements" 
-                                            placeholder="List any achievements, awards, or recognition received..."
-                                            rows={4}
-                                            value={data.achievements}
-                                            onChange={(e) => setData('achievements', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center space-x-2 p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <Checkbox 
-                                            id="is_regular" 
-                                            checked={data.is_regular}
-                                            onCheckedChange={(checked) => setData('is_regular', checked as boolean)}
-                                            className="dark:border-gray-600"
-                                        />
-                                        <Label htmlFor="is_regular" className="cursor-pointer dark:text-gray-300">
-                                            Regular Official (elected)
-                                        </Label>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Right Column - Photo & Preview */}
-                        <div className="space-y-6">
-                            {/* Photo Upload */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
-                                            <Camera className="h-3 w-3 text-white" />
-                                        </div>
-                                        Official Photo
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Upload a photo or use resident's existing photo
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <PhotoUpload
-                                        photoPreview={photoPreview}
-                                        useResidentPhoto={data.use_resident_photo}
-                                        selectedResident={selectedResident}
-                                        onUseResidentPhotoChange={handleUseResidentPhoto}
-                                        onFileChange={handleFileChange}
-                                        onClearPhoto={clearPhoto}
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Official Settings" description="Configure the official's flags">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={errors}
+                                        onIsRegularChange={(checked) => handleBooleanChange('is_regular', checked)}
+                                        isSubmitting={isSubmitting}
                                     />
-                                </CardContent>
-                            </Card>
-
-                            {/* Preview Card */}
-                            <PreviewCard
-                                selectedResident={selectedResident}
-                                selectedUser={selectedUser}
-                                selectedPosition={currentPosition}
-                                photoPreview={photoPreview}
-                                positionId={data.position_id}
-                                committeeId={data.committee_id}
-                                termStart={data.term_start}
-                                termEnd={data.term_end}
-                                useResidentPhoto={data.use_resident_photo}
-                                photo={data.photo}
-                                isRegular={data.is_regular}
-                                userAssigned={!!data.user_id}
-                                positions={positions}
-                                committees={committees}
-                                roles={roles}
-                            />
-
-                            <QuickStats
-                                availableResidents={availableResidents}
-                                positions={positions}
-                                committees={committees}
-                                isCaptain={isCaptain}
-                                isKeyPosition={!!isKeyPosition}
-                            />
-                        </div>
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Details"
+                                    showNext={false}
+                                    submitLabel="Update Official"
+                                />
+                            </>
+                        )}
                     </div>
 
-                    {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
-                        <Link href="/admin/officials">
-                            <Button variant="outline" type="button" className="dark:border-gray-600 dark:text-gray-300">
-                                Cancel
-                            </Button>
-                        </Link>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                type="submit" 
-                                disabled={processing}
-                                className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white dark:from-amber-700 dark:to-orange-700"
-                            >
-                                <Save className="h-4 w-4 mr-2" />
-                                {processing ? 'Updating...' : 'Update Official'}
-                            </Button>
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* Official Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Official Summary</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
+                                                <UserPlus className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {selectedResident 
+                                                        ? `${selectedResident.first_name} ${selectedResident.last_name}`
+                                                        : <span className="text-gray-400 italic">No resident selected</span>
+                                                    }
+                                                </div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {selectedPosition?.name || 'Position not selected'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Term:</span>
+                                                <span className="font-medium dark:text-gray-300">
+                                                    {formData.term_start ? formatDate(formData.term_start) : '?'} - {formData.term_end ? formatDate(formData.term_end) : '?'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                                <span className={`capitalize font-medium ${
+                                                    formData.status === 'active' ? 'text-green-600 dark:text-green-400' : 
+                                                    formData.status === 'inactive' ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500'
+                                                }`}>
+                                                    {formData.status || 'unknown'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Order:</span>
+                                                <span className="font-medium dark:text-gray-300">{formData.order ?? 0}</span>
+                                            </div>
+                                        </div>
+
+                                        {formData.responsibilities && (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3">
+                                                    <span className="font-medium">Responsibilities:</span> {formData.responsibilities}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Last Updated Info */}
+                                        <div className="pt-2 border-t dark:border-gray-700">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                Last updated: {formatDateTime(official.updated_at)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-            </form>
+            </div>
         </AppLayout>
     );
 }

@@ -38,7 +38,7 @@ import { Household, Purok, SelectionStats, SelectionMode, BulkAction } from '@/t
 
 interface HouseholdsContentProps {
     households: Household[];
-    stats: {
+    stats?: any[] | {
         total: number;
         active: number;
         inactive: number;
@@ -68,7 +68,7 @@ interface HouseholdsContentProps {
     onSort: (column: string) => void;
     puroks: Purok[];
     sortBy: string;
-    sortOrder: string;
+    sortOrder: 'asc' | 'desc' | string;
     selectionStats: SelectionStats;
     isPerformingBulkAction: boolean;
     onBulkOperation: (operation: BulkAction) => void;
@@ -82,11 +82,12 @@ interface HouseholdsContentProps {
     selectionMode: SelectionMode;
     onSortChange?: (value: string) => void;
     getCurrentSortValue?: () => string;
+    isLoading?: boolean;
 }
 
 export default function HouseholdsContent({
     households,
-    stats,
+    stats = { total: 0, active: 0, inactive: 0, totalMembers: 0, averageMembers: 0, purokCount: 0 },
     isBulkMode,
     setIsBulkMode,
     isSelectAll,
@@ -122,7 +123,8 @@ export default function HouseholdsContent({
     setShowBulkPurokDialog,
     selectionMode,
     onSortChange = () => {},
-    getCurrentSortValue = () => 'household_number-asc'
+    getCurrentSortValue = () => 'household_number-asc',
+    isLoading = false
 }: HouseholdsContentProps) {
     
     // Bulk action items configuration
@@ -132,13 +134,15 @@ export default function HouseholdsContent({
                 label: 'Export',
                 icon: <Download className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('export'),
-                tooltip: 'Export selected households'
+                tooltip: 'Export selected households',
+                disabled: isLoading
             },
             {
                 label: 'Edit Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => setShowBulkStatusDialog?.(true),
-                tooltip: 'Bulk edit status'
+                tooltip: 'Bulk edit status',
+                disabled: isLoading
             }
         ],
         secondary: [
@@ -146,31 +150,36 @@ export default function HouseholdsContent({
                 label: 'Activate',
                 icon: <Users className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('activate'),
-                tooltip: 'Activate selected households'
+                tooltip: 'Activate selected households',
+                disabled: isLoading
             },
             {
                 label: 'Deactivate',
                 icon: <Users className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('deactivate'),
-                tooltip: 'Deactivate selected households'
+                tooltip: 'Deactivate selected households',
+                disabled: isLoading
             },
             {
                 label: 'Change Purok',
                 icon: <Globe className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => setShowBulkPurokDialog?.(true),
-                tooltip: 'Change purok for selected households'
+                tooltip: 'Change purok for selected households',
+                disabled: isLoading
             },
             {
                 label: 'Print',
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => onBulkOperation('print'),
-                tooltip: 'Print selected households'
+                tooltip: 'Print selected households',
+                disabled: isLoading
             },
             {
                 label: 'Copy Data',
                 icon: <Copy className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: onCopySelectedData,
-                tooltip: 'Copy selected data to clipboard'
+                tooltip: 'Copy selected data to clipboard',
+                disabled: isLoading
             }
         ],
         destructive: [
@@ -179,13 +188,15 @@ export default function HouseholdsContent({
                 icon: <Trash2 className="h-3.5 w-3.5 mr-1.5" />,
                 onClick: () => setShowBulkDeleteDialog?.(true),
                 tooltip: 'Delete selected households',
-                variant: 'destructive' as const
+                variant: 'destructive' as const,
+                disabled: isLoading
             }
         ]
     };
 
     // Toggle bulk mode handler
     const handleBulkModeToggle = () => {
+        if (isLoading) return;
         setIsBulkMode(!isBulkMode);
         if (isBulkMode) {
             onClearSelection();
@@ -194,6 +205,11 @@ export default function HouseholdsContent({
 
     // Check if we have any households
     const hasHouseholds = households && households.length > 0;
+
+    // Safe stats extraction
+    const safeStats = Array.isArray(stats) 
+        ? { total: 0, active: 0, inactive: 0, totalMembers: 0, averageMembers: 0, purokCount: 0 }
+        : stats;
 
     return (
         <>
@@ -258,6 +274,7 @@ export default function HouseholdsContent({
                                 <Select
                                     value={getCurrentSortValue()}
                                     onValueChange={onSortChange}
+                                    disabled={isLoading}
                                 >
                                     <SelectTrigger className="w-[180px] h-8 text-xs">
                                         <SelectValue placeholder="Sort by..." />
@@ -271,8 +288,8 @@ export default function HouseholdsContent({
                                         <SelectItem value="member_count-desc">Members (High to Low)</SelectItem>
                                         <SelectItem value="purok-asc">Purok (A to Z)</SelectItem>
                                         <SelectItem value="purok-desc">Purok (Z to A)</SelectItem>
-                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
-                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="status-asc">Status (A to Z)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Z to A)</SelectItem>
                                         <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
                                         <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
                                     </SelectContent>
@@ -287,6 +304,7 @@ export default function HouseholdsContent({
                                     id="select-all-grid"
                                     checked={isSelectAll}
                                     onCheckedChange={onSelectAllOnPage}
+                                    disabled={isLoading}
                                     className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                                 />
                                 <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -305,6 +323,7 @@ export default function HouseholdsContent({
                                                 id="bulk-mode"
                                                 checked={isBulkMode}
                                                 onCheckedChange={handleBulkModeToggle}
+                                                disabled={isLoading}
                                                 className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                             />
                                             <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -322,7 +341,7 @@ export default function HouseholdsContent({
                         
                         {/* Page Info */}
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                            Page {currentPage} of {totalPages}
+                            Page {currentPage} of {totalPages || 1}
                         </div>
                     </div>
                 </CardHeader>
@@ -362,6 +381,7 @@ export default function HouseholdsContent({
                                     puroks={puroks}
                                     sortBy={sortBy}
                                     sortOrder={sortOrder}
+                                    isLoading={isLoading}
                                 />
                             ) : (
                                 // Grid View
@@ -377,6 +397,7 @@ export default function HouseholdsContent({
                                     onToggleStatus={onToggleStatus}
                                     onCopyToClipboard={onCopyToClipboard}
                                     puroks={puroks}
+                                    isLoading={isLoading}
                                 />
                             )}
 

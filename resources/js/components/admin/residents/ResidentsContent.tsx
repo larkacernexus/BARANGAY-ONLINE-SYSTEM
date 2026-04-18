@@ -13,20 +13,6 @@ import {
 } from '@/components/ui/select';
 import { 
     User, 
-    Download, 
-    Printer, 
-    Edit, 
-    Trash2, 
-    Copy, 
-    Users, 
-    Globe,
-    FileSpreadsheet,
-    Home,
-    CheckSquare,
-    Square,
-    UserPlus,
-    UserMinus,
-    FileDown,
     ArrowUpDown
 } from 'lucide-react';
 
@@ -92,11 +78,12 @@ interface ResidentsContentProps {
     sortOrder?: 'asc' | 'desc';
     onSortChange?: (value: string) => void;
     getCurrentSortValue?: () => string;
+    isLoading?: boolean;
 }
 
 export default function ResidentsContent({
     residents,
-    stats,
+    stats: _stats, // Prefixed with underscore since it's not used
     isBulkMode,
     setIsBulkMode,
     isSelectAll,
@@ -137,11 +124,13 @@ export default function ResidentsContent({
     sortBy = 'last_name',
     sortOrder = 'asc',
     onSortChange = () => {},
-    getCurrentSortValue = () => 'last_name-asc'
+    getCurrentSortValue = () => 'last_name-asc',
+    isLoading = false
 }: ResidentsContentProps) {
     
     // Toggle handler for bulk mode
     const handleBulkModeToggle = () => {
+        if (isLoading) return;
         setIsBulkMode(!isBulkMode);
         if (isBulkMode) {
             onClearSelection();
@@ -149,11 +138,16 @@ export default function ResidentsContent({
     };
 
     // Ensure hasActiveFilters is a boolean (in case it's passed as string)
-    const activeFilters = Boolean(hasActiveFilters);
+    const activeFilters = typeof hasActiveFilters === 'string' 
+        ? hasActiveFilters === 'true' || hasActiveFilters === '1'
+        : Boolean(hasActiveFilters);
+
+    // Check if we have any residents
+    const hasResidents = residents && residents.length > 0;
 
     // Convert selectionStats to match the expected SelectionStats type
     const normalizedSelectionStats = selectionStats ? {
-        total: selectionStats.total,
+        total: selectionStats.total || 0,
         male: selectionStats.male || selectionStats.males || 0,
         female: selectionStats.female || selectionStats.females || 0,
         males: selectionStats.males || selectionStats.male || 0,
@@ -187,12 +181,16 @@ export default function ResidentsContent({
                     onBulkOperation={onBulkOperation}
                     onCopySelectedData={onCopySelectedData}
                     setShowBulkDeleteDialog={setShowBulkDeleteDialog}
+                    setShowBulkStatusDialog={setShowBulkStatusDialog}
+                    setShowBulkPurokDialog={setShowBulkPurokDialog}
+                    setShowBulkPrivilegeDialog={setShowBulkPrivilegeDialog}
+                    setShowBulkRemovePrivilegeDialog={setShowBulkRemovePrivilegeDialog}
                     bulkActions={customBulkActions}
                 />
             )}
 
             {/* Floating Select All for Grid View */}
-            {viewMode === 'grid' && residents.length > 0 && selectedResidents.length < residents.length && isBulkMode && (
+            {viewMode === 'grid' && hasResidents && selectedResidents.length < residents.length && isBulkMode && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
                     onSelectAll={onSelectAllOnPage}
@@ -233,6 +231,7 @@ export default function ResidentsContent({
                                 <Select
                                     value={getCurrentSortValue()}
                                     onValueChange={onSortChange}
+                                    disabled={isLoading}
                                 >
                                     <SelectTrigger className="w-[180px] h-8 text-xs">
                                         <SelectValue placeholder="Sort by..." />
@@ -248,8 +247,8 @@ export default function ResidentsContent({
                                         <SelectItem value="gender-desc">Gender (Z to A)</SelectItem>
                                         <SelectItem value="civil_status-asc">Civil Status (A to Z)</SelectItem>
                                         <SelectItem value="civil_status-desc">Civil Status (Z to A)</SelectItem>
-                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
-                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
+                                        <SelectItem value="status-asc">Status (A to Z)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Z to A)</SelectItem>
                                         <SelectItem value="purok-asc">Purok (A to Z)</SelectItem>
                                         <SelectItem value="purok-desc">Purok (Z to A)</SelectItem>
                                         <SelectItem value="is_voter-asc">Voter (No to Yes)</SelectItem>
@@ -262,12 +261,13 @@ export default function ResidentsContent({
                         )}
 
                         {/* Grid view select all checkbox */}
-                        {viewMode === 'grid' && isBulkMode && residents.length > 0 && (
+                        {viewMode === 'grid' && isBulkMode && hasResidents && (
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all-grid"
                                     checked={isSelectAll}
                                     onCheckedChange={onSelectAllOnPage}
+                                    disabled={isLoading}
                                     className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                                 />
                                 <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -286,6 +286,7 @@ export default function ResidentsContent({
                                                 id="bulk-mode"
                                                 checked={isBulkMode}
                                                 onCheckedChange={handleBulkModeToggle}
+                                                disabled={isLoading}
                                                 className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                             />
                                             <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -295,6 +296,7 @@ export default function ResidentsContent({
                                     </TooltipTrigger>
                                     <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
                                         <p>Toggle bulk selection mode</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Ctrl+Shift+B • Ctrl+A to select</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
@@ -302,13 +304,13 @@ export default function ResidentsContent({
                         
                         {/* Page Info */}
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                            Page {currentPage} of {totalPages}
+                            Page {currentPage} of {totalPages || 1}
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 dark:bg-gray-900">
                     {/* Empty State with dark mode */}
-                    {residents.length === 0 ? (
+                    {!hasResidents ? (
                         <EmptyState
                             icon={<User className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No residents found"
@@ -319,6 +321,7 @@ export default function ResidentsContent({
                                 label: "Clear Filters",
                                 onClick: onClearFilters
                             } : undefined}
+                            className="py-12 sm:py-16 dark:bg-gray-900"
                         />
                     ) : (
                         <>
@@ -339,6 +342,9 @@ export default function ResidentsContent({
                                     onCopyToClipboard={onCopyToClipboard}
                                     onSelectAllOnPage={onSelectAllOnPage}
                                     isSelectAll={isSelectAll}
+                                    sortBy={sortBy}
+                                    sortOrder={sortOrder}
+                                    isLoading={isLoading}
                                 />
                             ) : (
                                 // Grid View
@@ -353,6 +359,7 @@ export default function ResidentsContent({
                                     onToggleStatus={onToggleStatus}
                                     onViewPhoto={onViewPhoto}
                                     onCopyToClipboard={onCopyToClipboard}
+                                    isLoading={isLoading}
                                 />
                             )}
 
@@ -365,6 +372,14 @@ export default function ResidentsContent({
                                     onSelectAll={onSelectAllOnPage}
                                     onClearSelection={onClearSelection}
                                     className="mt-4 mx-4 dark:text-gray-300"
+                                    extraInfo={
+                                        normalizedSelectionStats && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                {normalizedSelectionStats.male} male • {normalizedSelectionStats.female} female • 
+                                                Avg age: {normalizedSelectionStats.averageAge.toFixed(1)}
+                                            </div>
+                                        )
+                                    }
                                 />
                             )}
 

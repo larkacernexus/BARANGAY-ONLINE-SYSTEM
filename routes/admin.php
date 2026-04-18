@@ -610,7 +610,7 @@ Route::middleware('permission:view-privileges')->prefix('privileges')->name('pri
 
 // Routes for managing privileges (manage-privileges permission)
 Route::middleware('permission:manage-privileges')->prefix('privileges')->name('privileges.')->group(function () {
-    Route::get('/create', [PrivilegeController::class, 'create'])->name('create');
+    Route::get('/privileges/create', [PrivilegeController::class, 'create'])->name('create');
     Route::post('/', [PrivilegeController::class, 'store'])->name('store');
     Route::get('/{privilege}/edit', [PrivilegeController::class, 'edit'])->name('edit');
     Route::put('/{privilege}', [PrivilegeController::class, 'update'])->name('update');

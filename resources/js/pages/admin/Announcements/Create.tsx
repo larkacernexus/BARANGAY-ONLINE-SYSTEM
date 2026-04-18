@@ -1,53 +1,21 @@
-// pages/admin/Announcements/Create.tsx
-
-import { useState, useEffect } from 'react';
-import { Link, useForm, usePage } from '@inertiajs/react';
+// pages/admin/announcements/create.tsx
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import AudienceTarget from '@/components/admin/announcements/AudienceTarget';
-import { 
-    ArrowLeft,
-    Save,
-    Bell,
-    AlertCircle,
-    Calendar,
-    Clock,
-    Megaphone,
-    Zap,
-    Eye,
-    Settings,
-    Wrench,
-    Tag,
-    CalendarClock,
-    Users,
-    Home,
-    MapPin,
-    Briefcase,
-    UserCog,
-    Globe,
-    Paperclip,
-    X,
-    Upload,
-    File,
-    FileImage,
-    FileText,
-    FileSpreadsheet,
-    FileArchive,
-    Loader2,
-    Trash2,
-    Maximize2,
-    Info,
-} from 'lucide-react';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { Megaphone, Paperclip, Settings, Users, Sparkles, Copy, RefreshCw, AlertCircle, Bell, Briefcase, Calendar, FileArchive, FileImage, FileSpreadsheet, FileText, Globe, Home, MapPin, Tag, UserCog, Wrench } from 'lucide-react';
+import { ContentTab } from '@/components/admin/announcements/create/content-tab';
+import { AttachmentsTab } from '@/components/admin/announcements/create/attachments-tab';
+import { SettingsTab } from '@/components/admin/announcements/create/settings-tab';
+import { AudienceTab } from '@/components/admin/announcements/create/audience-tab';
 import { route } from 'ziggy-js';
 import {
     Dialog,
@@ -56,17 +24,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
-
-// Import types from centralized types file
-import type {
-    AnnouncementType,
-    PriorityLevel,
+import type { 
+    AnnouncementType, 
+    PriorityLevel, 
     AudienceType,
     Role,
     Purok,
@@ -75,21 +35,20 @@ import type {
     User
 } from '@/types/admin/announcements/announcement.types';
 
-// Props interface using imported types
-interface CreateAnnouncementProps {
-    types: Record<AnnouncementType, string>;
-    priorities: Record<PriorityLevel, string>;
-    audience_types: Record<AudienceType, string>;
-    roles: Role[];
-    puroks: Purok[];
-    households: Household[];
-    businesses: Business[];
-    users: User[];
-    maxFileSize?: number;
-    allowedFileTypes?: string[];
-}
+const tabs: TabConfig[] = [
+    { id: 'content', label: 'Content', icon: Megaphone, requiredFields: ['title', 'content'] },
+    { id: 'attachments', label: 'Attachments', icon: Paperclip, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] },
+    { id: 'audience', label: 'Audience', icon: Users, requiredFields: [] }
+];
 
-// Attachment interface
+const requiredFieldsMap = {
+    content: ['title', 'content'],
+    attachments: [],
+    settings: [],
+    audience: []
+};
+
 interface Attachment {
     id?: number;
     file: File;
@@ -97,14 +56,11 @@ interface Attachment {
     name: string;
     size: number;
     type: string;
-    progress?: number;
     error?: string;
-    isUploading?: boolean;
     isImage?: boolean;
 }
 
-// Form data interface
-interface AnnouncementFormData {
+interface FormData {
     title: string;
     content: string;
     type: AnnouncementType;
@@ -123,114 +79,199 @@ interface AnnouncementFormData {
     attachments: File[];
 }
 
-// Helper function to format file size
-const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
+export default function CreateAnnouncement() {
+    const { props } = usePage<{
+        types: Record<AnnouncementType, string>;
+        priorities: Record<PriorityLevel, string>;
+        audience_types: Record<AudienceType, string>;
+        roles: Role[];
+        puroks: Purok[];
+        households: Household[];
+        businesses: Business[];
+        users: User[];
+        maxFileSize: number;
+        allowedFileTypes: string[];
+        templates: Array<{ title: string; content: string; type: AnnouncementType; priority: PriorityLevel }>;
+    }>();
 
-// Helper function to get file icon
-const getFileIcon = (file: File | Attachment) => {
-    const type = file.type;
-    const name = file.name;
-    
-    if (type.includes('image')) return FileImage;
-    if (type.includes('pdf')) return FileText;
-    if (type.includes('word') || name.endsWith('.doc') || name.endsWith('.docx')) return FileText;
-    if (type.includes('excel') || name.endsWith('.xls') || name.endsWith('.xlsx')) return FileSpreadsheet;
-    if (type.includes('zip') || type.includes('rar') || type.includes('7z')) return FileArchive;
-    return File;
-};
+    const {
+        types = {} as Record<AnnouncementType, string>,
+        priorities = {} as Record<PriorityLevel, string>,
+        audience_types = {} as Record<AudienceType, string>,
+        roles = [],
+        puroks = [],
+        households = [],
+        businesses = [],
+        users = [],
+        maxFileSize = 10,
+        allowedFileTypes = ['image/*', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv'],
+        templates = []
+    } = props;
 
-export default function CreateAnnouncement({ 
-    types, 
-    priorities,
-    audience_types,
-    roles,
-    puroks,
-    households,
-    businesses,
-    users,
-    maxFileSize = 10,
-    allowedFileTypes = ['image/*', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv']
-}: CreateAnnouncementProps) {
-    const { flash } = usePage().props as any;
-    const [activeTab, setActiveTab] = useState<string>('content');
-    const [showStartTime, setShowStartTime] = useState<boolean>(false);
-    const [showEndTime, setShowEndTime] = useState<boolean>(false);
-    
-    // Attachment state
+    const [showPreview, setShowPreview] = useState(true);
+    const [showStartTime, setShowStartTime] = useState(false);
+    const [showEndTime, setShowEndTime] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
-    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const [isDragging, setIsDragging] = useState(false);
     const [previewImage, setPreviewImage] = useState<Attachment | null>(null);
 
-    // Form state with proper typing
-    const { data, setData, post, processing, errors, reset } = useForm<AnnouncementFormData>({
-        title: '',
-        content: '',
-        type: 'general',
-        priority: 1,
-        is_active: true,
-        audience_type: 'all',
-        target_roles: [],
-        target_puroks: [],
-        target_households: [],
-        target_businesses: [],
-        target_users: [],
-        start_date: '',
-        start_time: '',
-        end_date: '',
-        end_time: '',
-        attachments: [],
+    // Memoized values
+    const typeOptions = useMemo(() => Object.entries(types).map(([value, label]) => ({ value: value as AnnouncementType, label })), [types]);
+    const priorityOptions = useMemo(() => Object.entries(priorities).map(([value, label]) => ({ value: parseInt(value) as PriorityLevel, label })), [priorities]);
+    const audienceOptions = useMemo(() => Object.entries(audience_types).map(([value, label]) => ({ value: value as AudienceType, label })), [audience_types]);
+
+    const attachmentsCount = attachments.length;
+
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm,
+        hasUnsavedChanges
+    } = useFormManager<FormData>({
+        initialData: {
+            title: '',
+            content: '',
+            type: 'general' as AnnouncementType,
+            priority: 2 as PriorityLevel,
+            is_active: true,
+            audience_type: 'all' as AudienceType,
+            target_roles: [],
+            target_puroks: [],
+            target_households: [],
+            target_businesses: [],
+            target_users: [],
+            start_date: '',
+            start_time: '',
+            end_date: '',
+            end_time: '',
+            attachments: [],
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            const submitData = new FormData();
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== null && value !== undefined && value !== '') {
+                    if (key === 'attachments' && Array.isArray(value)) {
+                        value.forEach((file, index) => {
+                            submitData.append(`attachments[${index}]`, file);
+                        });
+                    } else if (Array.isArray(value)) {
+                        value.forEach(id => {
+                            submitData.append(`${key}[]`, id.toString());
+                        });
+                    } else if (typeof value === 'boolean') {
+                        submitData.append(key, value ? '1' : '0');
+                    } else {
+                        submitData.append(key, value.toString());
+                    }
+                }
+            });
+
+            router.post(route('admin.announcements.store'), submitData, {
+                onSuccess: () => {
+                    toast.success('Announcement created successfully');
+                    router.visit(route('admin.announcements.index'));
+                },
+                onError: (errs) => {
+                    toast.error('Failed to create announcement');
+                }
+            });
+        }
     });
 
-    // Flash messages
+    // Ensure active tab is 'content' when component mounts
     useEffect(() => {
-        if (flash?.success) {
-            toast.success(flash.success);
-        }
-        if (flash?.error) {
-            toast.error(flash.error);
-        }
-    }, [flash]);
+        setActiveTab('content');
+    }, []); // Empty dependency array ensures this runs once on mount
 
-    // Auto-set end date to 30 days from start date
-    useEffect(() => {
-        if (data.start_date && !data.end_date) {
-            const startDate = new Date(data.start_date);
-            const endDate = new Date(startDate);
-            endDate.setDate(endDate.getDate() + 30);
-            
-            const formattedEndDate = endDate.toISOString().split('T')[0];
-            setData('end_date', formattedEndDate);
-        }
-    }, [data.start_date, setData]);
+    // Format file size
+    const formatFileSize = useCallback((bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }, []);
 
-    // Clean up preview URLs on unmount
-    useEffect(() => {
-        return () => {
-            if (attachments.length > 0) {
-                attachments.forEach(att => {
-                    if (att?.preview) {
-                        URL.revokeObjectURL(att.preview);
-                    }
-                });
-            }
-        };
-    }, [attachments]);
+    // Get file icon component
+    const getFileIconComponent = useCallback((attachment: Attachment) => {
+        const type = attachment.type;
+        const name = attachment.name;
+        
+        if (type.includes('image')) return FileImage;
+        if (type.includes('pdf')) return FileText;
+        if (name.endsWith('.doc') || name.endsWith('.docx')) return FileText;
+        if (name.endsWith('.xls') || name.endsWith('.xlsx')) return FileSpreadsheet;
+        if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z')) return FileArchive;
+        return FileText;
+    }, []);
+
+    // Get priority color
+    const getPriorityColor = useCallback((priority: PriorityLevel): string => {
+        switch (priority) {
+            case 4: return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+            case 3: return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
+            case 2: return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+            case 1: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+        }
+    }, []);
+
+    // Get type color
+    const getTypeColor = useCallback((type: AnnouncementType): string => {
+        switch (type) {
+            case 'important': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+            case 'event': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400';
+            case 'maintenance': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
+            case 'other': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+            default: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+        }
+    }, []);
+
+    // Get type icon
+    const getTypeIcon = useCallback((type: AnnouncementType) => {
+        switch (type) {
+            case 'important': return AlertCircle;
+            case 'event': return Calendar;
+            case 'maintenance': return Wrench;
+            case 'other': return Tag;
+            default: return Bell;
+        }
+    }, []);
+
+    // Get audience icon
+    const getAudienceIcon = useCallback((type: AudienceType) => {
+        switch (type) {
+            case 'roles': return Users;
+            case 'puroks': return MapPin;
+            case 'households': return Home;
+            case 'household_members': return Users;
+            case 'businesses': return Briefcase;
+            case 'specific_users': return UserCog;
+            default: return Globe;
+        }
+    }, []);
 
     // Validate file before adding
-    const validateFile = (file: File): string | null => {
-        // Check file size (convert MB to bytes)
+    const validateFile = useCallback((file: File): string | null => {
         const maxSizeBytes = maxFileSize * 1024 * 1024;
         if (file.size > maxSizeBytes) {
             return `File size exceeds ${maxFileSize}MB limit`;
         }
 
-        // Check file type if allowed types are specified
         if (allowedFileTypes.length > 0) {
             const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
             const isAllowed = allowedFileTypes.some(type => {
@@ -247,17 +288,16 @@ export default function CreateAnnouncement({
         }
 
         return null;
-    };
+    }, [maxFileSize, allowedFileTypes]);
 
     // Handle file selection
-    const handleFileSelect = (files: FileList | null) => {
+    const handleFileSelect = useCallback((files: FileList | null) => {
         if (!files) return;
 
         const newAttachments: Attachment[] = [];
         const newFiles: File[] = [];
 
         Array.from(files).forEach(file => {
-            // Check for duplicates
             if (attachments.some(att => att.name === file.name && att.size === file.size)) {
                 toast.error(`${file.name} is already added`);
                 return;
@@ -285,237 +325,117 @@ export default function CreateAnnouncement({
             newAttachments.push(attachment);
         });
 
-        setAttachments([...attachments, ...newAttachments]);
-        setData('attachments', [...data.attachments, ...newFiles]);
-    };
+        setAttachments(prev => [...prev, ...newAttachments]);
+        updateFormData({ attachments: [...formData.attachments, ...newFiles] });
+    }, [attachments, formData.attachments, updateFormData, validateFile]);
 
     // Handle file drop
-    const handleDrop = (e: React.DragEvent) => {
+    const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
         handleFileSelect(e.dataTransfer.files);
-    };
+    }, [handleFileSelect]);
 
     // Handle drag events
-    const handleDragOver = (e: React.DragEvent) => {
+    const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(true);
-    };
+    }, []);
 
-    const handleDragLeave = (e: React.DragEvent) => {
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-    };
+    }, []);
 
     // Remove attachment
-    const removeAttachment = (index: number) => {
-        // Clean up preview URL if exists
+    const removeAttachment = useCallback((index: number) => {
         if (attachments[index]?.preview) {
             URL.revokeObjectURL(attachments[index].preview!);
         }
         
-        // Update attachments state
         setAttachments(prev => prev.filter((_, i) => i !== index));
-        
-        // Update form data - use direct assignment instead of updater function
-        const updatedAttachments = data.attachments.filter((_, i) => i !== index);
-        setData('attachments', updatedAttachments);
-    };
+        const updatedAttachments = formData.attachments.filter((_, i) => i !== index);
+        updateFormData({ attachments: updatedAttachments });
+    }, [attachments, formData.attachments, updateFormData]);
 
     // Clear all attachments
-    const clearAttachments = () => {
-        // Clean up all preview URLs
+    const clearAttachments = useCallback(() => {
         attachments.forEach(att => {
             if (att?.preview) {
                 URL.revokeObjectURL(att.preview);
             }
         });
         setAttachments([]);
-        setData('attachments', []);
-    };
+        updateFormData({ attachments: [] });
+    }, [attachments, updateFormData]);
 
-    // Validate form before submit
-    const validateForm = (): boolean => {
-        if (!data.title.trim()) {
-            toast.error('Title is required');
-            setActiveTab('content');
-            return false;
-        }
-        if (!data.content.trim()) {
-            toast.error('Content is required');
-            setActiveTab('content');
-            return false;
-        }
-        
-        // Check for attachment errors
-        const hasErrors = attachments.some(att => att.error);
-        if (hasErrors) {
-            toast.error('Please fix attachment errors before publishing');
-            setActiveTab('attachments');
-            return false;
-        }
+    // Cleanup object URLs on unmount
+    useEffect(() => {
+        return () => {
+            attachments.forEach(att => {
+                if (att?.preview) {
+                    URL.revokeObjectURL(att.preview);
+                }
+            });
+        };
+    }, [attachments]);
 
-        // Validate audience selections
-        switch (data.audience_type) {
-            case 'roles':
-                if (data.target_roles.length === 0) {
-                    toast.error('Please select at least one role');
-                    setActiveTab('audience');
-                    return false;
-                }
-                break;
-            case 'puroks':
-                if (data.target_puroks.length === 0) {
-                    toast.error('Please select at least one purok');
-                    setActiveTab('audience');
-                    return false;
-                }
-                break;
-            case 'households':
-            case 'household_members':
-                if (data.target_households.length === 0) {
-                    toast.error('Please select at least one household');
-                    setActiveTab('audience');
-                    return false;
-                }
-                break;
-            case 'businesses':
-                if (data.target_businesses.length === 0) {
-                    toast.error('Please select at least one business');
-                    setActiveTab('audience');
-                    return false;
-                }
-                break;
-            case 'specific_users':
-                if (data.target_users.length === 0) {
-                    toast.error('Please select at least one user');
-                    setActiveTab('audience');
-                    return false;
-                }
-                break;
-        }
-        
-        return true;
-    };
+    // Handle multi-select changes for audience targets
+    const handleMultiSelectChange = useCallback((name: string, value: number[]) => {
+        updateFormData({ [name]: value });
+    }, [updateFormData]);
 
-    const handleSubmit = () => {
-        if (!validateForm()) return;
+    // Handle switch changes
+    const handleSwitchChange = useCallback((name: string, checked: boolean) => {
+        updateFormData({ [name]: checked });
+    }, [updateFormData]);
 
-        // Prepare FormData for submission with files
-        const formData = new FormData();
+    // Auto-set end date to 30 days from start date
+    const handleAutoFillDates = useCallback(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 30);
+        const formattedEndDate = endDate.toISOString().split('T')[0];
         
-        // Add all form fields
-        formData.append('title', data.title);
-        formData.append('content', data.content);
-        formData.append('type', data.type);
-        formData.append('priority', data.priority.toString());
-        formData.append('is_active', data.is_active.toString());
-        formData.append('audience_type', data.audience_type);
-        
-        // Add array fields
-        if (data.target_roles.length > 0) {
-            data.target_roles.forEach(id => formData.append('target_roles[]', id.toString()));
-        }
-        
-        if (data.target_puroks.length > 0) {
-            data.target_puroks.forEach(id => formData.append('target_puroks[]', id.toString()));
-        }
-        
-        if (data.target_households.length > 0) {
-            data.target_households.forEach(id => formData.append('target_households[]', id.toString()));
-        }
-        
-        if (data.target_businesses.length > 0) {
-            data.target_businesses.forEach(id => formData.append('target_businesses[]', id.toString()));
-        }
-        
-        if (data.target_users.length > 0) {
-            data.target_users.forEach(id => formData.append('target_users[]', id.toString()));
-        }
-        
-        // Add dates
-        if (data.start_date) formData.append('start_date', data.start_date);
-        if (showStartTime && data.start_time) formData.append('start_time', data.start_time);
-        if (data.end_date) formData.append('end_date', data.end_date);
-        if (showEndTime && data.end_time) formData.append('end_time', data.end_time);
-        
-        // Add attachments
-        data.attachments.forEach((file, index) => {
-            formData.append(`attachments[${index}]`, file);
+        updateFormData({
+            start_date: formData.start_date || today,
+            end_date: formData.end_date || formattedEndDate,
         });
-
-        // Submit using FormData
-        post(route('admin.announcements.store'), {
-            data: formData,
-            preserveScroll: true,
-            onSuccess: () => {
-                reset();
-                clearAttachments();
-                setShowStartTime(false);
-                setShowEndTime(false);
-                setActiveTab('content');
-                toast.success('Announcement created successfully');
-            },
-            onError: (errors) => {
-                console.error('Submission errors:', errors);
-                toast.error('Please check the form for errors');
-            }
-        });
-    };
-
-    const handleAutoFillDate = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
         
-        if (!data.start_date) {
-            const today = new Date().toISOString().split('T')[0];
-            setData('start_date', today);
-        }
-        
-        if (!data.end_date) {
-            const endDate = new Date();
-            endDate.setDate(endDate.getDate() + 30);
-            const formattedEndDate = endDate.toISOString().split('T')[0];
-            setData('end_date', formattedEndDate);
-        }
-        
-        if (showStartTime && !data.start_time) {
+        if (showStartTime && !formData.start_time) {
             const now = new Date();
             const hours = now.getHours().toString().padStart(2, '0');
             const minutes = now.getMinutes().toString().padStart(2, '0');
-            setData('start_time', `${hours}:${minutes}`);
+            updateFormData({ start_time: `${hours}:${minutes}` });
         }
         
         toast.success('Dates auto-filled');
-    };
+    }, [formData.start_date, formData.end_date, formData.start_time, showStartTime, updateFormData]);
 
-    const clearForm = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        reset();
-        clearAttachments();
-        setShowStartTime(false);
-        setShowEndTime(false);
-        setActiveTab('content');
-        toast.info('Form cleared');
-    };
-
-    const handleToggleTime = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
+    // Handle toggle time
+    const handleToggleTime = useCallback(() => {
         setShowStartTime(!showStartTime);
         setShowEndTime(!showEndTime);
-    };
+    }, [showStartTime, showEndTime]);
+
+    // Apply template
+    const applyTemplate = useCallback((template: { title: string; content: string; type: AnnouncementType; priority: PriorityLevel }) => {
+        updateFormData({
+            title: template.title,
+            content: template.content,
+            type: template.type,
+            priority: template.priority,
+        });
+        setActiveTab('content');
+        toast.success('Template applied');
+    }, [updateFormData, setActiveTab]);
 
     // Format date and time for preview
-    const formatDateTimePreview = (date: string, time: string, showTime: boolean): string => {
+    const formatDateTimePreview = useCallback((date: string, time: string, showTime: boolean): string => {
         if (!date) return 'Not set';
         
         const dateObj = new Date(date);
         const formattedDate = dateObj.toLocaleDateString('en-US', {
-            weekday: 'long',
             year: 'numeric',
             month: 'long',
             day: 'numeric'
@@ -530,823 +450,345 @@ export default function CreateAnnouncement({
         }
         
         return formattedDate;
-    };
+    }, []);
 
-    // Get priority color
-    const getPriorityColor = (priority: PriorityLevel): string => {
-        switch (priority) {
-            case 4: return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
-            case 3: return 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800';
-            case 2: return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
-            case 1: return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
-            default: return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
+    // Handle reset
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
+            resetForm();
+            clearAttachments();
+            setShowStartTime(false);
+            setShowEndTime(false);
+            setActiveTab('content'); // Reset to content tab
+            toast.info('Form reset');
         }
-    };
+    }, [resetForm, clearAttachments]);
 
-    // Get type color
-    const getTypeColor = (type: AnnouncementType): string => {
-        switch (type) {
-            case 'important': return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
-            case 'event': return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800';
-            case 'maintenance': return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800';
-            case 'other': return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-700';
-            default: return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
+    // Handle cancel
+    const handleCancel = useCallback(() => {
+        if (hasUnsavedChanges) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.announcements.index'));
+            }
+        } else {
+            router.visit(route('admin.announcements.index'));
         }
+    }, [hasUnsavedChanges]);
+
+    // Default templates
+    const defaultTemplates = [
+        {
+            title: 'Barangay Assembly',
+            content: 'Barangay Assembly will be held on [DATE] at [TIME] at the Barangay Hall. All residents are invited to attend.',
+            type: 'event' as AnnouncementType,
+            priority: 2 as PriorityLevel,
+        },
+        {
+            title: 'Medical Mission',
+            content: 'Free medical mission with dental check-up, blood pressure monitoring, and medicine distribution.',
+            type: 'event' as AnnouncementType,
+            priority: 2 as PriorityLevel,
+        },
+        {
+            title: 'Clean-Up Drive',
+            content: 'Community clean-up drive. Meet at the Barangay Hall at 7 AM. Please bring your own gloves and trash bags.',
+            type: 'general' as AnnouncementType,
+            priority: 1 as PriorityLevel,
+        },
+    ];
+
+    const displayTemplates = templates.length > 0 ? templates : defaultTemplates;
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        content: getTabStatus('content'),
+        attachments: getTabStatus('attachments'),
+        settings: getTabStatus('settings'),
+        audience: getTabStatus('audience')
     };
 
-    // Get type icon
-    const getTypeIcon = (type: AnnouncementType) => {
-        switch (type) {
-            case 'important': return AlertCircle;
-            case 'event': return Calendar;
-            case 'maintenance': return Wrench;
-            case 'other': return Tag;
-            default: return Bell;
-        }
-    };
+    const missingFields = getMissingFields();
 
-    // Get audience icon
-    const getAudienceIcon = (type: AudienceType) => {
-        switch (type) {
-            case 'roles': return Users;
-            case 'puroks': return MapPin;
-            case 'households': return Home;
-            case 'household_members': return Users;
-            case 'businesses': return Briefcase;
-            case 'specific_users': return UserCog;
-            default: return Globe;
-        }
-    };
+    const requiredFieldsList = [
+        { label: 'Title', value: !!formData.title, tabId: 'content' },
+        { label: 'Content', value: !!formData.content, tabId: 'content' },
+    ];
 
-    const typeOptions = Object.entries(types).map(([value, label]) => ({ 
-        value: value as AnnouncementType, 
-        label 
-    }));
-    
-    const priorityOptions = Object.entries(priorities).map(([value, label]) => ({ 
-        value: parseInt(value) as PriorityLevel, 
-        label 
-    }));
-
-    // Safe check for attachments count
-    const attachmentsCount = attachments.length;
+    const tabOrder = ['content', 'attachments', 'settings', 'audience'];
 
     return (
         <AppLayout
             title="Create Announcement"
             breadcrumbs={[
-                { title: 'Dashboard', href: route('admin.dashboard') },
-                { title: 'Announcements', href: route('admin.announcements.index') },
-                { title: 'Create', href: route('admin.announcements.create') }
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Announcements', href: '/admin/announcements' },
+                { title: 'Create', href: '/admin/announcements/create' }
             ]}
         >
-            {/* Using div instead of form to prevent accidental submissions */}
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <Link href={route('admin.announcements.index')}>
-                            <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back
-                            </Button>
-                        </Link>
-                        <div className="flex items-center gap-3">
-                            <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                <Megaphone className="h-6 w-6 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
-                                    Create New Announcement
-                                </h1>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                    Create and publish announcements with attachments and targeted audience
-                                </p>
+                <FormHeader
+                    title="Create Announcement"
+                    description="Create and publish announcements with attachments and targeted audience"
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Reset
+                            </button>
+                        </div>
+                    }
+                />
+
+                {/* Quick Templates Card */}
+                <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
+                    <div className="flex items-start gap-3">
+                        <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+                        <div className="flex-1">
+                            <h3 className="font-medium text-purple-800 dark:text-purple-300">Quick start with templates</h3>
+                            <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">
+                                Choose from common announcement templates to get started quickly.
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                                {displayTemplates.map((template, index) => (
+                                    <button
+                                        key={index}
+                                        type="button"
+                                        onClick={() => applyTemplate(template)}
+                                        className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                                    >
+                                        <Copy className="h-3 w-3" />
+                                        {template.title}
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button 
-                            type="button" 
-                            onClick={handleSubmit} 
-                            disabled={processing} 
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white dark:from-purple-700 dark:to-pink-700"
-                        >
-                            {processing ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                                <Save className="h-4 w-4 mr-2" />
-                            )}
-                            {processing ? 'Publishing...' : 'Publish Announcement'}
-                        </Button>
                     </div>
                 </div>
 
-                {/* Error Summary */}
-                {Object.keys(errors).length > 0 && (
-                    <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
-                        <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                                <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
-                                <div>
-                                    <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
-                                    <ul className="list-disc list-inside mt-2 space-y-1">
-                                        {Object.entries(errors).map(([field, error]) => (
-                                            <li key={field} className="text-sm text-red-600 dark:text-red-400">
-                                                <span className="font-medium capitalize">{field.replace(/_/g, ' ')}:</span> {error as string}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                <FormErrors errors={errors} />
 
-                {/* Main Content Tabs */}
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                    <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-                        <TabsTrigger value="content" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white">
-                            Content
-                        </TabsTrigger>
-                        <TabsTrigger value="attachments" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white">
-                            Attachments
-                            {attachmentsCount > 0 && (
-                                <Badge variant="secondary" className="ml-2 dark:bg-gray-700 dark:text-gray-300">
-                                    {attachmentsCount}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger value="settings" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white">
-                            Settings
-                        </TabsTrigger>
-                        <TabsTrigger value="audience" type="button" className="dark:text-gray-400 dark:data-[state=active]:text-white">
-                            Audience
-                        </TabsTrigger>
-                    </TabsList>
-
-                    {/* Content Tab */}
-                    <TabsContent value="content" className="space-y-6">
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                    <Megaphone className="h-5 w-5" />
-                                    Announcement Content
-                                </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    What residents will see
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="title" className="dark:text-gray-300">Title <span className="text-red-500">*</span></Label>
-                                    <Input 
-                                        id="title" 
-                                        placeholder="e.g., Important: Water Service Interruption" 
-                                        value={data.title}
-                                        onChange={(e) => setData('title', e.target.value)}
-                                        className="text-lg font-medium dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                        maxLength={255}
-                                    />
-                                    {errors.title && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.title}</p>
-                                    )}
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Make the title clear and attention-grabbing. {data.title.length}/255 characters
-                                    </p>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="content" className="dark:text-gray-300">Content <span className="text-red-500">*</span></Label>
-                                    <Textarea 
-                                        id="content" 
-                                        placeholder="Enter the full announcement details here..."
-                                        rows={8}
-                                        value={data.content}
-                                        onChange={(e) => setData('content', e.target.value)}
-                                        className="min-h-[200px] font-mono dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                    />
-                                    {errors.content && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.content}</p>
-                                    )}
-                                    <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                                        <span>Supports plain text. Keep it clear and concise.</span>
-                                        <span>{data.content.length} characters</span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* Attachments Tab */}
-                    <TabsContent value="attachments" className="space-y-6">
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                    <Paperclip className="h-5 w-5" />
-                                    Attachments (Optional)
-                                </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Upload files, images, or documents to support your announcement
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                {/* Upload Area */}
-                                <div
-                                    className={`
-                                        border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer
-                                        ${isDragging 
-                                            ? 'border-blue-500 bg-blue-50 dark:border-blue-600 dark:bg-blue-900/20' 
-                                            : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900'
-                                        }
-                                    `}
-                                    onDrop={handleDrop}
-                                    onDragOver={handleDragOver}
-                                    onDragLeave={handleDragLeave}
-                                    onClick={() => document.getElementById('file-upload')?.click()}
-                                >
-                                    <input
-                                        type="file"
-                                        id="file-upload"
-                                        multiple
-                                        className="hidden"
-                                        onChange={(e) => handleFileSelect(e.target.files)}
-                                        accept={allowedFileTypes.join(',')}
-                                    />
-                                    
-                                    <div className="flex flex-col items-center gap-2 pointer-events-none">
-                                        <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30">
-                                            <Upload className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                                        </div>
-                                        <h3 className="font-semibold text-lg dark:text-gray-100">
-                                            Drop files here or click to upload
-                                        </h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
-                                            Drag and drop your files here, or click to browse
-                                        </p>
-                                        <div className="flex flex-wrap gap-2 justify-center mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">Max size: {maxFileSize}MB</span>
-                                            {allowedFileTypes.slice(0, 3).map((type, i) => (
-                                                <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">{type}</span>
-                                            ))}
-                                            {allowedFileTypes.length > 3 && (
-                                                <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">+{allowedFileTypes.length - 3} more</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* File List */}
-                                {attachments.length > 0 && (
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="font-semibold dark:text-gray-100">
-                                                Selected Files ({attachments.length})
-                                            </h3>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={clearAttachments}
-                                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
-                                            >
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Clear All
-                                            </Button>
-                                        </div>
-
-                                        <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
-                                            {attachments.map((attachment, index) => {
-                                                if (!attachment) return null;
-                                                
-                                                const FileIcon = getFileIcon(attachment);
-                                                
-                                                return (
-                                                    <div
-                                                        key={index}
-                                                        className={`
-                                                            flex items-center gap-3 p-3 border rounded-lg
-                                                            ${attachment.error 
-                                                                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' 
-                                                                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
-                                                            }
-                                                            transition-colors
-                                                        `}
-                                                    >
-                                                        {/* Thumbnail for images */}
-                                                        {attachment.isImage && attachment.preview ? (
-                                                            <div className="relative group flex-shrink-0">
-                                                                <img
-                                                                    src={attachment.preview}
-                                                                    alt={attachment.name}
-                                                                    className="h-12 w-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        setPreviewImage(attachment);
-                                                                    }}
-                                                                    className="absolute inset-0 bg-black/0 group-hover:bg-black/40 rounded-lg transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100"
-                                                                >
-                                                                    <Maximize2 className="h-4 w-4 text-white" />
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center flex-shrink-0 border border-gray-200 dark:border-gray-700">
-                                                                <FileIcon className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                                                            </div>
-                                                        )}
-
-                                                        {/* File Info */}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="font-medium text-sm truncate dark:text-gray-100">
-                                                                    {attachment.name}
-                                                                </p>
-                                                                {attachment.error && (
-                                                                    <Badge variant="destructive" className="text-xs flex-shrink-0 dark:bg-red-900/30 dark:text-red-400">
-                                                                        Error
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                                <span>{formatFileSize(attachment.size)}</span>
-                                                                <span>•</span>
-                                                                <span className="truncate">
-                                                                    {attachment.type || 'Unknown type'}
-                                                                </span>
-                                                            </div>
-                                                            {attachment.error && (
-                                                                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                                                                    {attachment.error}
-                                                                </p>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Actions */}
-                                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                                            {attachment.isImage && attachment.preview && (
-                                                                <TooltipProvider>
-                                                                    <Tooltip>
-                                                                        <TooltipTrigger asChild>
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="h-8 w-8 dark:text-gray-400 dark:hover:text-white"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setPreviewImage(attachment);
-                                                                                }}
-                                                                            >
-                                                                                <Eye className="h-4 w-4" />
-                                                                            </Button>
-                                                                        </TooltipTrigger>
-                                                                        <TooltipContent>Preview</TooltipContent>
-                                                                    </Tooltip>
-                                                                </TooltipProvider>
-                                                            )}
-                                                            <TooltipProvider>
-                                                                <Tooltip>
-                                                                    <TooltipTrigger asChild>
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                removeAttachment(index);
-                                                                            }}
-                                                                        >
-                                                                            <X className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>Remove</TooltipContent>
-                                                                </Tooltip>
-                                                            </TooltipProvider>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Tips */}
-                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                                    <h4 className="font-semibold text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">
-                                        <Info className="h-4 w-4" />
-                                        Tips for attachments
-                                    </h4>
-                                    <ul className="space-y-1 text-sm text-blue-600 dark:text-blue-400">
-                                        <li>• Upload images to make announcements more visual</li>
-                                        <li>• Include PDF forms or documents residents might need</li>
-                                        <li>• Keep file sizes under {maxFileSize}MB for faster loading</li>
-                                        <li>• Use descriptive filenames (e.g., "meeting-minutes-2024.pdf")</li>
-                                        <li>• Attachments are optional - you can publish without them</li>
-                                    </ul>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* Settings Tab */}
-                    <TabsContent value="settings" className="space-y-6">
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                    <Settings className="h-5 w-5" />
-                                    Announcement Settings
-                                </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Configure how and when the announcement appears
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="type" className="dark:text-gray-300">Type *</Label>
-                                        <Select 
-                                            value={data.type}
-                                            onValueChange={(value: AnnouncementType) => setData('type', value)}
-                                        >
-                                            <SelectTrigger id="type" className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                {typeOptions.map((type) => {
-                                                    const IconComponent = getTypeIcon(type.value);
-                                                    return (
-                                                        <SelectItem key={type.value} value={type.value} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                            <div className="flex items-center gap-2">
-                                                                <IconComponent className="h-4 w-4" />
-                                                                {type.label}
-                                                            </div>
-                                                        </SelectItem>
-                                                    );
-                                                })}
-                                            </SelectContent>
-                                        </Select>
-                                        {errors.type && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.type}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="priority" className="dark:text-gray-300">Priority Level *</Label>
-                                        <Select 
-                                            value={data.priority.toString()}
-                                            onValueChange={(value) => setData('priority', parseInt(value) as PriorityLevel)}
-                                        >
-                                            <SelectTrigger id="priority" className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                <SelectValue placeholder="Select priority" />
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                {priorityOptions.map((priority) => (
-                                                    <SelectItem key={priority.value} value={priority.value.toString()} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`px-2 py-1 rounded text-xs ${getPriorityColor(priority.value)}`}>
-                                                                {priority.label}
-                                                            </span>
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {errors.priority && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.priority}</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <Separator className="dark:bg-gray-700" />
-
-                                <div className="space-y-4">
-                                    <Label className="dark:text-gray-300">Schedule</Label>
-                                    
-                                    {/* Start Date & Time */}
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <Label className="text-sm font-medium dark:text-gray-300">Start Date & Time</Label>
-                                            <div className="flex items-center gap-2">
-                                                <Switch
-                                                    id="show-start-time"
-                                                    checked={showStartTime}
-                                                    onCheckedChange={setShowStartTime}
-                                                    className="dark:data-[state=checked]:bg-blue-600"
-                                                />
-                                                <Label htmlFor="show-start-time" className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer">
-                                                    Add specific time
-                                                </Label>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Input 
-                                                    id="start_date" 
-                                                    type="date" 
-                                                    value={data.start_date}
-                                                    onChange={(e) => setData('start_date', e.target.value)}
-                                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                />
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                    Leave empty to start immediately
-                                                </p>
-                                            </div>
-                                            
-                                            {showStartTime && (
-                                                <div className="space-y-2">
-                                                    <Input 
-                                                        id="start_time" 
-                                                        type="time" 
-                                                        value={data.start_time}
-                                                        onChange={(e) => setData('start_time', e.target.value)}
-                                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* End Date & Time */}
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <Label className="text-sm font-medium dark:text-gray-300">End Date & Time</Label>
-                                            <div className="flex items-center gap-2">
-                                                <Switch
-                                                    id="show-end-time"
-                                                    checked={showEndTime}
-                                                    onCheckedChange={setShowEndTime}
-                                                    className="dark:data-[state=checked]:bg-blue-600"
-                                                />
-                                                <Label htmlFor="show-end-time" className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer">
-                                                    Add specific time
-                                                </Label>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Input 
-                                                    id="end_date" 
-                                                    type="date" 
-                                                    value={data.end_date}
-                                                    onChange={(e) => setData('end_date', e.target.value)}
-                                                    min={data.start_date}
-                                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                />
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                    Leave empty for indefinite display
-                                                </p>
-                                            </div>
-                                            
-                                            {showEndTime && (
-                                                <div className="space-y-2">
-                                                    <Input 
-                                                        id="end_time" 
-                                                        type="time" 
-                                                        value={data.end_time}
-                                                        onChange={(e) => setData('end_time', e.target.value)}
-                                                        disabled={!data.end_date}
-                                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-2 pt-2">
-                                        <Button 
-                                            type="button" 
-                                            variant="outline" 
-                                            size="sm"
-                                            onClick={handleAutoFillDate}
-                                            className="flex-1 dark:border-gray-600 dark:text-gray-300"
-                                        >
-                                            <Zap className="h-3 w-3 mr-1" />
-                                            Auto-fill Dates
-                                        </Button>
-                                        <Button 
-                                            type="button" 
-                                            variant="outline" 
-                                            size="sm"
-                                            onClick={handleToggleTime}
-                                            className="flex-1 dark:border-gray-600 dark:text-gray-300"
-                                        >
-                                            <CalendarClock className="h-3 w-3 mr-1" />
-                                            Toggle Time
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <Separator className="dark:bg-gray-700" />
-
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-0.5">
-                                        <Label htmlFor="is_active" className="dark:text-gray-300">Active Status</Label>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                                            Announcement will be visible to residents when active
-                                        </p>
-                                    </div>
-                                    <Switch 
-                                        id="is_active"
-                                        checked={data.is_active}
-                                        onCheckedChange={(checked) => setData('is_active', checked)}
-                                        className="dark:data-[state=checked]:bg-green-600"
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* Audience Tab */}
-                    <TabsContent value="audience" className="space-y-6">
-                        <AudienceTarget
-                            value={{
-                                audience_type: data.audience_type,
-                                target_roles: data.target_roles,
-                                target_puroks: data.target_puroks,
-                                target_households: data.target_households,
-                                target_businesses: data.target_businesses,
-                                target_users: data.target_users,
-                            }}
-                            onChange={(field, value) => setData(field as any, value)}
-                            roles={roles}
-                            puroks={puroks}
-                            households={households}
-                            businesses={businesses}
-                            users={users}
-                            errors={errors}
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
                         />
-                    </TabsContent>
-                </Tabs>
 
-                {/* Live Preview */}
-                <Card className="dark:bg-gray-900">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                            <Eye className="h-5 w-5" />
-                            Live Preview
-                        </CardTitle>
-                        <CardDescription className="dark:text-gray-400">
-                            How the announcement will appear to targeted users
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="border rounded-lg p-6 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-sm">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-3 rounded-lg ${getTypeColor(data.type)}`}>
-                                        {(() => {
-                                            const IconComponent = getTypeIcon(data.type);
-                                            return <IconComponent className="h-5 w-5" />;
-                                        })()}
-                                    </div>
-                                <div>
-                                    <h3 className="font-bold text-lg dark:text-gray-100">
-                                        {data.title || "Announcement Title"}
-                                    </h3>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                        <Calendar className="h-3 w-3" />
-                                        <span>Posted: {new Date().toLocaleDateString()}</span>
-                                        <span>•</span>
-                                        <span className={`font-medium px-2 py-1 rounded-full text-xs ${getPriorityColor(data.priority)}`}>
-                                            {priorities[data.priority] || 'Normal'} Priority
-                                        </span>
-                                    </div>
-                                </div>
-                                </div>
-                                {data.is_active && (
-                                    <div className="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full text-xs font-medium">
-                                        Active
-                                    </div>
-                                )}
-                            </div>
+                        {activeTab === 'content' && (
+                            <>
+                                <FormContainer title="Announcement Content" description="What residents will see">
+                                    <ContentTab
+                                        formData={formData}
+                                        errors={errors}
+                                        onInputChange={handleInputChange}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    showPrevious={false}
+                                    nextLabel="Next: Attachments"
+                                />
+                            </>
+                        )}
 
-                            {/* Audience Badge */}
-                            <div className="mb-3 flex items-center gap-2">
-                                <Badge variant="outline" className="flex items-center gap-1 dark:border-gray-600 dark:text-gray-300">
-                                    {(() => {
-                                        const IconComponent = getAudienceIcon(data.audience_type);
-                                        return <IconComponent className="h-3 w-3" />;
-                                    })()}
-                                    {audience_types[data.audience_type] || 'All Users'}
-                                </Badge>
-                                {data.audience_type !== 'all' && (
-                                    <Badge variant="secondary" className="text-xs dark:bg-gray-700 dark:text-gray-300">
-                                        {data.audience_type === 'roles' && data.target_roles.length} roles selected
-                                        {data.audience_type === 'puroks' && data.target_puroks.length} puroks selected
-                                        {data.audience_type === 'households' && data.target_households.length} households selected
-                                        {data.audience_type === 'household_members' && data.target_households.length} households selected
-                                        {data.audience_type === 'businesses' && data.target_businesses.length} businesses selected
-                                        {data.audience_type === 'specific_users' && data.target_users.length} users selected
-                                    </Badge>
-                                )}
-                            </div>
+                        {activeTab === 'attachments' && (
+                            <>
+                                <FormContainer title="Attachments" description="Upload files, images, or documents to support your announcement">
+                                    <AttachmentsTab
+                                        attachments={attachments}
+                                        maxFileSize={maxFileSize}
+                                        allowedFileTypes={allowedFileTypes}
+                                        isDragging={isDragging}
+                                        isSubmitting={isSubmitting}
+                                        onFileSelect={handleFileSelect}
+                                        onRemoveAttachment={removeAttachment}
+                                        onClearAttachments={clearAttachments}
+                                        onDrop={handleDrop}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onPreviewImage={setPreviewImage}
+                                        formatFileSize={formatFileSize}
+                                        getFileIcon={getFileIconComponent}
+                                        errors={errors}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Content"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
 
-                            <div className="border-t dark:border-gray-700 pt-4">
-                                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                                    {data.content || "Announcement content will appear here..."}
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Announcement Settings" description="Configure how and when the announcement appears">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={errors}
+                                        typeOptions={typeOptions}
+                                        priorityOptions={priorityOptions}
+                                        showStartTime={showStartTime}
+                                        showEndTime={showEndTime}
+                                        getTypeIcon={getTypeIcon}
+                                        getPriorityColor={getPriorityColor}
+                                        onSelectChange={handleSelectChange}
+                                        onInputChange={handleInputChange}
+                                        onSwitchChange={handleSwitchChange}
+                                        onAutoFillDates={handleAutoFillDates}
+                                        onToggleTime={handleToggleTime}
+                                        onShowStartTimeChange={setShowStartTime}
+                                        onShowEndTimeChange={setShowEndTime}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Attachments"
+                                    nextLabel="Next: Audience"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'audience' && (
+                            <>
+                                <FormContainer title="Target Audience" description="Select who should see this announcement">
+                                    <AudienceTab
+                                        formData={formData}
+                                        errors={errors}
+                                        audienceOptions={audienceOptions}
+                                        roles={roles}
+                                        puroks={puroks}
+                                        households={households}
+                                        businesses={businesses}
+                                        users={users}
+                                        getAudienceIcon={getAudienceIcon}
+                                        onSelectChange={handleSelectChange}
+                                        onMultiSelectChange={handleMultiSelectChange}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Settings"
+                                    showNext={false}
+                                    submitLabel="Publish Announcement"
+                                />
+                            </>
+                        )}
+                    </div>
+
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* Announcement Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Announcement Preview</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className={`p-2 rounded-lg ${getTypeColor(formData.type)}`}>
+                                                {(() => {
+                                                    const IconComponent = getTypeIcon(formData.type);
+                                                    return <IconComponent className="h-4 w-4" />;
+                                                })()}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.title || <span className="text-gray-400 italic">Untitled</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityColor(formData.priority)}`}>
+                                                        {priorities[formData.priority] || 'Normal'} Priority
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Type:</span>
+                                                <span className="font-medium dark:text-gray-300">{types[formData.type] || formData.type}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Priority:</span>
+                                                <span className="font-medium dark:text-gray-300">{priorities[formData.priority]}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Audience:</span>
+                                                <span className="font-medium dark:text-gray-300">{audience_types[formData.audience_type] || 'All Users'}</span>
+                                            </div>
+                                            <div className="flex justify-between pt-2 border-t dark:border-gray-700">
+                                                <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                                <span className={`font-medium ${
+                                                    formData.is_active 
+                                                        ? 'text-green-600 dark:text-green-400' 
+                                                        : 'text-gray-500 dark:text-gray-400'
+                                                }`}>
+                                                    {formData.is_active ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                        {formData.content && (
+                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3 whitespace-pre-wrap">
+                                    {formData.content}
                                 </p>
                             </div>
+                        )}
 
-                            {/* Attachments Preview */}
-                            {attachments.length > 0 && (
-                                <div className="mt-4 pt-4 border-t dark:border-gray-700">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Paperclip className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                        <span className="text-sm font-medium dark:text-gray-300">Attachments ({attachments.length})</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {attachments.slice(0, 5).map((attachment, index) => {
-                                            if (!attachment) return null;
-                                            const FileIcon = getFileIcon(attachment);
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    className="flex items-center gap-2 px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded-full text-xs dark:text-gray-300"
-                                                >
-                                                    <FileIcon className="h-3 w-3" />
-                                                    <span className="max-w-[100px] truncate">{attachment.name}</span>
-                                                </div>
-                                            );
-                                        })}
-                                        {attachments.length > 5 && (
-                                            <div className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded-full text-xs dark:text-gray-300">
-                                                +{attachments.length - 5} more
-                                            </div>
-                                        )}
+                        {attachments.length > 0 && (
+                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                <Paperclip className="h-3 w-3" />
+                                <span>{attachments.length} attachment(s)</span>
+                            </div>
+                        )}
                                     </div>
                                 </div>
-                            )}
-
-                            {(data.start_date || data.end_date) && (
-                                <div className="mt-4 pt-4 border-t dark:border-gray-700">
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        {data.start_date && (
-                                            <div className="flex items-center gap-2">
-                                                <Calendar className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <div>
-                                                    <div className="font-medium dark:text-gray-300">Starts</div>
-                                                    <div className="text-gray-500 dark:text-gray-400">
-                                                        {formatDateTimePreview(data.start_date, data.start_time, showStartTime)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                        {data.end_date && (
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <div>
-                                                    <div className="font-medium dark:text-gray-300">Ends</div>
-                                                    <div className="text-gray-500 dark:text-gray-400">
-                                                        {formatDateTimePreview(data.end_date, data.end_time, showEndTime)}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
-
-                {/* Form Actions */}
-                <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
-                    <div>
-                        <Button 
-                            variant="ghost" 
-                            type="button" 
-                            onClick={clearForm}
-                            className="dark:text-gray-400 dark:hover:text-white"
-                        >
-                            Clear Form
-                        </Button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Link href={route('admin.announcements.index')}>
-                            <Button variant="outline" type="button" className="dark:border-gray-600 dark:text-gray-300">
-                                Cancel
-                            </Button>
-                        </Link>
-                        <Button 
-                            type="button" 
-                            onClick={handleSubmit} 
-                            disabled={processing} 
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white dark:from-purple-700 dark:to-pink-700"
-                        >
-                            {processing ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                                <Save className="h-4 w-4 mr-2" />
-                            )}
-                            {processing ? 'Publishing...' : 'Publish Announcement'}
-                        </Button>
-                    </div>
+                    )}
                 </div>
             </div>
 

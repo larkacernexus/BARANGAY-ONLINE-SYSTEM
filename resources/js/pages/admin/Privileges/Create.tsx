@@ -1,481 +1,520 @@
-// resources/js/Pages/Admin/Privileges/Create.tsx
-
-import React from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { route } from 'ziggy-js';
+// pages/admin/privileges/create.tsx
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    ArrowLeft,
-    Save,
-    Award,
-    Percent,
-    Shield,
-    IdCard,
-    Calendar,
-    CheckCircle,
-    XCircle,
-    AlertCircle,
-    Tag,
-    Clock,
-    FileText
-} from 'lucide-react';
-import { DiscountType, PrivilegeFormData } from '@/types/admin/privileges/privilege.types';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { Award, Percent, Settings, Sparkles, RefreshCw } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/privileges/create/basic-info-tab';
+import { DiscountTab } from '@/components/admin/privileges/create/discount-tab';
+import { SettingsTab } from '@/components/admin/privileges/create/settings-tab';
+import { route } from 'ziggy-js';
+import type { 
+    DiscountType, 
+    PrivilegeFormData
+} from '@/types/admin/privileges/privilege.types';
 
-interface Props {
-    discountTypes: DiscountType[];
+// Define PrivilegeTemplate locally since it's not in the types file
+interface PrivilegeTemplate {
+    name: string;
+    code: string;
+    description: string;
+    discount_type_name: string;
+    default_discount_percentage: number;
+    requires_id_number: boolean;
+    requires_verification: boolean;
+    validity_years: number | null;
+    is_active: boolean;
 }
 
-export default function Create({ discountTypes }: Props) {
-    const { data, setData, post, processing, errors } = useForm<PrivilegeFormData>({
-        name: '',
-        code: '',
-        description: null,
-        discount_type_id: null,
-        default_discount_percentage: 0,
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: Award, requiredFields: ['name', 'code'] },
+    { id: 'discount', label: 'Discount', icon: Percent, requiredFields: ['discount_type_id', 'default_discount_percentage'] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
+
+const requiredFieldsMap = {
+    basic: ['name', 'code'],
+    discount: ['discount_type_id', 'default_discount_percentage'],
+    settings: []
+};
+
+const defaultTemplates: PrivilegeTemplate[] = [
+    {
+        name: 'Senior Citizen Discount',
+        code: 'SENIOR_CITIZEN',
+        description: '20% discount and VAT exemption for senior citizens on certain goods and services',
+        discount_type_name: 'Percentage',
+        default_discount_percentage: 20,
         requires_id_number: true,
         requires_verification: true,
-        validity_years: null,
+        validity_years: 5,
         is_active: true,
+    },
+    {
+        name: 'PWD Discount',
+        code: 'PWD',
+        description: '20% discount and VAT exemption for persons with disabilities',
+        discount_type_name: 'Percentage',
+        default_discount_percentage: 20,
+        requires_id_number: true,
+        requires_verification: true,
+        validity_years: 5,
+        is_active: true,
+    },
+    {
+        name: 'Solo Parent Discount',
+        code: 'SOLO_PARENT',
+        description: '10% discount for solo parents on specific services',
+        discount_type_name: 'Percentage',
+        default_discount_percentage: 10,
+        requires_id_number: true,
+        requires_verification: true,
+        validity_years: 5,
+        is_active: true,
+    },
+    {
+        name: 'Student Discount',
+        code: 'STUDENT',
+        description: 'Discount for students on transportation and certain services',
+        discount_type_name: 'Percentage',
+        default_discount_percentage: 10,
+        requires_id_number: true,
+        requires_verification: true,
+        validity_years: 1,
+        is_active: true,
+    },
+];
+
+interface PageProps {
+    discountTypes: DiscountType[];
+    templates?: PrivilegeTemplate[];
+    [key: string]: unknown;
+}
+
+export default function CreatePrivilege() {
+    const { props } = usePage<PageProps>();
+    const discountTypes: DiscountType[] = props.discountTypes || [];
+    const templates: PrivilegeTemplate[] = props.templates || defaultTemplates;
+
+    const [showPreview, setShowPreview] = useState(true);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm
+    } = useFormManager<PrivilegeFormData>({
+        initialData: {
+            name: '',
+            code: '',
+            description: null,
+            discount_type_id: null,
+            default_discount_percentage: 0,
+            requires_id_number: true,
+            requires_verification: true,
+            validity_years: null,
+            is_active: true,
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            // Validate before submit
+            const newErrors: Record<string, string> = {};
+            
+            if (!data.name?.trim()) {
+                newErrors.name = 'Privilege name is required';
+            }
+            if (!data.code?.trim()) {
+                newErrors.code = 'Privilege code is required';
+            }
+            if (!data.discount_type_id) {
+                newErrors.discount_type_id = 'Discount type is required';
+            }
+            if (data.default_discount_percentage <= 0) {
+                newErrors.default_discount_percentage = 'Discount percentage must be greater than 0';
+            }
+            if (data.default_discount_percentage > 100) {
+                newErrors.default_discount_percentage = 'Discount percentage cannot exceed 100';
+            }
+            if (data.validity_years !== null && data.validity_years < 0) {
+                newErrors.validity_years = 'Validity years cannot be negative';
+            }
+            
+            if (Object.keys(newErrors).length > 0) {
+                setValidationErrors(newErrors);
+                toast.error('Please fix the validation errors');
+                return;
+            }
+            
+            router.post(route('admin.privileges.store'), data as any, {
+                onSuccess: () => {
+                    toast.success('Privilege created successfully');
+                    router.visit(route('admin.privileges.index'));
+                },
+                onError: (errs) => {
+                    setValidationErrors(errs);
+                    toast.error('Failed to create privilege');
+                }
+            });
+        }
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(route('admin.privileges.store'));
+    // Combine errors from server and validation
+    const allErrors = { ...errors, ...validationErrors };
+
+    // Memoized values
+    const selectedDiscountType = useMemo(() => {
+        if (!formData.discount_type_id) return null;
+        return discountTypes.find(dt => dt.id === formData.discount_type_id);
+    }, [discountTypes, formData.discount_type_id]);
+
+    // Handle copy to clipboard
+    const handleCopy = useCallback((text: string, field: string) => {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            setCopiedField(field);
+            setTimeout(() => setCopiedField(null), 2000);
+            toast.success(`${field} copied to clipboard`);
+        });
+    }, []);
+
+    // Generate code from name
+    const generateCode = useCallback(() => {
+        if (formData.name) {
+            const code = formData.name
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '');
+            updateFormData({ code });
+            toast.success('Code generated from name');
+        } else {
+            toast.error('Please enter a privilege name first');
+        }
+    }, [formData.name, updateFormData]);
+
+    // Handle number change
+    const handleNumberChange = useCallback((name: string, value: string) => {
+        const parsedValue = name === 'default_discount_percentage' 
+            ? parseFloat(value) 
+            : (value === '' ? null : parseInt(value));
+        
+        updateFormData({ [name]: parsedValue });
+        
+        // Clear validation error if exists
+        if (validationErrors[name]) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
+        }
+    }, [updateFormData, validationErrors]);
+
+    // Handle switch change
+    const handleSwitchChange = useCallback((name: string, checked: boolean) => {
+        updateFormData({ [name]: checked });
+    }, [updateFormData]);
+
+    // Apply template
+    const applyTemplate = useCallback((template: PrivilegeTemplate) => {
+        const discountType = discountTypes.find(dt => dt.name === template.discount_type_name);
+        
+        updateFormData({
+            name: template.name,
+            code: template.code,
+            description: template.description,
+            discount_type_id: discountType?.id || null,
+            default_discount_percentage: template.default_discount_percentage,
+            requires_id_number: template.requires_id_number,
+            requires_verification: template.requires_verification,
+            validity_years: template.validity_years,
+            is_active: template.is_active,
+        });
+        
+        // Clear validation errors for these fields
+        setValidationErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.name;
+            delete newErrors.code;
+            delete newErrors.discount_type_id;
+            delete newErrors.default_discount_percentage;
+            return newErrors;
+        });
+        
+        toast.success(`${template.name} template applied`);
+    }, [discountTypes, updateFormData]);
+
+    // Handle reset
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
+            resetForm();
+            setValidationErrors({});
+            toast.info('Form reset');
+        }
+    }, [resetForm]);
+
+    // Handle cancel
+    const handleCancel = useCallback(() => {
+        if (formData.name || formData.code || formData.description) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.privileges.index'));
+            }
+        } else {
+            router.visit(route('admin.privileges.index'));
+        }
+    }, [formData]);
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        discount: getTabStatus('discount'),
+        settings: getTabStatus('settings')
     };
 
-    // Helper to get discount type name by ID
-    const getDiscountTypeName = (id: number | null): string => {
-        if (!id) return 'Not set';
-        const type = discountTypes.find(t => t.id === id);
-        return type?.name || 'Not set';
-    };
+    const missingFields = getMissingFields();
+
+    const requiredFieldsList = [
+        { label: 'Privilege Name', value: !!formData.name, tabId: 'basic' },
+        { label: 'Code', value: !!formData.code, tabId: 'basic' },
+        { label: 'Discount Type', value: !!formData.discount_type_id, tabId: 'discount' },
+        { label: 'Discount Percentage', value: formData.default_discount_percentage > 0, tabId: 'discount' },
+    ];
+
+    const tabOrder = ['basic', 'discount', 'settings'];
 
     return (
         <AppLayout
-            title="Add Privilege"
+            title="Create Privilege"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Privileges', href: '/admin/privileges' },
-                { title: 'Add Privilege', href: '/admin/privileges/create' }
+                { title: 'Create', href: '/admin/privileges/create' }
             ]}
         >
-            <Head title="Create Privilege" />
+            <div className="space-y-6">
+                <FormHeader
+                    title="Create Privilege"
+                    description="Create a new privilege or discount for residents"
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Reset
+                            </button>
+                        </div>
+                    }
+                />
 
-            <form onSubmit={handleSubmit}>
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Link href="/admin/privileges">
-                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center shadow-lg shadow-amber-500/20">
-                                    <Award className="h-6 w-6 text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
-                                        Add New Privilege
-                                    </h1>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Create a new privilege or discount for residents
-                                    </p>
-                                </div>
+                {/* Quick Templates Card */}
+                <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-start gap-3">
+                        <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                        <div className="flex-1">
+                            <h3 className="font-medium text-amber-800 dark:text-amber-300">Quick start with templates</h3>
+                            <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                                Choose from common privilege templates to get started quickly.
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                                {templates.map((template) => (
+                                    <button
+                                        key={template.code}
+                                        type="button"
+                                        onClick={() => applyTemplate(template)}
+                                        className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                                    >
+                                        <Award className="h-3 w-3" />
+                                        {template.name}
+                                    </button>
+                                ))}
                             </div>
-                        </div>
-                        <Button 
-                            type="submit" 
-                            disabled={processing}
-                            className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white dark:from-amber-700 dark:to-orange-700"
-                        >
-                            <Save className="h-4 w-4 mr-2" />
-                            {processing ? 'Saving...' : 'Save Privilege'}
-                        </Button>
-                    </div>
-
-                    {/* Error Messages */}
-                    {Object.keys(errors).length > 0 && (
-                        <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
-                            <CardContent className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
-                                    <div>
-                                        <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
-                                        <ul className="list-disc list-inside mt-2 space-y-1">
-                                            {Object.entries(errors).map(([field, error]) => (
-                                                <li key={field} className="text-sm text-red-600 dark:text-red-400">
-                                                    <span className="font-medium capitalize">{field.replace('_', ' ')}:</span> {error}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    <div className="grid gap-6 lg:grid-cols-2">
-                        {/* Left Column - Basic Information & Discount Settings */}
-                        <div className="space-y-6">
-                            {/* Basic Information Card */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
-                                            <FileText className="h-3 w-3 text-white" />
-                                        </div>
-                                        Basic Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Enter the privilege's basic details
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name" className="dark:text-gray-300">
-                                            Privilege Name <span className="text-red-500">*</span>
-                                        </Label>
-                                        <Input 
-                                            id="name" 
-                                            placeholder="e.g., Senior Citizen Discount" 
-                                            required
-                                            value={data.name}
-                                            onChange={(e) => setData('name', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                        />
-                                        {errors.name && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="code" className="dark:text-gray-300">
-                                                Code <span className="text-red-500">*</span>
-                                            </Label>
-                                            <div className="relative">
-                                                <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input 
-                                                    id="code" 
-                                                    placeholder="e.g., SENIOR_DISCOUNT"
-                                                    value={data.code}
-                                                    onChange={(e) => setData('code', e.target.value.toUpperCase())}
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300 font-mono"
-                                                />
-                                            </div>
-                                            {errors.code && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="discount_type_id" className="dark:text-gray-300">
-                                                Discount Type <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Select
-                                                value={data.discount_type_id?.toString() || ""}
-                                                onValueChange={(value) => setData('discount_type_id', parseInt(value))}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                    <SelectValue placeholder="Select type" />
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    {discountTypes.map((type) => (
-                                                        <SelectItem 
-                                                            key={type.id} 
-                                                            value={type.id.toString()}
-                                                            className="dark:text-gray-300 dark:focus:bg-gray-700"
-                                                        >
-                                                            {type.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {errors.discount_type_id && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.discount_type_id}</p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
-                                        <Textarea 
-                                            id="description" 
-                                            placeholder="Describe the privilege, eligibility criteria, and benefits..."
-                                            rows={3}
-                                            value={data.description || ''}
-                                            onChange={(e) => setData('description', e.target.value || null)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                        />
-                                        {errors.description && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.description}</p>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Discount Settings Card */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
-                                            <Percent className="h-3 w-3 text-white" />
-                                        </div>
-                                        Discount Settings
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Configure the discount amount
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="default_discount_percentage" className="dark:text-gray-300">
-                                            Default Discount (%) <span className="text-red-500">*</span>
-                                        </Label>
-                                        <div className="relative">
-                                            <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                            <Input 
-                                                id="default_discount_percentage"
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                step="0.01"
-                                                placeholder="e.g., 20"
-                                                value={data.default_discount_percentage}
-                                                onChange={(e) => setData('default_discount_percentage', parseFloat(e.target.value))}
-                                                className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Enter a percentage between 0 and 100
-                                        </p>
-                                        {errors.default_discount_percentage && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.default_discount_percentage}</p>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Right Column - Requirements & Settings */}
-                        <div className="space-y-6">
-                            {/* Requirements Card */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-700 dark:to-indigo-700 flex items-center justify-center">
-                                            <Shield className="h-3 w-3 text-white" />
-                                        </div>
-                                        Requirements & Verification
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Set the requirements for this privilege
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                                        <div className="flex items-start gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                                                <IdCard className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="requires_id_number" className="font-medium dark:text-gray-200">
-                                                    Require ID Number
-                                                </Label>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    Resident must provide an ID number
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Switch
-                                            id="requires_id_number"
-                                            checked={data.requires_id_number}
-                                            onCheckedChange={(checked) => setData('requires_id_number', checked)}
-                                            className="data-[state=checked]:bg-blue-600"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                                        <div className="flex items-start gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                                                <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="requires_verification" className="font-medium dark:text-gray-200">
-                                                    Requires Verification
-                                                </Label>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    Privilege needs to be verified before use
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Switch
-                                            id="requires_verification"
-                                            checked={data.requires_verification}
-                                            onCheckedChange={(checked) => setData('requires_verification', checked)}
-                                            className="data-[state=checked]:bg-purple-600"
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Validity & Status Card */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-700 dark:to-cyan-700 flex items-center justify-center">
-                                            <Calendar className="h-3 w-3 text-white" />
-                                        </div>
-                                        Validity & Status
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Set validity period and initial status
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="validity_years" className="dark:text-gray-300">Validity Period</Label>
-                                        <div className="relative">
-                                            <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                            <Input 
-                                                id="validity_years"
-                                                type="number"
-                                                min="0"
-                                                placeholder="Leave empty for lifetime"
-                                                value={data.validity_years ?? ''}
-                                                onChange={(e) => setData('validity_years', e.target.value ? parseInt(e.target.value) : null)}
-                                                className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Number of years the privilege remains valid. Leave empty for no expiration.
-                                        </p>
-                                        {errors.validity_years && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.validity_years}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="is_active" className="dark:text-gray-300">Initial Status</Label>
-                                        <Select
-                                            value={data.is_active ? '1' : '0'}
-                                            onValueChange={(value) => setData('is_active', value === '1')}
-                                        >
-                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                <SelectValue placeholder="Select status" />
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <SelectItem value="1" className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                    <div className="flex items-center gap-2">
-                                                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                        Active
-                                                    </div>
-                                                </SelectItem>
-                                                <SelectItem value="0" className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                    <div className="flex items-center gap-2">
-                                                        <XCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                                                        Inactive
-                                                    </div>
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Active privileges can be assigned to residents immediately
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Form Preview Card */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
-                                            <Save className="h-3 w-3 text-white" />
-                                        </div>
-                                        Form Preview
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3 text-sm">
-                                        <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Privilege Name:</span>
-                                            <span className="font-medium dark:text-gray-200">{data.name || 'Not set'}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                                            <span className="font-mono font-medium dark:text-gray-200">{data.code || 'Not set'}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Discount Type:</span>
-                                            <span className="font-medium dark:text-gray-200">
-                                                {getDiscountTypeName(data.discount_type_id)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Discount:</span>
-                                            <span className="font-medium text-green-600 dark:text-green-400">
-                                                {data.default_discount_percentage ? `${data.default_discount_percentage}%` : 'Not set'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Requirements:</span>
-                                            <span className="font-medium dark:text-gray-200">
-                                                {data.requires_id_number && data.requires_verification 
-                                                    ? 'ID + Verification'
-                                                    : data.requires_id_number 
-                                                        ? 'ID Only'
-                                                        : data.requires_verification
-                                                            ? 'Verification Only'
-                                                            : 'None'
-                                                }
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Validity:</span>
-                                            <span className="font-medium dark:text-gray-200">
-                                                {data.validity_years ? `${data.validity_years} year(s)` : 'Lifetime'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center py-2">
-                                            <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                            <span className={`font-medium ${
-                                                data.is_active 
-                                                    ? 'text-green-600 dark:text-green-400' 
-                                                    : 'text-amber-600 dark:text-amber-400'
-                                            }`}>
-                                                {data.is_active ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
                         </div>
                     </div>
                 </div>
-            </form>
+
+                <FormErrors errors={allErrors} />
+
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer title="Basic Information" description="Enter the core details for this privilege">
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        copiedField={copiedField}
+                                        onInputChange={handleInputChange}
+                                        onGenerateCode={generateCode}
+                                        onCopy={handleCopy}
+                                        isSubmitting={isSubmitting}
+                                        isEdit={false}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    showPrevious={false}
+                                    nextLabel="Next: Discount"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'discount' && (
+                            <>
+                                <FormContainer title="Discount Configuration" description="Configure the discount amount and type">
+                                    <DiscountTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        discountTypes={discountTypes}
+                                        selectedDiscountType={selectedDiscountType}
+                                        onSelectChange={handleSelectChange}
+                                        onNumberChange={handleNumberChange}
+                                        isSubmitting={isSubmitting}
+                                        isEdit={false}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.discount_type_id && formData.default_discount_percentage > 0}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Settings" description="Configure requirements, verification, and status">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        onSwitchChange={handleSwitchChange}
+                                        onNumberChange={handleNumberChange}
+                                        isSubmitting={isSubmitting}
+                                        isEdit={false}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.discount_type_id && formData.default_discount_percentage > 0}
+                                    previousLabel="Back: Discount"
+                                    showNext={false}
+                                    submitLabel="Create Privilege"
+                                />
+                            </>
+                        )}
+                    </div>
+
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.discount_type_id && formData.default_discount_percentage > 0}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* Privilege Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Privilege Summary</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
+                                                <Award className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
+                                                </div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {formData.code || 'No code'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Discount Type:</span>
+                                                <span className="font-medium dark:text-gray-300">
+                                                    {selectedDiscountType?.name || 'Not selected'}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Discount:</span>
+                                                <span className="font-medium text-green-600 dark:text-green-400">
+                                                    {formData.default_discount_percentage}%
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between pt-2 border-t dark:border-gray-700">
+                                                <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                                <span className={`font-medium ${
+                                                    formData.is_active 
+                                                        ? 'text-green-600 dark:text-green-400' 
+                                                        : 'text-gray-500 dark:text-gray-400'
+                                                }`}>
+                                                    {formData.is_active ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
         </AppLayout>
     );
 }

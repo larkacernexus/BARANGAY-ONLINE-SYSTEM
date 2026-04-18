@@ -1,4 +1,4 @@
-// types/admin/households/household.types.ts
+// types/admin/households/household.types.ts - COMPLETE REVISED FILE
 
 import { ReactNode } from 'react';
 
@@ -325,19 +325,20 @@ export interface PaginationLink {
 }
 
 // ============================================================================
-// Filter Types
+// Filter Types - FIXED
 // ============================================================================
 
 export interface HouseholdFilters {
+    per_page?: number;
     search?: string;
-    status?: HouseholdStatus;
-    purok_id?: number | string;
+    status?: HouseholdStatus | 'all';
+    purok_id?: number | string | 'all';        // ✅ Allow string 'all'
     from_date?: string;
     to_date?: string;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
-    min_members?: number;
-    max_members?: number;
+    min_members?: number | string;              // ✅ Allow string for input
+    max_members?: number | string;              // ✅ Allow string for input
 }
 
 export interface FilterState {
@@ -360,7 +361,7 @@ export interface HouseholdStats {
     total: number;
     active: number;
     inactive: number;
-    archived: number;
+    archived?: number;
     totalMembers: number;
     averageMembers: number;
     purokCount: number;
@@ -425,7 +426,7 @@ export interface PageProps {
 }
 
 export interface HouseholdsPageProps extends PageProps {
-    households: Household[];
+    households: PaginationData<Household>;
     stats: HouseholdStats;
     filters: HouseholdFilters;
     puroks: Purok[];
@@ -546,7 +547,7 @@ export const getStatusColor = (status: HouseholdStatus): string => {
         inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
         archived: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
     };
-    return colors[status];
+    return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
 };
 
 export const getStatusLabel = (status: HouseholdStatus): string => {
@@ -555,7 +556,7 @@ export const getStatusLabel = (status: HouseholdStatus): string => {
         inactive: 'Inactive',
         archived: 'Archived'
     };
-    return labels[status];
+    return labels[status] || status;
 };
 
 export const getPurokColor = (purokName: string): string => {
@@ -597,16 +598,20 @@ export const formatDateTime = (date: string | null | undefined): string => {
     }
 };
 
-export const calculateAge = (dateOfBirth: string): number => {
+export const calculateAge = (dateOfBirth: string | null | undefined): number => {
     if (!dateOfBirth) return 0;
-    const birthDate = new Date(dateOfBirth);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
+    try {
+        const birthDate = new Date(dateOfBirth);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age;
+    } catch {
+        return 0;
     }
-    return age;
 };
 
 export const getMemberAgeGroup = (age: number): string => {
@@ -676,14 +681,7 @@ export const hasPhoto = (item: { photo_path?: string; photo_url?: string }): boo
     return !!(item.photo_path || item.photo_url);
 };
 
-// ============================================================================
-// Additional Utility Functions
-// ============================================================================
-
-/**
- * Check if a record was created within the last 7 days
- */
-export const isNew = (createdAt: string): boolean => {
+export const isNew = (createdAt: string | null | undefined): boolean => {
     if (!createdAt) return false;
     try {
         const created = new Date(createdAt);
@@ -695,10 +693,7 @@ export const isNew = (createdAt: string): boolean => {
     }
 };
 
-/**
- * Check if a record was created within the last N days
- */
-export const isRecent = (createdAt: string, days: number = 7): boolean => {
+export const isRecent = (createdAt: string | null | undefined, days: number = 7): boolean => {
     if (!createdAt) return false;
     try {
         const created = new Date(createdAt);
@@ -710,10 +705,7 @@ export const isRecent = (createdAt: string, days: number = 7): boolean => {
     }
 };
 
-/**
- * Get relative time string (e.g., "2 days ago", "just now")
- */
-export const getRelativeTime = (date: string): string => {
+export const getRelativeTime = (date: string | null | undefined): string => {
     if (!date) return 'N/A';
     try {
         const now = new Date();
@@ -735,4 +727,54 @@ export const getRelativeTime = (date: string): string => {
     }
 };
 
+// ============================================================================
+// Component Props Types
+// ============================================================================
 
+export interface BulkActionItem {
+    label: string;
+    icon: ReactNode;
+    onClick: () => void;
+    tooltip: string;
+    variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+    disabled?: boolean;
+}
+
+export interface ViewToggleProps {
+    viewMode: 'table' | 'grid';
+    onViewModeChange: (mode: 'table' | 'grid') => void;
+    isMobile?: boolean;
+}
+
+export interface EmptyStateProps {
+    icon?: ReactNode;
+    title: string;
+    description: string;
+    action?: {
+        label: string;
+        onClick: () => void;
+    };
+    hasFilters?: boolean;
+    onClearFilters?: () => void;
+    onCreateNew?: () => void;
+    createLabel?: string;
+    className?: string;
+}
+
+export interface SelectAllFloatProps {
+    isSelectAll: boolean;
+    onSelectAll: () => void;
+    selectedCount: number;
+    totalCount: number;
+    position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+}
+
+export interface GridSelectionSummaryProps {
+    selectedCount: number;
+    totalCount: number;
+    isSelectAll: boolean;
+    onSelectAll: () => void;
+    onClearSelection: () => void;
+    className?: string;
+    extraInfo?: ReactNode;
+}

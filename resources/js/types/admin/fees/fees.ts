@@ -1,5 +1,9 @@
 // types/admin/fees/fees.ts
 
+import React from 'react';
+
+// ========== BASE INTERFACES ==========
+
 // Base Fee interface
 export interface Fee {
     name: any;
@@ -23,8 +27,8 @@ export interface Fee {
     // Additional fields from the grid view
     fee_code?: string;
     code?: string;
-    payer_type?: 'resident' | 'household' | 'business';
-    type?: 'resident' | 'household' | 'business';
+    payer_type?: 'resident' | 'household' | 'business' | string;
+    type?: 'resident' | 'household' | 'business' | string;
     payer_name?: string;
     contact_number?: string;
     purok?: string;
@@ -108,7 +112,7 @@ export interface Resident {
     privileges?: PrivilegeData[];
 }
 
-// Household interface - ONLY DECLARE ONCE
+// Household interface
 export interface Household {
     id: number;
     name: string;
@@ -190,7 +194,8 @@ export interface Payment {
     created_at: string;
 }
 
-// Pagination data
+// ========== PAGINATION ==========
+
 export interface PaginationData {
     data: Fee[];
     current_page: number;
@@ -208,7 +213,8 @@ export interface PaginationLink {
     active: boolean;
 }
 
-// Filter types
+// ========== FILTERS (FIXED) ==========
+
 export interface Filters {
     search?: string;
     status?: string;
@@ -226,7 +232,18 @@ export interface Filters {
     is_overdue?: boolean;
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
-   due_date_range?: string;  
+    due_date_range?: string;
+    
+    // ✅ ADDED: Missing properties for cross-module compatibility
+    payer_type?: string;
+    amount_range?: string;
+    type?: string;
+    urgency?: string;
+    payment_status?: string;
+    clearance_type?: string;
+    clearance_type_id?: string;
+    applicant_type?: string;
+    clearance_number?: string;
 }
 
 export interface FilterState {
@@ -240,8 +257,10 @@ export interface FilterState {
     amount_max: string;
 }
 
-// Stats interface
+// ========== STATS (FIXED) ==========
+
 export interface Stats {
+    // Required fields
     total: number;
     total_amount: number;
     collected: number;
@@ -256,9 +275,38 @@ export interface Stats {
     this_month_collected: number;
     status_counts: Record<string, number>;
     category_totals: Record<string, number>;
+    
+    // Optional fields
     issued_count?: number;
     partially_paid_count?: number;
     waived_count?: number;
+    
+    // ✅ ADDED: Missing properties for cross-module compatibility
+    active?: number;
+    inactive?: number;
+    averageAmount?: number;
+    overdue?: number;
+    issued?: number;
+    partially_paid?: number;
+    cancelled?: number;
+    refunded?: number;
+    residentCount?: number;
+    businessCount?: number;
+    householdCount?: number;
+    paid?: number;
+    processing?: number;
+    approved?: number;
+    unpaid?: number;
+    partially_paid_count_alt?: number;
+    pending_payment?: number;
+    totalIssued?: number;
+    issuedThisMonth?: number;
+    pendingToday?: number;
+    expiringSoon?: number;
+    totalRevenue?: number;
+    expressRequests?: number;
+    rushRequests?: number;
+    
     // Legacy fields for compatibility
     total_fees?: number;
     paid_amount?: number;
@@ -275,7 +323,8 @@ export interface Stats {
     recent_payments?: Payment[];
 }
 
-// Selection stats
+// ========== SELECTION STATS ==========
+
 export interface SelectionStats {
     total: number;
     totalAmount: number;
@@ -291,17 +340,26 @@ export interface SelectionStats {
     residents: number;
     households: number;
     businesses: number;
-    // For compatibility
+    
+    // ✅ ADDED: For compatibility
     paid?: number;
     pending?: number;
     overdue?: number;
+    issued?: number;
+    partially_paid?: number;
+    cancelled?: number;
+    refunded?: number;
+    active?: number;
+    inactive?: number;
+    averageAmount?: number;
     paidAmount?: number;
     pendingAmount?: number;
     overdueAmount?: number;
     byStatus?: Record<string, number>;
 }
 
-// Bulk operation types
+// ========== BULK OPERATIONS (FIXED) ==========
+
 export type BulkOperation = 
     | 'delete' 
     | 'activate'        
@@ -314,7 +372,19 @@ export type BulkOperation =
     | 'apply_penalties' 
     | 'waive_penalties'
     | 'print'          
-    | 'copy_data';
+    | 'copy_data'
+    // ✅ ADDED: Missing operations for clearances compatibility
+    | 'issue'
+    | 'cancel'
+    | 'process'
+    | 'approve'
+    | 'update_status'
+    | 'generate_receipt'
+    | 'send_reminder'
+    | 'refund'
+    | 'mark_as_processed'
+    | 'mark_as_approved'
+    | 'mark_as_issued';
 
 export type BulkEditField = 
     | 'status' 
@@ -324,7 +394,8 @@ export type BulkEditField =
 
 export type SelectionMode = 'page' | 'filtered' | 'all';
 
-// Flash message types
+// ========== FLASH MESSAGES ==========
+
 export interface FlashMessages {
     success?: string;
     error?: string;
@@ -332,7 +403,8 @@ export interface FlashMessages {
     warning?: string;
 }
 
-// Permissions interface
+// ========== PERMISSIONS ==========
+
 export interface Permissions {
     can_edit: boolean;
     can_delete: boolean;
@@ -344,7 +416,8 @@ export interface Permissions {
     can_collect?: boolean;
 }
 
-// Props for the Fees Index page
+// ========== PAGE PROPS ==========
+
 export interface FeesIndexProps {
     fees: PaginationData;
     filters: Filters;
@@ -353,9 +426,9 @@ export interface FeesIndexProps {
     puroks: string[];
     stats: Stats;
     flash?: FlashMessages;
+    payerTypes?: Record<string, string>;
 }
 
-// Props for the Fees Show page
 export interface FeesShowProps {
     fee: Fee;
     fee_type: FeeType;
@@ -369,9 +442,8 @@ export interface FeesShowProps {
     };
 }
 
-// Props for the Fees Create page
 export interface FeesCreateProps {
-    fee_types: FeeType[];  // Note: plural with underscore
+    fee_types: FeeType[];
     residents: Resident[];
     households?: Household[];
     puroks: string[];
@@ -388,7 +460,34 @@ export interface FeesCreateProps {
     preselectedHousehold?: Household | null;
 }
 
-// Bulk Fee Form Data interface
+export interface FeesEditProps {
+    fee: Fee;
+    fee_type: FeeType;
+    resident: Resident;
+    fee_types: FeeType[];
+    residents: Resident[];
+    puroks: string[];
+    errors?: Record<string, string>;
+}
+
+// ========== FORM DATA ==========
+
+export interface FeeFormData {
+    fee_type_id: number;
+    resident_id: number;
+    amount: number;
+    due_date: string;
+    status: string;
+    payment_method?: string;
+    payment_reference?: string;
+    notes?: string;
+    apply_discounts?: boolean;
+    senior_discount?: boolean;
+    pwd_discount?: boolean;
+    solo_parent_discount?: boolean;
+    indigent_discount?: boolean;
+}
+
 export interface BulkFeeFormData extends FeeFormData {
     payer_type: string;
     household_id: string;
@@ -431,35 +530,8 @@ export interface BulkFeeFormData extends FeeFormData {
     purok: string;
 }
 
-// Props for the Fees Edit page
-export interface FeesEditProps {
-    fee: Fee;
-    fee_type: FeeType;
-    resident: Resident;
-    fee_types: FeeType[];
-    residents: Resident[];
-    puroks: string[];
-    errors?: Record<string, string>;
-}
+// ========== UTILITY FUNCTIONS ==========
 
-// Form data for create/edit
-export interface FeeFormData {
-    fee_type_id: number;
-    resident_id: number;
-    amount: number;
-    due_date: string;
-    status: string;
-    payment_method?: string;
-    payment_reference?: string;
-    notes?: string;
-    apply_discounts?: boolean;
-    senior_discount?: boolean;
-    pwd_discount?: boolean;
-    solo_parent_discount?: boolean;
-    indigent_discount?: boolean;
-}
-
-// Validation and calculation utilities
 export const calculateDaysOverdue = (dueDate: string): number => {
     const due = new Date(dueDate);
     const today = new Date();
@@ -532,14 +604,12 @@ export const getCategoryLabel = (category: string): string => {
     return labels[category] || category;
 };
 
-// Helper function to parse number safely
 export const parseNumber = (value: any): number => {
     if (value === undefined || value === null) return 0;
     const num = typeof value === 'string' ? parseFloat(value) : value;
     return isNaN(num) ? 0 : num;
 };
 
-// Helper function to safely convert to string
 export const safeString = (value: any): string => {
     if (value === undefined || value === null) return '';
     return String(value);

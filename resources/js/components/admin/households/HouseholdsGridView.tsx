@@ -38,7 +38,7 @@ import {
   PauseCircle 
 } from 'lucide-react';
 import { router } from '@inertiajs/react';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { getPurokName, truncateText, truncateAddress, formatContactNumber } from '../../../admin-utils/householdUtils';
 import { SingleHouseholdMapModal } from '@/components/admin/puroks/show/components/SingleHouseholdMapModal';
 
@@ -57,6 +57,7 @@ interface HouseholdsGridViewProps {
     onGenerateQr?: (household: any) => void;
     onCreateClearance?: (household: any) => void;
     windowWidth?: number;
+    isLoading?: boolean;
 }
 
 // Status color classes
@@ -66,6 +67,8 @@ const getStatusColor = (status: string) => {
             return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
         case 'inactive':
             return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
+        case 'archived':
+            return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800';
         default:
             return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
     }
@@ -73,11 +76,15 @@ const getStatusColor = (status: string) => {
 
 const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
+    try {
+        return new Date(dateString).toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch {
+        return 'Invalid date';
+    }
 };
 
 export default function HouseholdsGridView({
@@ -94,23 +101,17 @@ export default function HouseholdsGridView({
     puroks,
     onGenerateQr,
     onCreateClearance,
-    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
+    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024,
+    isLoading = false
 }: HouseholdsGridViewProps) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [mapModalOpen, setMapModalOpen] = useState(false);
     const [selectedHouseholdForMap, setSelectedHouseholdForMap] = useState<any>(null);
-    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
-    
-    useEffect(() => {
-        setDevicePixelRatio(window.devicePixelRatio || 1);
-    }, []);
     
     const isCompactView = isMobile;
     
     // Determine grid columns based on actual available width
-    // For 110% scaling on laptop, we want 3 columns
     const gridCols = useMemo(() => {
-        // Calculate effective width (accounts for scaling)
         const effectiveWidth = windowWidth;
         
         if (effectiveWidth < 640) return 1;      // Mobile: 1 column
@@ -122,34 +123,38 @@ export default function HouseholdsGridView({
     // Toggle card expansion
     const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         setExpandedId(prev => prev === id ? null : id);
-    }, []);
+    }, [isLoading]);
 
     // Handle card click
     const handleCardClick = (householdId: number, e: React.MouseEvent) => {
-        if (isBulkMode) {
+        if (isBulkMode || isLoading) {
             e.stopPropagation();
             return;
         }
         e.stopPropagation();
-        handleToggleExpand(householdId, e);
+        setExpandedId(prev => prev === householdId ? null : householdId);
     };
 
     // Handle view details
     const handleViewDetails = (householdId: number, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         router.get(`/admin/households/${householdId}`);
     };
 
     // Handle edit
     const handleEdit = (householdId: number, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         router.get(`/admin/households/${householdId}/edit`);
     };
 
     // Handle toggle status
     const handleToggleStatus = (household: any, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         if (onToggleStatus) {
             onToggleStatus(household);
         }
@@ -158,6 +163,7 @@ export default function HouseholdsGridView({
     // Handle map view
     const handleViewMap = (household: any, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         setSelectedHouseholdForMap(household);
         setMapModalOpen(true);
     };
@@ -165,6 +171,7 @@ export default function HouseholdsGridView({
     // Handle generate QR
     const handleGenerateQr = (household: any, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         if (onGenerateQr) {
             onGenerateQr(household);
         } else {
@@ -175,6 +182,7 @@ export default function HouseholdsGridView({
     // Handle create clearance
     const handleCreateClearance = (household: any, e: React.MouseEvent) => {
         e.stopPropagation();
+        if (isLoading) return;
         if (onCreateClearance) {
             onCreateClearance(household);
         } else {
@@ -182,27 +190,29 @@ export default function HouseholdsGridView({
         }
     };
     
+    // Check if household can be deleted
+    const canDelete = (status: string) => {
+        return status === 'pending' || status === 'inactive';
+    };
+    
     // Memoize selected set for quick lookup
     const selectedSet = useMemo(() => new Set(selectedHouseholds), [selectedHouseholds]);
 
-    // Create empty state component
-    const emptyState = (
-        <EmptyState
-            title="No households found"
-            description={hasActiveFilters 
-                ? 'Try changing your filters or search criteria.'
-                : 'Get started by registering a household.'}
-            icon={<Home className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
-            hasFilters={hasActiveFilters}
-            onClearFilters={onClearFilters}
-            onCreateNew={() => router.get('/admin/households/create')}
-            createLabel="Register Household"
-        />
-    );
-
-    // Early return for empty state
+    // Empty state
     if (households.length === 0) {
-        return emptyState;
+        return (
+            <EmptyState
+                title="No households found"
+                description={hasActiveFilters 
+                    ? 'Try changing your filters or search criteria.'
+                    : 'Get started by registering a household.'}
+                icon={<Home className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
+                action={hasActiveFilters ? {
+                    label: "Clear Filters",
+                    onClick: onClearFilters
+                } : undefined}
+            />
+        );
     }
 
     return (
@@ -217,7 +227,7 @@ export default function HouseholdsGridView({
                 {households.map(household => {
                     const isSelected = selectedSet.has(household.id);
                     const isExpanded = expandedId === household.id;
-                    const hasCoordinates = household.latitude && household.longitude;
+                    const hasCoordinates = !!(household.latitude && household.longitude);
                     
                     // Truncation lengths based on view
                     const nameLength = isCompactView ? 20 : 30;
@@ -230,7 +240,9 @@ export default function HouseholdsGridView({
                                 isSelected 
                                     ? 'ring-2 ring-blue-500 border-blue-500 shadow-lg shadow-blue-500/20 dark:ring-blue-400 dark:border-blue-400' 
                                     : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg'
-                            } ${isExpanded ? 'shadow-lg' : ''} cursor-pointer`}
+                            } ${isExpanded ? 'shadow-lg' : ''} ${
+                                isLoading ? 'cursor-default opacity-60 pointer-events-none' : 'cursor-pointer'
+                            }`}
                             onClick={(e) => handleCardClick(household.id, e)}
                         >
                             <CardContent className="p-4">
@@ -257,6 +269,7 @@ export default function HouseholdsGridView({
                                                 checked={isSelected}
                                                 onCheckedChange={() => onItemSelect(household.id)}
                                                 onClick={(e) => e.stopPropagation()}
+                                                disabled={isLoading}
                                                 className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                             />
                                         )}
@@ -265,41 +278,45 @@ export default function HouseholdsGridView({
                                                 <button
                                                     className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                                     onClick={(e) => e.stopPropagation()}
+                                                    disabled={isLoading}
                                                 >
                                                     <MoreVertical className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                                 </button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-48">
-                                                <DropdownMenuItem onClick={(e) => handleViewDetails(household.id, e)}>
+                                            <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
+                                                <DropdownMenuItem onClick={(e) => handleViewDetails(household.id, e)} className="cursor-pointer">
                                                     <Eye className="h-4 w-4 mr-2" />
                                                     View Details
                                                 </DropdownMenuItem>
                                                 
-                                                <DropdownMenuItem onClick={(e) => handleEdit(household.id, e)}>
+                                                <DropdownMenuItem onClick={(e) => handleEdit(household.id, e)} className="cursor-pointer">
                                                     <Edit className="h-4 w-4 mr-2" />
                                                     Edit Household
                                                 </DropdownMenuItem>
 
                                                 {onToggleStatus && (
-                                                    <DropdownMenuItem onClick={(e) => handleToggleStatus(household, e)}>
-                                                        {household.status === 'active' ? (
-                                                            <>
-                                                                <PauseCircle className="h-4 w-4 mr-2" />
-                                                                Deactivate
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <PlayCircle className="h-4 w-4 mr-2" />
-                                                                Activate
-                                                            </>
-                                                        )}
-                                                    </DropdownMenuItem>
+                                                    <>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onClick={(e) => handleToggleStatus(household, e)} className="cursor-pointer">
+                                                            {household.status === 'active' ? (
+                                                                <>
+                                                                    <PauseCircle className="h-4 w-4 mr-2" />
+                                                                    Deactivate
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <PlayCircle className="h-4 w-4 mr-2" />
+                                                                    Activate
+                                                                </>
+                                                            )}
+                                                        </DropdownMenuItem>
+                                                    </>
                                                 )}
                                                 
                                                 <DropdownMenuSeparator />
 
                                                 {hasCoordinates && (
-                                                    <DropdownMenuItem onClick={(e) => handleViewMap(household, e)}>
+                                                    <DropdownMenuItem onClick={(e) => handleViewMap(household, e)} className="cursor-pointer">
                                                         <MapIcon className="h-4 w-4 mr-2" />
                                                         View on Map
                                                     </DropdownMenuItem>
@@ -308,25 +325,35 @@ export default function HouseholdsGridView({
                                                 <DropdownMenuItem onClick={(e) => {
                                                     e.stopPropagation();
                                                     onCopyToClipboard(household.household_number, 'Household Number');
-                                                }}>
-                                                    <Copy className="h-4 w-4 mr-2" />
+                                                }} className="cursor-pointer">
+                                                    <Clipboard className="h-4 w-4 mr-2" />
                                                     Copy Household #
                                                 </DropdownMenuItem>
                                                 
                                                 <DropdownMenuItem onClick={(e) => {
                                                     e.stopPropagation();
                                                     onCopyToClipboard(household.head_of_family, 'Head of Family');
-                                                }}>
-                                                    <Copy className="h-4 w-4 mr-2" />
+                                                }} className="cursor-pointer">
+                                                    <Clipboard className="h-4 w-4 mr-2" />
                                                     Copy Head Name
                                                 </DropdownMenuItem>
+                                                
+                                                {household.address && (
+                                                    <DropdownMenuItem onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onCopyToClipboard(household.address, 'Address');
+                                                    }} className="cursor-pointer">
+                                                        <Clipboard className="h-4 w-4 mr-2" />
+                                                        Copy Address
+                                                    </DropdownMenuItem>
+                                                )}
                                                 
                                                 {household.contact_number && (
                                                     <>
                                                         <DropdownMenuItem onClick={(e) => {
                                                             e.stopPropagation();
                                                             window.location.href = `tel:${household.contact_number}`;
-                                                        }}>
+                                                        }} className="cursor-pointer">
                                                             <Phone className="h-4 w-4 mr-2" />
                                                             Call Household
                                                         </DropdownMenuItem>
@@ -334,7 +361,7 @@ export default function HouseholdsGridView({
                                                         <DropdownMenuItem onClick={(e) => {
                                                             e.stopPropagation();
                                                             onCopyToClipboard(household.contact_number, 'Contact');
-                                                        }}>
+                                                        }} className="cursor-pointer">
                                                             <Copy className="h-4 w-4 mr-2" />
                                                             Copy Contact
                                                         </DropdownMenuItem>
@@ -343,19 +370,15 @@ export default function HouseholdsGridView({
                                                 
                                                 <DropdownMenuSeparator />
                                                 
-                                                {onGenerateQr && (
-                                                    <DropdownMenuItem onClick={(e) => handleGenerateQr(household, e)}>
-                                                        <QrCode className="h-4 w-4 mr-2" />
-                                                        Generate QR Code
-                                                    </DropdownMenuItem>
-                                                )}
+                                                <DropdownMenuItem onClick={(e) => handleGenerateQr(household, e)} className="cursor-pointer">
+                                                    <QrCode className="h-4 w-4 mr-2" />
+                                                    Generate QR Code
+                                                </DropdownMenuItem>
                                                 
-                                                {onCreateClearance && (
-                                                    <DropdownMenuItem onClick={(e) => handleCreateClearance(household, e)}>
-                                                        <FileText className="h-4 w-4 mr-2" />
-                                                        Create Clearance
-                                                    </DropdownMenuItem>
-                                                )}
+                                                <DropdownMenuItem onClick={(e) => handleCreateClearance(household, e)} className="cursor-pointer">
+                                                    <FileText className="h-4 w-4 mr-2" />
+                                                    Create Clearance
+                                                </DropdownMenuItem>
 
                                                 {isBulkMode && (
                                                     <>
@@ -363,7 +386,7 @@ export default function HouseholdsGridView({
                                                         <DropdownMenuItem onClick={(e) => {
                                                             e.stopPropagation();
                                                             onItemSelect(household.id);
-                                                        }}>
+                                                        }} className="cursor-pointer">
                                                             {isSelected ? (
                                                                 <>
                                                                     <CheckSquare className="h-4 w-4 mr-2 text-green-600" />
@@ -379,18 +402,21 @@ export default function HouseholdsGridView({
                                                     </>
                                                 )}
                                                 
-                                                <DropdownMenuSeparator />
-                                                
-                                                <DropdownMenuItem 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onDelete(household);
-                                                    }}
-                                                    className="text-red-600 dark:text-red-400"
-                                                >
-                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                    Delete Household
-                                                </DropdownMenuItem>
+                                                {canDelete(household.status) && (
+                                                    <>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onDelete(household);
+                                                            }}
+                                                            className="text-red-600 dark:text-red-400 cursor-pointer"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            Delete Household
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
@@ -450,6 +476,7 @@ export default function HouseholdsGridView({
                                         <button
                                             className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                             onClick={(e) => handleToggleExpand(household.id, e)}
+                                            disabled={isLoading}
                                         >
                                             {isExpanded ? (
                                                 <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -482,7 +509,7 @@ export default function HouseholdsGridView({
                                             </div>
                                         )}
 
-                                        {/* Map Coordinates (if available) */}
+                                        {/* Map Coordinates */}
                                         {hasCoordinates && (
                                             <div className="text-sm">
                                                 <div className="flex items-center gap-2 mb-1">
@@ -498,6 +525,7 @@ export default function HouseholdsGridView({
                                                         size="sm"
                                                         className="h-auto p-0 ml-2 text-xs text-blue-600 dark:text-blue-400"
                                                         onClick={(e) => handleViewMap(household, e)}
+                                                        disabled={isLoading}
                                                     >
                                                         View on map
                                                     </Button>
@@ -517,11 +545,12 @@ export default function HouseholdsGridView({
                                             </div>
                                         </div>
 
-                                        {/* View full details link and collapse button */}
+                                        {/* View full details link */}
                                         <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
                                             <button
                                                 className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
                                                 onClick={(e) => handleViewDetails(household.id, e)}
+                                                disabled={isLoading}
                                             >
                                                 <ExternalLink className="h-3.5 w-3.5" />
                                                 View full details
@@ -529,6 +558,7 @@ export default function HouseholdsGridView({
                                             <button
                                                 className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                                 onClick={(e) => handleToggleExpand(household.id, e)}
+                                                disabled={isLoading}
                                             >
                                                 <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" />
                                             </button>
@@ -545,7 +575,10 @@ export default function HouseholdsGridView({
             {selectedHouseholdForMap && (
                 <SingleHouseholdMapModal
                     open={mapModalOpen}
-                    onOpenChange={setMapModalOpen}
+                    onOpenChange={(open) => {
+                        setMapModalOpen(open);
+                        if (!open) setSelectedHouseholdForMap(null);
+                    }}
                     household={selectedHouseholdForMap}
                     purokName={getPurokName(selectedHouseholdForMap, puroks)}
                 />

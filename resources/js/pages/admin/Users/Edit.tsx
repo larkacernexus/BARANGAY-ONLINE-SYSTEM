@@ -1,47 +1,24 @@
 // pages/admin/users/edit.tsx
-
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo, useEffect } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { useForm } from '@inertiajs/react';
-import { useEffect, useState, useMemo } from 'react';
-import { 
-    Card, 
-    CardContent, 
-    CardDescription, 
-    CardHeader, 
-    CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { 
-    Select, 
-    SelectContent, 
-    SelectItem, 
-    SelectTrigger, 
-    SelectValue 
-} from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { 
-    ArrowLeft,
-    Save,
-    Trash2,
-    Mail,
-    Lock,
-    Phone,
-    Shield,
-    Building,
-    Eye,
-    EyeOff,
-    Copy,
-    User as UserIcon,
-    AlertCircle,
-    RefreshCw,
-    ShieldAlert,
-    Loader2
-} from 'lucide-react';
-import { Link } from '@inertiajs/react';
-import { Badge } from '@/components/ui/badge';
-import { 
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { User, Lock, Shield, Settings, History, Trash2, AlertCircle } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/users/create/basic-info-tab';
+import { SecurityTab } from '@/components/admin/users/create/security-tab';
+import { PermissionsTab } from '@/components/admin/users/create/permissions-tab';
+import { SettingsTab } from '@/components/admin/users/create/settings-tab';
+import { route } from 'ziggy-js';
+import { PageProps as InertiaPageProps } from '@inertiajs/core';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -50,41 +27,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 
-import type { 
-    Permission, 
-    UserRole as Role, 
-    UserDepartment as Department,
-    User,
-    UserStatus
-} from '@/types/admin/users/user-types';
-
-interface EditUserProps {
-    user: User & {
-        permissions?: Permission[];
-        roles?: Role[];
-        department?: Department;
-        username?: string;
-        contact_number?: string;
-        position?: string;
-        require_password_change?: boolean;
-    };
-    permissions: Record<string, Permission[]>;
-    roles: Role[];
-    departments: Department[];
-}
-
-// Update FormData to match the actual status options available for editing
 interface FormData {
     first_name: string;
     last_name: string;
@@ -103,90 +47,198 @@ interface FormData {
     send_reset_email: boolean;
 }
 
-// Helper function to convert UserStatus to editable status
-const getEditableStatus = (status: UserStatus): 'active' | 'inactive' => {
-    if (status === 'suspended') {
-        return 'inactive';
-    }
-    return status === 'active' ? 'active' : 'inactive';
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: User, requiredFields: ['first_name', 'last_name', 'email', 'username', 'role_id'] },
+    { id: 'security', label: 'Security', icon: Lock, requiredFields: [] },
+    { id: 'permissions', label: 'Permissions', icon: Shield, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
+
+const requiredFieldsMap = {
+    basic: ['first_name', 'last_name', 'email', 'username', 'role_id'],
+    security: [],
+    permissions: [],
+    settings: []
 };
 
-// Helper to get initial form data
-const getInitialFormData = (user: EditUserProps['user']): FormData => ({
-    first_name: user?.first_name || '',
-    last_name: user?.last_name || '',
-    email: user?.email || '',
-    username: user?.username || '',
-    password: '',
-    password_confirmation: '',
-    contact_number: user?.contact_number || '',
-    position: user?.position || '',
-    department_id: user?.department_id?.toString() || '',
-    role_id: user?.roles?.[0]?.id?.toString() || '',
-    selected_permissions: user?.permissions?.map(p => p.id) || [],
-    status: getEditableStatus(user?.status || 'inactive'),
-    require_password_change: user?.require_password_change || false,
-    is_email_verified: user?.email_verified_at !== null,
-    send_reset_email: false,
-});
+interface PageProps extends InertiaPageProps {
+    user: any;
+    permissions: Record<string, Permission[]>;
+    roles: Role[];
+    departments: Department[];
+}
 
-export default function EditUser({ user, permissions = {}, roles = [], departments = [] }: EditUserProps) {
-    const { data, setData, put, processing, errors, reset } = useForm<FormData>(
-        getInitialFormData(user)
-    );
+import type { Permission, UserRole as Role, UserDepartment as Department } from '@/types/admin/users/user-types';
 
+export default function EditUser() {
+    const { props } = usePage<PageProps>();
+    const { user, permissions = {}, roles = [], departments = [] } = props;
+
+    const [showPreview, setShowPreview] = useState(true);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [selectedRolePermissions, setSelectedRolePermissions] = useState<number[]>([]);
     const [isGeneratingPassword, setIsGeneratingPassword] = useState(false);
-    const [localSelectedPermissions, setLocalSelectedPermissions] = useState<number[]>([]);
     const [passwordResetMode, setPasswordResetMode] = useState(false);
+    const [localSelectedPermissions, setLocalSelectedPermissions] = useState<number[]>([]);
+    const [selectedRolePermissions, setSelectedRolePermissions] = useState<number[]>([]);
     const [isResettingPermissions, setIsResettingPermissions] = useState(false);
+    const [initialFormData, setInitialFormData] = useState<FormData | null>(null);
+
+    // Helper to get editable status
+    const getEditableStatus = (status: string): 'active' | 'inactive' => {
+        if (status === 'suspended') return 'inactive';
+        return status === 'active' ? 'active' : 'inactive';
+    };
+
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        // Remove resetForm and hasUnsavedChanges from here
+    } = useFormManager<FormData>({
+        initialData: {
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            email: user.email || '',
+            username: user.username || '',
+            password: '',
+            password_confirmation: '',
+            contact_number: user.contact_number || '',
+            position: user.position || '',
+            department_id: user.department_id?.toString() || '',
+            role_id: user.roles?.[0]?.id?.toString() || '',
+            selected_permissions: user.permissions?.map((p: any) => p.id) || [],
+            status: getEditableStatus(user.status),
+            require_password_change: user.require_password_change || false,
+            is_email_verified: user.email_verified_at !== null,
+            send_reset_email: false,
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            router.put(route('admin.users.update', user.id), data as any, {
+                onSuccess: () => {
+                    toast.success('User updated successfully');
+                    router.visit(route('admin.users.show', user.id));
+                },
+                onError: (errs) => {
+                    toast.error('Failed to update user');
+                }
+            });
+        }
+    });
+
+    // Store initial form data for reset functionality
+    useEffect(() => {
+        if (!initialFormData) {
+            setInitialFormData({
+                first_name: user.first_name || '',
+                last_name: user.last_name || '',
+                email: user.email || '',
+                username: user.username || '',
+                password: '',
+                password_confirmation: '',
+                contact_number: user.contact_number || '',
+                position: user.position || '',
+                department_id: user.department_id?.toString() || '',
+                role_id: user.roles?.[0]?.id?.toString() || '',
+                selected_permissions: user.permissions?.map((p: any) => p.id) || [],
+                status: getEditableStatus(user.status),
+                require_password_change: user.require_password_change || false,
+                is_email_verified: user.email_verified_at !== null,
+                send_reset_email: false,
+            });
+        }
+    }, []);
+
+    // Calculate hasUnsavedChanges
+    const hasUnsavedChanges = useMemo(() => {
+        if (!initialFormData) return false;
+        
+        return (
+            formData.first_name !== initialFormData.first_name ||
+            formData.last_name !== initialFormData.last_name ||
+            formData.email !== initialFormData.email ||
+            formData.username !== initialFormData.username ||
+            formData.contact_number !== initialFormData.contact_number ||
+            formData.position !== initialFormData.position ||
+            formData.department_id !== initialFormData.department_id ||
+            formData.role_id !== initialFormData.role_id ||
+            formData.status !== initialFormData.status ||
+            formData.require_password_change !== initialFormData.require_password_change ||
+            formData.is_email_verified !== initialFormData.is_email_verified ||
+            JSON.stringify(formData.selected_permissions) !== JSON.stringify(initialFormData.selected_permissions) ||
+            formData.password !== '' ||
+            formData.password_confirmation !== ''
+        );
+    }, [formData, initialFormData]);
+
+    // Reset function
+    const resetForm = () => {
+        if (initialFormData) {
+            updateFormData(initialFormData);
+            setLocalSelectedPermissions(initialFormData.selected_permissions);
+            setPasswordResetMode(false);
+        }
+    };
+
+    // Memoized values
+    const flattenedPermissions = useMemo(() => {
+        if (!permissions) return [];
+        return Object.values(permissions).flat();
+    }, [permissions]);
+
+    const selectedRole = useMemo(() => {
+        if (!Array.isArray(roles) || !formData.role_id) return null;
+        return roles.find(role => role && role.id && role.id.toString() === formData.role_id.toString()) || null;
+    }, [roles, formData.role_id]);
+
+    const selectedDepartment = useMemo(() => {
+        if (!Array.isArray(departments) || !formData.department_id) return null;
+        return departments.find(dept => dept && dept.id && dept.id.toString() === formData.department_id.toString()) || null;
+    }, [departments, formData.department_id]);
+
+    const selectedPermissionsCount = useMemo(() => {
+        return localSelectedPermissions.length + selectedRolePermissions.length;
+    }, [localSelectedPermissions, selectedRolePermissions]);
+
+    const permissionModules = useMemo(() => {
+        if (!permissions || typeof permissions !== 'object') return [];
+        return Object.keys(permissions).filter(key =>
+            Array.isArray(permissions[key]) && permissions[key].length > 0
+        );
+    }, [permissions]);
 
     // Sync local state with form data
     useEffect(() => {
-        if (Array.isArray(data.selected_permissions)) {
-            setLocalSelectedPermissions(data.selected_permissions);
+        if (Array.isArray(formData.selected_permissions)) {
+            setLocalSelectedPermissions(formData.selected_permissions);
         }
-    }, [data.selected_permissions]);
-
-    // Load user's initial data when user changes
-    useEffect(() => {
-        if (user) {
-            const initialData = getInitialFormData(user);
-            // Reset each field individually
-            setData('first_name', initialData.first_name);
-            setData('last_name', initialData.last_name);
-            setData('email', initialData.email);
-            setData('username', initialData.username);
-            setData('password', initialData.password);
-            setData('password_confirmation', initialData.password_confirmation);
-            setData('contact_number', initialData.contact_number);
-            setData('position', initialData.position);
-            setData('department_id', initialData.department_id);
-            setData('role_id', initialData.role_id);
-            setData('selected_permissions', initialData.selected_permissions);
-            setData('status', initialData.status);
-            setData('require_password_change', initialData.require_password_change);
-            setData('is_email_verified', initialData.is_email_verified);
-            setData('send_reset_email', initialData.send_reset_email);
-            
-            setLocalSelectedPermissions(user.permissions?.map(p => p.id) || []);
-            setPasswordResetMode(false);
-        }
-    }, [user, setData]);
+    }, [formData.selected_permissions]);
 
     // When role changes, load its permissions
     useEffect(() => {
-        if (data.role_id && roles) {
-            const role = Array.isArray(roles) 
-                ? roles.find(r => r && r.id && r.id.toString() === data.role_id.toString())
+        if (formData.role_id && roles) {
+            const role = Array.isArray(roles)
+                ? roles.find(r => r && r.id && r.id.toString() === formData.role_id.toString())
                 : null;
-            
+
             if (role && role.permissions) {
                 const rolePermissionIds = Array.isArray(role.permissions)
                     ? role.permissions
-                        .filter(p => p && p.id !== undefined && p.id !== null)
-                        .map(p => p.id)
+                        .filter((p: any) => p && p.id !== undefined && p.id !== null)
+                        .map((p: any) => p.id)
                     : [];
                 setSelectedRolePermissions(rolePermissionIds);
             } else {
@@ -195,54 +247,58 @@ export default function EditUser({ user, permissions = {}, roles = [], departmen
         } else {
             setSelectedRolePermissions([]);
         }
-    }, [data.role_id, roles]);
+    }, [formData.role_id, roles]);
 
-    // Update form data when local state changes
-    const updateSelectedPermissions = (newPermissions: number[]) => {
-        setLocalSelectedPermissions(newPermissions);
-        setData('selected_permissions', newPermissions);
-    };
-
-    // Memoize flattened permissions for better performance
-    const flattenedPermissions = useMemo(() => {
-        if (!permissions) return [];
-        return Object.values(permissions).flat();
-    }, [permissions]);
-
+    // Toggle permission
     const togglePermission = (permissionId: number) => {
-        if (!permissionId) return;
-        
         if (localSelectedPermissions.includes(permissionId)) {
             const newPermissions = localSelectedPermissions.filter(id => id !== permissionId);
-            updateSelectedPermissions(newPermissions);
+            setLocalSelectedPermissions(newPermissions);
+            updateFormData({ selected_permissions: newPermissions });
         } else {
             const newPermissions = [...localSelectedPermissions, permissionId];
-            updateSelectedPermissions(newPermissions);
+            setLocalSelectedPermissions(newPermissions);
+            updateFormData({ selected_permissions: newPermissions });
         }
     };
 
-    const toggleAllPermissions = (module: string, modulePermissions: Permission[]) => {
+    // Toggle all permissions in a module
+    const toggleAllPermissions = (modulePermissions: Permission[]) => {
         const permissionsArray = Array.isArray(modulePermissions) ? modulePermissions : [];
         if (permissionsArray.length === 0) return;
 
         const permissionIds = permissionsArray
             .filter((p: Permission) => p && p.id !== undefined && p.id !== null)
             .map((p: Permission) => p.id);
-        
+
         if (permissionIds.length === 0) return;
 
         const allSelected = permissionIds.every(id => localSelectedPermissions.includes(id));
-        
+
         if (allSelected) {
             const newPermissions = localSelectedPermissions.filter(id => !permissionIds.includes(id));
-            updateSelectedPermissions(newPermissions);
+            setLocalSelectedPermissions(newPermissions);
+            updateFormData({ selected_permissions: newPermissions });
         } else {
             const newIds = permissionIds.filter(id => !localSelectedPermissions.includes(id));
             const newPermissions = [...localSelectedPermissions, ...newIds];
-            updateSelectedPermissions(newPermissions);
+            setLocalSelectedPermissions(newPermissions);
+            updateFormData({ selected_permissions: newPermissions });
         }
     };
 
+    // Reset permissions
+    const handleResetPermissions = () => {
+        setIsResettingPermissions(true);
+        setLocalSelectedPermissions([]);
+        updateFormData({ selected_permissions: [] });
+        setTimeout(() => {
+            setIsResettingPermissions(false);
+            toast.success('Custom permissions reset');
+        }, 500);
+    };
+
+    // Generate password
     const generatePassword = (): string => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
         let password = '';
@@ -255,979 +311,473 @@ export default function EditUser({ user, permissions = {}, roles = [], departmen
     const handleGeneratePassword = () => {
         setIsGeneratingPassword(true);
         const newPassword = generatePassword();
-        setData({
-            ...data,
+        updateFormData({
             password: newPassword,
             password_confirmation: newPassword,
         });
         setPasswordResetMode(true);
-        
         setTimeout(() => setIsGeneratingPassword(false), 500);
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        put(`/admin/users/${user.id}`);
-    };
-
-    const handleDeleteUser = () => {
-        console.log('Delete user:', user.id);
+        toast.success('Password generated');
     };
 
     const handleForcePasswordReset = () => {
         handleGeneratePassword();
-        setData('require_password_change', true);
-        setData('send_reset_email', true);
+        updateFormData({ require_password_change: true, send_reset_email: true });
     };
 
     const clearPasswordFields = () => {
-        setData({
-            ...data,
-            password: '',
-            password_confirmation: '',
+        updateFormData({ password: '', password_confirmation: '' });
+        setPasswordResetMode(false);
+    };
+
+    // Handle reset
+    const handleReset = () => {
+        if (confirm('Reset all changes to the original values?')) {
+            resetForm();
+            setLocalSelectedPermissions(user.permissions?.map((p: any) => p.id) || []);
+            setPasswordResetMode(false);
+            toast.info('Form reset to original values');
+        }
+    };
+
+    // Handle cancel
+    const handleCancel = () => {
+        if (hasUnsavedChanges) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.users.show', user.id));
+            }
+        } else {
+            router.visit(route('admin.users.show', user.id));
+        }
+    };
+
+    // Handle delete
+    const handleDelete = () => {
+        setShowDeleteDialog(true);
+    };
+
+    const confirmDelete = () => {
+        router.delete(route('admin.users.destroy', user.id), {
+            onSuccess: () => {
+                toast.success('User deleted successfully');
+                router.visit(route('admin.users.index'));
+            },
+            onError: () => {
+                toast.error('Failed to delete user');
+                setShowDeleteDialog(false);
+            }
         });
-        setPasswordResetMode(false);
     };
 
-    const handleResetPermissions = () => {
-        setIsResettingPermissions(true);
-        updateSelectedPermissions([]);
-        setTimeout(() => setIsResettingPermissions(false), 500);
+    // Get permission by ID
+    const getPermissionById = (permissionId: number): Permission | undefined => {
+        return flattenedPermissions.find((p: Permission) => p && p.id === permissionId);
     };
 
-    const handleResetForm = () => {
-        const initialData = getInitialFormData(user);
-        setData('first_name', initialData.first_name);
-        setData('last_name', initialData.last_name);
-        setData('email', initialData.email);
-        setData('username', initialData.username);
-        setData('password', initialData.password);
-        setData('password_confirmation', initialData.password_confirmation);
-        setData('contact_number', initialData.contact_number);
-        setData('position', initialData.position);
-        setData('department_id', initialData.department_id);
-        setData('role_id', initialData.role_id);
-        setData('selected_permissions', initialData.selected_permissions);
-        setData('status', initialData.status);
-        setData('require_password_change', initialData.require_password_change);
-        setData('is_email_verified', initialData.is_email_verified);
-        setData('send_reset_email', initialData.send_reset_email);
-        
-        setLocalSelectedPermissions(user.permissions?.map(p => p.id) || []);
-        setPasswordResetMode(false);
-    };
-
-    // Safe department/role finding
-    const selectedDepartment = useMemo(() => {
-        if (!Array.isArray(departments) || !data.department_id) return null;
-        return departments.find(dept => dept && dept.id && dept.id.toString() === data.department_id.toString()) || null;
-    }, [departments, data.department_id]);
-
-    const selectedRole = useMemo(() => {
-        if (!Array.isArray(roles) || !data.role_id) return null;
-        return roles.find(role => role && role.id && role.id.toString() === data.role_id.toString()) || null;
-    }, [roles, data.role_id]);
-
-    // Calculate total permissions safely
-    const totalPermissionsCount = useMemo(() => {
-        if (!permissions) return 0;
-        const allPermissions = Object.values(permissions).flat();
-        return allPermissions.filter(p => p && p.id !== undefined && p.id !== null).length;
-    }, [permissions]);
-
-    const selectedPermissionsCount = useMemo(() => {
-        return localSelectedPermissions.length + selectedRolePermissions.length;
-    }, [localSelectedPermissions, selectedRolePermissions]);
-
-    // Get permission by ID safely
-    const getPermissionById = useMemo(() => {
-        return (permissionId: number): Permission | undefined => {
-            if (!permissionId || !flattenedPermissions) return undefined;
-            return flattenedPermissions.find(p => p && p.id === permissionId);
-        };
-    }, [flattenedPermissions]);
-
-    // Get all modules from permissions
-    const permissionModules = useMemo(() => {
-        if (!permissions || typeof permissions !== 'object') return [];
-        return Object.keys(permissions).filter(key => 
-            Array.isArray(permissions[key]) && permissions[key].length > 0
-        );
-    }, [permissions]);
-
-    // User activity info
-    const lastLogin = user.last_login_at 
-        ? new Date(user.last_login_at).toLocaleDateString('en-US', {
+    // Format date
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return 'Never';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
-        })
-        : 'Never';
+        });
+    };
 
-    const createdAt = new Date(user.created_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        security: getTabStatus('security'),
+        permissions: getTabStatus('permissions'),
+        settings: getTabStatus('settings')
+    };
 
-    const updatedAt = new Date(user.updated_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    const missingFields = getMissingFields();
 
-    // Loading state if data is not ready
-    if (!user || !permissions || !roles || !departments) {
-        return (
-            <AppLayout
-                title="Edit User"
-                breadcrumbs={[
-                    { title: 'Dashboard', href: '/admin/dashboard' },
-                    { title: 'Users', href: '/admin/users' },
-                    { title: 'Edit User', href: `/admin/users/${user?.id}/edit` }
-                ]}
-            >
-                <div className="flex items-center justify-center h-64">
-                    <div className="text-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500 dark:text-gray-400">Loading user data...</p>
-                    </div>
-                </div>
-            </AppLayout>
-        );
-    }
+    const requiredFieldsList = [
+        { label: 'First Name', value: !!formData.first_name, tabId: 'basic' },
+        { label: 'Last Name', value: !!formData.last_name, tabId: 'basic' },
+        { label: 'Email Address', value: !!formData.email, tabId: 'basic' },
+        { label: 'Username', value: !!formData.username, tabId: 'basic' },
+        { label: 'User Role', value: !!formData.role_id, tabId: 'basic' },
+    ];
+
+    const tabOrder = ['basic', 'security', 'permissions', 'settings'];
+
+    // Count changed fields
+    const changedFieldsCount = () => {
+        if (!initialFormData) return 0;
+        let count = 0;
+        if (formData.first_name !== initialFormData.first_name) count++;
+        if (formData.last_name !== initialFormData.last_name) count++;
+        if (formData.email !== initialFormData.email) count++;
+        if (formData.username !== initialFormData.username) count++;
+        if (formData.contact_number !== initialFormData.contact_number) count++;
+        if (formData.position !== initialFormData.position) count++;
+        if (formData.department_id !== initialFormData.department_id) count++;
+        if (formData.role_id !== initialFormData.role_id) count++;
+        if (formData.status !== initialFormData.status) count++;
+        if (formData.require_password_change !== initialFormData.require_password_change) count++;
+        if (formData.is_email_verified !== initialFormData.is_email_verified) count++;
+        if (JSON.stringify(formData.selected_permissions) !== JSON.stringify(initialFormData.selected_permissions)) count++;
+        if (formData.password !== '') count++;
+        return count;
+    };
 
     return (
-        <TooltipProvider>
-            <AppLayout
-                title={`Edit ${user.first_name} ${user.last_name}`}
-                breadcrumbs={[
-                    { title: 'Dashboard', href: '/admin/dashboard' },
-                    { title: 'Users', href: '/admin/users' },
-                    { title: `${user.first_name} ${user.last_name}`, href: `/admin/users/${user.id}` },
-                    { title: 'Edit', href: `/admin/users/${user.id}/edit` }
-                ]}
-            >
-                <form onSubmit={handleSubmit}>
-                    <div className="space-y-6">
-                        {/* Header */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <Link href="/admin/users">
-                                    <Button variant="outline" size="sm" type="button" className="dark:border-gray-600 dark:text-gray-300">
-                                        <ArrowLeft className="h-4 w-4 mr-2" />
-                                        Back to Users
-                                    </Button>
-                                </Link>
-                                <div>
-                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-white">
-                                        Edit User: {user.first_name} {user.last_name}
-                                    </h1>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        User ID: {user.id} • Created: {createdAt}
-                                    </p>
-                                </div>
+        <AppLayout
+            title={`Edit User: ${user.first_name} ${user.last_name}`}
+            breadcrumbs={[
+                { title: 'Dashboard', href: '/admin/dashboard' },
+                { title: 'Users', href: '/admin/users' },
+                { title: `${user.first_name} ${user.last_name}`, href: route('admin.users.show', user.id) },
+                { title: 'Edit', href: route('admin.users.edit', user.id) }
+            ]}
+        >
+            <div className="space-y-6">
+                <FormHeader
+                    title="Edit User"
+                    description={`Editing ${user.first_name} ${user.last_name}`}
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            {hasUnsavedChanges && (
+                                <button
+                                    type="button"
+                                    onClick={handleReset}
+                                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                                >
+                                    <History className="h-4 w-4" />
+                                    Reset
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 flex items-center gap-1"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                            </button>
+                            <div className="px-2 py-1 rounded-md text-xs bg-gray-100 dark:bg-gray-800">
+                                ID: {user.id}
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button type="submit" disabled={processing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm">
-                                    <Save className="h-4 w-4 mr-2" />
-                                    {processing ? 'Saving...' : 'Save Changes'}
-                                </Button>
+                            <div className={`px-2 py-1 rounded-md text-xs ${
+                                formData.status === 'active' 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                                {formData.status}
                             </div>
                         </div>
+                    }
+                />
 
-                        {/* Validation Errors Summary */}
-                        {Object.keys(errors).length > 0 && (
-                            <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                                        <AlertCircle className="h-5 w-5" />
-                                        <span className="font-medium">Please fix the following errors:</span>
-                                    </div>
-                                    <ul className="mt-2 list-disc list-inside text-sm text-red-600 dark:text-red-400">
-                                        {Object.entries(errors).map(([key, error]) => (
-                                            <li key={key}>{key}: {error}</li>
-                                        ))}
-                                    </ul>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* User Status Alert */}
-                        {user.status !== data.status && (
-                            <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-800">
-                                <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                                <AlertDescription className="text-yellow-800 dark:text-yellow-400">
-                                    User status will be changed from <strong>{user.status}</strong> to <strong>{data.status}</strong>
-                                </AlertDescription>
-                            </Alert>
-                        )}
-
-                        {/* Suspended User Notice */}
-                        {user.status === 'suspended' && (
-                            <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-                                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                                <AlertDescription className="text-red-800 dark:text-red-400">
-                                    This account is currently suspended. To reactivate, change status to active.
-                                </AlertDescription>
-                            </Alert>
-                        )}
-
-                        <div className="grid gap-6 lg:grid-cols-3">
-                            {/* Left Column - User Information */}
-                            <div className="lg:col-span-2 space-y-6">
-                                {/* Basic Information Card - Keep existing JSX */}
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 dark:text-white">
-                                            <UserIcon className="h-5 w-5" />
-                                            Basic Information
-                                        </CardTitle>
-                                        <CardDescription className="dark:text-gray-400">
-                                            Update the user's personal details
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        {/* Form fields remain the same */}
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="first_name" className="dark:text-gray-300">First Name *</Label>
-                                                <Input 
-                                                    id="first_name" 
-                                                    placeholder="Juan" 
-                                                    value={data.first_name}
-                                                    onChange={(e) => setData('first_name', e.target.value)}
-                                                    className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                                                />
-                                                {errors.first_name && (
-                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.first_name}</p>
-                                                )}
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="last_name" className="dark:text-gray-300">Last Name *</Label>
-                                                <Input 
-                                                    id="last_name" 
-                                                    placeholder="Dela Cruz" 
-                                                    value={data.last_name}
-                                                    onChange={(e) => setData('last_name', e.target.value)}
-                                                    className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                                                />
-                                                {errors.last_name && (
-                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.last_name}</p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="email" className="dark:text-gray-300">Email Address *</Label>
-                                                <div className="relative">
-                                                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                                    <Input 
-                                                        id="email" 
-                                                        type="email" 
-                                                        placeholder="juan@example.com" 
-                                                        className="pl-10 dark:bg-gray-800 dark:border-gray-700 dark:text-white" 
-                                                        value={data.email}
-                                                        onChange={(e) => setData('email', e.target.value)}
-                                                    />
-                                                </div>
-                                                {errors.email && (
-                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-                                                )}
-                                                {user.email_verified_at && (
-                                                    <Badge variant="outline" className="mt-1 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                                                        ✓ Email Verified
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="contact_number" className="dark:text-gray-300">Contact Number</Label>
-                                                <div className="relative">
-                                                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                                    <Input 
-                                                        id="contact_number" 
-                                                        placeholder="09123456789" 
-                                                        className="pl-10 dark:bg-gray-800 dark:border-gray-700 dark:text-white" 
-                                                        value={data.contact_number}
-                                                        onChange={(e) => setData('contact_number', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="username" className="dark:text-gray-300">Username *</Label>
-                                                <Input 
-                                                    id="username" 
-                                                    placeholder="juan.delacruz" 
-                                                    value={data.username}
-                                                    onChange={(e) => setData('username', e.target.value)}
-                                                    className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                                                />
-                                                {errors.username && (
-                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.username}</p>
-                                                )}
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="position" className="dark:text-gray-300">Position/Title</Label>
-                                                <Input 
-                                                    id="position" 
-                                                    placeholder="Barangay Secretary" 
-                                                    value={data.position}
-                                                    onChange={(e) => setData('position', e.target.value)}
-                                                    className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="department_id" className="dark:text-gray-300">Department</Label>
-                                                <Select 
-                                                    value={data.department_id} 
-                                                    onValueChange={(value) => setData('department_id', value)}
-                                                >
-                                                    <SelectTrigger className="dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                                        <SelectValue placeholder="Select department" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
-                                                        <SelectItem value="">No Department</SelectItem>
-                                                        {Array.isArray(departments) && departments.map((dept) => (
-                                                            dept && dept.id && (
-                                                                <SelectItem key={dept.id} value={dept.id.toString()} className="dark:text-white">
-                                                                    {dept.name || 'Unnamed Department'}
-                                                                </SelectItem>
-                                                            )
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="role_id" className="dark:text-gray-300">User Role *</Label>
-                                                <Select 
-                                                    value={data.role_id} 
-                                                    onValueChange={(value) => setData('role_id', value)}
-                                                >
-                                                    <SelectTrigger className="dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                                                        <SelectValue placeholder="Select role" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
-                                                        <SelectItem value="">No Role</SelectItem>
-                                                        {Array.isArray(roles) && roles.map((role) => (
-                                                            role && role.id && (
-                                                                <SelectItem key={role.id} value={role.id.toString()} className="dark:text-white">
-                                                                    {role.name || 'Unnamed Role'}
-                                                                </SelectItem>
-                                                            )
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                {errors.role_id && (
-                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.role_id}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Security & Access Card */}
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 dark:text-white">
-                                            <ShieldAlert className="h-5 w-5" />
-                                            Security & Access
-                                        </CardTitle>
-                                        <CardDescription className="dark:text-gray-400">
-                                            Manage password and security settings
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        {passwordResetMode && (
-                                            <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
-                                                <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                                <AlertDescription className="text-blue-800 dark:text-blue-400">
-                                                    Password reset mode active. Leave blank to keep current password.
-                                                    <Button 
-                                                        type="button" 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        className="ml-2 text-blue-600 dark:text-blue-400"
-                                                        onClick={clearPasswordFields}
-                                                    >
-                                                        Cancel Reset
-                                                    </Button>
-                                                </AlertDescription>
-                                            </Alert>
-                                        )}
-
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="password" className="dark:text-gray-300">
-                                                    New Password {!passwordResetMode && '(Leave blank to keep current)'}
-                                                </Label>
-                                                <div className="relative">
-                                                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                                    <Input 
-                                                        id="password" 
-                                                        type={showPassword ? "text" : "password"}
-                                                        placeholder="Enter new password"
-                                                        className="pl-10 pr-10 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                                                        value={data.password}
-                                                        onChange={(e) => {
-                                                            setData('password', e.target.value);
-                                                            if (e.target.value) {
-                                                                setPasswordResetMode(true);
-                                                            }
-                                                        }}
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="absolute right-0 top-0 h-full px-3"
-                                                        onClick={() => setShowPassword(!showPassword)}
-                                                    >
-                                                        {showPassword ? (
-                                                            <EyeOff className="h-4 w-4" />
-                                                        ) : (
-                                                            <Eye className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
-                                                </div>
-                                                {errors.password && (
-                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.password}</p>
-                                                )}
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="password_confirmation" className="dark:text-gray-300">Confirm New Password</Label>
-                                                <Input 
-                                                    id="password_confirmation" 
-                                                    type="password"
-                                                    placeholder="Confirm new password"
-                                                    value={data.password_confirmation}
-                                                    onChange={(e) => setData('password_confirmation', e.target.value)}
-                                                    className="dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                                                />
-                                                {errors.password_confirmation && (
-                                                    <p className="text-sm text-red-600 dark:text-red-400">{errors.password_confirmation}</p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-2">
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button 
-                                                        type="button" 
-                                                        variant="outline" 
-                                                        size="sm"
-                                                        onClick={handleGeneratePassword}
-                                                        disabled={isGeneratingPassword}
-                                                        className="dark:border-gray-600 dark:text-gray-300"
-                                                    >
-                                                        <Copy className="h-4 w-4 mr-2" />
-                                                        {isGeneratingPassword ? 'Generating...' : 'Generate Password'}
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>Generate a random secure password</TooltipContent>
-                                            </Tooltip>
-                                            
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button 
-                                                        type="button" 
-                                                        variant="outline" 
-                                                        size="sm"
-                                                        onClick={handleForcePasswordReset}
-                                                        className="dark:border-gray-600 dark:text-gray-300"
-                                                    >
-                                                        <RefreshCw className="h-4 w-4 mr-2" />
-                                                        Force Reset
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent>Force password reset on next login</TooltipContent>
-                                            </Tooltip>
-                                            
-                                            <Button 
-                                                type="button" 
-                                                variant="outline" 
-                                                size="sm"
-                                                onClick={() => setData('send_reset_email', !data.send_reset_email)}
-                                                className={`dark:border-gray-600 ${data.send_reset_email ? 'bg-green-50 dark:bg-green-900/20' : ''}`}
-                                            >
-                                                {data.send_reset_email ? (
-                                                    <span className="text-green-600 dark:text-green-400">✓ </span>
-                                                ) : null}
-                                                Send Reset Email
-                                            </Button>
-                                        </div>
-
-                                        <Separator className="dark:bg-gray-800" />
-
-                                        <div className="space-y-3">
-                                            <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700">
-                                                <Checkbox 
-                                                    id="requirePasswordChange" 
-                                                    checked={data.require_password_change}
-                                                    onCheckedChange={(checked) => 
-                                                        setData('require_password_change', checked as boolean)
-                                                    }
-                                                    className="dark:border-gray-600"
-                                                />
-                                                <Label htmlFor="requirePasswordChange" className="text-sm cursor-pointer dark:text-gray-300">
-                                                    Require password change on next login
-                                                </Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700">
-                                                <Checkbox 
-                                                    id="is_email_verified" 
-                                                    checked={data.is_email_verified}
-                                                    onCheckedChange={(checked) => 
-                                                        setData('is_email_verified', checked as boolean)
-                                                    }
-                                                    className="dark:border-gray-600"
-                                                />
-                                                <Label htmlFor="is_email_verified" className="text-sm cursor-pointer dark:text-gray-300">
-                                                    Mark email as verified
-                                                </Label>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Permissions Section - Keep existing JSX */}
-                                {permissionModules.length > 0 && (
-                                    <Card className="dark:bg-gray-900">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2 dark:text-white">
-                                                <Shield className="h-5 w-5" />
-                                                System Permissions
-                                            </CardTitle>
-                                            <CardDescription className="dark:text-gray-400">
-                                                Current permissions: {user.permissions?.length || 0} direct permissions
-                                                {user.roles?.[0] && ` + ${user.roles[0].permissions?.length || 0} from role`}
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-6">
-                                                {permissionModules.map((module) => {
-                                                    const modulePermissions = permissions[module];
-                                                    const safePermissions = Array.isArray(modulePermissions) ? modulePermissions : [];
-                                                    
-                                                    if (safePermissions.length === 0) return null;
-
-                                                    return (
-                                                        <div key={module} className="space-y-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <Label className="text-base font-semibold dark:text-white">{module}</Label>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => toggleAllPermissions(module, safePermissions)}
-                                                                    className="dark:text-gray-400"
-                                                                >
-                                                                    Toggle All
-                                                                </Button>
-                                                            </div>
-                                                            <div className="grid gap-3 md:grid-cols-2">
-                                                                {safePermissions.map((permission) => {
-                                                                    if (!permission || permission.id === undefined) return null;
-                                                                    
-                                                                    const permissionId = permission.id;
-                                                                    const isFromRole = selectedRolePermissions.includes(permissionId);
-                                                                    const isSelected = localSelectedPermissions.includes(permissionId);
-                                                                    const hadPermission = user.permissions?.some(p => p.id === permissionId);
-                                                                    
-                                                                    return (
-                                                                        <div 
-                                                                            key={permission.id}
-                                                                            className={`flex items-start space-x-2 p-3 rounded-lg border ${
-                                                                                isFromRole 
-                                                                                    ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30' 
-                                                                                    : hadPermission && !isSelected
-                                                                                    ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/30'
-                                                                                    : 'border-gray-200 dark:border-gray-700'
-                                                                            }`}
-                                                                        >
-                                                                            <Checkbox 
-                                                                                id={`permission-${permission.id}`}
-                                                                                checked={isSelected || isFromRole}
-                                                                                onCheckedChange={() => togglePermission(permissionId)}
-                                                                                disabled={isFromRole}
-                                                                                className="mt-0.5 dark:border-gray-600"
-                                                                            />
-                                                                            <div className="space-y-1 flex-1">
-                                                                                <div className="flex items-center justify-between flex-wrap gap-1">
-                                                                                    <Label 
-                                                                                        htmlFor={`permission-${permission.id}`} 
-                                                                                        className={`text-sm font-medium cursor-pointer ${
-                                                                                            isFromRole ? 'text-blue-700 dark:text-blue-400' : 
-                                                                                            hadPermission && !isSelected ? 'text-yellow-700 dark:text-yellow-400' : 'dark:text-gray-300'
-                                                                                        }`}
-                                                                                    >
-                                                                                        {permission.display_name || permission.name}
-                                                                                        {isFromRole && (
-                                                                                            <Badge variant="outline" className="ml-2 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                                                                                                From Role
-                                                                                            </Badge>
-                                                                                        )}
-                                                                                        {hadPermission && !isSelected && !isFromRole && (
-                                                                                            <Badge variant="outline" className="ml-2 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-                                                                                                Removing
-                                                                                            </Badge>
-                                                                                        )}
-                                                                                    </Label>
-                                                                                </div>
-                                                                                {permission.description && (
-                                                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                                                        {permission.description}
-                                                                                    </p>
-                                                                                )}
-                                                                                <code className="text-xs text-gray-400 dark:text-gray-500">
-                                                                                    {permission.name}
-                                                                                </code>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Permissions Summary */}
-                                            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <span className="text-sm font-medium dark:text-gray-300">Permissions Summary:</span>
-                                                    <span className="text-sm dark:text-gray-300">
-                                                        {localSelectedPermissions.length} custom + {selectedRolePermissions.length} from role
-                                                    </span>
-                                                </div>
-                                                {user.permissions && user.permissions.length > 0 && (
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                                        Previously: {user.permissions.length} permissions
-                                                    </div>
-                                                )}
-                                                <div className="flex gap-2 flex-wrap max-h-32 overflow-y-auto">
-                                                    {localSelectedPermissions.map(permissionId => {
-                                                        const permission = getPermissionById(permissionId);
-                                                        if (!permission) return null;
-                                                        
-                                                        const hadPermission = user.permissions?.some(p => p.id === permissionId);
-                                                        
-                                                        return (
-                                                            <span 
-                                                                key={permissionId}
-                                                                className={`text-xs px-2 py-1 rounded ${
-                                                                    hadPermission 
-                                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                                                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                                                                }`}
-                                                            >
-                                                                {permission.display_name || permission.name}
-                                                                {!hadPermission && <span className="ml-1">(new)</span>}
-                                                            </span>
-                                                        );
-                                                    })}
-                                                    {selectedRolePermissions.map(permissionId => {
-                                                        const permission = getPermissionById(permissionId);
-                                                        if (!permission) return null;
-                                                        
-                                                        return (
-                                                            <span 
-                                                                key={`role-${permissionId}`}
-                                                                className="text-xs bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 px-2 py-1 rounded"
-                                                            >
-                                                                {permission.display_name || permission.name} (role)
-                                                            </span>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-                            </div>
-
-                            {/* Right Column - Summary & Actions */}
-                            <div className="space-y-6">
-                                {/* Account Status Card */}
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <CardTitle className="dark:text-white">Account Status</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-500 dark:text-gray-400">Total Permissions:</span>
-                                                <span className="font-medium dark:text-white">
-                                                    {selectedPermissionsCount}
-                                                </span>
-                                            </div>
-                                            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                <div 
-                                                    className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full" 
-                                                    style={{ 
-                                                        width: `${Math.min(
-                                                            (selectedPermissionsCount / Math.max(totalPermissionsCount, 1)) * 100, 
-                                                            100
-                                                        )}%` 
-                                                    }}
-                                                />
-                                            </div>
-                                            
-                                            <Separator className="dark:bg-gray-800" />
-                                            
-                                            <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700">
-                                                <Checkbox 
-                                                    id="status" 
-                                                    checked={data.status === 'active'}
-                                                    onCheckedChange={(checked) => 
-                                                        setData('status', checked ? 'active' : 'inactive')
-                                                    }
-                                                    className="dark:border-gray-600"
-                                                />
-                                                <Label htmlFor="status" className="text-sm cursor-pointer dark:text-gray-300">
-                                                    Account is active
-                                                </Label>
-                                            </div>
-                                        </div>
-
-                                        {/* Account Activity */}
-                                        <div className="pt-4 space-y-3">
-                                            <h4 className="text-sm font-medium dark:text-gray-300">Account Activity</h4>
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Last Login:</span>
-                                                    <span className="dark:text-gray-300">{lastLogin}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Created:</span>
-                                                    <span className="dark:text-gray-300">{createdAt}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Last Updated:</span>
-                                                    <span className="dark:text-gray-300">{updatedAt}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Email Verified:</span>
-                                                    <span className="dark:text-gray-300">
-                                                        {user.email_verified_at 
-                                                            ? new Date(user.email_verified_at).toLocaleDateString()
-                                                            : 'Not Verified'
-                                                        }
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* User Preview Card */}
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <CardTitle className="dark:text-white">User Preview</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="flex flex-col items-center text-center p-4 border rounded-lg dark:border-gray-700">
-                                            <div className="h-16 w-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center mb-3">
-                                                <UserIcon className="h-8 w-8 text-gray-600 dark:text-gray-400" />
-                                            </div>
-                                            <div className="font-medium dark:text-white">
-                                                {data.first_name || data.last_name 
-                                                    ? `${data.first_name} ${data.last_name}`.trim() 
-                                                    : user.first_name || user.last_name
-                                                    ? `${user.first_name} ${user.last_name}`.trim()
-                                                    : 'No name'
-                                                }
-                                            </div>
-                                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                {selectedRole?.name || user.roles?.[0]?.name || 'No role selected'}
-                                            </div>
-                                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                {selectedDepartment?.name || user.department?.name || 'No department'}
-                                            </div>
-                                            <div className="mt-2">
-                                                <Badge variant={data.status === 'active' ? 'default' : 'secondary'}>
-                                                    {data.status === 'active' ? 'Active' : 'Inactive'}
-                                                </Badge>
-                                            </div>
-                                            <div className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                                                ID: {user.id}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Department Info Card */}
-                                {(selectedDepartment || user.department) && (
-                                    <Card className="dark:bg-gray-900">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2 dark:text-white">
-                                                <Building className="h-4 w-4" />
-                                                Department Info
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-3 text-sm">
-                                                <div>
-                                                    <div className="text-gray-500 dark:text-gray-400">Department:</div>
-                                                    <div className="font-medium dark:text-white">
-                                                        {selectedDepartment?.name || user.department?.name}
-                                                    </div>
-                                                </div>
-                                                {(selectedDepartment?.description || user.department?.description) && (
-                                                    <div>
-                                                        <div className="text-gray-500 dark:text-gray-400">Description:</div>
-                                                        <div className="font-medium dark:text-white">
-                                                            {selectedDepartment?.description || user.department?.description}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* Danger Zone Card */}
-                                <Card className="border-red-200 dark:border-red-900">
-                                    <CardHeader>
-                                        <CardTitle className="text-red-700 dark:text-red-400 flex items-center gap-2">
-                                            <AlertCircle className="h-5 w-5" />
-                                            Danger Zone
-                                        </CardTitle>
-                                        <CardDescription className="text-red-600 dark:text-red-400">
-                                            Irreversible and destructive actions
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button 
-                                                    variant="outline" 
-                                                    className="w-full justify-start text-yellow-600 border-yellow-200 hover:bg-yellow-50 dark:text-yellow-400 dark:border-yellow-800 dark:hover:bg-yellow-950/30"
-                                                >
-                                                    <RefreshCw className="h-4 w-4 mr-2" />
-                                                    Reset All Permissions
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle className="dark:text-white">Reset all permissions?</AlertDialogTitle>
-                                                    <AlertDialogDescription className="dark:text-gray-400">
-                                                        This will remove all custom permissions and only keep role-based permissions.
-                                                        This action cannot be undone.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction
-                                                        onClick={handleResetPermissions}
-                                                        disabled={isResettingPermissions}
-                                                        className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                                                    >
-                                                        {isResettingPermissions ? (
-                                                            <>
-                                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                                Resetting...
-                                                            </>
-                                                        ) : (
-                                                            'Reset Permissions'
-                                                        )}
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <Button 
-                                                    variant="destructive"
-                                                    className="w-full justify-start"
-                                                >
-                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                    Delete User Account
-                                                </Button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle className="dark:text-white">Delete this user?</AlertDialogTitle>
-                                                    <AlertDialogDescription className="dark:text-gray-400">
-                                                        This will permanently delete the user account and all associated data.
-                                                        This action cannot be undone.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction
-                                                        onClick={handleDeleteUser}
-                                                        className="bg-red-600 hover:bg-red-700 text-white"
-                                                    >
-                                                        Delete User
-                                                    </AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </div>
-
-                        {/* Form Actions */}
-                        <div className="flex items-center justify-between pt-6 border-t dark:border-gray-800">
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                                Last updated: {updatedAt}
-                            </div>
+                {/* Unsaved Changes Banner */}
+                {hasUnsavedChanges && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Link href={`/admin/users/${user.id}`}>
-                                    <Button 
-                                        type="button" 
-                                        variant="outline" 
-                                        disabled={processing}
-                                        className="dark:border-gray-600 dark:text-gray-300"
-                                    >
-                                        Cancel
-                                    </Button>
-                                </Link>
-                                <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    disabled={processing}
-                                    onClick={handleResetForm}
-                                    className="dark:border-gray-600 dark:text-gray-300"
-                                >
-                                    Reset Changes
-                                </Button>
-                                <Button 
-                                    type="submit" 
-                                    disabled={processing}
-                                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm"
-                                >
-                                    {processing ? (
-                                        <>
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="h-4 w-4 mr-2" />
-                                            Save Changes
-                                        </>
-                                    )}
-                                </Button>
+                                <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse"></div>
+                                <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                                    {changedFieldsCount()} field{changedFieldsCount() !== 1 ? 's' : ''} modified
+                                </span>
+                            </div>
+                            <button 
+                                type="button" 
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                            >
+                                Reset All
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Status Change Warning */}
+                {user.status !== formData.status && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                            <div>
+                                <p className="font-medium text-yellow-800 dark:text-yellow-300">Status Change</p>
+                                <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                                    User status will be changed from <strong>{user.status}</strong> to <strong>{formData.status}</strong>
+                                </p>
                             </div>
                         </div>
                     </div>
-                </form>
-            </AppLayout>
-        </TooltipProvider>
+                )}
+
+                {/* Suspended User Notice */}
+                {user.status === 'suspended' && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                            <div>
+                                <p className="font-medium text-red-800 dark:text-red-300">Account Suspended</p>
+                                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                                    This account is currently suspended. To reactivate, change status to active.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <FormErrors errors={errors} />
+
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer title="Basic Information" description="Update the user's personal and professional details">
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={errors}
+                                        user={user}
+                                        roles={roles}
+                                        departments={departments}
+                                        selectedRole={selectedRole}
+                                        selectedDepartment={selectedDepartment}
+                                        onInputChange={handleInputChange}
+                                        onSelectChange={handleSelectChange}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    showPrevious={false}
+                                    nextLabel="Next: Security"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'security' && (
+                            <>
+                                <FormContainer title="Password & Security" description="Update the user's login credentials">
+                                    <SecurityTab
+                                        formData={formData}
+                                        errors={errors}
+                                        showPassword={showPassword}
+                                        passwordResetMode={passwordResetMode}
+                                        onToggleShowPassword={() => setShowPassword(!showPassword)}
+                                        onGeneratePassword={handleGeneratePassword}
+                                        onForcePasswordReset={handleForcePasswordReset}
+                                        onClearPasswordFields={clearPasswordFields}
+                                        isGeneratingPassword={isGeneratingPassword}
+                                        onInputChange={handleInputChange}
+                                        onSwitchChange={(name, checked) => updateFormData({ [name]: checked })}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Permissions"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'permissions' && (
+                            <>
+                                <FormContainer 
+                                    title="System Permissions" 
+                                    description="Select modules and features this user can access. Permissions from role are shown in blue and cannot be changed."
+                                >
+                                    <PermissionsTab
+                                        formData={formData}
+                                        errors={errors}
+                                        permissions={permissions}
+                                        permissionModules={permissionModules}
+                                        selectedRolePermissions={selectedRolePermissions}
+                                        selectedPermissionsCount={selectedPermissionsCount}
+                                        flattenedPermissions={flattenedPermissions}
+                                        onTogglePermission={togglePermission}
+                                        onToggleAllPermissions={toggleAllPermissions}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Security"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Account Settings" description="Configure account behavior and access options">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={errors}
+                                        user={user}
+                                        lastLogin={formatDate(user.last_login_at)}
+                                        emailVerifiedAt={formatDate(user.email_verified_at)}
+                                        createdAt={formatDate(user.created_at)}
+                                        onStatusChange={(checked) => updateFormData({ status: checked ? 'active' : 'inactive' })}
+                                        isSubmitting={isSubmitting} onSwitchChange={function (name: string, checked: boolean): void {
+                                            throw new Error('Function not implemented.');
+                                        } }                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Permissions"
+                                    showNext={false}
+                                    submitLabel="Update User"
+                                />
+                            </>
+                        )}
+                    </div>
+
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* User Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">User Summary</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center">
+                                                <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.first_name || formData.last_name
+                                                        ? `${formData.first_name} ${formData.last_name}`.trim()
+                                                        : <span className="text-gray-400 italic">User</span>
+                                                    }
+                                                </div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {selectedRole?.name || 'No role selected'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Email:</span>
+                                                <span className="font-medium dark:text-gray-300 truncate max-w-[180px]">
+                                                    {formData.email || <span className="text-gray-400 italic">Not set</span>}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Username:</span>
+                                                <span className="font-mono font-medium dark:text-gray-300">
+                                                    {formData.username || <span className="text-gray-400 italic">Not set</span>}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                                <span className={`font-medium ${
+                                                    formData.status === 'active' 
+                                                        ? 'text-green-600 dark:text-green-400' 
+                                                        : 'text-gray-500 dark:text-gray-400'
+                                                }`}>
+                                                    {formData.status === 'active' ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Permissions Summary */}
+                                        <div className="pt-2 border-t dark:border-gray-700">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">Permissions:</span>
+                                                <span className="text-xs font-medium dark:text-gray-300">
+                                                    {selectedPermissionsCount} total
+                                                </span>
+                                            </div>
+                                            {selectedPermissionsCount > 0 ? (
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                    ({localSelectedPermissions.length} custom + {selectedRolePermissions.length} from role)
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-gray-400 italic">No permissions selected</p>
+                                            )}
+                                        </div>
+
+                                        {/* Last Updated Info */}
+                                        <div className="pt-2 border-t dark:border-gray-700">
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                Last updated: {formatDate(user.updated_at)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <AlertDialogContent className="dark:bg-gray-900">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                            <Trash2 className="h-5 w-5" />
+                            Delete User
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="dark:text-gray-400">
+                            Are you sure you want to delete user "{user.first_name} {user.last_name}"? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                        >
+                            Delete User
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </AppLayout>
     );
 }

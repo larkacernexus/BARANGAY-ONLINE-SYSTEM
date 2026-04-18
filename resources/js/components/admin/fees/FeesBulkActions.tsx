@@ -21,7 +21,6 @@ import {
     User,
     Home,
     Building,
-    Loader2,
     CheckSquare,
     Square
 } from 'lucide-react';
@@ -49,18 +48,17 @@ interface FeesBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: BulkOperation) => void; // Changed to BulkOperation
+    onBulkOperation: (operation: BulkOperation) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setIsBulkMode?: (value: boolean) => void;
-    bulkActionRef?: React.RefObject<HTMLDivElement>;
+    // ✅ FIXED: Allow null in RefObject
+    bulkActionRef?: React.RefObject<HTMLDivElement | null>;
     showBulkActions?: boolean;
     setShowBulkActions?: (show: boolean) => void;
     onRemindersSent?: () => void;
     onExport?: () => void;
     onPrint?: () => void;
-    
-    // Bulk actions configuration (optional for customization)
     bulkActions?: {
         primary?: BulkActionItem[];
         secondary?: BulkActionItem[];
@@ -94,6 +92,9 @@ export default function FeesBulkActions({
     onCopySelectedData,
     setShowBulkDeleteDialog,
     setIsBulkMode,
+    bulkActionRef,
+    showBulkActions: _showBulkActions,
+    setShowBulkActions: _setShowBulkActions,
     onRemindersSent,
     onExport,
     onPrint,
@@ -177,16 +178,8 @@ export default function FeesBulkActions({
             {
                 label: 'Generate Receipts',
                 icon: <Receipt className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('generate_receipts' as BulkOperation),
+                onClick: () => onBulkOperation('generate_receipt' as BulkOperation),
                 tooltip: 'Generate receipts for selected fees',
-                variant: 'outline' as const,
-                disabled: false
-            },
-            {
-                label: 'Generate Certificates',
-                icon: <FileDigit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('generate_certificates' as BulkOperation),
-                tooltip: 'Generate certificates for selected fees',
                 variant: 'outline' as const,
                 disabled: false
             },
@@ -236,7 +229,10 @@ export default function FeesBulkActions({
                      safeStats.businesses > 0;
 
     return (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4 animate-in slide-in-from-top-2 duration-300">
+        <div 
+            ref={bulkActionRef}
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4 animate-in slide-in-from-top-2 duration-300"
+        >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 {/* Left side: Selection info */}
                 <div className="flex items-center gap-3">

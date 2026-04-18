@@ -11,7 +11,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Search, X, Filter, Download, FilterX, Award, ChevronDown, ChevronUp } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Search, X, Filter, Download, FilterX, Award, ChevronDown, ChevronUp, Users, UserCheck, UserX, MapPin, Heart, Calendar, Briefcase } from 'lucide-react';
 import { useState, RefObject } from 'react';
 import { FilterState } from '@/types/admin/residents/residents-types';
 
@@ -148,18 +149,36 @@ export default function ResidentsFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
+    // Helper to get active filter count
+    const getActiveFilterCount = () => {
+        let count = 0;
+        if (filtersState.status && filtersState.status !== 'all') count++;
+        if (filtersState.gender && filtersState.gender !== 'all') count++;
+        if (filtersState.purok_id && filtersState.purok_id !== 'all') count++;
+        if (filtersState.civil_status && filtersState.civil_status !== 'all') count++;
+        if (filtersState.is_voter === 'true') count++;
+        if (filtersState.is_head === 'true') count++;
+        if (filtersState.privilege_id && filtersState.privilege_id !== 'all') count++;
+        if (filtersState.min_age || filtersState.max_age) count++;
+        return count;
+    };
+
+    const activeFilterCount = getActiveFilterCount();
+
     return (
-        <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-            <CardContent className="pt-6">
-                <div className="flex flex-col space-y-4">
-                    {/* Search Bar */}
+        <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-900 rounded-xl">
+            <CardContent className="p-5 md:p-6">
+                <div className="flex flex-col space-y-5">
+                    {/* Search Bar - Enhanced */}
                     <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
+                        <div className="flex-1 relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-indigo-500 dark:group-focus-within:text-indigo-400 transition-colors" />
+                            </div>
                             <Input
                                 ref={searchInputRef}
-                                placeholder="Search by name, contact, address, or ID number..."
-                                className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                                placeholder="Search by name, ID number, contact, or address..."
+                                className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 value={search}
                                 onChange={handleSearchChange}
                             />
@@ -167,10 +186,10 @@ export default function ResidentsFilters({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                                     onClick={() => setSearch('')}
                                 >
-                                    <X className="h-3 w-3" />
+                                    <X className="h-3.5 w-3.5" />
                                 </Button>
                             )}
                         </div>
@@ -179,20 +198,25 @@ export default function ResidentsFilters({
                                 <Button 
                                     variant="outline" 
                                     onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                                    className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all"
                                 >
                                     <Filter className="h-4 w-4 mr-2" />
-                                    <span className="hidden sm:inline">
+                                    <span className="hidden sm:inline font-medium">
                                         {showAdvancedFilters ? 'Hide Filters' : 'More Filters'}
                                     </span>
                                     <span className="sm:hidden">
                                         {showAdvancedFilters ? 'Hide' : 'Filters'}
                                     </span>
+                                    {!showAdvancedFilters && activeFilterCount > 0 && (
+                                        <Badge variant="secondary" className="ml-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full px-1.5 py-0 text-xs">
+                                            +{activeFilterCount}
+                                        </Badge>
+                                    )}
                                 </Button>
                             )}
                             <Button 
                                 variant="outline"
-                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all"
                                 onClick={() => {
                                     const exportUrl = new URL('/admin/residents/export', window.location.origin);
                                     if (search) exportUrl.searchParams.append('search', search);
@@ -206,133 +230,201 @@ export default function ResidentsFilters({
                                 }}
                             >
                                 <Download className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Export</span>
+                                <span className="hidden sm:inline font-medium">Export</span>
                             </Button>
                         </div>
                     </div>
 
-                    {/* Active Filters Info and Clear Button */}
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} residents
-                            {search && ` matching "${search}"`}
+                    {/* Results Info & Active Filters Bar */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 px-3 py-1.5 rounded-lg">
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{startIndex + 1}-{Math.min(endIndex, totalItems)}</span>
+                            <span className="mx-1">of</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{totalItems}</span>
+                            <span className="ml-1">residents</span>
+                            {search && (
+                                <span className="ml-1">
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                </span>
+                            )}
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Active filter badges */}
+                            {activeFilters && (
+                                <>
+                                    {filtersState.status && filtersState.status !== 'all' && (
+                                        <Badge variant="secondary" className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                            Status: {filtersState.status}
+                                        </Badge>
+                                    )}
+                                    {filtersState.gender && filtersState.gender !== 'all' && (
+                                        <Badge variant="secondary" className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                            Gender: {filtersState.gender}
+                                        </Badge>
+                                    )}
+                                    {filtersState.purok_id && filtersState.purok_id !== 'all' && (
+                                        <Badge variant="secondary" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                            Purok: {puroks.find(p => p.id.toString() === filtersState.purok_id?.toString())?.name}
+                                        </Badge>
+                                    )}
+                                    {filtersState.civil_status && filtersState.civil_status !== 'all' && (
+                                        <Badge variant="secondary" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                            Civil: {civilStatusOptions.find(s => s.value === filtersState.civil_status)?.label}
+                                        </Badge>
+                                    )}
+                                    {filtersState.privilege_id && filtersState.privilege_id !== 'all' && (
+                                        <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                            <Award className="h-3 w-3 mr-1 inline" />
+                                            {privileges.find(p => p.id.toString() === filtersState.privilege_id?.toString())?.name}
+                                        </Badge>
+                                    )}
+                                    {filtersState.is_voter === 'true' && (
+                                        <Badge variant="secondary" className="bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                            Voters Only
+                                        </Badge>
+                                    )}
+                                    {filtersState.is_head === 'true' && (
+                                        <Badge variant="secondary" className="bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                            Heads Only
+                                        </Badge>
+                                    )}
+                                </>
+                            )}
+                            
                             {activeFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleClearFilters}
-                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-7 px-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-xs"
                                 >
-                                    <FilterX className="h-3.5 w-3.5 mr-1" />
-                                    Clear Filters
+                                    <FilterX className="h-3 w-3 mr-1" />
+                                    Clear all
                                 </Button>
                             )}
-                            {filtersState.privilege_id && filtersState.privilege_id !== 'all' && (
-                                <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30 px-2 py-1 rounded-md text-xs">
-                                    <Award className="h-3 w-3" />
-                                    <span>Filtered by: {privileges.find(p => p.id.toString() === filtersState.privilege_id?.toString())?.name}</span>
-                                </div>
-                            )}
                         </div>
                     </div>
 
-                    {/* Basic Filters */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Status</Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                    {/* Basic Filters - Modern Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+                        {/* Status Filter */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</Label>
+                            <Select
                                 value={filtersState.status || 'all'}
-                                onChange={(e) => updateFilter('status', e.target.value)}
+                                onValueChange={(value) => updateFilter('status', value)}
                             >
-                                <option value="all">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                                <option value="pending">Pending</option>
-                                <option value="suspended">Suspended</option>
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-indigo-500">
+                                    <SelectValue placeholder="All Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Status</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="inactive">Inactive</SelectItem>
+                                    <SelectItem value="pending">Pending</SelectItem>
+                                    <SelectItem value="suspended">Suspended</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Gender</Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                        {/* Gender Filter */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Gender</Label>
+                            <Select
                                 value={filtersState.gender || 'all'}
-                                onChange={(e) => updateFilter('gender', e.target.value)}
+                                onValueChange={(value) => updateFilter('gender', value)}
                             >
-                                <option value="all">All Genders</option>
-                                <option value="male">Male</option>
-                                <option value="female">Female</option>
-                                <option value="other">Other</option>
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                    <SelectValue placeholder="All Genders" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Genders</SelectItem>
+                                    <SelectItem value="male">Male</SelectItem>
+                                    <SelectItem value="female">Female</SelectItem>
+                                    <SelectItem value="other">Other</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Purok</Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                        {/* Purok Filter */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Purok</Label>
+                            <Select
                                 value={filtersState.purok_id?.toString() || 'all'}
-                                onChange={(e) => updateFilter('purok_id', e.target.value)}
+                                onValueChange={(value) => updateFilter('purok_id', value)}
                             >
-                                <option value="all">All Puroks</option>
-                                {puroks.map((purok) => (
-                                    <option key={purok.id} value={purok.id.toString()}>
-                                        {purok.name}
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                    <SelectValue placeholder="All Puroks" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Puroks</SelectItem>
+                                    {puroks.map((purok) => (
+                                        <SelectItem key={purok.id} value={purok.id.toString()}>
+                                            {purok.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Civil Status</Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                        {/* Civil Status Filter */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Civil Status</Label>
+                            <Select
                                 value={filtersState.civil_status || 'all'}
-                                onChange={(e) => updateFilter('civil_status', e.target.value)}
+                                onValueChange={(value) => updateFilter('civil_status', value)}
                             >
-                                <option value="all">All Civil Status</option>
-                                {civilStatusOptions.map((status) => (
-                                    <option key={status.value} value={status.value}>
-                                        {status.label}
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                    <SelectValue placeholder="All Civil Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Civil Status</SelectItem>
+                                    {civilStatusOptions.map((status) => (
+                                        <SelectItem key={status.value} value={status.value}>
+                                            {status.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 
-                    {/* Advanced Filters */}
+                    {/* Advanced Filters - Modern Accordion Style */}
                     {showAdvancedFilters && (
-                        <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
-                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Advanced Filters</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {/* Voter & Head Status */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status Flags</Label>
-                                    <div className="space-y-2">
-                                        <div className="flex items-center space-x-2">
-                                            <input
-                                                type="checkbox"
+                        <div className="border-t border-gray-100 dark:border-gray-800 pt-5 mt-2 space-y-5">
+                            <div className="flex items-center gap-2">
+                                <div className="h-5 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
+                                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Advanced Filters</h3>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Status Flags */}
+                                <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <Users className="h-4 w-4 text-indigo-500" />
+                                        Resident Status
+                                    </Label>
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center space-x-3">
+                                            <Checkbox
                                                 id="voter"
                                                 checked={filtersState.is_voter === 'true'}
-                                                onChange={(e) => updateFilter('is_voter', e.target.checked ? 'true' : 'false')}
-                                                className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                                onCheckedChange={(checked) => updateFilter('is_voter', checked ? 'true' : 'false')}
+                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-500"
                                             />
-                                            <Label htmlFor="voter" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                            <Label htmlFor="voter" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer font-normal">
                                                 Voters Only
                                             </Label>
                                         </div>
-                                        <div className="flex items-center space-x-2">
-                                            <input
-                                                type="checkbox"
+                                        <div className="flex items-center space-x-3">
+                                            <Checkbox
                                                 id="head"
                                                 checked={filtersState.is_head === 'true'}
-                                                onChange={(e) => updateFilter('is_head', e.target.checked ? 'true' : 'false')}
-                                                className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                                onCheckedChange={(checked) => updateFilter('is_head', checked ? 'true' : 'false')}
+                                                className="border-gray-300 dark:border-gray-600 data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-500"
                                             />
-                                            <Label htmlFor="head" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                                            <Label htmlFor="head" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer font-normal">
                                                 Heads of Household Only
                                             </Label>
                                         </div>
@@ -341,40 +433,62 @@ export default function ResidentsFilters({
 
                                 {/* Privilege Filter */}
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Privilege</Label>
-                                    <select
-                                        className={`w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 ${
-                                            filtersState.privilege_id && filtersState.privilege_id !== 'all' 
-                                            ? 'border-purple-300 dark:border-purple-700 bg-purple-50/50 dark:bg-purple-950/30' 
-                                            : ''
-                                        }`}
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <Award className="h-4 w-4 text-amber-500" />
+                                        Privilege
+                                    </Label>
+                                    <Select
                                         value={filtersState.privilege_id?.toString() || 'all'}
-                                        onChange={(e) => updateFilter('privilege_id', e.target.value)}
+                                        onValueChange={(value) => updateFilter('privilege_id', value)}
                                     >
-                                        <option value="all">All Privileges</option>
-                                        {privileges.map((privilege) => (
-                                            <option key={privilege.id} value={privilege.id.toString()}>
-                                                {privilege.name} ({privilege.code})
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger className={`w-full bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm ${
+                                            filtersState.privilege_id && filtersState.privilege_id !== 'all' 
+                                            ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/20' 
+                                            : ''
+                                        }`}>
+                                            <SelectValue placeholder="All Privileges" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Privileges</SelectItem>
+                                            {privileges.map((privilege) => (
+                                                <SelectItem key={privilege.id} value={privilege.id.toString()}>
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="font-medium">{privilege.name}</span>
+                                                        <span className="text-xs text-gray-400">({privilege.code})</span>
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {filtersState.privilege_id && filtersState.privilege_id !== 'all' && (
+                                        <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
+                                            Filtering by specific privilege
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Age Range */}
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Age Range</Label>
-                                    <select
-                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-emerald-500" />
+                                        Age Range
+                                    </Label>
+                                    <Select
                                         value={getCurrentAgeRangeValue()}
-                                        onChange={(e) => handleAgeRangeChange(e.target.value)}
+                                        onValueChange={(value) => handleAgeRangeChange(value)}
                                     >
-                                        <option value="all">All Ages</option>
-                                        {ageRanges.map((range) => (
-                                            <option key={`${range.min}-${range.max}`} value={`${range.min}-${range.max}`}>
-                                                {range.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger className="w-full bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                            <SelectValue placeholder="All Ages" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Ages</SelectItem>
+                                            {ageRanges.map((range) => (
+                                                <SelectItem key={`${range.min}-${range.max}`} value={`${range.min}-${range.max}`}>
+                                                    {range.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>

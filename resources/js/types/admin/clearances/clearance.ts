@@ -122,7 +122,6 @@ export interface ClearanceType {
 }
 
 // ========== RESIDENT ==========
-// COMMENTED OUT - Not used in admin panel (admins manage users/accounts, not residents directly)
 export interface Resident {
     purok: any;
     id: number;
@@ -144,7 +143,6 @@ export interface Resident {
 }
 
 // ========== HOUSEHOLD ==========
-// COMMENTED OUT - Not used in admin panel (household management is separate module)
 export interface Household {
     id: number;
     household_number: string;
@@ -175,10 +173,6 @@ export interface ClearanceRequest {
     payer_type: any;
     contact_number: boolean;
     contact_address: boolean;
-    // contact_purok: boolean;
-    // business: boolean;
-    // payer_name: boolean;
-    // payer_id: number;
     or_number: any;
     id: number;
     resident_id: number;
@@ -205,8 +199,6 @@ export interface ClearanceRequest {
     
     // Relations
     clearance_type?: ClearanceType;
-    // COMMENTED OUT - Admin panel uses simplified resident data
-    // resident?: Resident;
     resident?: {
         address: any;
         purok: any;
@@ -219,8 +211,6 @@ export interface ClearanceRequest {
         contact_number?: string;
         email?: string;
     };
-    // COMMENTED OUT - Not used in admin panel
-    // household?: Household;
     documents?: ClearanceDocument[];
     status_history?: StatusHistory[];
     payment_items?: PaymentItem[];
@@ -236,14 +226,31 @@ export interface ClearanceRequest {
     is_overdue: boolean;
 }
 
-// ========== FILTERS ==========
+// ========== FILTERS - FIXED ==========
+// ✅ Changed from methods to properties
+export interface Filters {
+    search?: string;
+    status?: string;
+    type?: string;
+    urgency?: string;
+    payment_status?: string;
+    from_date?: string;      // ✅ Property, not method
+    to_date?: string;        // ✅ Property, not method
+    sort?: string;
+    direction?: string;
+    // Additional filter properties
+    clearance_number?: string;
+    applicant_type?: string;
+    amount_range?: string;
+    sort_by?: string;        // ✅ Added
+    sort_order?: string;     // ✅ Added
+}
+
 export interface ClearanceFilters {
     search?: string;
     status?: ClearanceStatus | 'all';
     clearance_type?: string | 'all';
     urgency?: UrgencyLevel | 'all';
-    // COMMENTED OUT - Admin panel filters by other criteria instead of resident
-    // resident?: string | 'all';
     year?: string | 'all';
     date_from?: string;
     date_to?: string;
@@ -254,6 +261,24 @@ export interface ClearanceFilters {
 }
 
 // ========== STATISTICS ==========
+export interface Stats {
+    total: number;
+    processing: number;
+    approved: number;
+    unpaid: number;
+    partially_paid: number;
+    paid: number;
+    pending_payment: number;
+    totalIssued?: number;
+    issuedThisMonth?: number;
+    pending?: number;
+    pendingToday?: number;
+    expiringSoon?: number;
+    totalRevenue?: number;
+    expressRequests?: number;
+    rushRequests?: number;
+}
+
 export interface ClearanceStats {
     total_clearances: number;
     pending_clearances: number;
@@ -272,6 +297,21 @@ export interface ClearanceStats {
 }
 
 // ========== PAGINATION ==========
+export interface PaginationData<T = any> {
+    current_page: number;
+    data: T[];
+    from: number;
+    last_page: number;
+    per_page: number;
+    to: number;
+    total: number;
+    links?: Array<{
+        url: string | null;
+        label: string;
+        active: boolean;
+    }>;
+}
+
 export interface PaginatedResponse<T> {
     data: T[];
     current_page: number;
@@ -293,10 +333,6 @@ export interface ClearancePageProps {
     stats?: ClearanceStats;
     availableYears?: number[];
     availableClearanceTypes?: ClearanceType[];
-    // COMMENTED OUT - Not used in admin panel
-    // householdResidents?: Resident[];
-    // currentResident?: Resident;
-    // household?: Household;
     filters?: ClearanceFilters;
     error?: string;
 }
@@ -306,51 +342,7 @@ export interface StatusOption {
     label: string;
 }
 
-export interface Filters {
-    from_date(from_date: any): string | (() => string);
-    to_date(to_date: any): string | (() => string);
-    search?: string;
-    status?: string;
-    type?: string;
-    urgency?: string;
-    payment_status?: any;
-    sort?: any;
-    direction?: any;
-}
-
-export interface Stats {
-    totalIssued?: number;
-    issuedThisMonth?: number;
-    pending?: number;
-    pendingToday?: number;
-    expiringSoon?: number;
-    totalRevenue?: number;
-    expressRequests?: number;
-    rushRequests?: number;
-    total: any;
-    processing: any;
-    approved: any;
-    unpaid: any;
-    partially_paid: any;
-    paid: any;
-    pending_payment: any;
-}
-
-export interface PaginationData<T = any> {
-    current_page: number;
-    data: T[];
-    from: number;
-    last_page: number;
-    per_page: number;
-    to: number;
-    total: number;
-    links?: Array<{
-        url: string | null;
-        label: string;
-        active: boolean;
-    }>;
-}
-
+// ========== BULK OPERATIONS ==========
 export interface BulkActionItem {
     label: string;
     icon: React.ReactNode;
@@ -360,7 +352,33 @@ export interface BulkActionItem {
     disabled?: boolean;
 }
 
-// COMMENTED OUT - Not used in admin panel (audit logs are separate concern)
+export type BulkOperation = 
+    | 'process'
+    | 'approve'
+    | 'issue'
+    | 'delete'
+    | 'export'
+    | 'print'
+    | 'update_status'
+    | 'copy_data'
+    | 'generate_receipt'
+    | 'send_reminder'
+    | 'mark_as_processed'
+    | 'mark_as_approved'
+    | 'mark_as_issued'
+    | 'cancel'
+    | 'refund';
+
+// ========== SELECTION MODE ==========
+export type SelectionMode = 'page' | 'filtered' | 'all';
+
+// Status badge variants mapping
+export type StatusVariant = "default" | "secondary" | "destructive" | "outline" | "success";
+
+// Urgency badge variants mapping
+export type UrgencyVariant = "default" | "secondary" | "destructive" | "outline";
+
+// ========== OTHER TYPES ==========
 export interface ActivityLog {
     causer: any;
     id: number;
@@ -418,30 +436,3 @@ export interface Business {
     created_at?: string;
     updated_at?: string;
 }
-
-// ========== BULK OPERATIONS ==========
-export type BulkOperation = 
-    | 'process'
-    | 'approve'
-    | 'issue'
-    | 'delete'
-    | 'export'
-    | 'print'
-    | 'update_status'
-    | 'copy_data'
-    | 'generate_receipt'
-    | 'send_reminder'
-    | 'mark_as_processed'
-    | 'mark_as_approved'
-    | 'mark_as_issued'
-    | 'cancel'
-    | 'refund';
-
-// ========== SELECTION MODE ==========
-export type SelectionMode = 'page' | 'filtered' | 'all';
-
-// Status badge variants mapping
-export type StatusVariant = "default" | "secondary" | "destructive" | "outline" | "success";
-
-// Urgency badge variants mapping
-export type UrgencyVariant = "default" | "secondary" | "destructive" | "outline";

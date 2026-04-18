@@ -1,16 +1,13 @@
 import { router, usePage } from '@inertiajs/react';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { ResidentsProps, Resident, FilterState, SelectionMode, SelectionStats, Privilege, ResidentPrivilege } from '@/types/admin/residents/residents-types';
+import { ResidentsProps, Resident, SelectionMode, SelectionStats, ResidentPrivilege } from '@/types/admin/residents/residents-types';
 import { 
-    filterResidents,
     getSelectionStats,
     formatForClipboard,
     getFullName,
     isHeadOfHousehold,
-    getStatusBadgeVariant,
-    formatDate,
 } from '@/admin-utils/residentsUtils';
 
 // Import reusable components
@@ -21,40 +18,56 @@ import ResidentsFilters from '@/components/admin/residents/ResidentsFilters';
 import ResidentsContent from '@/components/admin/residents/ResidentsContent';
 import ResidentsDialogs from '@/components/admin/residents/ResidentsDialogs';
 import { Button } from '@/components/ui/button';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, Loader2 } from 'lucide-react';
+
+// Debounce utility
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
 
 export default function Residents() {
     const { props } = usePage<ResidentsProps>();
     const { 
-        residents, 
+        residents: initialResidents, 
         stats, 
-        filters, 
+        filters: initialFilters, 
         puroks, 
         civilStatusOptions = [], 
         ageRanges = [], 
-        allResidents,
         privileges = [] 
     } = props;
     
-    // State management for client-side filtering/sorting
-// State management for client-side filtering/sorting
-    const [search, setSearch] = useState(filters.search || '');
-    const [statusFilter, setStatusFilter] = useState<string>(filters.status || 'all');
-    const [purokFilter, setPurokFilter] = useState<string>(filters.purok_id ? String(filters.purok_id) : 'all');
-    const [genderFilter, setGenderFilter] = useState<string>(filters.gender || 'all');
-    const [civilStatusFilter, setCivilStatusFilter] = useState<string>(filters.civil_status || 'all');
-    const [voterFilter, setVoterFilter] = useState<string>(filters.is_voter || 'all');
-    const [headFilter, setHeadFilter] = useState<string>(filters.is_head || 'all');
-    const [privilegeFilter, setPrivilegeFilter] = useState<string>(
-        filters.privilege_id ? String(filters.privilege_id) : 'all'
+    // State management for server-side filtering
+    const [search, setSearch] = useState(initialFilters.search || '');
+    const [statusFilter, setStatusFilter] = useState<string>(initialFilters.status || 'all');
+    const [purokFilter, setPurokFilter] = useState<string>(initialFilters.purok_id || 'all');
+    const [genderFilter, setGenderFilter] = useState<string>(initialFilters.gender || 'all');
+    const [civilStatusFilter, setCivilStatusFilter] = useState<string>(initialFilters.civil_status || 'all');
+    const [voterFilter, setVoterFilter] = useState<string>(initialFilters.is_voter || 'all');
+    const [headFilter, setHeadFilter] = useState<string>(initialFilters.is_head || 'all');
+    const [privilegeFilter, setPrivilegeFilter] = useState<string>(initialFilters.privilege_id || 'all');
+    const [minAge, setMinAge] = useState<string>(initialFilters.min_age || '');
+    const [maxAge, setMaxAge] = useState<string>(initialFilters.max_age || '');
+    const [sortBy, setSortBy] = useState<string>(initialFilters.sort_by || 'last_name');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
+        (initialFilters.sort_order as 'asc' | 'desc') || 'asc'
     );
-    const [minAge, setMinAge] = useState<string>(filters.min_age ? String(filters.min_age) : '');
-    const [maxAge, setMaxAge] = useState<string>(filters.max_age ? String(filters.max_age) : '');
-    const [sortBy, setSortBy] = useState<string>(filters.sort_by || 'last_name');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(filters.sort_order as 'asc' | 'desc' || 'asc');
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 15;
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // UI states
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -76,6 +89,12 @@ export default function Residents() {
     const [bulkPrivilegeAction, setBulkPrivilegeAction] = useState<'add' | 'remove'>('add');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const isFirstMount = useRef(true);
+    
+    // Debounce search to avoid too many requests
+    const debouncedSearch = useDebounce(search, 300);
+    const debouncedMinAge = useDebounce(minAge, 500);
+    const debouncedMaxAge = useDebounce(maxAge, 500);
 
     // Handle window resize
     useEffect(() => {
@@ -95,10 +114,73 @@ export default function Residents() {
         return () => window.removeEventListener('resize', handleResize);
     }, [viewMode]);
 
-    // Reset to first page when filters change
+    // Get current page residents
+    const currentResidents = initialResidents?.data || [];
+    const paginationData = {
+        current_page: initialResidents?.current_page || 1,
+        last_page: initialResidents?.last_page || 1,
+        total: initialResidents?.total || 0,
+        from: initialResidents?.from || 0,
+        to: initialResidents?.to || 0,
+        per_page: initialResidents?.per_page || 15,
+    };
+
+    const getCurrentFilters = useCallback((): Record<string, any> => {
+        const filters: Record<string, any> = {};
+        
+        if (debouncedSearch) filters.search = debouncedSearch;
+        if (statusFilter !== 'all') filters.status = statusFilter;
+        if (purokFilter !== 'all') filters.purok_id = purokFilter;
+        if (genderFilter !== 'all') filters.gender = genderFilter;
+        if (civilStatusFilter !== 'all') filters.civil_status = civilStatusFilter;
+        if (voterFilter !== 'all') filters.is_voter = voterFilter;
+        if (headFilter !== 'all') filters.is_head = headFilter;
+        if (privilegeFilter !== 'all') filters.privilege_id = privilegeFilter;
+        if (debouncedMinAge) filters.min_age = debouncedMinAge;
+        if (debouncedMaxAge) filters.max_age = debouncedMaxAge;
+        if (sortBy) filters.sort_by = sortBy;
+        if (sortOrder) filters.sort_order = sortOrder;
+        
+        return filters;
+    }, [
+        debouncedSearch, statusFilter, purokFilter, genderFilter, civilStatusFilter,
+        voterFilter, headFilter, privilegeFilter, debouncedMinAge, debouncedMaxAge,
+        sortBy, sortOrder
+    ]);
+
+    const reloadData = useCallback((page = 1) => {
+        setIsLoading(true);
+        
+        const filters = { ...getCurrentFilters(), page };
+        
+        router.get('/admin/residents', filters, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsLoading(false);
+                setSelectedResidents([]);
+                setIsSelectAll(false);
+            },
+            onError: () => {
+                setIsLoading(false);
+                toast.error('Failed to load residents');
+            }
+        });
+    }, [getCurrentFilters]);
+
+    // Server-side filtering - reload data when filters change
     useEffect(() => {
-        setCurrentPage(1);
-    }, [search, statusFilter, purokFilter, genderFilter, civilStatusFilter, voterFilter, headFilter, privilegeFilter, minAge, maxAge, sortBy, sortOrder]);
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            return;
+        }
+        
+        reloadData();
+    }, [
+        debouncedSearch, statusFilter, purokFilter, genderFilter, civilStatusFilter,
+        voterFilter, headFilter, privilegeFilter, debouncedMinAge, debouncedMaxAge,
+        sortBy, sortOrder, reloadData
+    ]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -108,174 +190,9 @@ export default function Residents() {
         }
     }, [isBulkMode]);
 
-    // Keyboard shortcuts
-    useEffect(() => {
-        if (isMobile) return;
-        
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
-            }
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedResidents.length > 0) {
-                        setSelectedResidents([]);
-                    } else {
-                        setIsBulkMode(false);
-                    }
-                }
-            }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-            if (e.key === 'Delete' && isBulkMode && selectedResidents.length > 0) {
-                e.preventDefault();
-                setShowBulkDeleteDialog(true);
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedResidents, isMobile]);
-
-    // Filter and sort residents (client-side)
-    const filteredResidents = useMemo(() => {
-        let filtered = [...allResidents];
-        
-        // Apply search filter
-        if (search) {
-            const searchLower = search.toLowerCase();
-            filtered = filtered.filter(resident =>
-                (resident.first_name?.toLowerCase() || '').includes(searchLower) ||
-                (resident.last_name?.toLowerCase() || '').includes(searchLower) ||
-                (resident.middle_name?.toLowerCase() || '').includes(searchLower) ||
-                (resident.email?.toLowerCase() || '').includes(searchLower) ||
-                (resident.contact_number?.toLowerCase() || '').includes(searchLower)
-            );
-        }
-        
-        // Apply status filter
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(resident => resident.status === statusFilter);
-        }
-        
-        // Apply purok filter
-        if (purokFilter !== 'all') {
-            filtered = filtered.filter(resident => resident.purok_id?.toString() === purokFilter);
-        }
-        
-        // Apply gender filter
-        if (genderFilter !== 'all') {
-            filtered = filtered.filter(resident => resident.gender === genderFilter);
-        }
-        
-        // Apply civil status filter
-        if (civilStatusFilter !== 'all') {
-            filtered = filtered.filter(resident => resident.civil_status === civilStatusFilter);
-        }
-        
-        // Apply voter filter
-        if (voterFilter !== 'all') {
-            filtered = filtered.filter(resident => resident.is_voter === (voterFilter === 'yes'));
-        }
-        
-        // Apply head filter
-        if (headFilter !== 'all') {
-            filtered = filtered.filter(resident => isHeadOfHousehold(resident) === (headFilter === 'yes'));
-        }
-        
-        // Apply privilege filter
-        if (privilegeFilter !== 'all') {
-            filtered = filtered.filter(resident =>
-                resident.privileges?.some(p => p.privilege_id?.toString() === privilegeFilter || p.privilege_code === privilegeFilter)
-            );
-        }
-        
-        // Apply age range filter
-        if (minAge) {
-            const min = parseInt(minAge);
-            filtered = filtered.filter(resident => (resident.age || 0) >= min);
-        }
-        if (maxAge) {
-            const max = parseInt(maxAge);
-            filtered = filtered.filter(resident => (resident.age || 0) <= max);
-        }
-        
-        // Apply sorting
-        filtered.sort((a, b) => {
-            let valueA: any;
-            let valueB: any;
-            
-            switch (sortBy) {
-                case 'first_name':
-                    valueA = a.first_name || '';
-                    valueB = b.first_name || '';
-                    break;
-                case 'last_name':
-                    valueA = a.last_name || '';
-                    valueB = b.last_name || '';
-                    break;
-                case 'age':
-                    valueA = a.age || 0;
-                    valueB = b.age || 0;
-                    break;
-                case 'gender':
-                    valueA = a.gender || '';
-                    valueB = b.gender || '';
-                    break;
-                case 'civil_status':
-                    valueA = a.civil_status || '';
-                    valueB = b.civil_status || '';
-                    break;
-                case 'status':
-                    valueA = a.status || '';
-                    valueB = b.status || '';
-                    break;
-                case 'purok':
-                    valueA = a.purok?.name || '';
-                    valueB = b.purok?.name || '';
-                    break;
-                case 'is_voter':
-                    valueA = a.is_voter ? 1 : 0;
-                    valueB = b.is_voter ? 1 : 0;
-                    break;
-                case 'created_at':
-                    valueA = new Date(a.created_at).getTime();
-                    valueB = new Date(b.created_at).getTime();
-                    break;
-                default:
-                    valueA = a.last_name || '';
-                    valueB = b.last_name || '';
-            }
-            
-            if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
-            if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-        
-        return filtered;
-    }, [allResidents, search, statusFilter, purokFilter, genderFilter, civilStatusFilter, voterFilter, headFilter, privilegeFilter, minAge, maxAge, sortBy, sortOrder]);
-
-    // Pagination
-    const totalItems = filteredResidents.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedResidents = filteredResidents.slice(startIndex, endIndex);
-
     // Selection handlers
     const handleSelectAllOnPage = () => {
-        const pageIds = paginatedResidents.map(resident => resident.id);
+        const pageIds = currentResidents.map(resident => resident.id);
         if (isSelectAll) {
             setSelectedResidents(prev => prev.filter(id => !pageIds.includes(id)));
         } else {
@@ -284,25 +201,6 @@ export default function Residents() {
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    };
-
-    const handleSelectAllFiltered = () => {
-        const allIds = filteredResidents.map(resident => resident.id);
-        if (selectedResidents.length === allIds.length && allIds.every(id => selectedResidents.includes(id))) {
-            setSelectedResidents(prev => prev.filter(id => !allIds.includes(id)));
-        } else {
-            const newSelected = [...new Set([...selectedResidents, ...allIds])];
-            setSelectedResidents(newSelected);
-            setSelectionMode('filtered');
-        }
-    };
-
-    const handleSelectAll = () => {
-        if (confirm(`This will select ALL ${allResidents.length || 0} residents. This action may take a moment.`)) {
-            const allIds = allResidents.map(resident => resident.id);
-            setSelectedResidents(allIds);
-            setSelectionMode('all');
-        }
     };
 
     const handleItemSelect = (id: number) => {
@@ -317,18 +215,18 @@ export default function Residents() {
 
     // Check if all items on current page are selected
     useEffect(() => {
-        const allPageIds = paginatedResidents.map(resident => resident.id);
+        const allPageIds = currentResidents.map(resident => resident.id);
         const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedResidents.includes(id));
         setIsSelectAll(allSelected);
-    }, [selectedResidents, paginatedResidents]);
+    }, [selectedResidents, currentResidents]);
 
     // Get selected residents data
-    const selectedResidentsData = useMemo(() => {
-        return filteredResidents.filter(resident => selectedResidents.includes(resident.id));
-    }, [selectedResidents, filteredResidents]);
+    const selectedResidentsData = currentResidents.filter(resident => 
+        selectedResidents.includes(resident.id)
+    );
 
     // Calculate selection stats
-    const rawSelectionStats = useMemo(() => {
+    const selectionStats: SelectionStats = (() => {
         const baseStats = getSelectionStats(selectedResidentsData);
         
         const privilegeCounts: Record<string, number> = {};
@@ -337,7 +235,7 @@ export default function Residents() {
         selectedResidentsData.forEach(resident => {
             if (resident.privileges && Array.isArray(resident.privileges)) {
                 resident.privileges.forEach((privilege: ResidentPrivilege) => {
-                    const code = privilege.privilege?.code || privilege.privilege_code;
+                    const code = privilege.privilege?.code || privilege.privilege_code || privilege.code;
                     if (code) {
                         privilegeCounts[code] = (privilegeCounts[code] || 0) + 1;
                     }
@@ -346,40 +244,36 @@ export default function Residents() {
         });
         
         return {
-            ...baseStats,
-            heads,
-            privilegeCounts,
+            total: baseStats.total || 0,
+            male: baseStats.male || 0,
+            female: baseStats.female || 0,
+            males: baseStats.male || 0,
+            females: baseStats.female || 0,
+            other: baseStats.other || 0,
+            voters: baseStats.voters || 0,
+            heads: heads || 0,
+            active: baseStats.active || 0,
+            inactive: baseStats.inactive || 0,
+            averageAge: baseStats.averageAge || 0,
+            hasPhotos: baseStats.hasPhotos || 0,
+            privilegeCounts: privilegeCounts || {},
             hasPrivileges: selectedResidentsData.filter(r => r.privileges?.length > 0).length
         };
-    }, [selectedResidentsData]);
+    })();
 
-    const selectionStats: SelectionStats = useMemo(() => {
-        return {
-            total: rawSelectionStats.total || 0,
-            male: rawSelectionStats.male || 0,
-            female: rawSelectionStats.female || 0,
-            males: rawSelectionStats.male || 0,
-            females: rawSelectionStats.female || 0,
-            other: rawSelectionStats.other || 0,
-            voters: rawSelectionStats.voters || 0,
-            heads: rawSelectionStats.heads || 0,
-            active: rawSelectionStats.active || 0,
-            inactive: rawSelectionStats.inactive || 0,
-            averageAge: rawSelectionStats.averageAge || 0,
-            hasPhotos: rawSelectionStats.hasPhotos || 0,
-            privilegeCounts: rawSelectionStats.privilegeCounts || {},
-            hasPrivileges: rawSelectionStats.hasPrivileges || 0
-        };
-    }, [rawSelectionStats]);
+    // Handle page change
+    const handlePageChange = (page: number) => {
+        reloadData(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-    // Handle sort change from dropdown
+    // Handle sort change
     const handleSortChange = (value: string) => {
         const [newSortBy, newSortOrder] = value.split('-');
         setSortBy(newSortBy);
         setSortOrder(newSortOrder as 'asc' | 'desc');
     };
 
-    // Get current sort value for dropdown
     const getCurrentSortValue = (): string => {
         return `${sortBy}-${sortOrder}`;
     };
@@ -407,6 +301,7 @@ export default function Residents() {
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedResidents([]);
+                            reloadData(paginationData.current_page);
                             toast.success(`${selectedResidents.length} residents ${operation}d successfully`);
                         },
                         onError: (errors) => {
@@ -427,12 +322,6 @@ export default function Residents() {
                 case 'remove_privilege':
                     setBulkPrivilegeAction('remove');
                     setShowBulkRemovePrivilegeDialog(true);
-                    break;
-                case 'export':
-                case 'print':
-                case 'print_ids':
-                case 'export_csv':
-                    toast.info(`${operation} functionality to be implemented`);
                     break;
                 default:
                     toast.info(`Operation ${operation} to be implemented`);
@@ -465,6 +354,7 @@ export default function Residents() {
                     setShowBulkPrivilegeDialog(false);
                     setShowBulkRemovePrivilegeDialog(false);
                     setBulkEditValue('');
+                    reloadData(paginationData.current_page);
                     toast.success(`Privilege ${bulkPrivilegeAction === 'add' ? 'added to' : 'removed from'} ${selectedResidents.length} resident(s) successfully`);
                 },
                 onError: (errors) => {
@@ -493,6 +383,7 @@ export default function Residents() {
                     setSelectedResidents([]);
                     setShowBulkStatusDialog(false);
                     setBulkEditValue('');
+                    reloadData(paginationData.current_page);
                     toast.success(`Status updated to ${status} for ${selectedResidents.length} residents`);
                 },
                 onError: (errors) => {
@@ -521,6 +412,7 @@ export default function Residents() {
                     setSelectedResidents([]);
                     setShowBulkPurokDialog(false);
                     setBulkEditValue('');
+                    reloadData(paginationData.current_page);
                     toast.success(`Purok updated for ${selectedResidents.length} residents`);
                 },
                 onError: (errors) => {
@@ -547,6 +439,7 @@ export default function Residents() {
                 onSuccess: () => {
                     setSelectedResidents([]);
                     setShowBulkDeleteDialog(false);
+                    reloadData(paginationData.current_page);
                     toast.success(`${selectedResidents.length} residents deleted successfully`);
                 },
                 onError: (errors) => {
@@ -561,27 +454,13 @@ export default function Residents() {
         }
     };
 
-    const handleCopySelectedData = () => {
-        if (selectedResidentsData.length === 0) {
-            toast.error('No data to copy');
-            return;
-        }
-        
-        const csv = formatForClipboard(selectedResidentsData);
-        
-        navigator.clipboard.writeText(csv).then(() => {
-            toast.success(`${selectedResidentsData.length} records copied to clipboard`);
-        }).catch(() => {
-            toast.error('Failed to copy to clipboard');
-        });
-    };
-
     const handleDelete = (resident: Resident) => {
         if (confirm(`Are you sure you want to delete resident "${getFullName(resident) || 'Untitled'}"?`)) {
             router.delete(`/admin/residents/${resident.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedResidents(selectedResidents.filter(id => id !== resident.id));
+                    reloadData(paginationData.current_page);
                     toast.success('Resident deleted successfully');
                 },
                 onError: (errors) => {
@@ -598,6 +477,7 @@ export default function Residents() {
         }, {
             preserveScroll: true,
             onSuccess: () => {
+                reloadData(paginationData.current_page);
                 toast.success(`Resident status updated to ${newStatus}`);
             },
             onError: (errors) => {
@@ -632,7 +512,6 @@ export default function Residents() {
         setMaxAge('');
         setSortBy('last_name');
         setSortOrder('asc');
-        setCurrentPage(1);
     };
 
     const handleClearSelection = () => {
@@ -702,6 +581,57 @@ export default function Residents() {
         }
     };
 
+    // Keyboard shortcuts
+    const bulkModeRef = useRef(isBulkMode);
+    const selectedRef = useRef(selectedResidents);
+    
+    useEffect(() => {
+        bulkModeRef.current = isBulkMode;
+        selectedRef.current = selectedResidents;
+    }, [isBulkMode, selectedResidents]);
+
+    useEffect(() => {
+        if (isMobile) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                setIsBulkMode(prev => !prev);
+            }
+            
+            if (e.ctrlKey && e.key.toLowerCase() === 'a' && bulkModeRef.current) {
+                e.preventDefault();
+                const pageIds = currentResidents.map(r => r.id);
+                setSelectedResidents(prev => {
+                    const allSelected = pageIds.length > 0 && pageIds.every(id => prev.includes(id));
+                    return allSelected 
+                        ? prev.filter(id => !pageIds.includes(id))
+                        : [...new Set([...prev, ...pageIds])];
+                });
+                setIsSelectAll(prev => !prev);
+                setSelectionMode('page');
+            }
+            
+            if (e.key === 'Escape' && bulkModeRef.current) {
+                e.preventDefault();
+                selectedRef.current.length > 0 ? setSelectedResidents([]) : setIsBulkMode(false);
+            }
+            
+            if (e.ctrlKey && e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            
+            if (e.key === 'Delete' && bulkModeRef.current && selectedRef.current.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isMobile, currentResidents]);
+
     return (
         <AppLayout
             title="Residents"
@@ -712,6 +642,14 @@ export default function Residents() {
         >
             <TooltipProvider>
                 <div className="space-y-4 sm:space-y-6">
+                    {/* Loading Indicator */}
+                    {isLoading && (
+                        <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading...</span>
+                        </div>
+                    )}
+                    
                     <ResidentsHeader 
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
@@ -736,14 +674,14 @@ export default function Residents() {
                         ageRanges={ageRanges}
                         civilStatusOptions={civilStatusOptions}
                         isMobile={isMobile}
-                        totalItems={totalItems}
-                        startIndex={startIndex}
-                        endIndex={endIndex}
+                        totalItems={paginationData.total}
+                        startIndex={paginationData.from}
+                        endIndex={paginationData.to}
                         searchInputRef={searchInputRef}
                     />
 
                     <ResidentsContent
-                        residents={paginatedResidents}
+                        residents={currentResidents}
                         stats={stats}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
@@ -753,14 +691,14 @@ export default function Residents() {
                         setViewMode={setViewMode}
                         isMobile={isMobile}
                         hasActiveFilters={hasActiveFilters}
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={totalItems}
-                        itemsPerPage={itemsPerPage}
-                        onPageChange={setCurrentPage}
+                        currentPage={paginationData.current_page}
+                        totalPages={paginationData.last_page}
+                        totalItems={paginationData.total}
+                        itemsPerPage={paginationData.per_page}
+                        onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
-                        onSelectAllFiltered={handleSelectAllFiltered}
-                        onSelectAll={handleSelectAll}
+                        onSelectAllFiltered={() => {}}
+                        onSelectAll={() => {}}
                         onItemSelect={handleItemSelect}
                         onClearFilters={handleClearFilters}
                         onClearSelection={handleClearSelection}
@@ -768,8 +706,8 @@ export default function Residents() {
                         onToggleStatus={handleToggleStatus}
                         onViewPhoto={handleViewPhoto}
                         onCopyToClipboard={handleCopyToClipboard}
-                        onCopySelectedData={handleCopySelectedData}
-                        onSort={() => {}} // No longer needed for server-side
+                        onCopySelectedData={() => {}}
+                        onSort={() => {}}
                         onBulkOperation={handleBulkOperation}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
                         setShowBulkStatusDialog={setShowBulkStatusDialog}
@@ -785,6 +723,7 @@ export default function Residents() {
                         sortOrder={sortOrder}
                         onSortChange={handleSortChange}
                         getCurrentSortValue={getCurrentSortValue}
+                        isLoading={isLoading}
                     />
 
                     {/* Keyboard Shortcuts Help */}
@@ -805,14 +744,10 @@ export default function Residents() {
                                     Exit Bulk Mode
                                 </Button>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 text-xs text-gray-600 dark:text-gray-400">
                                 <div className="flex items-center gap-1">
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+A</kbd>
                                     <span>Select page</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Shift+Ctrl+A</kbd>
-                                    <span>Select filtered</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Delete</kbd>
@@ -821,10 +756,6 @@ export default function Residents() {
                                 <div className="flex items-center gap-1">
                                     <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Esc</kbd>
                                     <span>Exit/clear</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded">Ctrl+F</kbd>
-                                    <span>Focus search</span>
                                 </div>
                             </div>
                         </div>

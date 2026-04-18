@@ -1,3 +1,5 @@
+// components/admin/fees/FeesContent.tsx - COMPLETE REVISED FILE
+
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -63,12 +65,13 @@ interface FeesContentProps {
     sortOrder?: 'asc' | 'desc';
     onSortChange?: (value: string) => void;
     getCurrentSortValue?: () => string;
-    bulkActionRef?: React.RefObject<HTMLDivElement>;
+    bulkActionRef?: React.RefObject<HTMLDivElement | null>;
     showBulkActions?: boolean;
     setShowBulkActions?: (show: boolean) => void;
     onRemindersSent?: () => void;
     onExport?: () => void;
     onPrint?: () => void;
+    isLoading?: boolean;
 }
 
 export default function FeesContent({
@@ -107,16 +110,17 @@ export default function FeesContent({
     statuses = {},
     categories = {},
     puroks = [],
-    sortBy = 'name',
-    sortOrder = 'asc',
+    sortBy = 'created_at',
+    sortOrder = 'desc',
     onSortChange = () => {},
-    getCurrentSortValue = () => 'name-asc',
+    getCurrentSortValue = () => 'created_at-desc',
     bulkActionRef,
     showBulkActions = false,
     setShowBulkActions = () => {},
     onRemindersSent,
     onExport,
-    onPrint
+    onPrint,
+    isLoading = false
 }: FeesContentProps) {
     
     const handleBulkModeToggle = () => {
@@ -128,7 +132,8 @@ export default function FeesContent({
 
     // Helper functions
     const formatCurrency = (amount: number | string | undefined) => {
-        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount || 0;
+        if (amount === undefined || amount === null) return '₱0.00';
+        const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
         if (isNaN(numAmount)) return '₱0.00';
         return new Intl.NumberFormat('en-PH', {
             style: 'currency',
@@ -140,21 +145,31 @@ export default function FeesContent({
 
     const getStatusColor = (status: string) => {
         const colors: Record<string, string> = {
+            paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            overdue: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            issued: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+            partial: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+            partially_paid: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+            cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
+            refunded: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
             active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-            inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
-            archived: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+            inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
         };
-        return colors[status] || 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+        return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     };
 
-    const getStatusIcon = (status: string) => null;
+    const getStatusIcon = (status: string) => {
+        return null;
+    };
 
     const getCategoryColor = (category: string) => {
         const colors: Record<string, string> = {
             tax: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
             clearance: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             permit: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-            fee: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+            fee: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            donation: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
         };
         return colors[category] || colors.fee;
     };
@@ -164,7 +179,8 @@ export default function FeesContent({
             tax: 'Tax',
             clearance: 'Clearance',
             permit: 'Permit',
-            fee: 'Fee'
+            fee: 'Fee',
+            donation: 'Donation'
         };
         return labels[category] || category;
     };
@@ -241,6 +257,7 @@ export default function FeesContent({
                                 <Select
                                     value={getCurrentSortValue()}
                                     onValueChange={onSortChange}
+                                    disabled={isLoading}
                                 >
                                     <SelectTrigger className="w-[180px] h-8 text-xs">
                                         <SelectValue placeholder="Sort by..." />
@@ -252,10 +269,12 @@ export default function FeesContent({
                                         <SelectItem value="code-desc">Code (Z to A)</SelectItem>
                                         <SelectItem value="amount-asc">Amount (Low to High)</SelectItem>
                                         <SelectItem value="amount-desc">Amount (High to Low)</SelectItem>
-                                        <SelectItem value="status-asc">Status (Inactive to Active)</SelectItem>
-                                        <SelectItem value="status-desc">Status (Active to Inactive)</SelectItem>
-                                        <SelectItem value="category-asc">Category (A to Z)</SelectItem>
-                                        <SelectItem value="category-desc">Category (Z to A)</SelectItem>
+                                        <SelectItem value="status-asc">Status (A to Z)</SelectItem>
+                                        <SelectItem value="status-desc">Status (Z to A)</SelectItem>
+                                        <SelectItem value="payer_type-asc">Payer Type (A to Z)</SelectItem>
+                                        <SelectItem value="payer_type-desc">Payer Type (Z to A)</SelectItem>
+                                        <SelectItem value="due_date-asc">Due Date (Oldest first)</SelectItem>
+                                        <SelectItem value="due_date-desc">Due Date (Newest first)</SelectItem>
                                         <SelectItem value="created_at-asc">Created (Oldest first)</SelectItem>
                                         <SelectItem value="created_at-desc">Created (Newest first)</SelectItem>
                                     </SelectContent>
@@ -270,6 +289,7 @@ export default function FeesContent({
                                     id="select-all-grid"
                                     checked={isSelectAll}
                                     onCheckedChange={onSelectAllOnPage}
+                                    disabled={isLoading}
                                     className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
                                 />
                                 <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -288,6 +308,7 @@ export default function FeesContent({
                                                 id="bulk-mode"
                                                 checked={isBulkMode}
                                                 onCheckedChange={handleBulkModeToggle}
+                                                disabled={isLoading}
                                                 className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
                                             />
                                             <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
@@ -318,10 +339,10 @@ export default function FeesContent({
                             description={hasActiveFilters 
                                 ? "No fees match your current filters. Try adjusting your search or filters."
                                 : "No fees have been created yet."}
-                            hasFilters={hasActiveFilters}
-                            onClearFilters={hasActiveFilters ? onClearFilters : undefined}
-                            onCreateNew={!hasActiveFilters ? () => window.location.href = '/admin/fees/create' : undefined}
-                            createLabel="Create Fee"
+                            action={hasActiveFilters ? {
+                                label: "Clear Filters",
+                                onClick: onClearFilters
+                            } : undefined}
                             className="py-12 sm:py-16 dark:bg-gray-900"
                         />
                     ) : (
@@ -350,6 +371,9 @@ export default function FeesContent({
                                     getStatusIcon={getStatusIcon}
                                     getCategoryColor={getCategoryColor}
                                     getCategoryLabel={getCategoryLabel}
+                                    sortBy={sortBy}
+                                    sortOrder={sortOrder}
+                                    isLoading={isLoading}
                                 />
                             ) : (
                                 // Grid View
@@ -371,6 +395,7 @@ export default function FeesContent({
                                     getCategoryLabel={getCategoryLabel}
                                     statuses={statuses}
                                     categories={categories}
+                                    isLoading={isLoading}
                                 />
                             )}
 

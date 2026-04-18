@@ -36,13 +36,23 @@ import {
     FilterX,
     Calendar,
     Activity,
-    Hash
+    Hash,
+    Shield,
+    TrendingUp,
+    Clock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -313,20 +323,20 @@ export default function PermissionsIndex({
 
     // Roles count filter options
     const rolesCountOptions = [
-        { value: 'all', label: 'All Permissions' },
-        { value: '0', label: 'No Roles Assigned (0)' },
-        { value: '1-5', label: 'Low Usage (1-5 roles)' },
-        { value: '6-10', label: 'Moderate Usage (6-10 roles)' },
-        { value: '10+', label: 'High Usage (10+ roles)' }
+        { value: 'all', label: 'All Permissions', color: 'gray' },
+        { value: '0', label: 'No Roles Assigned (0)', color: 'red' },
+        { value: '1-5', label: 'Low Usage (1-5 roles)', color: 'blue' },
+        { value: '6-10', label: 'Moderate Usage (6-10 roles)', color: 'emerald' },
+        { value: '10+', label: 'High Usage (10+ roles)', color: 'purple' }
     ];
 
     // Date range options
     const dateRangeOptions = [
-        { value: '', label: 'All Time' },
-        { value: 'last_7_days', label: 'Last 7 Days' },
-        { value: 'last_30_days', label: 'Last 30 Days' },
-        { value: 'last_90_days', label: 'Last 90 Days' },
-        { value: 'last_year', label: 'Last Year' }
+        { value: '', label: 'All Time', color: 'gray' },
+        { value: 'last_7_days', label: 'Last 7 Days', color: 'blue' },
+        { value: 'last_30_days', label: 'Last 30 Days', color: 'emerald' },
+        { value: 'last_90_days', label: 'Last 90 Days', color: 'amber' },
+        { value: 'last_year', label: 'Last Year', color: 'orange' }
     ];
 
     // Pagination
@@ -462,6 +472,19 @@ export default function PermissionsIndex({
         search || moduleFilter !== 'all' || statusFilter !== 'all' || rolesCountFilter !== 'all' || dateRange
     );
     
+    // Get active filter count
+    const getActiveFilterCount = () => {
+        let count = 0;
+        if (search) count++;
+        if (moduleFilter !== 'all') count++;
+        if (statusFilter !== 'all') count++;
+        if (rolesCountFilter !== 'all') count++;
+        if (dateRange) count++;
+        return count;
+    };
+
+    const activeFilterCount = getActiveFilterCount();
+    
     // Generate pagination items
     const paginationItems = useMemo(() => {
         const items: number[] = [];
@@ -479,6 +502,32 @@ export default function PermissionsIndex({
         
         return items;
     }, [totalPages, currentPage]);
+
+    // Get status color
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'active': return 'emerald';
+            case 'inactive': return 'gray';
+            default: return 'gray';
+        }
+    };
+
+    // Get roles count color
+    const getRolesCountColor = (value: string) => {
+        const option = rolesCountOptions.find(o => o.value === value);
+        return option?.color || 'gray';
+    };
+
+    // Get date range color
+    const getDateRangeColor = (value: string) => {
+        const option = dateRangeOptions.find(o => o.value === value);
+        return option?.color || 'gray';
+    };
+
+    // Get module label
+    const getModuleLabel = (value: string) => {
+        return value || 'N/A';
+    };
 
     return (
         <AdminLayout
@@ -509,7 +558,7 @@ export default function PermissionsIndex({
                     </div>
                     <div className="flex items-center gap-2">
                         <Link href={route('admin.roles.index')}>
-                            <Button variant="outline" className="h-9 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
+                            <Button variant="outline" className="h-9 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 rounded-xl">
                                 <Users className="h-4 w-4 mr-2" />
                                 <span className="hidden sm:inline">Manage Roles</span>
                                 <span className="sm:hidden">Roles</span>
@@ -521,7 +570,7 @@ export default function PermissionsIndex({
                                 <TooltipTrigger asChild>
                                     <Button 
                                         variant="outline"
-                                        className="h-9 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
+                                        className="h-9 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200 rounded-xl"
                                         onClick={handleContactDeveloper}
                                     >
                                         <MessageCircle className="h-4 w-4 mr-2" />
@@ -545,17 +594,19 @@ export default function PermissionsIndex({
                 />
 
                 {/* Search and Filters - Redesigned without sort dropdown */}
-                <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col space-y-4">
-                            {/* Search Bar */}
+                <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-900 rounded-xl">
+                    <CardContent className="p-5 md:p-6">
+                        <div className="flex flex-col space-y-5">
+                            {/* Search Bar - Enhanced */}
                             <div className="flex flex-col md:flex-row gap-4">
-                                <div className="flex-1 relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
+                                <div className="flex-1 relative group">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Search className="h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-indigo-500 dark:group-focus-within:text-indigo-400 transition-colors" />
+                                    </div>
                                     <Input
                                         ref={searchInputRef}
                                         placeholder="Search permissions by name or description... (Ctrl+F)"
-                                        className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                                        className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         onKeyPress={handleKeyPress}
@@ -564,10 +615,10 @@ export default function PermissionsIndex({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                                             onClick={handleClearSearch}
                                         >
-                                            <X className="h-3 w-3" />
+                                            <X className="h-3.5 w-3.5" />
                                         </Button>
                                     )}
                                 </div>
@@ -575,196 +626,305 @@ export default function PermissionsIndex({
                                     <Button 
                                         variant="outline" 
                                         onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all"
                                     >
                                         <Filter className="h-4 w-4 mr-2" />
-                                        <span className="hidden sm:inline">
+                                        <span className="hidden sm:inline font-medium">
                                             {showAdvancedFilters ? 'Hide Filters' : 'More Filters'}
                                         </span>
                                         <span className="sm:hidden">
                                             {showAdvancedFilters ? 'Hide' : 'Filters'}
                                         </span>
+                                        {!showAdvancedFilters && activeFilterCount > 0 && (
+                                            <Badge variant="secondary" className="ml-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full px-1.5 py-0 text-xs">
+                                                +{activeFilterCount}
+                                            </Badge>
+                                        )}
                                     </Button>
                                     <Button 
                                         variant="outline"
-                                        className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all"
                                         onClick={handleExport}
                                     >
                                         <Download className="h-4 w-4 mr-2" />
-                                        <span className="hidden sm:inline">Export</span>
+                                        <span className="hidden sm:inline font-medium">Export</span>
                                     </Button>
                                 </div>
                             </div>
 
-                            {/* Active Filters Info and Clear Button */}
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} permissions
-                                    {search && ` matching "${search}"`}
+                            {/* Results Info & Active Filters Bar */}
+                            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                                <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 px-3 py-1.5 rounded-lg">
+                                    <span className="font-semibold text-gray-700 dark:text-gray-300">{startIndex + 1}-{Math.min(endIndex, totalItems)}</span>
+                                    <span className="mx-1">of</span>
+                                    <span className="font-semibold text-gray-700 dark:text-gray-300">{totalItems}</span>
+                                    <span className="ml-1">permissions</span>
+                                    {search && (
+                                        <span className="ml-1">
+                                            matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                        </span>
+                                    )}
                                 </div>
                                 
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Active filter badges */}
+                                    {hasActiveFilters && (
+                                        <>
+                                            {moduleFilter !== 'all' && (
+                                                <Badge variant="secondary" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                                    <Layers className="h-3 w-3 mr-1 inline" />
+                                                    Module: {getModuleLabel(moduleFilter)}
+                                                </Badge>
+                                            )}
+                                            {statusFilter !== 'all' && (
+                                                <Badge variant="secondary" className={`${
+                                                    getStatusColor(statusFilter) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                                    'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                                } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
+                                                    <Activity className="h-3 w-3 mr-1 inline" />
+                                                    Status: {statusFilter === 'active' ? 'Active' : 'Inactive'}
+                                                </Badge>
+                                            )}
+                                            {rolesCountFilter !== 'all' && (
+                                                <Badge variant="secondary" className={`${
+                                                    getRolesCountColor(rolesCountFilter) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                                    getRolesCountColor(rolesCountFilter) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                                    getRolesCountColor(rolesCountFilter) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                                    'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                                } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
+                                                    <Users className="h-3 w-3 mr-1 inline" />
+                                                    {rolesCountOptions.find(o => o.value === rolesCountFilter)?.label}
+                                                </Badge>
+                                            )}
+                                            {dateRange && dateRange !== '' && (
+                                                <Badge variant="secondary" className={`${
+                                                    getDateRangeColor(dateRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                                    getDateRangeColor(dateRange) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                                    getDateRangeColor(dateRange) === 'amber' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                                    'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                                                } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
+                                                    <Calendar className="h-3 w-3 mr-1 inline" />
+                                                    {dateRangeOptions.find(o => o.value === dateRange)?.label}
+                                                </Badge>
+                                            )}
+                                        </>
+                                    )}
+                                    
                                     {hasActiveFilters && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
                                             onClick={resetFilters}
-                                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-7 px-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-xs"
                                         >
-                                            <FilterX className="h-3.5 w-3.5 mr-1" />
-                                            Clear Filters
+                                            <FilterX className="h-3 w-3 mr-1" />
+                                            Clear all
                                         </Button>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Basic Filters - Module + Status + Roles Count + Date Range */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                <div className="space-y-1">
-                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            {/* Basic Filters - Modern Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                                {/* Module Filter */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                         <Layers className="h-3 w-3" />
                                         Module
                                     </Label>
-                                    <select
-                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                    <Select
                                         value={moduleFilter}
-                                        onChange={(e) => setModuleFilter(e.target.value)}
-                                        aria-label="Filter by module"
+                                        onValueChange={setModuleFilter}
                                     >
-                                        <option value="all">All Modules</option>
-                                        {availableModules.map((module) => (
-                                            <option key={module} value={module}>
-                                                {module}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-indigo-500">
+                                            <SelectValue placeholder="All Modules" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Modules</SelectItem>
+                                            {availableModules.map((module) => (
+                                                <SelectItem key={module} value={module}>
+                                                    {module}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                {/* Status Filter */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                         <Activity className="h-3 w-3" />
                                         Status
                                     </Label>
-                                    <select
-                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                    <Select
                                         value={statusFilter}
-                                        onChange={(e) => setStatusFilter(e.target.value as StatusFilterType)}
-                                        aria-label="Filter by status"
+                                        onValueChange={(value) => setStatusFilter(value as StatusFilterType)}
                                     >
-                                        <option value="all">All Status</option>
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                    </select>
+                                        <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                            <SelectValue placeholder="All Status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Status</SelectItem>
+                                            <SelectItem value="active">Active</SelectItem>
+                                            <SelectItem value="inactive">Inactive</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                {/* Roles Count Filter */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                         <Users className="h-3 w-3" />
                                         Roles Count
                                     </Label>
-                                    <select
-                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                    <Select
                                         value={rolesCountFilter}
-                                        onChange={(e) => setRolesCountFilter(e.target.value as RolesCountFilterType)}
+                                        onValueChange={(value) => setRolesCountFilter(value as RolesCountFilterType)}
                                     >
-                                        {rolesCountOptions.map(option => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                            <SelectValue placeholder="All Permissions" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {rolesCountOptions.map(option => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    <span className="flex items-center gap-2">
+                                                        <span className={`w-2 h-2 rounded-full ${
+                                                            option.color === 'red' ? 'bg-red-500' :
+                                                            option.color === 'blue' ? 'bg-blue-500' :
+                                                            option.color === 'emerald' ? 'bg-emerald-500' :
+                                                            option.color === 'purple' ? 'bg-purple-500' :
+                                                            'bg-gray-400'
+                                                        }`} />
+                                                        {option.label}
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <Label className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                {/* Created Date Filter */}
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                         <Calendar className="h-3 w-3" />
                                         Created Date
                                     </Label>
-                                    <select
-                                        className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                    <Select
                                         value={dateRange}
-                                        onChange={(e) => setDateRange(e.target.value)}
+                                        onValueChange={setDateRange}
                                     >
-                                        {dateRangeOptions.map(option => (
-                                            <option key={option.value} value={option.value}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                                            <SelectValue placeholder="All Time" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {dateRangeOptions.map(option => (
+                                                <SelectItem key={option.value} value={option.value}>
+                                                    <span className="flex items-center gap-2">
+                                                        <span className={`w-2 h-2 rounded-full ${
+                                                            option.color === 'blue' ? 'bg-blue-500' :
+                                                            option.color === 'emerald' ? 'bg-emerald-500' :
+                                                            option.color === 'amber' ? 'bg-amber-500' :
+                                                            option.color === 'orange' ? 'bg-orange-500' :
+                                                            'bg-gray-400'
+                                                        }`} />
+                                                        {option.label}
+                                                    </span>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
 
-                            {/* Advanced Filters */}
+                            {/* Advanced Filters - Modern Accordion Style */}
                             {showAdvancedFilters && (
-                                <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
-                                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Quick Actions</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Filters</Label>
+                                <div className="border-t border-gray-100 dark:border-gray-800 pt-5 mt-2 space-y-5">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-5 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
+                                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Quick Actions</h3>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Quick Filters */}
+                                        <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
+                                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                                                Quick Filters
+                                            </Label>
                                             <div className="flex flex-wrap gap-2">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="text-xs"
+                                                    className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                                     onClick={() => {
                                                         setStatusFilter('active');
                                                         setShowAdvancedFilters(false);
                                                     }}
                                                 >
+                                                    <Activity className="h-3 w-3 mr-1" />
                                                     Active Only
                                                 </Button>
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="text-xs"
+                                                    className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                                     onClick={() => {
                                                         setStatusFilter('inactive');
                                                         setShowAdvancedFilters(false);
                                                     }}
                                                 >
+                                                    <XCircle className="h-3 w-3 mr-1" />
                                                     Inactive Only
                                                 </Button>
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="text-xs"
+                                                    className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                                     onClick={() => {
                                                         setRolesCountFilter('0');
                                                         setShowAdvancedFilters(false);
                                                     }}
                                                 >
+                                                    <Users className="h-3 w-3 mr-1" />
                                                     Unused Permissions
                                                 </Button>
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="text-xs"
+                                                    className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                                     onClick={() => {
                                                         setRolesCountFilter('10+');
                                                         setShowAdvancedFilters(false);
                                                     }}
                                                 >
+                                                    <TrendingUp className="h-3 w-3 mr-1" />
                                                     Popular Permissions
                                                 </Button>
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="text-xs"
+                                                    className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                                     onClick={() => {
                                                         setDateRange('last_30_days');
                                                         setShowAdvancedFilters(false);
                                                     }}
                                                 >
+                                                    <Calendar className="h-3 w-3 mr-1" />
                                                     Recently Added
                                                 </Button>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Information</Label>
+                                        {/* Information Section */}
+                                        <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
+                                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                                <Shield className="h-4 w-4 text-indigo-500" />
+                                                Information
+                                            </Label>
                                             <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                                                <p>• <span className="font-medium">Roles Count</span> - Number of roles using this permission</p>
-                                                <p>• <span className="font-medium">Created Date</span> - When the permission was added</p>
+                                                <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Roles Count</span> - Number of roles using this permission</p>
+                                                <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Created Date</span> - When the permission was added</p>
+                                                <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Module</span> - Category/group of the permission</p>
                                                 <p>• Use the table header to sort by any column</p>
                                             </div>
                                         </div>
@@ -775,9 +935,9 @@ export default function PermissionsIndex({
                     </CardContent>
                 </Card>
 
-                {/* Permissions Table */}
-                <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-                    <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
+                {/* Permissions Table - Enhanced */}
+                <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-900 rounded-xl">
+                    <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
                         <CardTitle className="text-lg sm:text-xl dark:text-gray-100">Permissions List</CardTitle>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                             Page {currentPage} of {totalPages}
@@ -789,9 +949,9 @@ export default function PermissionsIndex({
                                 <div className="overflow-hidden">
                                     <Table className="min-w-full">
                                         <TableHeader>
-                                            <TableRow className="bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700">
+                                            <TableRow className="bg-gray-50/50 dark:bg-gray-800/30 border-gray-100 dark:border-gray-800">
                                                 <TableHead 
-                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[180px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                                                     onClick={() => handleSort('name')}
                                                 >
                                                     <div className="flex items-center gap-1">
@@ -800,7 +960,7 @@ export default function PermissionsIndex({
                                                     </div>
                                                 </TableHead>
                                                 <TableHead 
-                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                                                     onClick={() => handleSort('display_name')}
                                                 >
                                                     <div className="flex items-center gap-1">
@@ -809,7 +969,7 @@ export default function PermissionsIndex({
                                                     </div>
                                                 </TableHead>
                                                 <TableHead 
-                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                                                     onClick={() => handleSort('module')}
                                                 >
                                                     <div className="flex items-center gap-1">
@@ -818,7 +978,7 @@ export default function PermissionsIndex({
                                                     </div>
                                                 </TableHead>
                                                 <TableHead 
-                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                                                     onClick={() => handleSort('status')}
                                                 >
                                                     <div className="flex items-center gap-1">
@@ -827,7 +987,7 @@ export default function PermissionsIndex({
                                                     </div>
                                                 </TableHead>
                                                 <TableHead 
-                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                                                     onClick={() => handleSort('roles_count')}
                                                 >
                                                     <div className="flex items-center gap-1">
@@ -836,7 +996,7 @@ export default function PermissionsIndex({
                                                     </div>
                                                 </TableHead>
                                                 <TableHead 
-                                                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                                                    className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
                                                     onClick={() => handleSort('created_at')}
                                                 >
                                                     <div className="flex items-center gap-1">
@@ -844,15 +1004,15 @@ export default function PermissionsIndex({
                                                         {getSortIcon('created_at')}
                                                     </div>
                                                 </TableHead>
-                                                <TableHead className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900/50 min-w-[80px]">
+                                                <TableHead className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky right-0 bg-gray-50/50 dark:bg-gray-800/30 min-w-[80px]">
                                                     Actions
                                                 </TableHead>
                                             </TableRow>
                                         </TableHeader>
-                                        <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
                                             {paginatedPermissions.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={7} className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                                    <TableCell colSpan={7} className="text-center py-12 text-gray-500 dark:text-gray-400">
                                                         <div className="flex flex-col items-center justify-center space-y-4">
                                                             <Key className="h-16 w-16 text-gray-300 dark:text-gray-700" />
                                                             <div>
@@ -870,7 +1030,7 @@ export default function PermissionsIndex({
                                                                     <Button
                                                                         variant="outline"
                                                                         onClick={resetFilters}
-                                                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
+                                                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 rounded-lg"
                                                                     >
                                                                         Clear Filters
                                                                     </Button>
@@ -880,7 +1040,7 @@ export default function PermissionsIndex({
                                                                         <TooltipTrigger asChild>
                                                                             <Button 
                                                                                 variant="outline"
-                                                                                className="h-8 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
+                                                                                className="h-8 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200 rounded-lg"
                                                                                 onClick={handleContactDeveloper}
                                                                             >
                                                                                 <MessageCircle className="h-3 w-3 mr-1" />
@@ -898,7 +1058,7 @@ export default function PermissionsIndex({
                                                 </TableRow>
                                             ) : (
                                                 paginatedPermissions.map((permission) => (
-                                                    <TableRow key={permission.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors border-gray-200 dark:border-gray-700">
+                                                    <TableRow key={permission.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors border-gray-100 dark:border-gray-800">
                                                         <TableCell className="px-4 py-3 whitespace-nowrap dark:text-gray-300">
                                                             <div className="flex items-center gap-3">
                                                                 <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
@@ -937,7 +1097,7 @@ export default function PermissionsIndex({
                                                         <TableCell className="px-4 py-3">
                                                             <Badge 
                                                                 variant="outline" 
-                                                                className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800"
+                                                                className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 rounded-full"
                                                                 title={permission.module}
                                                             >
                                                                 <span className="truncate">
@@ -952,10 +1112,10 @@ export default function PermissionsIndex({
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 onClick={() => togglePermissionStatus(permission)}
-                                                                className={`h-6 px-2 text-xs font-medium ${
+                                                                className={`h-6 px-2 text-xs font-medium rounded-full ${
                                                                     permission.is_active
-                                                                        ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50'
-                                                                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'
+                                                                        ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-900/50'
+                                                                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
                                                                 }`}
                                                             >
                                                                 {permission.is_active ? (
@@ -971,7 +1131,7 @@ export default function PermissionsIndex({
                                                         <TableCell className="px-4 py-3 dark:text-gray-300">
                                                             <div className="flex items-center gap-2">
                                                                 <Users className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                                                <span className="truncate">{permission.roles_count || 0}</span>
+                                                                <span className="font-medium truncate">{permission.roles_count || 0}</span>
                                                             </div>
                                                         </TableCell>
                                                         <TableCell className="px-4 py-3">
@@ -987,14 +1147,14 @@ export default function PermissionsIndex({
                                                                 <DropdownMenuTrigger asChild>
                                                                     <Button 
                                                                         variant="ghost" 
-                                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
+                                                                        className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg dark:text-gray-400 dark:hover:text-gray-300"
                                                                     >
                                                                         <span className="sr-only">Open menu</span>
                                                                         <MoreVertical className="h-4 w-4" />
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700">
-                                                                    <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-700">
+                                                                <DropdownMenuContent align="end" className="w-48 dark:bg-gray-900 dark:border-gray-700 rounded-xl">
+                                                                    <DropdownMenuItem asChild className="dark:text-gray-200 dark:focus:bg-gray-800 rounded-lg">
                                                                         <Link href={route('admin.permissions.show', permission.id)} className="flex items-center cursor-pointer">
                                                                             <Eye className="mr-2 h-4 w-4" />
                                                                             <span>View Details</span>
@@ -1005,7 +1165,7 @@ export default function PermissionsIndex({
                                                                     
                                                                     <DropdownMenuItem 
                                                                         onClick={() => handleCopyToClipboard(permission.name, 'Permission Name')}
-                                                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-800 rounded-lg"
                                                                     >
                                                                         <Copy className="mr-2 h-4 w-4" />
                                                                         <span>Copy Name</span>
@@ -1013,7 +1173,7 @@ export default function PermissionsIndex({
                                                                     
                                                                     <DropdownMenuItem 
                                                                         onClick={() => handleCopyToClipboard(permission.display_name, 'Display Name')}
-                                                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-700"
+                                                                        className="flex items-center cursor-pointer dark:text-gray-200 dark:focus:bg-gray-800 rounded-lg"
                                                                     >
                                                                         <Copy className="mr-2 h-4 w-4" />
                                                                         <span>Copy Display Name</span>
@@ -1022,7 +1182,7 @@ export default function PermissionsIndex({
                                                                     <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                     
                                                                     <DropdownMenuItem 
-                                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-950/30"
+                                                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:text-red-400 dark:focus:text-red-300 dark:focus:bg-red-950/30 rounded-lg"
                                                                         onClick={() => handleDelete(permission)}
                                                                     >
                                                                         <Trash2 className="mr-2 h-4 w-4" />
@@ -1040,9 +1200,9 @@ export default function PermissionsIndex({
                             </div>
                         </div>
 
-                        {/* Pagination */}
+                        {/* Pagination - Modern */}
                         {totalPages > 1 && (
-                            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-4 pt-4 px-4 border-t border-gray-100 dark:border-gray-800">
                                 <div className="text-sm text-gray-500 dark:text-gray-400">
                                     Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} results
                                 </div>
@@ -1052,7 +1212,7 @@ export default function PermissionsIndex({
                                         size="sm"
                                         onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                                         disabled={currentPage === 1}
-                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
+                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50 rounded-lg"
                                     >
                                         <ChevronLeft className="h-4 w-4 mr-1" />
                                         Previous
@@ -1064,9 +1224,9 @@ export default function PermissionsIndex({
                                                 variant={currentPage === pageNum ? "default" : "outline"}
                                                 size="sm"
                                                 onClick={() => setCurrentPage(pageNum)}
-                                                className={`h-8 w-8 p-0 ${
+                                                className={`h-8 w-8 p-0 rounded-lg ${
                                                     currentPage === pageNum 
-                                                        ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
+                                                        ? 'dark:bg-indigo-600 dark:hover:bg-indigo-700' 
                                                         : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900'
                                                 }`}
                                             >
@@ -1079,7 +1239,7 @@ export default function PermissionsIndex({
                                         size="sm"
                                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                                         disabled={currentPage === totalPages}
-                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50"
+                                        className="h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 dark:disabled:opacity-50 rounded-lg"
                                     >
                                         Next
                                         <ChevronRight className="h-4 w-4 ml-1" />
@@ -1090,16 +1250,16 @@ export default function PermissionsIndex({
                     </CardContent>
                 </Card>
 
-                {/* Quick Actions & Info */}
+                {/* Quick Actions & Info - Modern */}
                 <div className="grid gap-6 sm:grid-cols-2">
-                    <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-                        <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
+                    <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-900 rounded-xl">
+                        <CardHeader className="pb-3 border-b border-gray-100 dark:border-gray-800">
                             <CardTitle className="text-lg dark:text-gray-100">Quick Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
                             <div className="grid grid-cols-2 gap-3">
                                 <Link href={route('admin.roles.index')}>
-                                    <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
+                                    <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 rounded-lg">
                                         <Users className="h-3 w-3 mr-2" />
                                         <span className="truncate">Manage Roles</span>
                                     </Button>
@@ -1107,13 +1267,13 @@ export default function PermissionsIndex({
                                 <Button 
                                     variant="outline" 
                                     size="sm" 
-                                    className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
+                                    className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 rounded-lg"
                                     onClick={handleExport}
                                 >
                                     <Download className="h-3 w-3 mr-2" />
                                     <span className="truncate">Export CSV</span>
                                 </Button>
-                                <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900">
+                                <Button variant="outline" size="sm" className="w-full justify-start h-8 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900 rounded-lg">
                                     <BarChart3 className="h-3 w-3 mr-2" />
                                     <span className="truncate">Usage Report</span>
                                 </Button>
@@ -1123,7 +1283,7 @@ export default function PermissionsIndex({
                                             <Button 
                                                 variant="outline" 
                                                 size="sm" 
-                                                className="w-full justify-start h-8 col-span-2 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
+                                                className="w-full justify-start h-8 col-span-2 border-blue-400 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 dark:hover:text-blue-200 rounded-lg"
                                                 onClick={handleContactDeveloper}
                                             >
                                                 <MessageCircle className="h-3 w-3 mr-2" />
@@ -1139,8 +1299,8 @@ export default function PermissionsIndex({
                         </CardContent>
                     </Card>
 
-                    <Card className="overflow-hidden border-gray-200 dark:border-gray-700 dark:bg-gray-900">
-                        <CardHeader className="pb-3 border-b border-gray-200 dark:border-gray-700">
+                    <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-900 rounded-xl">
+                        <CardHeader className="pb-3 border-b border-gray-100 dark:border-gray-800">
                             <CardTitle className="text-lg dark:text-gray-100">Module Distribution</CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4">
@@ -1161,7 +1321,7 @@ export default function PermissionsIndex({
                                                             ? module.substring(0, getTruncationLength('module')) + '...' 
                                                             : module || 'N/A'}
                                                     </span>
-                                                    <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
+                                                    <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300 rounded-full">
                                                         {modulePermissions.length}
                                                     </Badge>
                                                 </div>
@@ -1176,7 +1336,7 @@ export default function PermissionsIndex({
                                             <Button 
                                                 variant="ghost" 
                                                 size="sm"
-                                                className="h-8 dark:text-gray-300 dark:hover:bg-gray-900"
+                                                className="h-8 dark:text-gray-300 dark:hover:bg-gray-900 rounded-lg"
                                                 onClick={resetFilters}
                                             >
                                                 View All Modules

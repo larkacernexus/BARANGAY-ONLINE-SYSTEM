@@ -1,6 +1,20 @@
-import { JSX, ReactNode } from "react";
+// types/admin/residents/residents-types.ts
 
-// Resident Type
+import { ReactNode } from "react";
+
+// ============================================================================
+// BASE TYPES
+// ============================================================================
+
+export type ResidentStatus = 'active' | 'inactive' | 'pending' | 'suspended';
+export type CivilStatus = 'single' | 'married' | 'divorced' | 'widowed' | 'separated';
+export type Gender = 'male' | 'female' | 'other';
+export type SelectionMode = 'page' | 'filtered' | 'all' | 'none';
+
+// ============================================================================
+// RESIDENT TYPE
+// ============================================================================
+
 export interface Resident {
     place_of_birth: string;
     remarks: string;
@@ -42,9 +56,12 @@ export interface Resident {
     valid_id_photo?: string | null;
     photo_url?: string | null;
     photo_path?: string | null;
+    has_photo?: boolean;
     
     // Privileges
     privileges: ResidentPrivilege[];
+    privileges_count?: number;
+    active_privileges_count?: number;
     
     // Household memberships
     household_memberships?: HouseholdMembership[];
@@ -59,21 +76,20 @@ export interface Resident {
     full_name?: string;
     address?: string;
     formatted_birth_date?: string;
-    
-    // Helper methods (these should be functions, but in interface they're properties)
-    // Move these to utility functions instead
 }
 
-// Resident Privilege Type
+// ============================================================================
+// PRIVILEGE TYPES
+// ============================================================================
+
 export interface ResidentPrivilege {
-    code(code: any): unknown;
-    discount_percentage: any;
     id: number;
     resident_id: number;
     privilege_id: number;
     privilege?: Privilege;
-    privilege_name?: string; // Add this
-    privilege_code?: string; // Add this
+    privilege_name?: string;
+    privilege_code?: string;
+    code?: string;
     id_number?: string | null;
     issued_date?: string | null;
     expiry_date?: string | null;
@@ -84,22 +100,54 @@ export interface ResidentPrivilege {
     granted_at?: string;
     granted_by?: number;
     valid_until?: string;
-    verified_at?: string | null; // Add this
-    verified_by?: number | null; // Add this
-    pivot?: {
-        resident_id: number;
-        privilege_id: number;
-        id_number?: string;
-        granted_at: string;
-        granted_by: number;
-        valid_until?: string;
-        status?: string;
-        verified_at?: string; // Add this
-        verified_by?: number; // Add this
-    };
+    verified_at?: string | null;
+    verified_by?: number | null;
+    discount_percentage?: number;
+    pivot?: ResidentPrivilegePivot;
 }
 
-// Purok Type
+export interface ResidentPrivilegePivot {
+    resident_id: number;
+    privilege_id: number;
+    id_number?: string;
+    granted_at: string;
+    granted_by: number;
+    valid_until?: string;
+    status?: string;
+    verified_at?: string;
+    verified_by?: number;
+}
+
+export interface Privilege {
+    id: number;
+    name: string;
+    code: string;
+    description?: string;
+    category?: string;
+    is_active: boolean;
+    requires_id_number?: boolean;
+    requires_verification: boolean;
+    discount_percentage?: number | null;
+    validity_years?: number | null;
+    valid_from?: string;
+    valid_until?: string;
+    discount_type?: DiscountType | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface DiscountType {
+    id: number;
+    name: string;
+    code: string;
+    percentage?: number;
+    description?: string;
+}
+
+// ============================================================================
+// PUROK & HOUSEHOLD TYPES
+// ============================================================================
+
 export interface Purok {
     id: number;
     name: string;
@@ -110,7 +158,6 @@ export interface Purok {
     updated_at?: string;
 }
 
-// Household Type
 export interface Household {
     id: number;
     household_number: string;
@@ -118,20 +165,22 @@ export interface Household {
     purok?: Purok;
     head_id?: number;
     head?: Resident;
+    head_of_family?: string;
     members?: Resident[];
     total_members: number;
+    member_count?: number;
+    address?: string;
     created_at: string;
     updated_at: string;
 }
 
-// Household Membership Type
 export interface HouseholdMembership {
-    relationship_to_head(relationship_to_head: any): string;
     id: number;
     household_id: number;
     resident_id: number;
     is_head: boolean;
     relationship?: string;
+    relationship_to_head?: string;
     joined_at?: string;
     left_at?: string;
     is_active: boolean;
@@ -139,35 +188,40 @@ export interface HouseholdMembership {
     resident?: Resident;
 }
 
-// Privilege Type
-export interface Privilege {
-    id: number;
-    name: string;
-    code: string;
-    description?: string;
-    category?: string;
-    is_active: boolean;
-    requires_id_number?: boolean;
-    requires_verification: boolean;
-    default_discount_percentage?: number | null;
-    validity_years?: number | null;
-    valid_from?: string;
-    valid_until?: string;
-    discount_type?: DiscountType | null;
-    created_at?: string;
-    updated_at?: string;
+export interface HouseholdOption {
+    id: number | string;
+    household_number: string;
+    head_of_family: string;
+    member_count: number;
+    address?: string;
+    purok?: string;
 }
 
-// Discount Type
-export interface DiscountType {
-    id: number;
-    name: string;
-    code: string;
-    percentage?: number;
-    description?: string;
+// ============================================================================
+// PAGINATION TYPES
+// ============================================================================
+
+export interface PaginatedResidents {
+    data: Resident[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number;
+    to: number;
+    per_page: number;
+    links?: PaginationLink[];
 }
 
-// Stats Type
+export interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+// ============================================================================
+// STATS TYPES
+// ============================================================================
+
 export interface Stats {
     total: number;
     active: number;
@@ -184,32 +238,84 @@ export interface Stats {
     by_age_group?: Record<string, number>;
 }
 
-// Filter State
+export interface SelectionStats {
+    total: number;
+    male: number;
+    female: number;
+    other: number;
+    averageAge: number;
+    hasPhotos: number;
+    males: number;
+    females: number;
+    voters: number;
+    heads: number;
+    active: number;
+    inactive: number;
+    privilegeCounts: Record<string, number>;
+    hasPrivileges: number;
+}
+
+// ============================================================================
+// FILTER TYPES
+// ============================================================================
+
 export interface FilterState {
     status: string;
-    purok_id: string | number;
+    purok_id: string;
     gender: string;
-    min_age: string | number;
-    max_age: string | number;
+    min_age: string;
+    max_age: string;
     civil_status: string;
     is_voter: string;
     is_head: string;
     privilege: string;
-    privilege_id: string | number;
+    privilege_id: string;
     sort_by: string;
     sort_order: 'asc' | 'desc';
     search?: string;
 }
 
-// Residents Page Props
+// ============================================================================
+// PAGE PROPS
+// ============================================================================
+
+export interface PageProps {
+    auth?: Auth;
+    flash?: FlashMessage;
+    errors?: Record<string, string>;
+    [key: string]: any;
+}
+
+export interface Auth {
+    user: User;
+    permissions?: string[];
+    roles?: string[];
+}
+
+export interface User {
+    id: number;
+    name: string;
+    email: string;
+    role_id?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface FlashMessage {
+    success?: string;
+    error?: string;
+    warning?: string;
+    info?: string;
+}
+
 export interface ResidentsProps extends PageProps {
-    residents: Resident[];
+    residents: PaginatedResidents;
     stats: Stats;
     filters: FilterState;
     puroks: Purok[];
     civilStatusOptions: Array<{ value: string; label: string }>;
     ageRanges: Array<{ min: number; max: number; label: string }>;
-    allResidents: Resident[];
+    allResidents?: Resident[];
     privileges: Privilege[];
     can?: {
         create?: boolean;
@@ -219,37 +325,27 @@ export interface ResidentsProps extends PageProps {
     };
 }
 
-// Residents Table Row Props
-export interface ResidentsTableRowProps {
-    resident: Resident;
+// ============================================================================
+// COMPONENT PROPS
+// ============================================================================
+
+export interface ResidentsHeaderProps {
     isBulkMode: boolean;
-    isSelected: boolean;
-    onSelect: () => void;
-    isExpanded: boolean;
-    onToggleExpand: () => void;
-    getFullName: (resident: Resident) => string;
-    truncateText: (text: string | null, maxLength?: number) => string;
-    getStatusBadgeVariant: (status: string) => "default" | "secondary" | "destructive" | "outline";
-    getStatusIcon: (status: string) => JSX.Element | null;
-    formatDate: (dateString: string | null) => string;
-    getAge: (birthDate: string) => number;
-    onDelete?: (resident: Resident) => void;
-    onToggleStatus?: (resident: Resident) => void;
-    onViewPhoto?: (resident: Resident) => void;
-    onCopyToClipboard?: (text: string, label: string) => void;
-    onEdit?: (resident: Resident) => void;
-    canEdit?: boolean;
-    canDelete?: boolean;
+    setIsBulkMode: (value: boolean) => void;
+    isMobile: boolean;
 }
 
-// Residents Filters Props
+export interface ResidentsStatsProps {
+    stats: Stats;
+}
+
 export interface ResidentsFiltersProps {
     stats: Stats;
     search: string;
     setSearch: (value: string) => void;
     onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     filtersState: FilterState;
-    updateFilter: (key: keyof FilterState, value: string) => void;
+    updateFilter: (key: string, value: string) => void;
     showAdvancedFilters: boolean;
     setShowAdvancedFilters: (value: boolean) => void;
     handleClearFilters: () => void;
@@ -262,10 +358,9 @@ export interface ResidentsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    searchInputRef: React.RefObject<HTMLInputElement>;
+    searchInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
-// Residents Content Props
 export interface ResidentsContentProps {
     residents: Resident[];
     stats: Stats;
@@ -305,9 +400,13 @@ export interface ResidentsContentProps {
     selectionMode: SelectionMode;
     selectionStats: SelectionStats;
     puroks: Purok[];
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    onSortChange?: (value: string) => void;
+    getCurrentSortValue?: () => string;
+    isLoading?: boolean;
 }
 
-// Residents Dialogs Props
 export interface ResidentsDialogsProps {
     showBulkDeleteDialog: boolean;
     setShowBulkDeleteDialog: (value: boolean) => void;
@@ -334,50 +433,34 @@ export interface ResidentsDialogsProps {
     bulkPrivilegeAction: 'add' | 'remove';
 }
 
-// Residents Header Props
-export interface ResidentsHeaderProps {
+export interface ResidentsTableRowProps {
+    resident: Resident;
     isBulkMode: boolean;
-    setIsBulkMode: (value: boolean) => void;
-    isMobile: boolean;
+    isSelected: boolean;
+    onSelect: () => void;
+    isExpanded: boolean;
+    onToggleExpand: () => void;
+    getFullName: (resident: Resident) => string;
+    truncateText: (text: string | null, maxLength?: number) => string;
+    getStatusBadgeVariant: (status: string) => "default" | "secondary" | "destructive" | "outline";
+    getStatusIcon: (status: string) => ReactNode | null;
+    formatDate: (dateString: string | null) => string;
+    getAge: (birthDate: string) => number;
+    onDelete?: (resident: Resident) => void;
+    onToggleStatus?: (resident: Resident) => void;
+    onViewPhoto?: (resident: Resident) => void;
+    onCopyToClipboard?: (text: string, label: string) => void;
+    onEdit?: (resident: Resident) => void;
+    canEdit?: boolean;
+    canDelete?: boolean;
 }
 
-// Residents Stats Props
-export interface ResidentsStatsProps {
-    stats: Stats;
-}
-
-// Selection Stats
-export interface SelectionStats {
-    total: number;
-    male: number;
-    female: number;
-    other: number;
-    averageAge: number;
-    hasPhotos: number;
-    males: number;
-    females: number;
-    voters: number;
-    heads: number;
-    active: number;
-    inactive: number;
-    privilegeCounts: Record<string, number>;
-    hasPrivileges: number;
-}
-
-// Selection Mode
-export type SelectionMode = 'page' | 'filtered' | 'all' | 'none';
-
-// Bulk Operation
-export interface BulkOperation {
-    action: string;
-    resident_ids: number[];
-    status?: string;
-    purok_id?: number;
-    privilege_id?: number;
-}
+// ============================================================================
+// FORM & API TYPES
+// ============================================================================
 
 export interface ResidentFormData {
-    age: number; // Fix: Change from ReactNode to number
+    age: number;
     place_of_birth?: string | null;
     remarks?: string | null;
     status: 'active' | 'inactive' | 'pending' | 'suspended';
@@ -413,7 +496,6 @@ export interface ResidentFormData {
     _method?: string;
 }
 
-// Resident Validation Errors
 export interface ResidentValidationErrors {
     first_name?: string[];
     last_name?: string[];
@@ -425,7 +507,6 @@ export interface ResidentValidationErrors {
     purok_id?: string[];
 }
 
-// API Response
 export interface ApiResponse<T = any> {
     success: boolean;
     message?: string;
@@ -433,7 +514,28 @@ export interface ApiResponse<T = any> {
     errors?: Record<string, string[]>;
 }
 
-// Resident Export Data
+export interface BulkActionResponse {
+    success: boolean;
+    message: string;
+    updated_count: number;
+    errors?: Array<{
+        id: number;
+        error: string;
+    }>;
+}
+
+export interface BulkOperation {
+    action: string;
+    resident_ids: number[];
+    status?: string;
+    purok_id?: number;
+    privilege_id?: number;
+}
+
+// ============================================================================
+// EXPORT TYPES
+// ============================================================================
+
 export interface ResidentExportData {
     'Full Name': string;
     'Age': number;
@@ -455,42 +557,20 @@ export interface ResidentExportData {
     'Date Registered': string;
 }
 
-// Bulk Action Response
-export interface BulkActionResponse {
-    success: boolean;
-    message: string;
-    updated_count: number;
-    errors?: Array<{
-        id: number;
-        error: string;
-    }>;
-}
+// ============================================================================
+// UTILITY TYPES
+// ============================================================================
 
-// Utility Types
-export type ResidentStatus = 'active' | 'inactive' | 'pending' | 'suspended';
-export type CivilStatus = 'single' | 'married' | 'divorced' | 'widowed' | 'separated';
-export type Gender = 'male' | 'female' | 'other';
-
-// Helper Functions (as types, not actual functions)
 export interface ResidentUtils {
     getFullName: (resident: Resident) => string;
     getAddress: (resident: Resident) => string;
     getAge: (birthDate: string) => number;
     formatDate: (dateString: string) => string;
     getStatusBadgeVariant: (status: ResidentStatus) => "default" | "secondary" | "destructive" | "outline";
-    getStatusIcon: (status: ResidentStatus) => JSX.Element | null;
+    getStatusIcon: (status: ResidentStatus) => ReactNode | null;
     hasActivePrivileges: (resident: Resident) => boolean;
     getActivePrivileges: (resident: Resident) => ResidentPrivilege[];
     getExpiringPrivileges: (resident: Resident, daysThreshold?: number) => ResidentPrivilege[];
-}
-
-export interface HouseholdOption {
-    id: number | string;
-    household_number: string;
-    head_of_family: string;
-    member_count: number;
-    address?: string;
-    purok?: string;
 }
 
 export interface RelatedHouseholdMember {
@@ -513,34 +593,4 @@ export interface RelatedHouseholdMember {
         photo_path?: string;
         photo_url?: string;
     };
-}
-
-
-export interface PageProps {
-    auth?: Auth;
-    flash?: FlashMessage;
-    errors?: Record<string, string>;
-    [key: string]: any;
-}
-
-export interface Auth {
-    user: User;
-    permissions?: string[];
-    roles?: string[];
-}
-
-export interface FlashMessage {
-    success?: string;
-    error?: string;
-    warning?: string;
-    info?: string;
-}
-
-export interface User {
-    id: number;
-    name: string;
-    email: string;
-    role_id?: number;
-    created_at?: string;
-    updated_at?: string;
 }

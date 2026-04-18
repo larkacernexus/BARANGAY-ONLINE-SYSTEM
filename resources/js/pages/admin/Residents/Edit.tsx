@@ -113,7 +113,7 @@ export default function EditResident({
             verified_at: p.verified_at || '',
             expires_at: p.expiry_date || '',
             remarks: p.remarks || '',
-            discount_percentage: p.privilege?.default_discount_percentage || 0,
+            discount_percentage: p.privilege?.discount_percentage || 0,
         })) || [],
         _method: 'PUT',
     });
@@ -425,7 +425,7 @@ export default function EditResident({
                                             verified_at: today,
                                             expires_at: expiresAt,
                                             remarks: '',
-                                            discount_percentage: privilege?.default_discount_percentage || undefined,
+                                            discount_percentage: privilege?.discount_percentage || undefined,
                                         }
                                     ]);
                                 }}

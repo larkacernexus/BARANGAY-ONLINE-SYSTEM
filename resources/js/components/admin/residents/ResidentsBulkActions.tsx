@@ -13,9 +13,13 @@ import {
     CheckSquare,
     Square,
     Home,
-    Award
+    Award,
+    X,
+    Layers,
+    Filter
 } from 'lucide-react';
 import { SelectionMode, SelectionStats } from '@/types/admin/residents/residents-types';
+import { useState, useRef, useEffect } from 'react';
 
 export interface BulkActionItem {
     label: string;
@@ -42,6 +46,10 @@ export interface ResidentBulkActionsProps {
     onBulkOperation: (operation: string, data?: any) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
+    setShowBulkStatusDialog?: (show: boolean) => void;
+    setShowBulkPurokDialog?: (show: boolean) => void;
+    setShowBulkPrivilegeDialog?: (show: boolean) => void;
+    setShowBulkRemovePrivilegeDialog?: (show: boolean) => void;
     
     // Bulk actions configuration
     bulkActions?: {
@@ -66,8 +74,38 @@ export default function ResidentBulkActions({
     onBulkOperation,
     onCopySelectedData,
     setShowBulkDeleteDialog,
+    setShowBulkStatusDialog,
+    setShowBulkPurokDialog,
+    setShowBulkPrivilegeDialog,
+    setShowBulkRemovePrivilegeDialog,
     bulkActions: customBulkActions
 }: ResidentBulkActionsProps) {
+    
+    const [showSelectMenu, setShowSelectMenu] = useState(false);
+    const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [showPrivilegeMenu, setShowPrivilegeMenu] = useState(false);
+    
+    const selectMenuRef = useRef<HTMLDivElement>(null);
+    const moreMenuRef = useRef<HTMLDivElement>(null);
+    const privilegeMenuRef = useRef<HTMLDivElement>(null);
+    
+    // Close menus when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (selectMenuRef.current && !selectMenuRef.current.contains(event.target as Node)) {
+                setShowSelectMenu(false);
+            }
+            if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+                setShowMoreMenu(false);
+            }
+            if (privilegeMenuRef.current && !privilegeMenuRef.current.contains(event.target as Node)) {
+                setShowPrivilegeMenu(false);
+            }
+        };
+        
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
     
     // Helper to get selection mode display text
     const getSelectionModeText = () => {
@@ -121,7 +159,7 @@ export default function ResidentBulkActions({
             {
                 label: 'Update Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('update_status'),
+                onClick: () => setShowBulkStatusDialog?.(true),
                 tooltip: 'Update status for selected residents',
                 variant: 'outline' as const,
                 disabled: false
@@ -129,7 +167,7 @@ export default function ResidentBulkActions({
             {
                 label: 'Update Purok',
                 icon: <Home className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('update_purok'),
+                onClick: () => setShowBulkPurokDialog?.(true),
                 tooltip: 'Update purok for selected residents',
                 variant: 'outline' as const,
                 disabled: false
@@ -155,7 +193,7 @@ export default function ResidentBulkActions({
             {
                 label: 'Add Privilege',
                 icon: <Award className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('add_privilege'),
+                onClick: () => setShowBulkPrivilegeDialog?.(true),
                 tooltip: 'Add privilege to selected residents',
                 variant: 'outline' as const,
                 disabled: false
@@ -163,7 +201,7 @@ export default function ResidentBulkActions({
             {
                 label: 'Remove Privilege',
                 icon: <Award className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('remove_privilege'),
+                onClick: () => setShowBulkRemovePrivilegeDialog?.(true),
                 tooltip: 'Remove privilege from selected residents',
                 variant: 'outline' as const,
                 disabled: false
@@ -184,7 +222,7 @@ export default function ResidentBulkActions({
     const bulkActions = customBulkActions || defaultBulkActions;
 
     return (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-4 mb-4 animate-in slide-in-from-top-2 duration-300">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 {/* Left side: Selection info */}
                 <div className="flex items-center gap-3">
@@ -195,7 +233,7 @@ export default function ResidentBulkActions({
                             </span>
                         </div>
                         <div>
-                            <span className="font-medium text-sm sm:text-base">
+                            <span className="font-medium text-sm sm:text-base dark:text-gray-200">
                                 {selectedResidents.length} resident(s) selected
                             </span>
                             {selectionMode !== 'page' && selectionMode !== 'none' && (
@@ -209,39 +247,39 @@ export default function ResidentBulkActions({
                     {/* Selection Stats */}
                     {selectionStats && (
                         <div className="hidden sm:flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                            {selectionStats.males && selectionStats.males > 0 && (
+                            {selectionStats.males > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                                     {selectionStats.males} male
                                 </span>
                             )}
-                            {selectionStats.females && selectionStats.females > 0 && (
+                            {selectionStats.females > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-pink-500"></div>
                                     {selectionStats.females} female
                                 </span>
                             )}
-                            {selectionStats.active && selectionStats.active > 0 && (
+                            {selectionStats.active > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
                                     {selectionStats.active} active
                                 </span>
                             )}
-                            {selectionStats.voters && selectionStats.voters > 0 && (
+                            {selectionStats.voters > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                                     {selectionStats.voters} voters
                                 </span>
                             )}
-                            {selectionStats.heads && selectionStats.heads > 0 && (
+                            {selectionStats.heads > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-amber-500"></div>
                                     {selectionStats.heads} heads
                                 </span>
                             )}
-                            {selectionStats.hasPrivileges && selectionStats.hasPrivileges > 0 && (
+                            {selectionStats.hasPrivileges > 0 && (
                                 <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
                                     {selectionStats.hasPrivileges} with privileges
                                 </span>
                             )}
@@ -258,18 +296,20 @@ export default function ResidentBulkActions({
                             size="sm"
                             onClick={onClearSelection}
                             disabled={isPerformingBulkAction}
-                            className="text-xs h-8"
+                            className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                         >
-                            Clear Selection
+                            <X className="h-3.5 w-3.5 mr-1.5" />
+                            Clear
                         </Button>
                         
                         {/* Select All Dropdown */}
-                        <div className="relative group">
+                        <div className="relative" ref={selectMenuRef}>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 disabled={isPerformingBulkAction}
-                                className="text-xs h-8"
+                                onClick={() => setShowSelectMenu(!showSelectMenu)}
+                                className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                             >
                                 {isSelectAll ? (
                                     <>
@@ -283,31 +323,45 @@ export default function ResidentBulkActions({
                                     </>
                                 )}
                             </Button>
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                                <div className="py-1">
-                                    <button
-                                        onClick={onSelectAllOnPage}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                        disabled={isPerformingBulkAction}
-                                    >
-                                        Select Page
-                                    </button>
-                                    <button
-                                        onClick={onSelectAllFiltered}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                        disabled={isPerformingBulkAction}
-                                    >
-                                        Select All Filtered
-                                    </button>
-                                    <button
-                                        onClick={onSelectAll}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                        disabled={isPerformingBulkAction}
-                                    >
-                                        Select All Residents
-                                    </button>
+                            {showSelectMenu && (
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                                    <div className="py-1">
+                                        <button
+                                            onClick={() => {
+                                                onSelectAllOnPage();
+                                                setShowSelectMenu(false);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
+                                            disabled={isPerformingBulkAction}
+                                        >
+                                            <Layers className="h-3.5 w-3.5" />
+                                            Select Page
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                onSelectAllFiltered();
+                                                setShowSelectMenu(false);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
+                                            disabled={isPerformingBulkAction}
+                                        >
+                                            <Filter className="h-3.5 w-3.5" />
+                                            Select All Filtered
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                onSelectAll();
+                                                setShowSelectMenu(false);
+                                            }}
+                                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
+                                            disabled={isPerformingBulkAction}
+                                        >
+                                            <CheckSquare className="h-3.5 w-3.5" />
+                                            Select All Residents
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                     
@@ -322,13 +376,13 @@ export default function ResidentBulkActions({
                                         size="sm"
                                         onClick={action.onClick}
                                         disabled={isPerformingBulkAction || action.disabled}
-                                        className="text-xs h-8"
+                                        className="text-xs h-8 dark:border-gray-600 dark:text-gray-300"
                                     >
                                         {action.icon}
                                         {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>
+                                <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                     <p>{action.tooltip}</p>
                                 </TooltipContent>
                             </Tooltip>
@@ -336,60 +390,73 @@ export default function ResidentBulkActions({
                         
                         {/* Privilege Actions */}
                         {bulkActions.privilege && bulkActions.privilege.length > 0 && (
-                            <div className="relative group">
+                            <div className="relative" ref={privilegeMenuRef}>
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     disabled={isPerformingBulkAction}
-                                    className="text-xs h-8"
+                                    onClick={() => setShowPrivilegeMenu(!showPrivilegeMenu)}
+                                    className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                                 >
                                     <Award className="h-3.5 w-3.5 mr-1.5" />
                                     Privileges
                                 </Button>
-                                <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                                    <div className="py-1">
-                                        {bulkActions.privilege.map((action, index) => (
-                                            <button
-                                                key={`privilege-${index}`}
-                                                onClick={action.onClick}
-                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                                disabled={isPerformingBulkAction || action.disabled}
-                                            >
-                                                {action.icon}
-                                                {action.label}
-                                            </button>
-                                        ))}
+                                {showPrivilegeMenu && (
+                                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                                        <div className="py-1">
+                                            {bulkActions.privilege.map((action, index) => (
+                                                <button
+                                                    key={`privilege-${index}`}
+                                                    onClick={() => {
+                                                        action.onClick();
+                                                        setShowPrivilegeMenu(false);
+                                                    }}
+                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
+                                                    disabled={isPerformingBulkAction || action.disabled}
+                                                >
+                                                    {action.icon}
+                                                    {action.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         )}
                         
                         {/* More Actions Dropdown */}
                         {bulkActions.secondary && bulkActions.secondary.length > 0 && (
-                            <div className="relative group">
+                            <div className="relative" ref={moreMenuRef}>
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     disabled={isPerformingBulkAction}
-                                    className="text-xs h-8"
+                                    onClick={() => setShowMoreMenu(!showMoreMenu)}
+                                    className="text-xs h-8 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
                                 >
-                                    More...
+                                    <Layers className="h-3.5 w-3.5 mr-1.5" />
+                                    More
                                 </Button>
-                                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-                                    <div className="py-1">
-                                        {bulkActions.secondary.map((action, index) => (
-                                            <button
-                                                key={`secondary-${index}`}
-                                                onClick={action.onClick}
-                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                                disabled={isPerformingBulkAction || action.disabled}
-                                            >
-                                                {action.icon}
-                                                {action.label}
-                                            </button>
-                                        ))}
+                                {showMoreMenu && (
+                                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                                        <div className="py-1">
+                                            {bulkActions.secondary.map((action, index) => (
+                                                <button
+                                                    key={`secondary-${index}`}
+                                                    onClick={() => {
+                                                        action.onClick();
+                                                        setShowMoreMenu(false);
+                                                    }}
+                                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 dark:text-gray-300"
+                                                    disabled={isPerformingBulkAction || action.disabled}
+                                                >
+                                                    {action.icon}
+                                                    {action.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         )}
                         
@@ -408,7 +475,7 @@ export default function ResidentBulkActions({
                                         {!isMobile && action.label}
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>
+                                <TooltipContent className="dark:bg-gray-800 dark:text-gray-200">
                                     <p>{action.tooltip}</p>
                                 </TooltipContent>
                             </Tooltip>
@@ -420,28 +487,34 @@ export default function ResidentBulkActions({
             {/* Mobile Stats Summary */}
             {isMobile && selectionStats && (
                 <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
-                    {selectionStats.males && selectionStats.males > 0 && (
+                    {selectionStats.males > 0 && (
                         <span className="flex items-center gap-1">
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                             {selectionStats.males} male
                         </span>
                     )}
-                    {selectionStats.females && selectionStats.females > 0 && (
+                    {selectionStats.females > 0 && (
                         <span className="flex items-center gap-1">
                             <div className="w-2 h-2 rounded-full bg-pink-500"></div>
                             {selectionStats.females} female
                         </span>
                     )}
-                    {selectionStats.active && selectionStats.active > 0 && (
+                    {selectionStats.active > 0 && (
                         <span className="flex items-center gap-1">
                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
                             {selectionStats.active} active
                         </span>
                     )}
-                    {selectionStats.voters && selectionStats.voters > 0 && (
+                    {selectionStats.voters > 0 && (
                         <span className="flex items-center gap-1">
                             <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                             {selectionStats.voters} voters
+                        </span>
+                    )}
+                    {selectionStats.hasPrivileges > 0 && (
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                            {selectionStats.hasPrivileges} with privileges
                         </span>
                     )}
                 </div>

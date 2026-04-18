@@ -26,7 +26,7 @@ import {
     Copy,
     Timer
 } from 'lucide-react';
-import { BulkOperation, SelectionMode, SelectionStats } from '@/types/report-types';
+import { BulkOperation, SelectionMode, SelectionStats } from '@/types/admin/report-types/report-types';
 
 interface ReportTypesBulkActionsProps {
     selectedReportTypes: number[];

@@ -17,34 +17,30 @@ class ResidentIndexController extends BaseResidentController
 {
     public function index(Request $request)
     {
-        // Get all residents for client-side filtering
-        $allResidents = $this->getAllResidents();
-        
-        // Get paginated residents
+        // Get paginated and filtered residents from server
         $residents = $this->getPaginatedResidents($request);
         
         // Calculate statistics
         $stats = $this->calculateStatistics();
         
-        // Get filter data
+        // Get filter data (dropdowns, etc.)
         $puroks = $this->getPuroksForFilter();
         $privileges = $this->getPrivilegesForFilter();
         $civilStatusOptions = $this->getCivilStatusOptions();
         $ageRanges = $this->getAgeRanges();
 
-        Log::info('Residents index response:', [
-            'has_privileges' => !empty($privileges),
-            'privileges_count' => count($privileges),
-            'has_puroks' => !empty($puroks),
-            'puroks_count' => count($puroks),
+        Log::info('Residents index response (Server-Side)', [
+            'total_residents' => $residents->total(),
+            'current_page' => $residents->currentPage(),
+            'filters_applied' => $request->only(['search', 'status', 'purok_id', 'gender']),
         ]);
 
         return Inertia::render('admin/Residents/Index', [
             'residents' => $residents,
-            'allResidents' => $allResidents,
             'filters' => $request->only([
                 'search', 'status', 'purok_id', 'gender', 'min_age', 'max_age',
-                'civil_status', 'is_voter', 'is_head', 'privilege_id', 'privilege', 'sort_by', 'sort_order'
+                'civil_status', 'is_voter', 'is_head', 'privilege_id', 'privilege', 
+                'sort_by', 'sort_order'
             ]),
             'stats' => $stats,
             'puroks' => $puroks,
@@ -54,38 +50,29 @@ class ResidentIndexController extends BaseResidentController
         ]);
     }
 
-    private function getAllResidents(): array
-    {
-        return Resident::with([
-                'householdMemberships.household', 
-                'purok', 
-                'residentPrivileges.privilege'
-            ])
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get()
-            ->map(fn($resident) => $this->formatResident($resident))
-            ->toArray();
-    }
-
     private function getPaginatedResidents(Request $request)
     {
         $query = Resident::with([
                 'householdMemberships.household', 
                 'purok', 
                 'residentPrivileges.privilege'
-            ])
-            ->orderBy('last_name')
-            ->orderBy('first_name');
+            ]);
 
+        // Apply all filters
         $this->applyFilters($query, $request);
+        
+        // Apply sorting
         $this->applySorting($query, $request);
 
-        return $query->paginate(15)->withQueryString();
+        // Paginate and format each resident
+        return $query->paginate(15)
+            ->withQueryString()
+            ->through(fn($resident) => $this->formatResident($resident));
     }
 
     private function applyFilters($query, Request $request)
     {
+        // Search filter
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
@@ -93,6 +80,7 @@ class ResidentIndexController extends BaseResidentController
                   ->orWhere('middle_name', 'like', "%{$search}%")
                   ->orWhere('contact_number', 'like', "%{$search}%")
                   ->orWhere('address', 'like', "%{$search}%")
+                  ->orWhere('resident_id', 'like', "%{$search}%")
                   ->orWhereHas('purok', fn($q) => $q->where('name', 'like', "%{$search}%"))
                   ->orWhereHas('householdMemberships.household', fn($q) => $q->where('household_number', 'like', "%{$search}%"))
                   ->orWhereHas('residentPrivileges.privilege', fn($q) => $q->where('name', 'like', "%{$search}%"))
@@ -100,41 +88,48 @@ class ResidentIndexController extends BaseResidentController
             });
         }
 
+        // Status filter
         if ($request->has('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
 
+        // Purok filter
         if ($request->has('purok_id') && $request->purok_id !== 'all') {
             $query->where('purok_id', $request->purok_id);
         }
 
+        // Gender filter
         if ($request->has('gender') && $request->gender !== 'all') {
             $query->where('gender', $request->gender);
         }
 
+        // Age range filter
         if ($request->has('min_age') && $request->min_age) {
             $query->where('age', '>=', $request->min_age);
         }
-
         if ($request->has('max_age') && $request->max_age) {
             $query->where('age', '<=', $request->max_age);
         }
 
+        // Civil status filter
         if ($request->has('civil_status') && $request->civil_status !== 'all') {
             $query->where('civil_status', $request->civil_status);
         }
 
+        // Voter filter
         if ($request->has('is_voter') && $request->is_voter !== 'all') {
             $isVoter = $request->is_voter === 'yes' || $request->is_voter === '1';
             $query->where('is_voter', $isVoter);
         }
 
+        // Household head filter
         if ($request->has('is_head') && $request->is_head !== 'all') {
             $isHead = $request->is_head === 'yes' || $request->is_head === '1';
             $method = $isHead ? 'whereHas' : 'whereDoesntHave';
             $query->$method('householdMemberships', fn($q) => $q->where('is_head', true));
         }
 
+        // Privilege filter
         if ($request->has('privilege_id') && $request->privilege_id !== 'all') {
             $query->whereHas('residentPrivileges', fn($q) => $q->where('privilege_id', $request->privilege_id));
         }
@@ -149,8 +144,16 @@ class ResidentIndexController extends BaseResidentController
         $sortBy = $request->input('sort_by', 'last_name');
         $sortOrder = $request->input('sort_order', 'asc');
         
-        if (in_array($sortBy, ['first_name', 'last_name', 'age', 'gender', 'civil_status', 'created_at', 'status'])) {
+        // Validate sort field to prevent SQL injection
+        $allowedSortFields = [
+            'first_name', 'last_name', 'age', 'gender', 
+            'civil_status', 'created_at', 'status', 'resident_id'
+        ];
+        
+        if (in_array($sortBy, $allowedSortFields)) {
             $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('last_name', 'asc')->orderBy('first_name', 'asc');
         }
     }
 
@@ -208,62 +211,69 @@ class ResidentIndexController extends BaseResidentController
 
     private function calculateStatistics(): array
     {
-        $allPrivileges = Privilege::where('is_active', true)->get();
-        
-        $stats = [
-            'total' => Resident::count(),
-            'active' => Resident::where('status', 'active')->count(),
-            'newThisMonth' => Resident::whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
-                ->count(),
-            'totalHouseholds' => Household::count(),
-            'avgAge' => round(Resident::avg('age') ?? 0, 1),
-            'maleCount' => Resident::where('gender', 'male')->count(),
-            'femaleCount' => Resident::where('gender', 'female')->count(),
-            'otherCount' => Resident::where('gender', 'other')->count(),
-            'voterCount' => Resident::where('is_voter', true)->count(),
-            'headCount' => HouseholdMember::where('is_head', true)->count(),
-        ];
+        // Cache statistics for 5 minutes to reduce database load
+        return cache()->remember('residents.statistics', 300, function () {
+            $allPrivileges = Privilege::where('is_active', true)->get();
+            
+            $stats = [
+                'total' => Resident::count(),
+                'active' => Resident::where('status', 'active')->count(),
+                'newThisMonth' => Resident::whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year)
+                    ->count(),
+                'totalHouseholds' => Household::count(),
+                'avgAge' => round(Resident::avg('age') ?? 0, 1),
+                'maleCount' => Resident::where('gender', 'male')->count(),
+                'femaleCount' => Resident::where('gender', 'female')->count(),
+                'otherCount' => Resident::where('gender', 'other')->count(),
+                'voterCount' => Resident::where('is_voter', true)->count(),
+                'headCount' => HouseholdMember::where('is_head', true)->count(),
+            ];
 
-        foreach ($allPrivileges as $privilege) {
-            $key = strtolower($privilege->code) . 'Count';
-            $stats[$key] = ResidentPrivilege::where('privilege_id', $privilege->id)->count();
-            $stats['active' . ucfirst($key)] = ResidentPrivilege::where('privilege_id', $privilege->id)
-                ->active()
-                ->count();
-        }
+            foreach ($allPrivileges as $privilege) {
+                $key = strtolower($privilege->code) . 'Count';
+                $stats[$key] = ResidentPrivilege::where('privilege_id', $privilege->id)->count();
+                $stats['active' . ucfirst($key)] = ResidentPrivilege::where('privilege_id', $privilege->id)
+                    ->active()
+                    ->count();
+            }
 
-        return $stats;
+            return $stats;
+        });
     }
 
     private function getPuroksForFilter(): array
     {
-        return Purok::where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn($p) => ['id' => $p->id, 'name' => $p->name])
-            ->values()
-            ->toArray();
+        return cache()->remember('puroks.active', 3600, function () {
+            return Purok::where('status', 'active')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn($p) => ['id' => $p->id, 'name' => $p->name])
+                ->values()
+                ->toArray();
+        });
     }
 
     private function getPrivilegesForFilter(): array
     {
-        return Privilege::where('is_active', true)
-            ->orderBy('name')
-            ->get()
-            ->map(fn($p) => [
-                'id' => $p->id,
-                'name' => $p->name,
-                'code' => $p->code,
-                'description' => $p->description,
-                'discount_percentage' => $p->default_discount_percentage,
-                'requires_id_number' => $p->requires_id_number,
-                'requires_verification' => $p->requires_verification,
-                'validity_years' => $p->validity_years,
-                'category' => $this->getPrivilegeCategory($p),
-            ])
-            ->values()
-            ->toArray();
+        return cache()->remember('privileges.active', 3600, function () {
+            return Privilege::where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(fn($p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'code' => $p->code,
+                    'description' => $p->description,
+                    'discount_percentage' => $p->default_discount_percentage,
+                    'requires_id_number' => $p->requires_id_number,
+                    'requires_verification' => $p->requires_verification,
+                    'validity_years' => $p->validity_years,
+                    'category' => $this->getPrivilegeCategory($p),
+                ])
+                ->values()
+                ->toArray();
+        });
     }
 
     private function getAgeRanges(): array
@@ -275,5 +285,15 @@ class ResidentIndexController extends BaseResidentController
             ['value' => '36-59', 'label' => 'Adults (36-59)', 'min' => 36, 'max' => 59],
             ['value' => '60-150', 'label' => 'Seniors (60+)', 'min' => 60, 'max' => 150],
         ];
+    }
+    
+    // Add this method if you need to clear cache when data changes
+    public function clearCache()
+    {
+        cache()->forget('residents.statistics');
+        cache()->forget('puroks.active');
+        cache()->forget('privileges.active');
+        
+        return response()->json(['message' => 'Cache cleared successfully']);
     }
 }

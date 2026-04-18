@@ -18,6 +18,7 @@ class PurokController extends Controller
     public function index(Request $request)
     {
         $query = Purok::query()
+            ->with(['leader'])
             ->withCount(['households', 'residents'])
             ->orderBy('name');
 
@@ -27,8 +28,11 @@ class PurokController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('leader_name', 'like', "%{$search}%")
-                  ->orWhere('leader_contact', 'like', "%{$search}%")
+                  ->orWhereHas('leader', function ($q) use ($search) {
+                      $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", ["%{$search}%"]);
+                  })
                   ->orWhere('google_maps_url', 'like', "%{$search}%");
             });
         }
@@ -45,6 +49,7 @@ class PurokController extends Controller
                     'name' => $purok->name,
                     'slug' => $purok->slug ?? str($purok->name)->slug(),
                     'description' => $purok->description,
+                    'leader_id' => $purok->leader_id,
                     'leader_name' => $purok->leader_name,
                     'leader_contact' => $purok->leader_contact,
                     'google_maps_url' => $purok->google_maps_url,
@@ -73,10 +78,29 @@ class PurokController extends Controller
     /**
      * Show the form for creating a new purok.
      */
-    public function create()
-    {
-        return Inertia::render('admin/Puroks/Create');
-    }
+   public function create()
+{
+    $residents = Resident::select('id', 'first_name', 'last_name', 'middle_name', 'contact_number', 'email', 'photo_path')
+        ->orderBy('last_name')
+        ->orderBy('first_name')
+        ->get()
+        ->map(function ($resident) {
+            return [
+                'id' => $resident->id,
+                'name' => $resident->full_name,
+                'first_name' => $resident->first_name,
+                'last_name' => $resident->last_name,
+                'middle_name' => $resident->middle_name,
+                'contact_number' => $resident->contact_number,
+                'email' => $resident->email,
+                'photo_url' => $resident->photo_url,
+            ];
+        });
+
+    return Inertia::render('admin/Puroks/Create', [
+        'availableResidents' => $residents,
+    ]);
+}
 
     /**
      * Store a newly created purok.
@@ -86,8 +110,7 @@ class PurokController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100|unique:puroks',
             'description' => 'nullable|string',
-            'leader_name' => 'nullable|string|max:200',
-            'leader_contact' => 'nullable|string|max:20',
+            'leader_id' => 'nullable|exists:residents,id',
             'status' => 'required|in:active,inactive',
             'google_maps_url' => 'nullable|url|max:500',
             'latitude' => 'nullable|numeric|between:-90,90',
@@ -100,7 +123,7 @@ class PurokController extends Controller
                 ->withInput();
         }
 
-        $data = $request->all();
+        $data = $request->except(['leader_name', 'leader_contact']);
         
         // Handle empty google_maps_url
         if (empty($data['google_maps_url'])) {
@@ -128,6 +151,8 @@ class PurokController extends Controller
      */
     public function show(Purok $purok, Request $request)
     {
+        $purok->load(['leader']);
+        
         // Load counts for the purok
         $purok->loadCount(['households', 'residents']);
         
@@ -195,7 +220,7 @@ class PurokController extends Controller
             ]
         ];
 
-        // Transform households for the view - ADD LATITUDE AND LONGITUDE
+        // Transform households for the view
         $householdsData = $households->through(function ($household) {
             $headMember = $household->householdMembers->firstWhere('is_head', true);
             $headOfFamily = 'No head assigned';
@@ -241,8 +266,14 @@ class PurokController extends Controller
                 'name' => $purok->name,
                 'slug' => $purok->slug,
                 'description' => $purok->description,
+                'leader_id' => $purok->leader_id,
                 'leader_name' => $purok->leader_name,
                 'leader_contact' => $purok->leader_contact,
+                'leader' => $purok->leader ? [
+                    'id' => $purok->leader->id,
+                    'full_name' => $purok->leader->full_name,
+                    'contact_number' => $purok->leader->contact_number,
+                ] : null,
                 'google_maps_url' => $purok->google_maps_url,
                 'latitude' => $purok->latitude,
                 'longitude' => $purok->longitude,
@@ -303,28 +334,49 @@ class PurokController extends Controller
     /**
      * Show the form for editing the specified purok.
      */
-    public function edit(Purok $purok)
-    {
-        $purok->loadCount(['households', 'residents']);
-        
-        return Inertia::render('admin/Puroks/Edit', [
-            'purok' => [
-                'id' => $purok->id,
-                'name' => $purok->name,
-                'description' => $purok->description,
-                'leader_name' => $purok->leader_name,
-                'leader_contact' => $purok->leader_contact,
-                'status' => $purok->status,
-                'google_maps_url' => $purok->google_maps_url,
-                'latitude' => $purok->latitude,
-                'longitude' => $purok->longitude,
-                'created_at' => $purok->created_at,
-                'updated_at' => $purok->updated_at,
-                'households_count' => $purok->households_count,
-                'residents_count' => $purok->residents_count,
-            ],
-        ]);
-    }
+   public function edit(Purok $purok)
+{
+    $purok->load(['leader']);
+    
+    $residents = Resident::select('id', 'first_name', 'last_name', 'middle_name', 'contact_number', 'email', 'photo_path')
+        ->orderBy('last_name')
+        ->orderBy('first_name')
+        ->get()
+        ->map(function ($resident) {
+            return [
+                'id' => $resident->id,
+                'name' => $resident->full_name,
+                'first_name' => $resident->first_name,
+                'last_name' => $resident->last_name,
+                'middle_name' => $resident->middle_name,
+                'contact_number' => $resident->contact_number,
+                'email' => $resident->email,
+                'photo_url' => $resident->photo_url,
+            ];
+        });
+    
+    $purok->loadCount(['households', 'residents']);
+    
+    return Inertia::render('admin/Puroks/Edit', [
+        'purok' => [
+            'id' => $purok->id,
+            'name' => $purok->name,
+            'description' => $purok->description,
+            'leader_id' => $purok->leader_id,
+            'leader_name' => $purok->leader_name,
+            'leader_contact' => $purok->leader_contact,
+            'status' => $purok->status,
+            'google_maps_url' => $purok->google_maps_url,
+            'latitude' => $purok->latitude,
+            'longitude' => $purok->longitude,
+            'created_at' => $purok->created_at,
+            'updated_at' => $purok->updated_at,
+            'households_count' => $purok->households_count,
+            'residents_count' => $purok->residents_count,
+        ],
+        'availableResidents' => $residents,
+    ]);
+}
 
     /**
      * Update the specified purok in storage.
@@ -334,8 +386,7 @@ class PurokController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100|unique:puroks,name,' . $purok->id,
             'description' => 'nullable|string',
-            'leader_name' => 'nullable|string|max:200',
-            'leader_contact' => 'nullable|string|max:20',
+            'leader_id' => 'nullable|exists:residents,id',
             'status' => 'required|in:active,inactive',
             'google_maps_url' => 'nullable|url|max:500',
             'latitude' => 'nullable|numeric|between:-90,90',
@@ -348,7 +399,7 @@ class PurokController extends Controller
                 ->withInput();
         }
 
-        $data = $request->all();
+        $data = $request->except(['leader_name', 'leader_contact']);
         
         // Handle empty google_maps_url
         if (empty($data['google_maps_url'])) {

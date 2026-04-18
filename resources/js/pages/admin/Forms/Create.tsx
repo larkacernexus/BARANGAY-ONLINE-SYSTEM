@@ -1,28 +1,41 @@
-// resources/js/Pages/Admin/Forms/Create.tsx
+// pages/admin/forms/create.tsx
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { 
-    ArrowLeft,
-    Save,
-    Upload,
-    FileText,
-    Building,
-    Eye,
-    AlertCircle,
-    CheckCircle,
-    XCircle
-} from 'lucide-react';
-import { Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
-import { PageProps } from '@/types/admin/forms/forms.types';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { FileText, Upload, Settings, Sparkles, RefreshCw, FileArchive, FileImage, FileSpreadsheet, File as FileDocument } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/forms/create/basic-info-tab';
+import { UploadTab } from '@/components/admin/forms/create/upload-tab';
+import { SettingsTab } from '@/components/admin/forms/create/settings-tab';
+import { route } from 'ziggy-js';
+import type { FormFormData, FormsCreateProps } from '@/types/admin/forms/forms.types';
+import { PageProps as InertiaPageProps } from '@inertiajs/core';
 
-// Define categories and agencies as constants (matching the Model)
+// Extend Inertia's PageProps with index signature
+interface PageProps extends InertiaPageProps, FormsCreateProps {
+    [key: string]: unknown;
+}
+
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: FileText, requiredFields: ['title'] },
+    { id: 'upload', label: 'Upload', icon: Upload, requiredFields: ['file'] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
+
+const requiredFieldsMap = {
+    basic: ['title'],
+    upload: ['file'],
+    settings: []
+};
+
 const CATEGORIES = [
     'Social Services',
     'Permits & Licenses',
@@ -50,38 +63,141 @@ const AGENCIES = [
     'Other',
 ];
 
-interface FormData {
-    title: string;
-    description: string;
-    category: string;
-    issuing_agency: string;
-    file: File | null;
-    is_active: boolean;
-}
-
-interface CreateFormProps extends PageProps {
-    // No props needed since we're using constants
-}
-
 export default function CreateForm() {
-    const { data, setData, post, processing, errors, reset } = useForm<FormData>({
-        title: '',
-        description: '',
-        category: '',
-        issuing_agency: '',
-        file: null,
-        is_active: true,
-    });
+    const { props } = usePage<PageProps>();
+    const { categories = [], agencies = [] } = props;
 
+    const [showPreview, setShowPreview] = useState(true);
     const [filePreview, setFilePreview] = useState<{
         name: string;
         size: string;
         type: string;
     } | null>(null);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] || null;
-        setData('file', file);
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm
+    } = useFormManager<FormFormData>({
+        initialData: {
+            title: '',
+            description: '',
+            category: '',
+            issuing_agency: '',
+            file: undefined,
+            is_active: true,
+            is_featured: false,
+            version: '',
+            changelog: '',
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            // Validate before submit
+            const newErrors: Record<string, string> = {};
+            
+            if (!data.title?.trim()) {
+                newErrors.title = 'Form title is required';
+            }
+            if (!data.category) {
+                newErrors.category = 'Category is required';
+            }
+            if (!data.issuing_agency) {
+                newErrors.issuing_agency = 'Issuing agency is required';
+            }
+            if (!data.file) {
+                newErrors.file = 'File is required';
+            } else if (data.file.size > 10 * 1024 * 1024) {
+                newErrors.file = 'File size exceeds 10MB limit';
+            }
+            
+            if (Object.keys(newErrors).length > 0) {
+                setValidationErrors(newErrors);
+                toast.error('Please fix the validation errors');
+                return;
+            }
+            
+            const submitData = new FormData();
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== null && value !== undefined && value !== '') {
+                    if (key === 'file' && value instanceof File) {
+                        submitData.append(key, value);
+                    } else if (typeof value === 'boolean') {
+                        submitData.append(key, value ? '1' : '0');
+                    } else {
+                        submitData.append(key, String(value));
+                    }
+                }
+            });
+
+            router.post(route('admin.forms.store'), submitData, {
+                onSuccess: () => {
+                    toast.success('Form uploaded successfully');
+                    router.visit(route('admin.forms.index'));
+                },
+                onError: (errs) => {
+                    setValidationErrors(errs);
+                    toast.error('Failed to upload form');
+                }
+            });
+        }
+    });
+
+    // Combine errors from server and validation
+    const allErrors = { ...errors, ...validationErrors };
+
+    // Format file size
+    const formatFileSize = useCallback((bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }, []);
+
+    // Get file icon component
+    const getFileIconComponent = useCallback((type: string) => {
+        if (type.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
+        if (type.includes('word') || type.includes('doc')) return <FileText className="h-5 w-5 text-blue-500" />;
+        if (type.includes('excel') || type.includes('sheet')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+        if (type.includes('image')) return <FileImage className="h-5 w-5 text-purple-500" />;
+        if (type.includes('zip') || type.includes('rar')) return <FileArchive className="h-5 w-5 text-amber-500" />;
+        return <FileDocument className="h-5 w-5 text-gray-500" />;
+    }, []);
+
+    // Handle file change
+    const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] || undefined;
+        
+        if (file && file.size > 10 * 1024 * 1024) {
+            toast.error('File size exceeds 10MB limit');
+            setValidationErrors(prev => ({ ...prev, file: 'File size exceeds 10MB limit' }));
+            return;
+        }
+        
+        updateFormData({ file });
+        
+        // Clear validation error if exists
+        if (validationErrors.file) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors.file;
+                return newErrors;
+            });
+        }
         
         if (file) {
             setFilePreview({
@@ -89,516 +205,333 @@ export default function CreateForm() {
                 size: formatFileSize(file.size),
                 type: file.type,
             });
+            toast.success(`File "${file.name}" selected`);
         } else {
             setFilePreview(null);
         }
-    };
+    }, [formatFileSize, updateFormData, validationErrors]);
 
-    const formatFileSize = (bytes: number): string => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        if (!data.file) {
-            alert('Please select a file to upload');
-            return;
-        }
-
-        post('/admin/forms', {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                reset();
-                setFilePreview(null);
-            },
-        });
-    };
-
-    const clearForm = () => {
-        reset({
-            title: '',
-            description: '',
-            category: '',
-            issuing_agency: '',
-            file: null,
-            is_active: true,
-        } as any);
+    // Clear file
+    const clearFile = useCallback(() => {
+        updateFormData({ file: undefined });
         setFilePreview(null);
+        toast.info('File removed');
+    }, [updateFormData]);
+
+    // Trigger file input
+    const triggerFileInput = useCallback(() => {
+        document.getElementById('file')?.click();
+    }, []);
+
+    // Apply template
+    const applyTemplate = useCallback((template: 'barangay_clearance' | 'medical_assistance' | 'indigency') => {
+        switch (template) {
+            case 'barangay_clearance':
+                updateFormData({
+                    title: 'Barangay Clearance Application Form',
+                    description: 'Official application form for Barangay Clearance. Required for employment, business permits, and other government transactions.',
+                    category: 'Permits & Licenses',
+                    issuing_agency: 'LGU',
+                });
+                toast.success('Barangay Clearance template applied');
+                break;
+            case 'medical_assistance':
+                updateFormData({
+                    title: 'Medical Assistance Application Form',
+                    description: 'Application form for medical assistance from the barangay. For residents needing financial support for medical expenses.',
+                    category: 'Health & Medical',
+                    issuing_agency: 'LGU',
+                });
+                toast.success('Medical Assistance template applied');
+                break;
+            case 'indigency':
+                updateFormData({
+                    title: 'Certificate of Indigency Application',
+                    description: 'Application form for Certificate of Indigency. Required for social services and government assistance programs.',
+                    category: 'Social Services',
+                    issuing_agency: 'DSWD',
+                });
+                toast.success('Certificate of Indigency template applied');
+                break;
+        }
+        // Clear validation errors for these fields
+        setValidationErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.title;
+            delete newErrors.category;
+            delete newErrors.issuing_agency;
+            return newErrors;
+        });
+    }, [updateFormData]);
+
+    // Handle reset
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
+            resetForm();
+            setFilePreview(null);
+            setValidationErrors({});
+            toast.info('Form reset');
+        }
+    }, [resetForm]);
+
+    // Handle cancel
+    const handleCancel = useCallback(() => {
+        if (formData.title || formData.file) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.forms.index'));
+            }
+        } else {
+            router.visit(route('admin.forms.index'));
+        }
+    }, [formData]);
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        upload: getTabStatus('upload'),
+        settings: getTabStatus('settings')
     };
 
-    const getFileIcon = (type: string) => {
-        if (type.includes('pdf')) return '📄';
-        if (type.includes('word') || type.includes('doc')) return '📝';
-        if (type.includes('excel') || type.includes('sheet')) return '📊';
-        if (type.includes('image')) return '🖼️';
-        return '📎';
-    };
+    const missingFields = getMissingFields();
 
-    const isFormValid = () => {
-        return data.title.trim() !== '' && data.file !== null;
-    };
+    const requiredFieldsList = [
+        { label: 'Form Title', value: !!formData.title, tabId: 'basic' },
+        { label: 'File Upload', value: !!formData.file, tabId: 'upload' },
+    ];
 
-    const requiredFields = ['title', 'file'];
-    const completedRequired = requiredFields.filter(field => {
-        if (field === 'file') return data.file !== null;
-        if (field === 'title') return data.title.trim() !== '';
-        return false;
-    }).length;
-
-    const progressPercentage = Math.round((completedRequired / requiredFields.length) * 100);
-
-    const handleCategoryChange = (value: string) => {
-        setData('category', value);
-    };
-
-    const handleAgencyChange = (value: string) => {
-        setData('issuing_agency', value);
-    };
+    const tabOrder = ['basic', 'upload', 'settings'];
 
     return (
         <AppLayout
-            title="Upload New Form"
+            title="Upload Form"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Forms', href: '/admin/forms' },
-                { title: 'Upload New Form', href: '/admin/forms/create' }
+                { title: 'Upload', href: '/admin/forms/create' }
             ]}
         >
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href="/admin/forms">
-                            <Button variant="ghost" size="sm" className="dark:text-gray-300 dark:hover:bg-gray-900">
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back to Forms
-                            </Button>
-                        </Link>
-                        <div>
-                            <h1 className="text-3xl font-bold tracking-tight dark:text-gray-100">Upload New Form</h1>
-                            <p className="text-gray-500 dark:text-gray-400">
-                                Add downloadable forms for residents
+                <FormHeader
+                    title="Upload Form"
+                    description="Add downloadable forms for residents"
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Reset
+                            </button>
+                        </div>
+                    }
+                />
+
+                {/* Quick Templates Card */}
+                <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-3">
+                        <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                        <div className="flex-1">
+                            <h3 className="font-medium text-blue-800 dark:text-blue-300">Quick start with templates</h3>
+                            <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                                Choose from common form templates to get started quickly.
                             </p>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                                <button
+                                    type="button"
+                                    onClick={() => applyTemplate('barangay_clearance')}
+                                    className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Barangay Clearance
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyTemplate('medical_assistance')}
+                                    className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Medical Assistance
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyTemplate('indigency')}
+                                    className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                >
+                                    <FileText className="h-3 w-3" />
+                                    Certificate of Indigency
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Error Messages */}
-                {Object.keys(errors).length > 0 && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
-                        <div className="flex items-center gap-2 mb-2">
-                            <AlertCircle className="h-5 w-5" />
-                            <p className="font-bold">Please fix the following errors:</p>
-                        </div>
-                        <ul className="list-disc list-inside mt-2 space-y-1">
-                            {Object.entries(errors).map(([field, error]) => (
-                                <li key={field}><strong>{field.replace('_', ' ')}:</strong> {error}</li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
+                <FormErrors errors={allErrors} />
 
-                <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-3">
-                    {/* Left Column - Form Details */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Basic Information */}
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                    <FileText className="h-5 w-5" />
-                                    Form Information
-                                </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Basic details about the form
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="title" className="dark:text-gray-300">
-                                        Form Title <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input 
-                                        id="title" 
-                                        placeholder="e.g., DSWD Medical Assistance Application Form"
-                                        required 
-                                        value={data.title}
-                                        onChange={(e) => setData('title', e.target.value)}
-                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer title="Form Information" description="Enter the basic details for this form">
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        categories={CATEGORIES}
+                                        agencies={AGENCIES}
+                                        onInputChange={handleInputChange}
+                                        onSelectChange={handleSelectChange}
+                                        isSubmitting={isSubmitting}
                                     />
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Descriptive title for the form
-                                    </p>
-                                    {errors.title && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.title}</p>
-                                    )}
-                                </div>
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.title && !!formData.file}
+                                    showPrevious={false}
+                                    nextLabel="Next: Upload"
+                                />
+                            </>
+                        )}
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="description" className="dark:text-gray-300">Description (Optional)</Label>
-                                    <Textarea 
-                                        id="description" 
-                                        placeholder="Brief description of what this form is for..."
-                                        rows={4}
-                                        value={data.description}
-                                        onChange={(e) => setData('description', e.target.value)}
-                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
+                        {activeTab === 'upload' && (
+                            <>
+                                <FormContainer title="File Upload" description="Upload the form file (PDF, Word, Excel, or Image)">
+                                    <UploadTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        filePreview={filePreview}
+                                        onFileChange={handleFileChange}
+                                        onClearFile={clearFile}
+                                        onTriggerFileInput={triggerFileInput}
+                                        getFileIcon={getFileIconComponent}
+                                        formatFileSize={formatFileSize}
+                                        isSubmitting={isSubmitting}
                                     />
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Explain the purpose and usage of this form
-                                    </p>
-                                </div>
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.title && !!formData.file}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
 
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="category" className="dark:text-gray-300">Category (Optional)</Label>
-                                        <Select 
-                                            value={data.category || undefined}
-                                            onValueChange={handleCategoryChange}
-                                        >
-                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                <SelectValue placeholder="Select category">
-                                                    {data.category || "Select category"}
-                                                </SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <SelectItem value="uncategorized" className="dark:text-gray-300 dark:focus:bg-gray-700">Uncategorized</SelectItem>
-                                                {CATEGORIES.map((category) => (
-                                                    <SelectItem key={category} value={category} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                        {category}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="issuing_agency" className="dark:text-gray-300">Issuing Agency (Optional)</Label>
-                                        <Select 
-                                            value={data.issuing_agency || undefined}
-                                            onValueChange={handleAgencyChange}
-                                        >
-                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                <SelectValue placeholder="Select agency">
-                                                    {data.issuing_agency || "Select agency"}
-                                                </SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <SelectItem value="not_specified" className="dark:text-gray-300 dark:focus:bg-gray-700">Not specified</SelectItem>
-                                                {AGENCIES.map((agency) => (
-                                                    <SelectItem key={agency} value={agency} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                        <div className="flex items-center gap-2">
-                                                            <Building className="h-4 w-4" />
-                                                            {agency}
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* File Upload */}
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                    <Upload className="h-5 w-5" />
-                                    File Upload
-                                </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Upload the form file (PDF, Word, Excel, or Image)
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="file" className="dark:text-gray-300">
-                                        Form File <span className="text-red-500">*</span>
-                                    </Label>
-                                    <div className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
-                                        data.file 
-                                            ? 'border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-900/10' 
-                                            : 'border-gray-300 dark:border-gray-700'
-                                    }`}>
-                                        <div className="flex flex-col items-center justify-center text-center">
-                                            <Upload className="h-12 w-12 text-gray-400 dark:text-gray-500 mb-4" />
-                                            <div className="space-y-2">
-                                                <p className="text-sm font-medium dark:text-gray-300">
-                                                    {data.file ? 'File Selected' : 'Upload form file'}
-                                                </p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    PDF, Word, Excel, or Image files up to 10MB
-                                                </p>
-                                            </div>
-                                            <Input
-                                                id="file"
-                                                name="file"
-                                                type="file"
-                                                className="hidden"
-                                                onChange={handleFileChange}
-                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant={data.file ? "outline" : "default"}
-                                                className="mt-4 dark:border-gray-600 dark:text-gray-300"
-                                                onClick={() => document.getElementById('file')?.click()}
-                                            >
-                                                {data.file ? 'Change File' : 'Choose File'}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {errors.file && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.file}</p>
-                                    )}
-                                </div>
-
-                                {filePreview && (
-                                    <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-2xl">
-                                                    {getFileIcon(filePreview.type)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium dark:text-gray-100">{filePreview.name}</p>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                        {filePreview.size} • {filePreview.type}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setData('file', null);
-                                                    setFilePreview(null);
-                                                }}
-                                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
-                                            >
-                                                Remove
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
-                                    <div className="flex items-start gap-3">
-                                        <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                                        <div className="text-sm text-blue-700 dark:text-blue-300">
-                                            <p className="font-medium">Important Notes:</p>
-                                            <ul className="list-disc list-inside mt-1 space-y-1">
-                                                <li>Only upload forms from legitimate government agencies</li>
-                                                <li>Ensure forms are the latest version</li>
-                                                <li>Files should be readable and not corrupted</li>
-                                                <li>Maximum file size: 10MB</li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Form Settings" description="Configure form visibility and access">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        onSwitchChange={(name, checked) => updateFormData({ [name]: checked })}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.title && !!formData.file}
+                                    previousLabel="Back: Upload"
+                                    showNext={false}
+                                    submitLabel="Upload Form"
+                                />
+                            </>
+                        )}
                     </div>
 
-                    {/* Right Column - Preview & Actions */}
-                    <div className="space-y-6">
-                        {/* Progress & Actions */}
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="dark:text-gray-100">Upload Progress</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="dark:text-gray-400">Required fields</span>
-                                        <span className="font-medium dark:text-gray-300">
-                                            {completedRequired}/{requiredFields.length}
-                                        </span>
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled && !!formData.title && !!formData.file}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* Form Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Form Summary</h3>
                                     </div>
-                                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full rounded-full transition-all duration-300 ${
-                                                progressPercentage === 100 ? 'bg-green-500 dark:bg-green-600' : 'bg-blue-500 dark:bg-blue-600'
-                                            }`}
-                                            style={{ width: `${progressPercentage}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3 pt-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <Label htmlFor="is_active" className="dark:text-gray-300">Active Status</Label>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                Visible to residents when active
-                                            </p>
-                                        </div>
-                                        <Switch 
-                                            id="is_active"
-                                            checked={data.is_active}
-                                            onCheckedChange={(checked) => {
-                                                setData('is_active', checked);
-                                            }}
-                                            className="dark:data-[state=checked]:bg-green-600"
-                                        />
-                                    </div>
-
-                                    <div className="pt-4 border-t dark:border-gray-700">
-                                        <Button 
-                                            type="submit"
-                                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
-                                            disabled={processing || !isFormValid()}
-                                        >
-                                            <Save className="h-4 w-4 mr-2" />
-                                            {processing ? 'Uploading...' : 'Upload Form'}
-                                        </Button>
-                                        
-                                        <Button 
-                                            type="button"
-                                            variant="outline"
-                                            className="w-full mt-2 dark:border-gray-600 dark:text-gray-300"
-                                            onClick={clearForm}
-                                        >
-                                            Clear Form
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Preview */}
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                    <Eye className="h-5 w-5" />
-                                    Preview
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="border rounded-lg p-4 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-gray-100 dark:bg-gray-900 rounded">
-                                                {filePreview ? getFileIcon(filePreview.type) : '📎'}
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center">
+                                                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                             </div>
-                                            <div>
-                                                <p className="font-medium dark:text-gray-100">
-                                                    {data.title || 'Form Title'}
-                                                </p>
-                                                <div className="flex flex-wrap gap-2 mt-1">
-                                                    {data.category && data.category !== 'uncategorized' && (
-                                                        <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded">
-                                                            {data.category}
-                                                        </span>
-                                                    )}
-                                                    {data.issuing_agency && data.issuing_agency !== 'not_specified' && (
-                                                        <span className="text-xs bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-1 rounded">
-                                                            {data.issuing_agency}
-                                                        </span>
-                                                    )}
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.title || <span className="text-gray-400 italic">Untitled Form</span>}
                                                 </div>
+                                                {formData.category && (
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                        {formData.category}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        
-                                        {data.description && (
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 border-t dark:border-gray-700 pt-3">
-                                                {data.description}
-                                            </p>
+
+                                        <div className="space-y-2 text-sm">
+                                            {formData.issuing_agency && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 dark:text-gray-400">Agency:</span>
+                                                    <span className="font-medium dark:text-gray-300">{formData.issuing_agency}</span>
+                                                </div>
+                                            )}
+                                            {filePreview && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 dark:text-gray-400">File:</span>
+                                                    <span className="font-medium dark:text-gray-300 truncate">{filePreview.name}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between pt-2 border-t dark:border-gray-700">
+                                                <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                                <span className={`font-medium ${
+                                                    formData.is_active 
+                                                        ? 'text-green-600 dark:text-green-400' 
+                                                        : 'text-gray-500 dark:text-gray-400'
+                                                }`}>
+                                                    {formData.is_active ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {formData.description && (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3">
+                                                    {formData.description}
+                                                </p>
+                                            </div>
                                         )}
-                                        
-                                        <div className="flex items-center justify-between pt-3 border-t dark:border-gray-700">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                Downloads: 0
-                                            </span>
-                                            <span className={`text-xs px-2 py-1 rounded ${
-                                                data.is_active 
-                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                                            }`}>
-                                                {data.is_active ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </div>
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Requirements Checklist */}
-                        <Card className="dark:bg-gray-900">
-                            <CardHeader>
-                                <CardTitle className="text-sm dark:text-gray-100">Requirements Checklist</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            {data.title ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
-                                            ) : (
-                                                <XCircle className="h-4 w-4 text-gray-300 dark:text-gray-600" />
-                                            )}
-                                            <span className="dark:text-gray-300">Form Title</span>
-                                        </div>
-                                        <span className={`font-medium ${data.title ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
-                                            {data.title ? '✓' : 'Required'}
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            {data.file ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
-                                            ) : (
-                                                <XCircle className="h-4 w-4 text-gray-300 dark:text-gray-600" />
-                                            )}
-                                            <span className="dark:text-gray-300">File Uploaded</span>
-                                        </div>
-                                        <span className={`font-medium ${data.file ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {data.file ? '✓' : 'Required'}
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            {data.file && data.file.size <= 10 * 1024 * 1024 ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
-                                            ) : data.file ? (
-                                                <XCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
-                                            ) : (
-                                                <div className="h-4 w-4" />
-                                            )}
-                                            <span className="dark:text-gray-300">File size ≤ 10MB</span>
-                                        </div>
-                                        <span className={`font-medium ${
-                                            data.file 
-                                                ? (data.file.size <= 10 * 1024 * 1024 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')
-                                                : 'text-gray-400 dark:text-gray-500'
-                                        }`}>
-                                            {data.file ? formatFileSize(data.file.size) : '-'}
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="pt-3 border-t dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
-                                        <p className="font-medium mb-1">Supported file types:</p>
-                                        <div className="grid grid-cols-2 gap-1">
-                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">PDF (.pdf)</span>
-                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">Word (.doc/.docx)</span>
-                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">Excel (.xls/.xlsx)</span>
-                                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-900 rounded">Images (.jpg/.png)</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </AppLayout>
     );

@@ -846,7 +846,7 @@ export default function ClearanceTypesIndex() {
                                 )}
                             </Button>
                             <Button asChild>
-                                <a href="/admin/clearance-types/create">
+                                <a href="/admin/clearance-types/clearance-types/create">
                                     <FileText className="h-4 w-4 mr-2" />
                                     Add Type
                                 </a>

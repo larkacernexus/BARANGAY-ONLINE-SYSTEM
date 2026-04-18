@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Resident;
 use App\Models\Resident;
 use App\Models\Purok;
 use App\Models\Privilege;
+use App\Models\DiscountType;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -15,16 +16,24 @@ class ResidentEditController extends BaseResidentController
     {
         $resident->load([
             'purok',
-            'residentPrivileges.privilege',
+            'residentPrivileges.privilege.discountType', // Load discount type through privilege
             'householdMemberships.household',
         ]);
 
         $currentMembership = $resident->householdMemberships()->first();
         $householdRelation = $currentMembership ? $currentMembership->household : null;
 
-        $allPrivileges = Privilege::where('is_active', true)
+        // Get all active privileges with their discount types loaded
+        $allPrivileges = Privilege::with('discountType')
+            ->active()
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'description', 'default_discount_percentage', 'requires_id_number', 'requires_verification', 'validity_years']);
+            ->get([
+                'id', 
+                'name', 
+                'code', 
+                'description', 
+                'discount_type_id'
+            ]);
 
         $residentData = $this->formatResidentData($resident, $householdRelation);
 
@@ -67,15 +76,27 @@ class ResidentEditController extends BaseResidentController
             'photo_url' => $resident->photo_url,
             'privileges' => $resident->residentPrivileges->map(fn($rp) => [
                 'privilege_id' => $rp->privilege_id,
+                'privilege' => $rp->privilege ? [
+                    'id' => $rp->privilege->id,
+                    'name' => $rp->privilege->name,
+                    'code' => $rp->privilege->code,
+                    'discount_percentage' => $rp->privilege->discount_percentage,
+                    'requires_verification' => $rp->privilege->requires_verification,
+                    'requires_id_number' => $rp->privilege->requires_id_number,
+                    'validity_days' => $rp->privilege->validity_days,
+                ] : null,
                 'id_number' => $rp->id_number,
                 'verified_at' => $rp->verified_at?->format('Y-m-d'),
                 'expires_at' => $rp->expires_at?->format('Y-m-d'),
                 'remarks' => $rp->remarks,
-                'discount_percentage' => $rp->discount_percentage,
+                'discount_percentage' => $rp->discount_percentage ?? $rp->privilege?->discount_percentage,
             ]),
             'created_at' => $resident->created_at->toISOString(),
             'updated_at' => $resident->updated_at->toISOString(),
-            'purok' => $resident->purok,
+            'purok' => $resident->purok ? [
+                'id' => $resident->purok->id,
+                'name' => $resident->purok->name,
+            ] : null,
             'household_relation' => $householdRelation ? [
                 'id' => $householdRelation->id,
                 'household_number' => $householdRelation->household_number,

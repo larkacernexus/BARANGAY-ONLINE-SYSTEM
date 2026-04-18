@@ -5,7 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, FilterX, Search, X, Filter } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Download, FilterX, Search, X, Filter, Layers, TrendingUp, FolderOpen, AlertCircle } from 'lucide-react';
 import { route } from 'ziggy-js';
 
 import type { FilterState } from '@/types/admin/fee-types/fee.types';
@@ -50,24 +58,62 @@ export default function FeeTypesFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
+    // Helper to get active filter count
+    const getActiveFilterCount = () => {
+        let count = 0;
+        if (filtersState.category && filtersState.category !== 'all') count++;
+        if (filtersState.status && filtersState.status !== 'all') count++;
+        if (search) count++;
+        return count;
+    };
+
+    const activeFilterCount = getActiveFilterCount();
+
     // Get category display name
     const getCategoryDisplayName = (categoryId: string): string => {
         if (categoryId === 'all') return '';
         return categories[categoryId] || categoryId;
     };
 
+    // Get category with count
+    const getCategoryWithCount = (categoryId: string): string => {
+        const name = categories[categoryId] || categoryId;
+        const count = categoryCounts[categoryId] || 0;
+        return `${name} (${count})`;
+    };
+
+    // Get status color
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'active': return 'emerald';
+            case 'inactive': return 'gray';
+            default: return 'gray';
+        }
+    };
+
+    // Get status label
+    const getStatusLabel = (value: string) => {
+        switch (value) {
+            case 'active': return 'Active';
+            case 'inactive': return 'Inactive';
+            default: return value;
+        }
+    };
+
     return (
-        <Card className="overflow-hidden border shadow-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-            <CardContent className="pt-6">
-                <div className="flex flex-col space-y-4">
-                    {/* Search Bar */}
+        <Card className="overflow-hidden border-0 shadow-xl bg-white dark:bg-gray-900 rounded-2xl">
+            <CardContent className="p-6 md:p-7">
+                <div className="flex flex-col space-y-6">
+                    {/* Search Bar - Enhanced */}
                     <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
+                        <div className="flex-1 relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                                <Search className="h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-indigo-500 dark:group-focus-within:text-indigo-400 transition-colors" />
+                            </div>
                             <Input
                                 ref={searchInputRef}
                                 placeholder="Search fee types by code, name, description, or category... (Ctrl+F)"
-                                className="pl-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                                className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 disabled={isLoading}
@@ -76,31 +122,36 @@ export default function FeeTypesFilters({
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    className="absolute right-1.5 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                                     onClick={() => setSearch('')}
                                 >
-                                    <X className="h-3 w-3" />
+                                    <X className="h-3.5 w-3.5" />
                                 </Button>
                             )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2.5">
                             <Button 
                                 variant="outline" 
                                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all shadow-sm"
                                 disabled={isLoading}
                             >
                                 <Filter className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">
+                                <span className="hidden sm:inline font-medium">
                                     {showAdvancedFilters ? 'Hide Filters' : 'More Filters'}
                                 </span>
                                 <span className="sm:hidden">
                                     {showAdvancedFilters ? 'Hide' : 'Filters'}
                                 </span>
+                                {!showAdvancedFilters && activeFilterCount > 0 && (
+                                    <Badge variant="secondary" className="ml-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full px-1.5 py-0 text-xs">
+                                        +{activeFilterCount}
+                                    </Badge>
+                                )}
                             </Button>
                             <Button 
                                 variant="outline"
-                                className="h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                className="h-10 px-4 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 rounded-xl transition-all shadow-sm"
                                 onClick={() => {
                                     const exportUrl = route('fee-types.export', {
                                         search: search || undefined,
@@ -112,81 +163,135 @@ export default function FeeTypesFilters({
                                 disabled={totalItems === 0 || isLoading}
                             >
                                 <Download className="h-4 w-4 mr-2" />
-                                <span className="hidden sm:inline">Export</span>
+                                <span className="hidden sm:inline font-medium">Export</span>
                             </Button>
                         </div>
                     </div>
 
-                    {/* Active Filters Info and Clear Button */}
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                            Showing {startIndex + 1} to {Math.min(endIndex, totalItems)} of {totalItems} fee types
-                            {search && ` matching "${search}"`}
+                    {/* Results Info & Active Filters Bar */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 px-3.5 py-1.5 rounded-lg">
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{startIndex + 1}-{Math.min(endIndex, totalItems)}</span>
+                            <span className="mx-1">of</span>
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{totalItems}</span>
+                            <span className="ml-1">fee types</span>
+                            {search && (
+                                <span className="ml-1">
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                </span>
+                            )}
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Active filter badges */}
+                            {activeFilters && (
+                                <>
+                                    {filtersState.category && filtersState.category !== 'all' && (
+                                        <Badge variant="secondary" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0 rounded-full px-3 py-1 text-xs font-medium shadow-sm">
+                                            <FolderOpen className="h-3 w-3 mr-1.5 inline" />
+                                            Category: {getCategoryWithCount(filtersState.category)}
+                                        </Badge>
+                                    )}
+                                    {filtersState.status && filtersState.status !== 'all' && (
+                                        <Badge variant="secondary" className={`${
+                                            getStatusColor(filtersState.status) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                            'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                        } border-0 rounded-full px-3 py-1 text-xs font-medium shadow-sm`}>
+                                            <AlertCircle className="h-3 w-3 mr-1.5 inline" />
+                                            Status: {getStatusLabel(filtersState.status)}
+                                        </Badge>
+                                    )}
+                                </>
+                            )}
+                            
                             {activeFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleClearFilters}
                                     disabled={isLoading}
-                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-8 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                    className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 h-7 px-2.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-medium"
                                 >
-                                    <FilterX className="h-3.5 w-3.5 mr-1" />
-                                    Clear Filters
+                                    <FilterX className="h-3 w-3 mr-1.5" />
+                                    Clear all
                                 </Button>
                             )}
                         </div>
                     </div>
 
-                    {/* Basic Filters */}
-                    <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Category</Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                    {/* Basic Filters - Modern Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-2 gap-4 pt-1">
+                        {/* Category Filter */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <FolderOpen className="h-3 w-3" />
+                                Category
+                            </Label>
+                            <Select
                                 value={filtersState.category}
-                                onChange={(e) => updateFilter('category', e.target.value)}
+                                onValueChange={(value) => updateFilter('category', value)}
                                 disabled={isLoading}
                             >
-                                <option value="all">All Categories</option>
-                                {Object.entries(categories).map(([id, name]) => (
-                                    <option key={id} value={id}>
-                                        {name} ({categoryCounts[id] || 0})
-                                    </option>
-                                ))}
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:ring-indigo-500 focus:ring-2 transition-all">
+                                    <SelectValue placeholder="All Categories" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                    <SelectItem value="all">All Categories</SelectItem>
+                                    {Object.entries(categories).map(([id, name]) => (
+                                        <SelectItem key={id} value={id}>
+                                            <span className="flex items-center justify-between w-full">
+                                                <span>{name}</span>
+                                                <span className="text-xs text-gray-400 ml-2">({categoryCounts[id] || 0})</span>
+                                            </span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label className="text-xs text-gray-500 dark:text-gray-400">Status</Label>
-                            <select
-                                className="w-full border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                        {/* Status Filter */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <AlertCircle className="h-3 w-3" />
+                                Status
+                            </Label>
+                            <Select
                                 value={filtersState.status}
-                                onChange={(e) => updateFilter('status', e.target.value)}
+                                onValueChange={(value) => updateFilter('status', value)}
                                 disabled={isLoading}
                             >
-                                <option value="all">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
+                                <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm transition-all">
+                                    <SelectValue placeholder="All Status" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                    <SelectItem value="all">All Status</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="inactive">Inactive</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 
-                    {/* Advanced Filters */}
+                    {/* Advanced Filters - Modern Accordion Style */}
                     {showAdvancedFilters && (
-                        <div className="border-t pt-4 space-y-4 border-gray-200 dark:border-gray-800">
-                            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Advanced Filters</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="border-t border-gray-100 dark:border-gray-800 pt-6 mt-2 space-y-6">
+                            <div className="flex items-center gap-2.5">
+                                <div className="h-5 w-1 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
+                                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wide">Advanced Filters</h3>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Quick Actions */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Quick Actions</Label>
-                                    <div className="flex flex-wrap gap-2">
+                                <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-4 rounded-xl">
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <TrendingUp className="h-4 w-4 text-amber-500" />
+                                        Quick Actions
+                                    </Label>
+                                    <div className="flex flex-wrap gap-2.5">
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
                                             onClick={() => {
                                                 updateFilter('status', 'active');
                                                 setShowAdvancedFilters(false);
@@ -198,7 +303,7 @@ export default function FeeTypesFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
                                             onClick={() => {
                                                 updateFilter('status', 'inactive');
                                                 setShowAdvancedFilters(false);
@@ -210,7 +315,7 @@ export default function FeeTypesFilters({
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="text-xs"
+                                            className="text-xs rounded-lg border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
                                             onClick={() => {
                                                 updateFilter('category', 'all');
                                                 updateFilter('status', 'all');
@@ -223,13 +328,17 @@ export default function FeeTypesFilters({
                                     </div>
                                 </div>
 
-                                {/* Information */}
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Information</Label>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                                        <p>• Fee types can be assigned to clearance types</p>
-                                        <p>• Categories help organize fee types</p>
-                                        <p>• Inactive fee types won't appear in selections</p>
+                                {/* Information Section */}
+                                <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-4 rounded-xl">
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                        <Layers className="h-4 w-4 text-indigo-500" />
+                                        Fee Type Information
+                                    </Label>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1.5">
+                                        <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Fee types</span> can be assigned to clearance types</p>
+                                        <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Categories</span> help organize fee types</p>
+                                        <p>• <span className="font-medium text-gray-700 dark:text-gray-300">Inactive fee types</span> won't appear in selections</p>
+                                        <p>• Use the table header to sort by any column</p>
                                     </div>
                                 </div>
                             </div>
@@ -237,9 +346,10 @@ export default function FeeTypesFilters({
                     )}
                 </div>
                 
-                {/* Loading indicator */}
+                {/* Loading indicator - Modern */}
                 {isLoading && (
-                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 animate-pulse">
+                    <div className="mt-3 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                         Updating...
                     </div>
                 )}

@@ -4,34 +4,14 @@ import {
     FileText, 
     DollarSign, 
     CreditCard, 
-    Calendar,
-    AlertCircle,
-    CheckCircle,
-    Clock,
-    Percent
+    Percent,
+    CheckCircle
 } from 'lucide-react';
 import { StatCard } from '@/components/adminui/stats-grid';
-
-interface FilteredStats {
-    total: number;
-    active: number;
-    inactive: number;
-    totalAmount: number;
-    averageAmount: number;
-    overdue: number;
-    pending: number;
-    paid: number;
-    issued: number;
-    partially_paid: number;
-    cancelled: number;
-    refunded: number;
-    residentCount: number;
-    businessCount: number;
-    householdCount: number;
-}
+import { Stats } from '@/types/admin/fees/fees';
 
 interface FeesStatsProps {
-    stats: FilteredStats;
+    stats: Stats;
 }
 
 const formatCurrency = (amount: number) => {
@@ -43,53 +23,47 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function FeesStats({ stats }: FeesStatsProps) {
-    // Safe stats with fallbacks
-    const safeStats = {
-        total: stats?.total || 0,
-        totalAmount: stats?.totalAmount || 0,
-        paid: stats?.paid || 0,
-        pending: stats?.pending || 0,
-        issued: stats?.issued || 0,
-        overdue: stats?.overdue || 0,
-        partially_paid: stats?.partially_paid || 0,
-        active: stats?.active || 0,
-        inactive: stats?.inactive || 0,
-        cancelled: stats?.cancelled || 0,
-        refunded: stats?.refunded || 0,
-        residentCount: stats?.residentCount || 0,
-        businessCount: stats?.businessCount || 0,
-        householdCount: stats?.householdCount || 0
-    };
+    // Extract values safely from the Stats interface
+    const total = stats?.total || 0;
+    const totalAmount = stats?.total_amount || 0;
+    const paid = stats?.status_counts?.paid || 0;
+    const pending = stats?.status_counts?.pending || stats?.pending || 0;
+    const issued = stats?.issued_count || 0;
+    const overdue = stats?.overdue_count || 0;
+    const collected = stats?.collected || paid || 0;
+    const active = stats?.active || 0;
+    const inactive = stats?.inactive || 0;
+    const partiallyPaid = stats?.partially_paid_count || stats?.status_counts?.partial || stats?.status_counts?.partially_paid || 0;
 
-    const collectionRate = safeStats.total > 0 
-        ? Math.round((safeStats.paid / safeStats.total) * 100) 
+    const collectionRate = total > 0 
+        ? Math.round((paid / total) * 100) 
         : 0;
 
     return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
                 title="Total Fees"
-                value={safeStats.total.toLocaleString()}
+                value={total.toLocaleString()}
                 icon={<FileText className="h-4 w-4 text-blue-500" />}
-                description={`${formatCurrency(safeStats.totalAmount)} total amount`}
+                description={`${formatCurrency(totalAmount)} total amount`}
             />
             <StatCard
                 title="Collected"
-                value={formatCurrency(safeStats.paid)}
+                value={formatCurrency(collected)}
                 icon={<CreditCard className="h-4 w-4 text-green-500" />}
-                description={`${formatCurrency(safeStats.pending)} pending`}
+                description={`${formatCurrency(pending)} pending`}
             />
             <StatCard
                 title="Collection Rate"
                 value={`${collectionRate}%`}
                 icon={<Percent className="h-4 w-4 text-purple-500" />}
-                description={`${safeStats.issued} issued • ${safeStats.overdue} overdue`}
+                description={`${issued} issued • ${overdue} overdue`}
             />
             <StatCard
                 title="Status Breakdown"
-                value={`${safeStats.active} Active`}
+                value={`${total} Total`}
                 icon={<CheckCircle className="h-4 w-4 text-amber-500" />}
-                description={`${safeStats.inactive} Inactive • ${safeStats.partially_paid} Partial`}
+                description={`${paid} Paid • ${pending} Pending • ${partiallyPaid} Partial`}
             />
         </div>
     );

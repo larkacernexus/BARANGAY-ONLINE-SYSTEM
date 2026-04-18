@@ -62,53 +62,58 @@ class FeeTypeController extends Controller
         ]);
     }
     
-    public function create()
-    {
-        // Fetch categories from document_categories table
-        $documentCategories = DocumentCategory::where('is_active', true)
-            ->orderBy('order')
-            ->get(['id', 'name', 'slug', 'icon', 'color']);
-        
-        // Transform for dropdown: id as value, name as label
-        $categories = [];
-        foreach ($documentCategories as $category) {
-            $categories[$category->id] = $category->name;
-        }
-        
-        // Log for debugging
-        Log::info('Document categories fetched for fee type create', [
-            'count' => count($categories),
-            'categories' => $categories
-        ]);
-        
-        return Inertia::render('admin/Fees/FeeTypes/Create', [
-            'documentCategories' => $documentCategories,
-            'categories' => $categories,
-            'amountTypes' => [
-                'fixed' => 'Fixed Amount',
-                'per_unit' => 'Per Unit',
-                'computed' => 'Computed',
-            ],
-            'frequencies' => [
-                'one_time' => 'One Time',
-                'monthly' => 'Monthly',
-                'quarterly' => 'Quarterly',
-                'semi_annual' => 'Semi-Annual',
-                'annual' => 'Annual',
-                'custom' => 'Custom',
-            ],
-            'applicableTo' => [
-                'all_residents' => 'All Residents',
-                'property_owners' => 'Property Owners',
-                'business_owners' => 'Business Owners',
-                'households' => 'Households',
-                'specific_purok' => 'Specific Purok',
-                'specific_zone' => 'Specific Zone',
-                'visitors' => 'Visitors',
-            ],
-            'puroks' => Purok::pluck('name')->filter()->values()->toArray(),
-        ]);
-    }
+public function create()
+{
+    // Fetch categories from document_categories table
+    $documentCategories = DocumentCategory::where('is_active', true)
+        ->orderBy('order')
+        ->get(['id', 'name', 'slug', 'icon', 'color']);
+    
+    // Transform to array format for frontend
+    $categoryOptions = $documentCategories->map(function($category) {
+        return [
+            'id' => $category->id,
+            'name' => $category->name,
+            'slug' => $category->slug,
+            'icon' => $category->icon,
+            'color' => $category->color,
+        ];
+    })->values()->toArray();
+    
+    // Log for debugging
+    Log::info('Document categories fetched for fee type create', [
+        'count' => count($categoryOptions),
+        'categories' => $categoryOptions
+    ]);
+    
+    return Inertia::render('admin/Fees/FeeTypes/Create', [
+        'documentCategories' => $documentCategories,
+        'categories' => $categoryOptions, // Now an array of objects
+        'amountTypes' => [
+            'fixed' => 'Fixed Amount',
+            'per_unit' => 'Per Unit',
+            'computed' => 'Computed',
+        ],
+        'frequencies' => [
+            'one_time' => 'One Time',
+            'monthly' => 'Monthly',
+            'quarterly' => 'Quarterly',
+            'semi_annual' => 'Semi-Annual',
+            'annual' => 'Annual',
+            'custom' => 'Custom',
+        ],
+        'applicableTo' => [
+            'all_residents' => 'All Residents',
+            'property_owners' => 'Property Owners',
+            'business_owners' => 'Business Owners',
+            'households' => 'Households',
+            'specific_purok' => 'Specific Purok',
+            'specific_zone' => 'Specific Zone',
+            'visitors' => 'Visitors',
+        ],
+        'puroks' => Purok::pluck('name')->filter()->values()->toArray(),
+    ]);
+}
     
     public function store(Request $request)
     {
@@ -248,55 +253,57 @@ class FeeTypeController extends Controller
         ]);
     }
     
-    public function edit(FeeType $feeType)
-    {
-        // Load related data
-        $feeType->load(['documentCategory']);
-        
-        // NO MANUAL DECODING NEEDED - the model's $casts property handles it automatically
-        // The values will already be arrays thanks to the casts in the model
-        
-        // Fetch categories from document_categories table
-        $documentCategories = DocumentCategory::where('is_active', true)
-            ->orderBy('order')
-            ->get(['id', 'name', 'slug', 'icon', 'color']);
-        
-        // Transform for dropdown
-        $categories = [];
-        foreach ($documentCategories as $category) {
-            $categories[$category->id] = $category->name;
-        }
-        
-        return Inertia::render('admin/Fees/FeeTypes/Edit', [
-            'feeType' => $feeType,
-            'documentCategories' => $documentCategories,
-            'categories' => $categories,
-            'amountTypes' => [
-                'fixed' => 'Fixed Amount',
-                'per_unit' => 'Per Unit',
-                'computed' => 'Computed',
-            ],
-            'frequencies' => [
-                'one_time' => 'One Time',
-                'monthly' => 'Monthly',
-                'quarterly' => 'Quarterly',
-                'semi_annual' => 'Semi-Annual',
-                'annual' => 'Annual',
-                'custom' => 'Custom',
-            ],
-            'applicableTo' => [
-                'all_residents' => 'All Residents',
-                'property_owners' => 'Property Owners',
-                'business_owners' => 'Business Owners',
-                'households' => 'Households',
-                'specific_purok' => 'Specific Purok',
-                'specific_zone' => 'Specific Zone',
-                'visitors' => 'Visitors',
-            ],
-            'puroks' => Purok::pluck('name')->filter()->values()->toArray(),
-        ]);
-    }
+ public function edit(FeeType $feeType)
+{
+    // Load related data
+    $feeType->load(['documentCategory']);
     
+    // Fetch categories from document_categories table
+    $documentCategories = DocumentCategory::where('is_active', true)
+        ->orderBy('order')
+        ->get(['id', 'name', 'slug', 'icon', 'color']);
+    
+    // Transform to array format for frontend
+    $categoryOptions = $documentCategories->map(function($category) {
+        return [
+            'id' => $category->id,
+            'name' => $category->name,
+            'slug' => $category->slug,
+            'icon' => $category->icon,
+            'color' => $category->color,
+        ];
+    })->values()->toArray();
+    
+    return Inertia::render('admin/Fees/FeeTypes/Edit', [
+        'feeType' => $feeType,
+        'documentCategories' => $documentCategories,
+        'categories' => $categoryOptions, // Now an array of objects
+        'amountTypes' => [
+            'fixed' => 'Fixed Amount',
+            'per_unit' => 'Per Unit',
+            'computed' => 'Computed',
+        ],
+        'frequencies' => [
+            'one_time' => 'One Time',
+            'monthly' => 'Monthly',
+            'quarterly' => 'Quarterly',
+            'semi_annual' => 'Semi-Annual',
+            'annual' => 'Annual',
+            'custom' => 'Custom',
+        ],
+        'applicableTo' => [
+            'all_residents' => 'All Residents',
+            'property_owners' => 'Property Owners',
+            'business_owners' => 'Business Owners',
+            'households' => 'Households',
+            'specific_purok' => 'Specific Purok',
+            'specific_zone' => 'Specific Zone',
+            'visitors' => 'Visitors',
+        ],
+        'puroks' => Purok::pluck('name')->filter()->values()->toArray(),
+    ]);
+}
+
     public function update(Request $request, FeeType $feeType)
     {
         Log::info('Fee Type Update Request Received', [

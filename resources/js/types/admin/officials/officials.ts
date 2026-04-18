@@ -69,6 +69,7 @@ export interface Role {
 }
 
 export interface User {
+    name?: any;
     id: number;
     username: string;
     email?: string;

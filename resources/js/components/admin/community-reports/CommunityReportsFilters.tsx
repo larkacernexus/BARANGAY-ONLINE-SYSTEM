@@ -57,8 +57,9 @@ interface CommunityReportsFiltersProps {
     setAffectedPeopleFilter: (value: string) => void;
     sortBy: string;
     setSortBy: (value: string) => void;
-    sortOrder: string;
-    setSortOrder: (value: string) => void;
+    // ✅ FIXED: Change from string to 'asc' | 'desc'
+    sortOrder: 'asc' | 'desc';
+    setSortOrder: (value: 'asc' | 'desc') => void;
     showAdvancedFilters: boolean;
     setShowAdvancedFilters: (value: boolean) => void;
     safeStatuses: Record<string, string>;
@@ -73,7 +74,7 @@ interface CommunityReportsFiltersProps {
     totalItems: number;
     startIndex: number;
     endIndex: number;
-    hasActiveFilters: boolean | string; // Allow string or boolean
+    hasActiveFilters: boolean | string;
     showSelectionOptions: boolean;
     setShowSelectionOptions: (value: boolean) => void;
     handleClearFilters: () => void;

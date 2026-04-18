@@ -1,23 +1,30 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+// pages/admin/Fees/Index.tsx - COMPLETE REVISED FILE
+
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-
-// Custom hooks
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-
-// Components
 import FeesHeader from '@/components/admin/fees/FeesHeader';
 import FeesStats from '@/components/admin/fees/FeesStats';
 import FeesFilters from '@/components/admin/fees/FeesFilters';
 import FeesContent from '@/components/admin/fees/FeesContent';
 import FeesDialogs from '@/components/admin/fees/FeesDialogs';
 import FlashMessages from '@/components/adminui/FlashMessages';
-
-// Types
 import { PaginationData, Filters, Stats, BulkOperation, Fee } from '@/types/admin/fees/fees';
 import { route } from 'ziggy-js';
+import { Loader2, KeyRound } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
+}
 
 interface FeesIndexProps {
     fees: PaginationData;
@@ -27,39 +34,41 @@ interface FeesIndexProps {
     puroks: string[];
     payerTypes?: Record<string, string>;
     stats: Stats;
-    flash?: {
-        success?: string;
-        error?: string;
-        info?: string;
-        warning?: string;
-    };
+    flash?: { success?: string; error?: string; info?: string; warning?: string; };
 }
 
 export default function FeesIndex({
-    fees,
-    filters,
-    statuses,
-    categories,
-    puroks,
+    fees: initialFees,
+    filters: initialFilters = {},
+    statuses = {},
+    categories = {},
+    puroks = [],
     payerTypes = {},
-    stats,
+    stats = { 
+        total: 0, 
+        total_amount: 0,
+        collected: 0,
+        pending: 0,
+        overdue_count: 0,
+        due_soon_count: 0,
+        today_count: 0,
+        today_amount: 0,
+        today_collected: 0,
+        this_month_count: 0,
+        this_month_amount: 0,
+        this_month_collected: 0,
+        status_counts: {},
+        category_totals: {}
+    },
     flash
 }: FeesIndexProps) {
     
-    // Detect mobile for responsive behavior
     const isMobile = useMediaQuery('(max-width: 768px)');
     
-    // SAFE DESTRUCTURING
-    const safeFees = fees || { data: [], current_page: 1, last_page: 1, total: 0, per_page: 15 };
-    const safeFilters = filters || {};
-    const safeStatuses = statuses || {};
-    const safePuroks = puroks || [];
-    const safePayerTypes = payerTypes || {};
-    const safeStats = stats || { total: 0, active: 0, inactive: 0, totalAmount: 0, averageAmount: 0 };
+    const safeFees = initialFees || { 
+        data: [], current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 
+    };
     
-    const allFees = safeFees.data || [];
-    
-    // Helper functions for safe value extraction
     const getSafeString = (value: any, defaultValue: string = ''): string => {
         if (value === null || value === undefined) return defaultValue;
         if (typeof value === 'string') return value;
@@ -67,359 +76,167 @@ export default function FeesIndex({
         return defaultValue;
     };
     
-    // Helper function to safely get payer type display
-    const getPayerTypeDisplay = useCallback((payerType: string | undefined): string => {
-        if (!payerType) return 'N/A';
-        return safePayerTypes[payerType] || payerType || 'N/A';
-    }, [safePayerTypes]);
-    
-    // Filter states
-    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
-    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
-    const [purokFilter, setPurokFilter] = useState<string>(getSafeString(safeFilters.purok, 'all'));
-    const [minAmount, setMinAmount] = useState<string>(getSafeString(safeFilters.min_amount));
-    const [maxAmount, setMaxAmount] = useState<string>(getSafeString(safeFilters.max_amount));
-    const [fromDate, setFromDate] = useState<string>(getSafeString(safeFilters.from_date));
-    const [toDate, setToDate] = useState<string>(getSafeString(safeFilters.to_date));
-    
-    // New filter states
-    const [payerTypeFilter, setPayerTypeFilter] = useState<string>('all');
-    const [dueDateRange, setDueDateRange] = useState<string>('');
+    const [search, setSearch] = useState<string>(getSafeString(initialFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(initialFilters.status, 'all'));
+    const [categoryFilter, setCategoryFilter] = useState<string>(getSafeString(initialFilters.category, 'all'));
+    const [purokFilter, setPurokFilter] = useState<string>(getSafeString(initialFilters.purok, 'all'));
+    const [payerTypeFilter, setPayerTypeFilter] = useState<string>(getSafeString(initialFilters.payer_type, 'all'));
+    const [minAmount, setMinAmount] = useState<string>(getSafeString(initialFilters.min_amount));
+    const [maxAmount, setMaxAmount] = useState<string>(getSafeString(initialFilters.max_amount));
+    const [fromDate, setFromDate] = useState<string>(getSafeString(initialFilters.from_date));
+    const [toDate, setToDate] = useState<string>(getSafeString(initialFilters.to_date));
+    const [amountRange, setAmountRange] = useState<string>(getSafeString(initialFilters.amount_range));
+    const [dueDateRange, setDueDateRange] = useState<string>(getSafeString(initialFilters.due_date_range));
     const [dateRangePreset, setDateRangePreset] = useState<string>('');
-    const [amountRange, setAmountRange] = useState<string>('');
     
-    // Separate sort states for table header
-    const [sortBy, setSortBy] = useState<string>('created_at');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [sortBy, setSortBy] = useState<string>(getSafeString(initialFilters.sort_by, 'created_at'));
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
+        (initialFilters.sort_order as 'asc' | 'desc') || 'desc'
+    );
     
     const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
-    const [currentPage, setCurrentPage] = useState<number>(1);
-    const itemsPerPage = 15;
+    const [isLoading, setIsLoading] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
-    const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
+    
     const [selectedFees, setSelectedFees] = useState<number[]>([]);
+    const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
     const [isSelectAll, setIsSelectAll] = useState<boolean>(false);
     const [selectionMode, setSelectionMode] = useState<'page' | 'filtered' | 'all'>('page');
     const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState<boolean>(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState<boolean>(false);
     const [selectionStats, setSelectionStats] = useState<any>(null);
+    
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const isFirstMount = useRef(true);
+    
+    const debouncedSearch = useDebounce(search, 300);
+    const debouncedMinAmount = useDebounce(minAmount, 500);
+    const debouncedMaxAmount = useDebounce(maxAmount, 500);
+    const debouncedFromDate = useDebounce(fromDate, 500);
+    const debouncedToDate = useDebounce(toDate, 500);
 
-    // Reset to first page when filters change
     useEffect(() => {
-        setCurrentPage(1);
-    }, [search, statusFilter, purokFilter, minAmount, maxAmount, fromDate, toDate, payerTypeFilter, dueDateRange, amountRange]);
+        if (isMobile && viewMode !== 'grid') {
+            setViewMode('grid');
+        }
+    }, [isMobile, viewMode]);
 
-    // Helper function to check amount range
-    const checkAmountRange = (amount: number, range: string): boolean => {
-        switch (range) {
-            case '0-100': return amount >= 0 && amount <= 100;
-            case '101-500': return amount >= 101 && amount <= 500;
-            case '501-1000': return amount >= 501 && amount <= 1000;
-            case '1001-5000': return amount >= 1001 && amount <= 5000;
-            case '5000+': return amount >= 5000;
-            default: return true;
-        }
-    };
+    const currentFees = safeFees.data || [];
+    const paginationData = useMemo(() => ({
+        current_page: safeFees.current_page || 1,
+        last_page: safeFees.last_page || 1,
+        total: safeFees.total || 0,
+        from: safeFees.from || 0,
+        to: safeFees.to || 0,
+        per_page: safeFees.per_page || 15,
+    }), [safeFees]);
 
-    // Filter fees client-side
-    const filteredFees = useMemo(() => {
-        if (!allFees || allFees.length === 0) {
-            return [];
-        }
-        
-        let filtered = [...allFees];
-        
-        // Search filter - searches fee_code, payer_name, or_number, certificate_number
-        if (search) {
-            const searchLower = search.toLowerCase();
-            filtered = filtered.filter(fee =>
-                fee?.name?.toLowerCase().includes(searchLower) ||
-                fee?.code?.toLowerCase().includes(searchLower) ||
-                fee?.fee_code?.toLowerCase().includes(searchLower) ||
-                fee?.description?.toLowerCase().includes(searchLower) ||
-                fee?.payer_name?.toLowerCase().includes(searchLower) ||
-                fee?.or_number?.toLowerCase().includes(searchLower) ||
-                fee?.certificate_number?.toLowerCase().includes(searchLower)
-            );
-        }
-        
-        // Status filter
-        if (statusFilter && statusFilter !== 'all') {
-            filtered = filtered.filter(fee => fee?.status === statusFilter);
-        }
-        
-        // Purok filter
-        if (purokFilter && purokFilter !== 'all') {
-            filtered = filtered.filter(fee => fee?.purok === purokFilter);
-        }
-        
-        // Payer Type filter
-        if (payerTypeFilter && payerTypeFilter !== 'all') {
-            filtered = filtered.filter(fee => fee?.payer_type === payerTypeFilter);
-        }
-        
-        // Amount range filter (min/max inputs)
-        if (minAmount) {
-            const min = parseFloat(minAmount);
-            filtered = filtered.filter(fee => (fee?.total_amount || 0) >= min);
-        }
-        if (maxAmount) {
-            const max = parseFloat(maxAmount);
-            filtered = filtered.filter(fee => (fee?.total_amount || 0) <= max);
-        }
-        
-        // Amount range filter (preset)
-        if (amountRange) {
-            filtered = filtered.filter(fee => checkAmountRange(fee?.total_amount || 0, amountRange));
-        }
-        
-        // Date range filter (created_at)
-        if (fromDate) {
-            filtered = filtered.filter(fee => fee?.created_at && fee.created_at >= fromDate);
-        }
-        if (toDate) {
-            filtered = filtered.filter(fee => fee?.created_at && fee.created_at <= toDate);
-        }
-        
-        // Due date range filter
-        if (dueDateRange) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            filtered = filtered.filter(fee => {
-                if (!fee?.due_date) return false;
-                const dueDate = new Date(fee.due_date);
-                dueDate.setHours(0, 0, 0, 0);
-                const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                
-                switch (dueDateRange) {
-                    case 'overdue':
-                        return dueDate < today && (fee?.status === 'pending' || fee?.status === 'issued' || fee?.status === 'partially_paid');
-                    case 'due_today':
-                        return dueDate.getTime() === today.getTime();
-                    case 'due_this_week':
-                        return diffDays >= 0 && diffDays <= 7;
-                    case 'due_next_week':
-                        return diffDays >= 8 && diffDays <= 14;
-                    case 'due_this_month':
-                        return diffDays >= 0 && diffDays <= 30;
-                    default:
-                        return true;
-                }
-            });
-        }
-        
-        // Apply sorting (for table header)
-        if (filtered.length > 0) {
-            filtered.sort((a, b) => {
-                let valueA: any;
-                let valueB: any;
-                
-                switch (sortBy) {
-                    case 'name':
-                        valueA = a?.name || a?.fee_type?.name || '';
-                        valueB = b?.name || b?.fee_type?.name || '';
-                        break;
-                    case 'code':
-                        valueA = a?.code || a?.fee_code || '';
-                        valueB = b?.code || b?.fee_code || '';
-                        break;
-                    case 'amount':
-                        valueA = Number(a?.total_amount) || 0;
-                        valueB = Number(b?.total_amount) || 0;
-                        break;
-                    case 'status':
-                        valueA = a?.status || '';
-                        valueB = b?.status || '';
-                        break;
-                    case 'payer_type':
-                        valueA = a?.payer_type || '';
-                        valueB = b?.payer_type || '';
-                        break;
-                    case 'due_date':
-                        valueA = a?.due_date ? new Date(a.due_date).getTime() : 0;
-                        valueB = b?.due_date ? new Date(b.due_date).getTime() : 0;
-                        break;
-                    case 'created_at':
-                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
-                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
-                        break;
-                    default:
-                        valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
-                        valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
-                }
-                
-                if (typeof valueA === 'string') {
-                    valueA = valueA.toLowerCase();
-                    valueB = valueB.toLowerCase();
-                }
-                
-                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
-                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
-        
-        return filtered;
-    }, [allFees, search, statusFilter, purokFilter, payerTypeFilter, minAmount, maxAmount, fromDate, toDate, dueDateRange, amountRange, sortBy, sortOrder]);
+    const getCurrentFilters = useCallback(() => ({
+        search: debouncedSearch,
+        status: statusFilter,
+        category: categoryFilter,
+        purok: purokFilter,
+        payer_type: payerTypeFilter,
+        min_amount: debouncedMinAmount,
+        max_amount: debouncedMaxAmount,
+        from_date: debouncedFromDate,
+        to_date: debouncedToDate,
+        amount_range: amountRange,
+        due_date_range: dueDateRange,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+    }), [
+        debouncedSearch, statusFilter, categoryFilter, purokFilter, payerTypeFilter,
+        debouncedMinAmount, debouncedMaxAmount, debouncedFromDate, debouncedToDate,
+        amountRange, dueDateRange, sortBy, sortOrder
+    ]);
 
-    // Calculate filtered stats
-    const filteredStats = useMemo(() => {
-        if (!filteredFees || filteredFees.length === 0) {
-            return {
-                total: 0,
-                active: 0,
-                inactive: 0,
-                totalAmount: 0,
-                averageAmount: 0,
-                overdue: 0,
-                pending: 0,
-                paid: 0,
-                issued: 0,
-                partially_paid: 0,
-                cancelled: 0,
-                refunded: 0,
-                residentCount: 0,
-                businessCount: 0,
-                householdCount: 0
-            };
+    const reloadData = useCallback((page = 1) => {
+        setIsLoading(true);
+        
+        const filters = { ...getCurrentFilters(), page };
+        
+        router.get('/admin/fees', filters, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsLoading(false);
+                setSelectedFees([]);
+                setIsSelectAll(false);
+            },
+            onError: () => {
+                setIsLoading(false);
+                toast.error('Failed to load fees');
+            }
+        });
+    }, [getCurrentFilters]);
+
+    useEffect(() => {
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            return;
         }
         
-        // Use the actual status values from the Fee type
-        const paid = filteredFees.filter(f => f?.status === 'paid').length;
-        const pending = filteredFees.filter(f => f?.status === 'pending').length;
-        const overdue = filteredFees.filter(f => f?.status === 'overdue').length;
-        const issued = filteredFees.filter(f => f?.status === 'issued').length;
-        const partially_paid = filteredFees.filter(f => f?.status === 'partial' || f?.status === 'partially_paid').length;
-        const cancelled = filteredFees.filter(f => f?.status === 'cancelled').length;
-        const refunded = filteredFees.filter(f => f?.status === 'refunded').length;
-        
-        // "Active" means not cancelled or refunded
-        const active = filteredFees.filter(f => 
-            f?.status === 'pending' || 
-            f?.status === 'paid' || 
-            f?.status === 'overdue' || 
-            f?.status === 'issued' || 
-            f?.status === 'partial' || 
-            f?.status === 'partially_paid'
-        ).length;
-        
-        // "Inactive" means cancelled or refunded
-        const inactive = filteredFees.filter(f => 
-            f?.status === 'cancelled' || 
-            f?.status === 'refunded'
-        ).length;
-        
-        const totalAmount = filteredFees.reduce((sum, f) => sum + (Number(f?.total_amount) || Number(f?.amount) || 0), 0);
-        const averageAmount = totalAmount / (filteredFees.length || 1);
-        
-        // Count by payer type
-        const residentCount = filteredFees.filter(f => f?.payer_type === 'resident' || f?.type === 'resident').length;
-        const businessCount = filteredFees.filter(f => f?.payer_type === 'business' || f?.type === 'business').length;
-        const householdCount = filteredFees.filter(f => f?.payer_type === 'household' || f?.type === 'household').length;
-        
-        return {
-            total: filteredFees.length,
-            active,
-            inactive,
-            totalAmount,
-            averageAmount,
-            overdue,
-            pending,
-            paid,
-            issued,
-            partially_paid,
-            cancelled,
-            refunded,
-            residentCount,
-            businessCount,
-            householdCount
-        };
-    }, [filteredFees]);
+        reloadData();
+    }, [
+        debouncedSearch, statusFilter, categoryFilter, purokFilter, payerTypeFilter,
+        debouncedMinAmount, debouncedMaxAmount, debouncedFromDate, debouncedToDate,
+        amountRange, dueDateRange, sortBy, sortOrder, reloadData
+    ]);
 
-    // Pagination
-    const totalItems = filteredFees.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedFees = filteredFees.slice(startIndex, endIndex);
+    useEffect(() => {
+        if (!isBulkMode) {
+            setSelectedFees([]);
+            setIsSelectAll(false);
+        }
+    }, [isBulkMode]);
 
-    // Selection handlers
     const handleSelectAllOnPage = useCallback(() => {
-        const pageIds = paginatedFees.map(fee => fee.id);
+        const pageIds = currentFees.map(fee => fee.id);
         if (isSelectAll) {
             setSelectedFees(prev => prev.filter(id => !pageIds.includes(id)));
         } else {
-            const newSelected = [...new Set([...selectedFees, ...pageIds])];
-            setSelectedFees(newSelected);
+            setSelectedFees(prev => [...new Set([...prev, ...pageIds])]);
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    }, [paginatedFees, isSelectAll, selectedFees]);
-
-    const handleSelectAllFiltered = useCallback(() => {
-        const allIds = filteredFees.map(fee => fee.id);
-        if (selectedFees.length === allIds.length && allIds.every(id => selectedFees.includes(id))) {
-            setSelectedFees(prev => prev.filter(id => !allIds.includes(id)));
-        } else {
-            const newSelected = [...new Set([...selectedFees, ...allIds])];
-            setSelectedFees(newSelected);
-            setSelectionMode('filtered');
-        }
-    }, [filteredFees, selectedFees]);
-
-    const handleSelectAll = useCallback(() => {
-        if (confirm(`This will select ALL ${totalItems} fees. This action may take a moment.`)) {
-            const allIds = filteredFees.map(fee => fee.id);
-            setSelectedFees(allIds);
-            setSelectionMode('all');
-        }
-    }, [filteredFees, totalItems]);
+    }, [currentFees, isSelectAll]);
 
     const handleItemSelect = useCallback((id: number) => {
-        setSelectedFees(prev => {
-            if (prev.includes(id)) {
-                return prev.filter(itemId => itemId !== id);
-            } else {
-                return [...prev, id];
-            }
-        });
+        setSelectedFees(prev => 
+            prev.includes(id) ? prev.filter(itemId => itemId !== id) : [...prev, id]
+        );
     }, []);
 
-    // Check if all items on current page are selected
     useEffect(() => {
-        const allPageIds = paginatedFees.map(fee => fee.id);
+        const allPageIds = currentFees.map(fee => fee.id);
         const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedFees.includes(id));
         setIsSelectAll(allSelected);
-    }, [selectedFees, paginatedFees]);
+    }, [selectedFees, currentFees]);
 
-    // Get selected fees data
-    const selectedFeesData = useMemo(() => {
-        return filteredFees.filter(fee => selectedFees.includes(fee.id));
-    }, [selectedFees, filteredFees]);
+    const selectedFeesData = useMemo(() => 
+        currentFees.filter(fee => selectedFees.includes(fee.id)),
+    [selectedFees, currentFees]);
 
-    // Calculate selection stats - FIXED: Use correct status values
     useEffect(() => {
-        const totalAmount = selectedFeesData.reduce((sum, f) => sum + (Number(f?.total_amount) || Number(f?.amount) || 0), 0);
+        if (selectedFeesData.length === 0) {
+            setSelectionStats({
+                total: 0, totalAmount: 0, averageAmount: 0,
+                active: 0, inactive: 0, pending: 0, paid: 0,
+                overdue: 0, issued: 0, partially_paid: 0,
+                cancelled: 0, refunded: 0, resident: 0, business: 0, household: 0
+            });
+            return;
+        }
         
-        // Define active as fees that are not cancelled or refunded
-        const active = selectedFeesData.filter(f => 
-            f?.status !== 'cancelled' && 
-            f?.status !== 'refunded'
-        ).length;
-        
-        // Define inactive as cancelled or refunded
-        const inactive = selectedFeesData.filter(f => 
-            f?.status === 'cancelled' || 
-            f?.status === 'refunded'
-        ).length;
+        const totalAmount = selectedFeesData.reduce((sum, f) => sum + (Number(f?.total_amount) || 0), 0);
         
         setSelectionStats({
             total: selectedFeesData.length,
             totalAmount,
-            averageAmount: selectedFeesData.length > 0 ? totalAmount / selectedFeesData.length : 0,
-            active,
-            inactive,
+            averageAmount: totalAmount / selectedFeesData.length,
+            active: selectedFeesData.filter(f => f?.status !== 'cancelled' && f?.status !== 'refunded').length,
+            inactive: selectedFeesData.filter(f => f?.status === 'cancelled' || f?.status === 'refunded').length,
             pending: selectedFeesData.filter(f => f?.status === 'pending').length,
             paid: selectedFeesData.filter(f => f?.status === 'paid').length,
             overdue: selectedFeesData.filter(f => f?.status === 'overdue').length,
@@ -427,20 +244,26 @@ export default function FeesIndex({
             partially_paid: selectedFeesData.filter(f => f?.status === 'partial' || f?.status === 'partially_paid').length,
             cancelled: selectedFeesData.filter(f => f?.status === 'cancelled').length,
             refunded: selectedFeesData.filter(f => f?.status === 'refunded').length,
-            resident: selectedFeesData.filter(f => f?.payer_type === 'resident' || f?.type === 'resident').length,
-            business: selectedFeesData.filter(f => f?.payer_type === 'business' || f?.type === 'business').length,
-            household: selectedFeesData.filter(f => f?.payer_type === 'household' || f?.type === 'household').length
+            resident: selectedFeesData.filter(f => f?.payer_type === 'resident').length,
+            business: selectedFeesData.filter(f => f?.payer_type === 'business').length,
+            household: selectedFeesData.filter(f => f?.payer_type === 'household').length
         });
     }, [selectedFeesData]);
 
-    // Handle sort from table header
-    const handleSort = useCallback((column: string) => {
-        const newOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
-        setSortBy(column);
-        setSortOrder(newOrder);
-    }, [sortBy, sortOrder]);
+    const handlePageChange = useCallback((page: number) => {
+        reloadData(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [reloadData]);
 
-    // Bulk operations
+    const handleSort = useCallback((column: string) => {
+        if (sortBy === column) {
+            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(column);
+            setSortOrder('asc');
+        }
+    }, [sortBy]);
+
     const handleBulkOperation = useCallback(async (operation: BulkOperation) => {
         if (selectedFees.length === 0) {
             toast.error('Please select at least one fee');
@@ -455,47 +278,31 @@ export default function FeesIndex({
                     setShowBulkDeleteDialog(true);
                     break;
                 case 'activate':
-                    await router.post('/admin/fees/bulk-action', {
-                        action: 'activate',
-                        fee_ids: selectedFees,
-                    }, {
-                        preserveScroll: true,
-                        onSuccess: () => {
-                            setSelectedFees([]);
-                            toast.success(`${selectedFees.length} fees activated successfully`);
-                            router.reload({ only: ['fees'] });
-                        },
-                        onError: () => {
-                            toast.error('Failed to activate fees');
-                        }
-                    });
-                    break;
                 case 'deactivate':
+                case 'issue':
+                case 'mark_paid':
+                case 'cancel':
                     await router.post('/admin/fees/bulk-action', {
-                        action: 'deactivate',
+                        action: operation,
                         fee_ids: selectedFees,
                     }, {
                         preserveScroll: true,
                         onSuccess: () => {
                             setSelectedFees([]);
-                            toast.success(`${selectedFees.length} fees deactivated successfully`);
-                            router.reload({ only: ['fees'] });
+                            reloadData(paginationData.current_page);
+                            toast.success(`${selectedFees.length} fees ${operation}d successfully`);
                         },
-                        onError: () => {
-                            toast.error('Failed to deactivate fees');
-                        }
+                        onError: () => toast.error(`Failed to ${operation} fees`)
                     });
                     break;
                 case 'export':
                     const exportData = selectedFeesData.map(fee => ({
-                        'Name': fee.name || fee.fee_type?.name || 'N/A',
-                        'Code': fee.code || fee.fee_code || 'N/A',
+                        'Fee Code': fee.fee_code || 'N/A',
+                        'Payer Name': fee.payer_name || 'N/A',
+                        'Payer Type': fee.payer_type || 'N/A',
                         'Amount': fee.total_amount || 0,
                         'Status': fee.status || 'N/A',
-                        'Payer': fee.payer_name || 'N/A',
-                        'Payer Type': getPayerTypeDisplay(fee.payer_type),
                         'Due Date': fee.due_date || 'N/A',
-                        'Created': fee.created_at ? new Date(fee.created_at).toLocaleDateString() : 'N/A'
                     }));
                     
                     const csv = [
@@ -519,6 +326,18 @@ export default function FeesIndex({
                     });
                     toast.success(`${selectedFees.length} fee(s) opened for printing`);
                     break;
+                case 'send_reminders':
+                    await router.post('/admin/fees/bulk-action', {
+                        action: 'send_reminders',
+                        fee_ids: selectedFees,
+                    }, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            toast.success(`Reminders sent for ${selectedFees.length} fees`);
+                        },
+                        onError: () => toast.error('Failed to send reminders')
+                    });
+                    break;
                 default:
                     toast.info('Functionality to be implemented');
             }
@@ -528,46 +347,42 @@ export default function FeesIndex({
         } finally {
             setIsPerformingBulkAction(false);
         }
-    }, [selectedFees, selectedFeesData, getPayerTypeDisplay]);
+    }, [selectedFees, selectedFeesData, paginationData.current_page, reloadData]);
 
-    // Individual fee operations
     const handleDelete = useCallback((fee: Fee) => {
-        if (confirm(`Are you sure you want to delete fee "${fee.name || fee.fee_code}"?`)) {
+        if (confirm(`Are you sure you want to delete fee "${fee.fee_code || 'Untitled'}"?`)) {
             router.delete(`/admin/fees/${fee.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedFees(prev => prev.filter(id => id !== fee.id));
+                    reloadData(paginationData.current_page);
                     toast.success('Fee deleted successfully');
-                    router.reload({ only: ['fees'] });
                 },
-                onError: () => {
-                    toast.error('Failed to delete fee');
-                }
+                onError: () => toast.error('Failed to delete fee')
             });
         }
-    }, []);
+    }, [paginationData.current_page, reloadData]);
 
     const handleClearFilters = useCallback(() => {
         setSearch('');
         setStatusFilter('all');
+        setCategoryFilter('all');
         setPurokFilter('all');
+        setPayerTypeFilter('all');
         setMinAmount('');
         setMaxAmount('');
         setFromDate('');
         setToDate('');
-        setPayerTypeFilter('all');
+        setAmountRange('');
         setDueDateRange('');
         setDateRangePreset('');
-        setAmountRange('');
         setSortBy('created_at');
         setSortOrder('desc');
-        setCurrentPage(1);
     }, []);
 
     const handleClearSelection = useCallback(() => {
         setSelectedFees([]);
         setIsSelectAll(false);
-        setIsBulkMode(false);
     }, []);
 
     const handleCopySelectedData = useCallback(() => {
@@ -577,12 +392,10 @@ export default function FeesIndex({
         }
         
         const data = selectedFeesData.map(fee => ({
-            'Name': fee.name || fee.fee_type?.name || 'N/A',
-            'Code': fee.code || fee.fee_code || 'N/A',
+            'Fee Code': fee.fee_code || 'N/A',
+            'Payer': fee.payer_name || 'N/A',
             'Amount': fee.total_amount || 0,
             'Status': fee.status || 'N/A',
-            'Payer': fee.payer_name || 'N/A',
-            'Payer Type': getPayerTypeDisplay(fee.payer_type)
         }));
         
         const csv = [
@@ -595,97 +408,96 @@ export default function FeesIndex({
         }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
-    }, [selectedFeesData, getPayerTypeDisplay]);
+    }, [selectedFeesData]);
 
     const updateFilter = useCallback((key: string, value: string) => {
         switch (key) {
-            case 'status':
-                setStatusFilter(value);
-                break;
-            case 'purok':
-                setPurokFilter(value);
-                break;
-            case 'min_amount':
-                setMinAmount(value);
-                break;
-            case 'max_amount':
-                setMaxAmount(value);
-                break;
-            case 'from_date':
-                setFromDate(value);
-                break;
-            case 'to_date':
-                setToDate(value);
-                break;
+            case 'status': setStatusFilter(value); break;
+            case 'purok': setPurokFilter(value); break;
+            case 'min_amount': setMinAmount(value); break;
+            case 'max_amount': setMaxAmount(value); break;
+            case 'from_date': setFromDate(value); break;
+            case 'to_date': setToDate(value); break;
         }
     }, []);
 
-    const hasActiveFilters = Boolean(
+    const hasActiveFilters = useMemo(() => Boolean(
         search || 
         (statusFilter && statusFilter !== 'all') || 
+        (categoryFilter && categoryFilter !== 'all') ||
         (purokFilter && purokFilter !== 'all') ||
         (payerTypeFilter && payerTypeFilter !== 'all') ||
-        minAmount ||
-        maxAmount ||
-        fromDate ||
-        toDate ||
-        dueDateRange ||
-        amountRange
-    );
+        minAmount || maxAmount || fromDate || toDate ||
+        amountRange || dueDateRange
+    ), [search, statusFilter, categoryFilter, purokFilter, payerTypeFilter, minAmount, maxAmount, fromDate, toDate, amountRange, dueDateRange]);
 
-    // Create filters object for the Filters component
-    const filtersStateForComponent = {
+    const filtersStateForComponent = useMemo(() => ({
         status: statusFilter,
         purok: purokFilter,
         min_amount: minAmount,
         max_amount: maxAmount,
         from_date: fromDate,
         to_date: toDate
-    };
+    }), [statusFilter, purokFilter, minAmount, maxAmount, fromDate, toDate]);
 
-    // Handle mobile view mode override
+    const bulkModeRef = useRef(isBulkMode);
+    const selectedFeesRef = useRef(selectedFees);
+    
     useEffect(() => {
-        if (isMobile && viewMode !== 'grid') {
-            setViewMode('grid');
-        }
-    }, [isMobile, viewMode]);
+        bulkModeRef.current = isBulkMode;
+        selectedFeesRef.current = selectedFees;
+    }, [isBulkMode, selectedFees]);
 
-    // Handle keyboard shortcuts
     useEffect(() => {
+        if (isMobile) return;
+
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
                 e.preventDefault();
-                setIsBulkMode(!isBulkMode);
+                setIsBulkMode(prev => !prev);
             }
-            if (e.ctrlKey && e.key.toLowerCase() === 'a' && isBulkMode) {
+            
+            if (e.ctrlKey && e.key.toLowerCase() === 'a' && bulkModeRef.current) {
                 e.preventDefault();
-                handleSelectAllOnPage();
+                const pageIds = currentFees.map(fee => fee.id);
+                setSelectedFees(prev => {
+                    const allSelected = pageIds.length > 0 && pageIds.every(id => prev.includes(id));
+                    if (allSelected) {
+                        return prev.filter(id => !pageIds.includes(id));
+                    } else {
+                        return [...new Set([...prev, ...pageIds])];
+                    }
+                });
+                setIsSelectAll(prev => !prev);
+                setSelectionMode('page');
             }
-            if (e.key === 'Escape' && isBulkMode && selectedFees.length > 0) {
+            
+            if (e.key === 'Escape' && bulkModeRef.current) {
                 e.preventDefault();
-                setIsBulkMode(false);
+                if (selectedFeesRef.current.length > 0) {
+                    setSelectedFees([]);
+                    setIsSelectAll(false);
+                } else {
+                    setIsBulkMode(false);
+                }
+            }
+            
+            if (e.ctrlKey && e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            
+            if (e.key === 'Delete' && bulkModeRef.current && selectedFeesRef.current.length > 0) {
+                e.preventDefault();
+                setShowBulkDeleteDialog(true);
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedFees.length, handleSelectAllOnPage, setIsBulkMode]);
+    }, [isMobile, currentFees]);
 
-    // Handle page change with scroll to top
-    const handlePageChange = useCallback((page: number) => {
-        setCurrentPage(page);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, []);
-
-    // Combine flash messages
-    const combinedFlash = {
-        success: flash?.success,
-        error: flash?.error,
-        warning: flash?.warning,
-        info: flash?.info
-    };
-
-    const hasFlashMessages = Object.values(combinedFlash).some(message => message !== undefined);
+    const hasFlashMessages = flash && Object.values(flash).some(message => message !== undefined);
 
     return (
         <AppLayout
@@ -697,24 +509,25 @@ export default function FeesIndex({
         >
             <TooltipProvider>
                 <div className="space-y-6">
-                    {/* Flash Messages */}
-                    {hasFlashMessages && (
-                        <FlashMessages flash={combinedFlash} />
+                    {isLoading && (
+                        <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading...</span>
+                        </div>
                     )}
                     
-                    {/* Header */}
+                    {hasFlashMessages && <FlashMessages flash={flash} />}
+                    
                     <FeesHeader 
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isMobile={isMobile}
                         selectedFees={selectedFees}
-                        paginatedFees={paginatedFees}
+                        paginatedFees={currentFees}
                     />
                     
-                    {/* Stats Cards */}
-                    <FeesStats stats={filteredStats} />
+                    <FeesStats stats={stats} />
                     
-                    {/* Search and Filters */}
                     <FeesFilters
                         search={search}
                         setSearch={setSearch}
@@ -724,19 +537,19 @@ export default function FeesIndex({
                         setShowAdvancedFilters={setShowAdvancedFilters}
                         handleClearFilters={handleClearFilters}
                         hasActiveFilters={hasActiveFilters}
-                        statuses={safeStatuses}
-                        puroks={safePuroks}
-                        payerTypes={safePayerTypes}
-                        startIndex={startIndex}
-                        endIndex={endIndex}
-                        totalItems={totalItems}
+                        statuses={statuses}
+                        puroks={puroks}
+                        payerTypes={payerTypes}
+                        startIndex={paginationData.from}
+                        endIndex={paginationData.to}
+                        totalItems={paginationData.total}
                         isBulkMode={isBulkMode}
                         selectedFees={selectedFees}
                         onSelectAllOnPage={handleSelectAllOnPage}
-                        onSelectAllFiltered={handleSelectAllFiltered}
-                        onSelectAll={handleSelectAll}
+                        onSelectAllFiltered={() => {}}
+                        onSelectAll={() => {}}
                         onClearSelection={handleClearSelection}
-                        isLoading={isPerformingBulkAction}
+                        isLoading={isLoading}
                         dateRangePreset={dateRangePreset}
                         setDateRangePreset={setDateRangePreset}
                         payerTypeFilter={payerTypeFilter}
@@ -745,11 +558,14 @@ export default function FeesIndex({
                         setAmountRange={setAmountRange}
                         dueDateRange={dueDateRange}
                         setDueDateRange={setDueDateRange}
+                        categoryFilter={categoryFilter}
+                        setCategoryFilter={setCategoryFilter}
+                        categories={categories}
+                        searchInputRef={searchInputRef}
                     />
                     
-                    {/* Main Content */}
                     <FeesContent
-                        fees={paginatedFees}
+                        fees={currentFees}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -758,14 +574,14 @@ export default function FeesIndex({
                         setViewMode={setViewMode}
                         isMobile={isMobile}
                         hasActiveFilters={hasActiveFilters}
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={totalItems}
-                        itemsPerPage={itemsPerPage}
+                        currentPage={paginationData.current_page}
+                        totalPages={paginationData.last_page}
+                        totalItems={paginationData.total}
+                        itemsPerPage={paginationData.per_page}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
-                        onSelectAllFiltered={handleSelectAllFiltered}
-                        onSelectAll={handleSelectAll}
+                        onSelectAllFiltered={() => {}}
+                        onSelectAll={() => {}}
                         onItemSelect={handleItemSelect}
                         onClearFilters={handleClearFilters}
                         onClearSelection={handleClearSelection}
@@ -784,17 +600,47 @@ export default function FeesIndex({
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
-                        statuses={safeStatuses}
-                        puroks={safePuroks}
+                        statuses={statuses}
+                        puroks={puroks}
                         sortBy={sortBy}
                         sortOrder={sortOrder}
-                        onSortChange={() => {}}
+                        onSortChange={(value) => {
+                            const [newSortBy, newSortOrder] = value.split('-');
+                            setSortBy(newSortBy);
+                            setSortOrder(newSortOrder as 'asc' | 'desc');
+                        }}
                         getCurrentSortValue={() => `${sortBy}-${sortOrder}`}
+                        isLoading={isLoading}
                     />
+
+                    {isBulkMode && !isMobile && (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <KeyRound className="h-4 w-4 text-gray-500" />
+                                    <span className="text-sm font-medium">Keyboard Shortcuts</span>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsBulkMode(false)}
+                                    className="h-7 text-xs"
+                                    disabled={isPerformingBulkAction}
+                                >
+                                    Exit Bulk Mode
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600">
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Ctrl+A</kbd> Select page</div>
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Delete</kbd> Delete selected</div>
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Esc</kbd> Exit/clear</div>
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Ctrl+F</kbd> Focus search</div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </TooltipProvider>
             
-            {/* Dialogs */}
             <FeesDialogs
                 showBulkDeleteDialog={showBulkDeleteDialog}
                 setShowBulkDeleteDialog={setShowBulkDeleteDialog}

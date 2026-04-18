@@ -15,7 +15,7 @@ import { Eye, Edit, Trash2, Clipboard, Home, Users, Phone, MapPin, ChevronUp, Ch
 import { router } from '@inertiajs/react';
 import { getPurokName, getStatusBadgeVariant, truncateText, truncateAddress, formatContactNumber } from '../../../admin-utils/householdUtils';
 import { SingleHouseholdMapModal } from '@/components/admin/puroks/show/components/SingleHouseholdMapModal';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface HouseholdsTableViewProps {
     households: any[];
@@ -34,6 +34,7 @@ interface HouseholdsTableViewProps {
     puroks: any[];
     sortBy: string;
     sortOrder: string;
+    isLoading?: boolean;
 }
 
 export default function HouseholdsTableView({
@@ -52,10 +53,22 @@ export default function HouseholdsTableView({
     isSelectAll,
     puroks,
     sortBy,
-    sortOrder
+    sortOrder,
+    isLoading = false
 }: HouseholdsTableViewProps) {
     const [mapModalOpen, setMapModalOpen] = useState(false);
     const [selectedHouseholdForMap, setSelectedHouseholdForMap] = useState<any>(null);
+    const [windowWidth, setWindowWidth] = useState<number>(
+        typeof window !== 'undefined' ? window.innerWidth : 1024
+    );
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const handleResize = () => setWindowWidth(window.innerWidth);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const getSortIcon = (column: string) => {
         if (sortBy !== column) return null;
@@ -63,9 +76,7 @@ export default function HouseholdsTableView({
     };
 
     const getTruncationLength = (type: 'name' | 'address' | 'contact' | 'household' = 'name'): number => {
-        if (typeof window === 'undefined') return 30;
-        
-        const width = window.innerWidth;
+        const width = windowWidth;
         if (width < 480) {
             switch(type) {
                 case 'name': return 12;
@@ -130,6 +141,10 @@ export default function HouseholdsTableView({
         }
     };
 
+    const canDelete = (status: string) => {
+        return status === 'pending' || status === 'inactive';
+    };
+
     return (
         <>
             <div className="overflow-x-auto">
@@ -144,14 +159,15 @@ export default function HouseholdsTableView({
                                                 <Checkbox
                                                     checked={isSelectAll && households.length > 0}
                                                     onCheckedChange={onSelectAllOnPage}
+                                                    disabled={isLoading}
                                                     className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 h-4 w-4"
                                                 />
                                             </div>
                                         </TableHead>
                                     )}
                                     <TableHead 
-                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] sm:min-w-[140px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={() => onSort('household_number')}
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] sm:min-w-[140px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={() => !isLoading && onSort('household_number')}
                                     >
                                         <div className="flex items-center gap-1">
                                             Household No.
@@ -159,8 +175,8 @@ export default function HouseholdsTableView({
                                         </div>
                                     </TableHead>
                                     <TableHead 
-                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px] sm:min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={() => onSort('head_of_family')}
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px] sm:min-w-[150px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={() => !isLoading && onSort('head_of_family')}
                                     >
                                         <div className="flex items-center gap-1">
                                             Head of Family
@@ -168,8 +184,8 @@ export default function HouseholdsTableView({
                                         </div>
                                     </TableHead>
                                     <TableHead 
-                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        onClick={() => onSort('member_count')}
+                                        className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px] sm:min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        onClick={() => !isLoading && onSort('member_count')}
                                     >
                                         <div className="flex items-center gap-1">
                                             Members
@@ -185,8 +201,8 @@ export default function HouseholdsTableView({
                                     {!isMobile && (
                                         <>
                                             <TableHead 
-                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                onClick={() => onSort('purok')}
+                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                onClick={() => !isLoading && onSort('purok')}
                                             >
                                                 <div className="flex items-center gap-1">
                                                     Purok
@@ -194,8 +210,8 @@ export default function HouseholdsTableView({
                                                 </div>
                                             </TableHead>
                                             <TableHead 
-                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-                                                onClick={() => onSort('status')}
+                                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                onClick={() => !isLoading && onSort('status')}
                                             >
                                                 <div className="flex items-center gap-1">
                                                     Status
@@ -226,10 +242,10 @@ export default function HouseholdsTableView({
                                                     ? 'Try changing your filters or search criteria.'
                                                     : 'Get started by registering a household.'}
                                                 icon={<Home className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
-                                                hasFilters={hasActiveFilters}
-                                                onClearFilters={onClearFilters}
-                                                onCreateNew={() => router.get('/admin/households/create')}
-                                                createLabel="Register Household"
+                                                action={hasActiveFilters ? {
+                                                    label: "Clear Filters",
+                                                    onClick: onClearFilters
+                                                } : undefined}
                                             />
                                         </TableCell>
                                     </TableRow>
@@ -247,12 +263,13 @@ export default function HouseholdsTableView({
                                                 key={household.id}
                                                 className={`hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors ${
                                                     isSelected ? 'bg-blue-50 dark:bg-blue-900/10 border-l-4 border-l-blue-500' : ''
-                                                }`}
+                                                } ${isLoading ? 'pointer-events-none opacity-60' : ''}`}
                                                 onClick={(e) => {
+                                                    if (isLoading) return;
                                                     if (isBulkMode && e.target instanceof HTMLElement && 
                                                         !e.target.closest('a') && 
                                                         !e.target.closest('button') &&
-                                                        !e.target.closest('.dropdown-menu-content') &&
+                                                        !e.target.closest('[role="menuitem"]') &&
                                                         !e.target.closest('input[type="checkbox"]')) {
                                                         onItemSelect(household.id);
                                                     }
@@ -265,6 +282,7 @@ export default function HouseholdsTableView({
                                                                 checked={isSelected}
                                                                 onCheckedChange={() => onItemSelect(household.id)}
                                                                 onClick={(e) => e.stopPropagation()}
+                                                                disabled={isLoading}
                                                                 className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                                             />
                                                         </div>
@@ -318,7 +336,7 @@ export default function HouseholdsTableView({
                                                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3">
                                                     <div className="flex items-center gap-2">
                                                         <Users className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
-                                                        <span className="text-sm">{household.member_count}</span>
+                                                        <span className="text-sm">{household.member_count || 0}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3">
@@ -395,6 +413,7 @@ export default function HouseholdsTableView({
                                                             <button
                                                                 className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                                                 onClick={(e) => e.stopPropagation()}
+                                                                disabled={isLoading}
                                                             >
                                                                 <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                                                             </button>
@@ -426,6 +445,7 @@ export default function HouseholdsTableView({
 
                                                             {onToggleStatus && (
                                                                 <>
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                     <DropdownMenuItem 
                                                                         onClick={(e) => {
                                                                             e.preventDefault();
@@ -446,12 +466,12 @@ export default function HouseholdsTableView({
                                                                             </>
                                                                         )}
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                 </>
                                                             )}
 
                                                             {hasCoordinates && (
                                                                 <>
+                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                     <DropdownMenuItem 
                                                                         onClick={(e) => {
                                                                             e.preventDefault();
@@ -463,9 +483,10 @@ export default function HouseholdsTableView({
                                                                         <MapIcon className="h-4 w-4" />
                                                                         <span>View Map</span>
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                 </>
                                                             )}
+                                                            
+                                                            <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                             
                                                             <DropdownMenuItem 
                                                                 onClick={(e) => {
@@ -490,6 +511,20 @@ export default function HouseholdsTableView({
                                                                 >
                                                                     <Clipboard className="h-4 w-4" />
                                                                     <span>Copy Contact</span>
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            
+                                                            {household.address && (
+                                                                <DropdownMenuItem 
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        onCopyToClipboard(household.address, 'Address');
+                                                                    }}
+                                                                    className="flex items-center gap-2 cursor-pointer dark:text-gray-300 dark:hover:bg-gray-800"
+                                                                >
+                                                                    <Clipboard className="h-4 w-4" />
+                                                                    <span>Copy Address</span>
                                                                 </DropdownMenuItem>
                                                             )}
                                                             
@@ -519,7 +554,7 @@ export default function HouseholdsTableView({
                                                                 </>
                                                             )}
                                                             
-                                                            {household.status !== 'inactive' && (
+                                                            {canDelete(household.status) && (
                                                                 <>
                                                                     <DropdownMenuSeparator className="dark:bg-gray-700" />
                                                                     <DropdownMenuItem 

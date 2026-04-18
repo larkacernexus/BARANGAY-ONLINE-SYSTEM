@@ -1,93 +1,293 @@
 // pages/admin/positions/create.tsx
-
+import { router, usePage } from '@inertiajs/react';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Shield, Target, Settings, Sparkles, Copy, RefreshCw, Info, BookOpen, Tag, AlertCircle, CheckCircle, Circle, AlertTriangle } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/positions/create/basic-info-tab';
+import { AssignmentTab } from '@/components/admin/positions/create/assignment-tab';
+import { SettingsTab } from '@/components/admin/positions/create/settings-tab';
+import { route } from 'ziggy-js';
 import { 
-    ArrowLeft,
-    Save,
-    Shield,
-    Target,
-    Key,
-    Users,
-    CheckCircle,
-    XCircle,
-    AlertCircle,
-    Hash,
-    Tag,
-    Award,
-    BookOpen
-} from 'lucide-react';
-import { Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
-import { PageProps, PositionFormData } from '@/types/admin/positions/position.types';
+    Committee, 
+    Role, 
+} from '@/types/admin/positions/position.types';
 
-interface CommitteeOption {
-    value: number;
-    label: string;
+
+interface PositionTemplate {
     name: string;
+    code: string;
+    description: string;
+    order: number;
+    requires_account: boolean;
+    is_active: boolean;
+    committee_name?: string;
+}
+
+interface FormData {
+    code: string;
+    name: string;
+    description: string;
+    order: number;
+    committee_id: number | null;
+    role_id: number | null;
+    additional_committees: number[];
+    requires_account: boolean;
     is_active: boolean;
 }
 
-interface RoleOption {
-    id: number;
-    name: string;
-}
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: Shield, requiredFields: ['name', 'code'] },
+    { id: 'assignment', label: 'Assignment', icon: Target, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
 
-interface CreatePositionProps extends PageProps {
-    committees: CommitteeOption[];
-    roles: RoleOption[];
-    nextOrder: number;
-}
+const requiredFieldsMap = {
+    basic: ['name', 'code'],
+    assignment: [],
+    settings: []
+};
 
-export default function CreatePosition({ committees, roles, nextOrder }: CreatePositionProps) {
-    const { data, setData, post, processing, errors } = useForm<PositionFormData>({
+export default function CreatePosition() {
+    const { props } = usePage<{
+        committees: Committee[];
+        roles: Role[];
+        maxOrder: number;
+        templates?: PositionTemplate[];
+    }>();
+    const { committees = [], roles = [], maxOrder = 0, templates = [] } = props;
+    
+    const [showPreview, setShowPreview] = useState(true);
+    const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState(false);
+    const prevNameRef = useRef<string>('');
+
+    // Generate code from name
+    const generateCodeFromName = useCallback((name: string): string => {
+        if (!name) return '';
+        return name
+            .toUpperCase()
+            .replace(/[^A-Z0-9\s]/g, '')
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '');
+    }, []);
+
+  const {
+    formData,
+    errors,
+    isSubmitting,
+    activeTab,
+    formProgress,
+    allRequiredFieldsFilled,
+    handleInputChange,
+    handleSelectChange,
+    handleSubmit,
+    setActiveTab,
+    getTabStatus,
+    getMissingFields,
+    goToNextTab,
+    goToPrevTab,
+    updateFormData
+} = useFormManager<FormData>({
+    initialData: {
         code: '',
         name: '',
         description: '',
-        order: nextOrder,
+        order: maxOrder + 1,
         committee_id: null,
+        role_id: null,
+        additional_committees: [],
         requires_account: false,
         is_active: true,
-    });
+    },
+    requiredFields: requiredFieldsMap,
+    // Remove validationRules - it's not supported
+    onSubmit: (data) => {
+        router.post(route('admin.positions.store'), data as any, {
+            onSuccess: () => {
+                toast.success('Position created successfully');
+                router.visit(route('admin.positions.index'));
+            },
+            onError: (errs) => {
+                toast.error('Failed to create position');
+            }
+        });
+    }
+});
 
-    const [selectedCommittee, setSelectedCommittee] = useState<CommitteeOption | null>(null);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post('/admin/positions');
-    };
-
-    const generateCodeFromName = () => {
-        if (!data.code && data.name) {
-            const code = data.name
-                .toLowerCase()
-                .replace(/[^a-zA-Z0-9]+/g, '_')
-                .replace(/^_+|_+$/g, '');
-            setData('code', code);
+    // Handle name change with auto code generation
+    const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const newName = e.target.value;
+        updateFormData({ name: newName });
+        
+        if (!isCodeManuallyEdited) {
+            const generatedCode = generateCodeFromName(newName);
+            updateFormData({ code: generatedCode });
         }
-    };
+    }, [isCodeManuallyEdited, generateCodeFromName, updateFormData]);
 
-    const handleCommitteeSelect = (committeeId: string) => {
-        if (committeeId === "null" || committeeId === "") {
-            setData('committee_id', null);
-            setSelectedCommittee(null);
+    // Handle code change
+    const handleCodeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        const processedValue = value.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+        updateFormData({ code: processedValue });
+        setIsCodeManuallyEdited(true);
+    }, [updateFormData]);
+
+    // Handle manual generate code button
+    const handleGenerateCode = useCallback(() => {
+        if (formData.name) {
+            const generatedCode = generateCodeFromName(formData.name);
+            updateFormData({ code: generatedCode });
+            setIsCodeManuallyEdited(false);
+            toast.success('Code generated from name');
         } else {
-            const id = parseInt(committeeId);
-            setData('committee_id', id);
-            const committee = committees.find(c => c.value === id);
-            setSelectedCommittee(committee || null);
+            toast.error('Please enter a position name first');
         }
+    }, [formData.name, generateCodeFromName, updateFormData]);
+
+    // Handle number input changes
+    const handleNumberChange = useCallback((name: string, value: number) => {
+        updateFormData({ [name]: value });
+    }, [updateFormData]);
+
+    // Handle switch changes
+    const handleSwitchChange = useCallback((name: keyof FormData, checked: boolean) => {
+        updateFormData({ [name]: checked });
+    }, [updateFormData]);
+
+    // Apply template
+    const applyTemplate = useCallback((template: PositionTemplate) => {
+        updateFormData({
+            name: template.name,
+            code: template.code,
+            description: template.description,
+            order: template.order,
+            requires_account: template.requires_account,
+            is_active: template.is_active,
+        });
+        
+        setIsCodeManuallyEdited(false);
+        
+        if (template.committee_name && committees.length > 0) {
+            const committee = committees.find(c => 
+                c.name.toLowerCase().includes(template.committee_name?.toLowerCase() || '')
+            );
+            if (committee) {
+                updateFormData({ committee_id: committee.id });
+            }
+        }
+        
+        toast.success(`${template.name} template applied`);
+    }, [committees, updateFormData]);
+
+    // Reset form
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
+            updateFormData({
+                code: '',
+                name: '',
+                description: '',
+                order: maxOrder + 1,
+                committee_id: null,
+                role_id: null,
+                additional_committees: [],
+                requires_account: false,
+                is_active: true,
+            });
+            setIsCodeManuallyEdited(false);
+            setActiveTab('basic');
+            toast.info('Form reset');
+        }
+    }, [maxOrder, updateFormData, setActiveTab]);
+
+    const handleCancel = useCallback(() => {
+        if (formData.name || formData.code || formData.description) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.positions.index'));
+            }
+        } else {
+            router.visit(route('admin.positions.index'));
+        }
+    }, [formData]);
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        assignment: getTabStatus('assignment'),
+        settings: getTabStatus('settings')
     };
 
-    const isKagawadPosition = data.name?.toLowerCase().includes('kagawad') || 
-                              data.code?.toLowerCase().includes('kagawad');
+    const missingFields = getMissingFields();
+    const requiredFieldsList = [
+        { label: 'Position Name', value: !!formData.name, tabId: 'basic' },
+        { label: 'Position Code', value: !!formData.code, tabId: 'basic' }
+    ];
+
+    const tabOrder = ['basic', 'assignment', 'settings'];
+
+    // Check if position is Kagawad type
+    const isKagawadPosition = useMemo(() => {
+        return formData.name?.toLowerCase().includes('kagawad') ||
+            formData.code?.toLowerCase().includes('kagawad');
+    }, [formData.name, formData.code]);
+
+    // Default templates if none provided
+    const defaultTemplates: PositionTemplate[] = [
+        {
+            name: 'Punong Barangay',
+            code: 'PUNONG_BARANGAY',
+            description: 'Chief executive of the barangay, responsible for overall governance and administration',
+            order: 1,
+            requires_account: true,
+            is_active: true,
+        },
+        {
+            name: 'Barangay Kagawad',
+            code: 'KAGAWAD',
+            description: 'Barangay council member responsible for specific committees',
+            order: 2,
+            requires_account: true,
+            is_active: true,
+        },
+        {
+            name: 'Barangay Secretary',
+            code: 'SECRETARY',
+            description: 'Records keeper and administrative officer of the barangay',
+            order: 3,
+            requires_account: true,
+            is_active: true,
+        },
+        {
+            name: 'Barangay Treasurer',
+            code: 'TREASURER',
+            description: 'Financial officer responsible for barangay funds and budgeting',
+            order: 4,
+            requires_account: true,
+            is_active: true,
+        },
+        {
+            name: 'SK Chairperson',
+            code: 'SK_CHAIRPERSON',
+            description: 'Sangguniang Kabataan chairperson, representing youth affairs',
+            order: 5,
+            requires_account: true,
+            is_active: true,
+        },
+    ];
+
+    const displayTemplates = templates.length > 0 ? templates : defaultTemplates;
 
     return (
         <AppLayout
@@ -95,389 +295,323 @@ export default function CreatePosition({ committees, roles, nextOrder }: CreateP
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Positions', href: '/admin/positions' },
-                { title: 'Create Position', href: '/admin/positions/create' }
+                { title: 'Create', href: '/admin/positions/create' }
             ]}
         >
-            <form onSubmit={handleSubmit}>
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Link href="/admin/positions">
-                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-700 dark:to-purple-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                                    <Shield className="h-6 w-6 text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
-                                        Create New Position
-                                    </h1>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Add a new official position for barangay officials
-                                    </p>
+            <div className="space-y-6">
+                <FormHeader
+                    title="Create Position"
+                    description="Add a new official position for barangay officials"
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    backLabel="Back"
+                />
+
+                {/* Quick Templates Card */}
+                <Card className="border-l-4 border-l-indigo-500 dark:bg-gray-900">
+                    <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                            <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-0.5" />
+                            <div className="flex-1">
+                                <h3 className="font-medium text-indigo-800 dark:text-indigo-300">Quick start with templates</h3>
+                                <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-1">
+                                    Choose from common position templates to get started quickly.
+                                </p>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {displayTemplates.map((template) => (
+                                        <Button
+                                            key={template.code}
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => applyTemplate(template)}
+                                            className="gap-2 dark:border-gray-600 dark:text-gray-300"
+                                            type="button"
+                                        >
+                                            <Copy className="h-3 w-3" />
+                                            {template.name}
+                                        </Button>
+                                    ))}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleReset}
+                                        className="gap-2 dark:border-gray-600 dark:text-gray-300"
+                                        type="button"
+                                    >
+                                        <RefreshCw className="h-3 w-3" />
+                                        Reset Form
+                                    </Button>
                                 </div>
                             </div>
                         </div>
-                        <Button 
-                            type="submit" 
-                            disabled={processing}
-                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white dark:from-indigo-700 dark:to-purple-700"
-                        >
-                            <Save className="h-4 w-4 mr-2" />
-                            {processing ? 'Saving...' : 'Save Position'}
-                        </Button>
-                    </div>
+                    </CardContent>
+                </Card>
 
-                    {/* Error Messages */}
-                    {Object.keys(errors).length > 0 && (
-                        <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
-                            <CardContent className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
-                                    <div>
-                                        <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
-                                        <ul className="list-disc list-inside mt-2 space-y-1">
-                                            {Object.entries(errors).map(([field, error]) => (
-                                                <li key={field} className="text-sm text-red-600 dark:text-red-400">
-                                                    <span className="font-medium capitalize">{field.replace('_', ' ')}:</span> {error}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
+                <FormErrors errors={errors} />
+
+                {/* Kagawad Warning */}
+                {isKagawadPosition && !formData.committee_id && (
+                    <Card className="border-l-4 border-l-yellow-500 dark:bg-gray-900">
+                        <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-yellow-800 dark:text-yellow-300">Kagawad Position Notice</p>
+                                    <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                                        Kagawad positions usually have a committee assigned. Consider selecting a committee in the Assignment tab.
+                                    </p>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
-                    <div className="grid gap-6 lg:grid-cols-2">
-                        {/* Left Column - Position Details */}
-                        <div className="space-y-6">
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-700 dark:to-purple-700 flex items-center justify-center">
-                                            <Shield className="h-3 w-3 text-white" />
-                                        </div>
-                                        Position Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Enter position details
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="name" className="dark:text-gray-300">
-                                                Position Name <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Input 
-                                                id="name" 
-                                                placeholder="e.g., Barangay Captain, Kagawad - Peace and Order" 
-                                                value={data.name}
-                                                onChange={(e) => setData('name', e.target.value)}
-                                                onBlur={generateCodeFromName}
-                                                required
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                            {errors.name && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="code" className="dark:text-gray-300">
-                                                Code <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Input 
-                                                id="code" 
-                                                placeholder="captain, kagawad_peace" 
-                                                value={data.code}
-                                                onChange={(e) => setData('code', e.target.value)}
-                                                required
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Unique identifier for the position
-                                            </p>
-                                            {errors.code && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
-                                            )}
-                                        </div>
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer 
+                                    title="Basic Information" 
+                                    description="Enter the core details for this position"
+                                >
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={errors}
+                                        onNameChange={handleNameChange}
+                                        onCodeChange={handleCodeChange}
+                                        onOrderChange={handleNumberChange}
+                                        onDescriptionChange={handleInputChange}
+                                        onGenerateCode={handleGenerateCode}
+                                        isSubmitting={isSubmitting}
+                                        maxOrder={maxOrder}
+                                        isCodeManuallyEdited={isCodeManuallyEdited}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    showPrevious={false}
+                                    nextLabel="Next: Assignment"
+                                    submitLabel="Create Position"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'assignment' && (
+                            <>
+                                <FormContainer 
+                                    title="Committee & Role Assignment" 
+                                    description="Assign this position to committees and system roles (optional)"
+                                >
+                                    <AssignmentTab
+                                        formData={formData}
+                                        errors={errors}
+                                        committees={committees}
+                                        roles={roles}
+                                        onCommitteeSelect={(id) => handleSelectChange('committee_id', id)}
+                                        onRoleSelect={(id) => handleSelectChange('role_id', id)}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Settings"
+                                    submitLabel="Create Position"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer 
+                                    title="Position Settings" 
+                                    description="Configure position behavior and access options (optional)"
+                                >
+                                    <SettingsTab
+                                        formData={formData}
+                                        onSwitchChange={handleSwitchChange}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Assignment"
+                                    showNext={false}
+                                    submitLabel="Create Position"
+                                />
+                            </>
+                        )}
+                    </div>
+
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+
+                                {/* Position Summary Preview Card */}
+                                <Card className="dark:bg-gray-900">
+                                    <div className="p-4 border-b dark:border-gray-700">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <Info className="h-4 w-4" />
+                                            Position Summary
+                                        </h3>
                                     </div>
-
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="order" className="dark:text-gray-300">Display Order</Label>
-                                            <div className="relative">
-                                                <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input 
-                                                    id="order" 
-                                                    type="number" 
-                                                    min="0"
-                                                    value={data.order}
-                                                    onChange={(e) => setData('order', parseInt(e.target.value))}
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                />
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center">
+                                                <Shield className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                                             </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Determines sorting in official lists
-                                            </p>
-                                            {errors.order && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.order}</p>
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Badge className={formData.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}>
+                                                        {formData.is_active ? 'Active' : 'Inactive'}
+                                                    </Badge>
+                                                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                                                        {formData.code || 'No code'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Display Order:</span>
+                                                <span className="font-medium dark:text-gray-300">{formData.order}</span>
+                                            </div>
+                                            {formData.committee_id && committees.find(c => c.id === formData.committee_id) && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 dark:text-gray-400">Committee:</span>
+                                                    <span className="font-medium dark:text-gray-300">
+                                                        {committees.find(c => c.id === formData.committee_id)?.name}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {formData.role_id && roles.find(r => r.id === formData.role_id) && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 dark:text-gray-400">System Role:</span>
+                                                    <span className="font-medium dark:text-gray-300">
+                                                        {roles.find(r => r.id === formData.role_id)?.name}
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="committee_id" className="dark:text-gray-300">Committee</Label>
-                                            <Select 
-                                                value={data.committee_id?.toString() || "null"}
-                                                onValueChange={handleCommitteeSelect}
-                                            >
-                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                    <SelectValue placeholder="Select committee" />
-                                                </SelectTrigger>
-                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                    <SelectItem value="null" className="dark:text-gray-300 dark:focus:bg-gray-700">No committee</SelectItem>
-                                                    {committees.map((committee) => (
-                                                        <SelectItem key={committee.value} value={committee.value.toString()} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                            <div className="flex items-center gap-2">
-                                                                <Target className="h-3 w-3" />
-                                                                <span>{committee.label}</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {isKagawadPosition && !data.committee_id && (
-                                                <p className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                                                    <AlertCircle className="h-3 w-3" />
-                                                    Kagawad positions usually have a committee assigned
+
+                                        {formData.description && (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3">
+                                                    {formData.description}
                                                 </p>
-                                            )}
-                                            {errors.committee_id && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.committee_id}</p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
-                                        <Textarea 
-                                            id="description" 
-                                            placeholder="Describe the position's responsibilities and duties..."
-                                            rows={4}
-                                            value={data.description}
-                                            onChange={(e) => setData('description', e.target.value)}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                        />
-                                        {errors.description && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.description}</p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <div className="flex items-center space-x-2 p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                            <Checkbox 
-                                                id="requires_account" 
-                                                checked={data.requires_account}
-                                                onCheckedChange={(checked) => setData('requires_account', checked as boolean)}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <Label htmlFor="requires_account" className="cursor-pointer dark:text-gray-300">
-                                                Requires system account
-                                            </Label>
-                                        </div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 ml-7">
-                                            Officials with this position will need a user account
-                                        </p>
-                                        {errors.requires_account && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.requires_account}</p>
-                                        )}
-
-                                        <div className="flex items-center space-x-2 p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                            <Checkbox 
-                                                id="is_active" 
-                                                checked={data.is_active}
-                                                onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <Label htmlFor="is_active" className="cursor-pointer dark:text-gray-300">
-                                                Position is active
-                                            </Label>
-                                        </div>
-                                        {errors.is_active && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.is_active}</p>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Right Column - Preview & Guidelines */}
-                        <div className="space-y-6">
-                            {/* Preview Card */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
-                                            <Shield className="h-3 w-3 text-white" />
-                                        </div>
-                                        Preview
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {data.name ? (
-                                        <>
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
-                                                    <Shield className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-medium dark:text-gray-100">{data.name}</h4>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                        {isKagawadPosition ? 'Kagawad Position' : 'Barangay Position'}
-                                                    </p>
-                                                </div>
                                             </div>
+                                        )}
 
-                                            <div className="pt-4 border-t dark:border-gray-700 space-y-3">
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                                                    <span className="font-mono font-medium dark:text-gray-300">{data.code || 'Not set'}</span>
-                                                </div>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Order:</span>
-                                                    <span className="font-medium dark:text-gray-300">{data.order}</span>
-                                                </div>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                                    <span className={`font-medium ${data.is_active ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                        {data.is_active ? 'Active' : 'Inactive'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">Account Required:</span>
-                                                    <span className={`font-medium ${data.requires_account ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                        {data.requires_account ? 'Yes' : 'No'}
+                                        <Separator className="dark:bg-gray-700" />
+
+                                        <div className="space-y-2">
+                                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Settings</h4>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-2 h-2 rounded-full ${formData.requires_account ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                                        {formData.requires_account ? 'Requires Account' : 'No Account Required'}
                                                     </span>
                                                 </div>
                                             </div>
-
-                                            {/* Committee Preview */}
-                                            {selectedCommittee && (
-                                                <div className="pt-4 border-t dark:border-gray-700">
-                                                    <h5 className="font-medium mb-2 dark:text-gray-300">Committee:</h5>
-                                                    <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                                                        <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                                                        <span className="text-sm dark:text-gray-300">{selectedCommittee.label}</span>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {data.description && (
-                                                <div className="pt-4 border-t dark:border-gray-700">
-                                                    <h5 className="font-medium mb-2 dark:text-gray-300">Description:</h5>
-                                                    <p className="text-sm text-gray-600 dark:text-gray-400">{data.description}</p>
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">
-                                            <Shield className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                                            <p>Enter position details to see preview</p>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                    </div>
+                                </Card>
 
-                            {/* Quick Tips */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
-                                            <BookOpen className="h-3 w-3 text-white" />
+                                {/* Quick Tips Card */}
+                                <Card className="dark:bg-gray-900">
+                                    <div className="p-4 border-b dark:border-gray-700">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-700 dark:to-cyan-700 flex items-center justify-center">
+                                                <BookOpen className="h-3 w-3 text-white" />
+                                            </div>
+                                            Quick Tips
+                                        </h3>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Tag className="h-3 w-3 text-indigo-500" />
+                                                Position Naming
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Use official position titles</li>
+                                                <li>For Kagawad, include committee</li>
+                                                <li>Keep names clear and descriptive</li>
+                                            </ul>
                                         </div>
-                                        Position Guidelines
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <ul className="space-y-3 text-sm">
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Kagawad Positions:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Should have a committee assigned (e.g., Kagawad - Peace and Order)</p>
-                                            </div>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Account Requirements:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Key positions like Captain, Secretary, Treasurer require system accounts</p>
-                                            </div>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Display Order:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Determines how officials are displayed on the barangay website</p>
-                                            </div>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <span className="font-medium dark:text-gray-200">Position Code:</span>
-                                                <p className="text-gray-600 dark:text-gray-400">Unique identifier used in URLs and API endpoints</p>
-                                            </div>
-                                        </li>
-                                    </ul>
-                                </CardContent>
-                            </Card>
+                                        
+                                        <Separator className="dark:bg-gray-700" />
+                                        
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Target className="h-3 w-3 text-green-500" />
+                                                Committee Assignment
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Kagawad positions should have a committee</li>
+                                                <li>Committee determines oversight responsibilities</li>
+                                                <li>Positions can have additional committees</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <Separator className="dark:bg-gray-700" />
+                                        
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Shield className="h-3 w-3 text-purple-500" />
+                                                System Access
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Key positions require system accounts</li>
+                                                <li>Assign appropriate system roles</li>
+                                                <li>Account required for dashboard access</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
-                        <Link href="/admin/positions">
-                            <Button variant="outline" type="button" className="dark:border-gray-600 dark:text-gray-300">
-                                Cancel
-                            </Button>
-                        </Link>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                variant="outline" 
-                                type="button"
-                                onClick={() => {
-                                    setData({
-                                        code: '',
-                                        name: '',
-                                        description: '',
-                                        order: nextOrder,
-                                        committee_id: null,
-                                        requires_account: false,
-                                        is_active: true,
-                                    });
-                                    setSelectedCommittee(null);
-                                }}
-                                className="dark:border-gray-600 dark:text-gray-300"
-                            >
-                                Reset Form
-                            </Button>
-                            <Button 
-                                type="submit" 
-                                disabled={processing}
-                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white dark:from-indigo-700 dark:to-purple-700"
-                            >
-                                <Save className="h-4 w-4 mr-2" />
-                                {processing ? 'Saving...' : 'Save Position'}
-                            </Button>
-                        </div>
-                    </div>
+                    )}
                 </div>
-            </form>
+            </div>
         </AppLayout>
     );
 }

@@ -1,3 +1,4 @@
+// pages/admin/search/index.tsx
 import React, { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
@@ -46,10 +47,12 @@ interface SearchResult {
   relevance?: number;
 }
 
+// Add index signature to PageProps
 interface PageProps {
   searchResults?: SearchResult[];
   recentSearches?: string[];
   currentQuery?: string;
+  [key: string]: unknown; // This satisfies Inertia's PageProps requirement
 }
 
 // Icon mapping

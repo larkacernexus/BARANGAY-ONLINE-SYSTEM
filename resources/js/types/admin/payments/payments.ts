@@ -413,14 +413,15 @@ export interface FeeType {
 // ==================== FILTERS AND STATS ====================
 
 export interface Filters {
-    sort_by?: string;      // Make optional
-    sort_order?: string;   // Make optional
     search?: string;
     status?: string;
     payment_method?: string;
+    payer_type?: string;
+    clearance_type_id?: string;
     date_from?: string;
     date_to?: string;
-    payer_type?: string;
+    sort_by?: string;
+    sort_order?: 'asc' | 'desc';
 }
 
 export interface Stats {
@@ -438,7 +439,7 @@ export interface PaginationMeta {
     current_page: number;
     from: number;
     last_page: number;
-    path: string;
+    path?: string;
     per_page: number;
     to: number;
     total: number;
@@ -457,8 +458,14 @@ export interface PaginationLinks {
 }
 
 export interface PaginationData {
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number;
+    to: number;
+    per_page: number;
     data: Payment[];
-    links: PaginationLinks;
+    links?: PaginationLinks;
     meta: PaginationMeta;
 }
 

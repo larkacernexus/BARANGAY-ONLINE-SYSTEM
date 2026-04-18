@@ -29,7 +29,7 @@ import {
     BulkEditField, 
     SelectionMode, 
     SelectionStats 
-} from '@/types/report-types';
+} from '@/types/admin/report-types/report-types';
 
 // ============================================
 // LOCAL PAGE PROPS INTERFACE

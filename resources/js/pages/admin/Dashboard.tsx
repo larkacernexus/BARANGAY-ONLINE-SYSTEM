@@ -21,13 +21,13 @@ import { RecentResidents } from '@/components/admin/dashboard/RecentResidents';
 import { PrivilegeStats } from '@/components/admin/dashboard/PrivilegeStats';
 import { DailyCollectionsChart } from '@/components/admin/dashboard/charts/DailyCollectionsChart';
 import { ClearanceStatusChart } from '@/components/admin/dashboard/charts/ClearanceStatusChart';
+import { FloatingFilterBar } from '@/components/admin/dashboard/FloatingFilterBar';
 
 // Import types
 import { 
     type PageProps, 
     type StatItem, 
     type QuickAction, 
-    type ActivityItem,
     type PrivilegeStatsData,
     type SystemStatus as SystemStatusType
 } from '@/types/admin/dashboard/dashboard';
@@ -106,6 +106,34 @@ export default function Dashboard() {
             setSelectedTimeRange(props.selectedDateRange);
         }
     }, [props.selectedDateRange]);
+
+    // Trigger data reload when selectedTimeRange changes
+    useEffect(() => {
+        // Skip initial load if already matching
+        if (selectedTimeRange === props.selectedDateRange) return;
+        
+        setRefreshing(true);
+        router.get(
+            DASHBOARD_URL, 
+            { dateRange: selectedTimeRange },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                only: [
+                    'stats', 'activities', 'recentActivities', 'paymentStats', 
+                    'clearanceRequestStats', 'clearanceTypeStats', 'collectionStats', 
+                    'activityStats', 'storageStats', 'demographicStats', 'privilegeStats', 
+                    'selectedDateRange'
+                ],
+                onSuccess: () => {
+                    setTimeout(() => setRefreshing(false), 500);
+                },
+                onError: () => {
+                    setRefreshing(false);
+                }
+            }
+        );
+    }, [selectedTimeRange, props.selectedDateRange]);
 
     useEffect(() => {
         if (!autoRefresh) return;
@@ -209,8 +237,11 @@ export default function Dashboard() {
             trend: 'stable',
         },
         {
-            title: 'Monthly Collections',
-            value: `₱${props.collectionStats.monthly}`,
+            title: `${selectedTimeRange === 'today' ? 'Today\'s' : selectedTimeRange === 'week' ? 'Weekly' : selectedTimeRange === 'month' ? 'Monthly' : 'Yearly'} Collections`,
+            value: `₱${selectedTimeRange === 'today' ? props.collectionStats.today : 
+                       selectedTimeRange === 'week' ? props.collectionStats.weekly : 
+                       selectedTimeRange === 'month' ? props.collectionStats.monthly : 
+                       props.collectionStats.yearly}`,
             change: props.collectionStats.growthRate,
             changeType: parseFloat(props.collectionStats.growthRate) > 0 ? 'increase' : 
                        parseFloat(props.collectionStats.growthRate) < 0 ? 'decrease' : 'neutral',
@@ -230,7 +261,7 @@ export default function Dashboard() {
             href: '/admin/clearances?status=pending',
             trend: props.stats.pendingClearances < yesterdayStats.clearances ? 'down' : 'up',
         },
-    ], [props.stats, props.collectionStats, yesterdayStats, calculateChange]);
+    ], [props.stats, props.collectionStats, yesterdayStats, calculateChange, selectedTimeRange]);
 
     const detailedStats: StatItem[] = useMemo(() => [
         {
@@ -324,7 +355,7 @@ export default function Dashboard() {
 
     const mobileQuickActions = quickActions.slice(0, 4);
     
-    // Transform activities to match what RecentActivities expects (with priority as required string)
+    // Transform activities to match what RecentActivities expects
     const transformedActivities: RecentActivityItem[] = useMemo(() => {
         const rawActivities = props.activities || [];
         return rawActivities.map(activity => ({
@@ -337,7 +368,7 @@ export default function Dashboard() {
             bgColor: activity.bgColor || 'bg-blue-100',
             data: activity.data,
             isRead: activity.isRead || false,
-            priority: activity.priority || 'medium', // Ensure priority is always a string
+            priority: activity.priority || 'medium',
             created_at: activity.created_at || new Date().toISOString(),
             causer: activity.causer,
             subject_type: activity.subject_type,
@@ -421,7 +452,6 @@ export default function Dashboard() {
             };
         }
         
-        // Transform expiringSoon and recentlyExpired to include all required fields
         const transformExpiringItem = (item: any) => ({
             id: item.id || 0,
             resident_id: item.resident_id || 0,
@@ -597,6 +627,17 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+
+                {/* Floating Filter Bar for Mobile */}
+                <FloatingFilterBar 
+                    selectedTimeRange={selectedTimeRange}
+                    setSelectedTimeRange={setSelectedTimeRange}
+                    onRefresh={handleRefresh}
+                    isRefreshing={refreshing}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={toggleFullscreen}
+                    activeUsers={props.activityStats?.activeUsers || 0}
+                />
             </AppLayout>
         );
     }
@@ -694,6 +735,17 @@ export default function Dashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Floating Filter Bar for Desktop */}
+            <FloatingFilterBar 
+                selectedTimeRange={selectedTimeRange}
+                setSelectedTimeRange={setSelectedTimeRange}
+                onRefresh={handleRefresh}
+                isRefreshing={refreshing}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
+                activeUsers={props.activityStats?.activeUsers || 0}
+            />
         </AppLayout>
     );
 }

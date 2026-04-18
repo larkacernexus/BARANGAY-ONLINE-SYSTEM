@@ -1,147 +1,24 @@
-// pages/admin/Reports/ReportTypes/Create.tsx
-
-import React from 'react';
+// pages/admin/report-types/create.tsx
 import { router, usePage } from '@inertiajs/react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import {
-    ArrowLeft,
-    Save,
-    X,
-    Plus,
-    Trash2,
-    AlertCircle,
-    CheckCircle,
-    FileText,
-    HelpCircle,
-    Sparkles,
-    Copy,
-    Settings,
-    ListChecks,
-    Activity,
-    Users,
-    Clock,
-    Zap,
-    Image,
-    User,
-    Mail,
-    Phone,
-    MapPin,
-    Calendar,
-    Target,
-    GripVertical,
-    ChevronDown,
-    ChevronUp,
-    AlertTriangle,
-    Volume2,
-    Map,
-    Shield,
-    Heart,
-    Building,
-    Car,
-    Store,
-    Eye,
-    EyeOff,
-    Globe,
-    MessageCircle,
-    Flag,
-    Home,
-    Flame,
-    Wind,
-    Sun,
-    Moon,
-    Cloud,
-    Thermometer,
-    Wifi,
-    Camera,
-    Video,
-    Mic,
-    Headphones,
-    Radio,
-    Tv,
-    Gamepad,
-    Pen,
-    Pencil,
-    Scissors,
-    Ruler,
-    Scale,
-    HeartPulse,
-    Pill,
-    Brain,
-    FlaskConical,
-    Microscope,
-    Dna,
-    Circle,
-    Square,
-    Triangle,
-    Hexagon,
-    Octagon,
-    Infinity,
-    Rocket,
-    Plane,
-    Ship,
-    Bus,
-    Bike,
-    Train,
-    Coffee,
-    Beer,
-    Wine,
-    Cake,
-    Cookie,
-    Pizza,
-    Hamburger,
-    Salad,
-    ShieldAlert,
-    Bolt,
-    Flame as FlameIcon,
-    RefreshCw,
-    Hash
-} from 'lucide-react';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { FileText, ListChecks, Activity, Settings, Sparkles, Copy, RefreshCw, AlertCircle, AlertTriangle, Bike, Bolt, Brain, Building, Bus, Cake, Calendar, Camera, Car, Circle, Clock, Cloud, Coffee, Dna, Flag, Flame, FlaskConical, Globe, Hamburger, Headphones, HeartPulse, HelpCircle, Hexagon, Home, Mail, MapPin, MessageCircle, Mic, Microscope, Moon, Octagon, Pen, Pencil, Phone, Pill, Pizza, Plane, Radio, Rocket, Ruler, Scissors, Shield, ShieldAlert, Ship, Square, Store, Sun, Target, Thermometer, Train, Triangle, Tv, Users, Video, Wifi, Wind, Zap } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/report-types/create/basic-info-tab';
+import { FieldsTab } from '@/components/admin/report-types/create/fields-tab';
+import { StepsTab } from '@/components/admin/report-types/create/steps-tab';
+import { SettingsTab } from '@/components/admin/report-types/create/settings-tab';
 import { route } from 'ziggy-js';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-} from '@/components/ui/alert';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Progress } from '@/components/ui/progress';
-
-interface CommonType {
-    name: string;
-    code: string;
-    description: string;
-    icon: string;
-    color: string;
-    priority_level: number;
-    resolution_days: number;
-    requires_immediate_action?: boolean;
-    requires_evidence?: boolean;
-    allows_anonymous?: boolean;
-}
+import type { ReportType } from '@/types/admin/report-types/report-types';
+import React from 'react';
 
 interface RequiredField {
     key: string;
@@ -159,16 +36,58 @@ interface ResolutionStep {
     description: string;
 }
 
-interface PageProps {
-    commonTypes: CommonType[];
-    priorityOptions: Record<number, string>;
-    roleOptions: Record<string, string>;
-    fieldTypes: Record<string, string>;
-    defaultRequiredFields: RequiredField[];
-    defaultResolutionSteps: ResolutionStep[];
+interface CommonType {
+    name: string;
+    code: string;
+    description: string;
+    icon: string;
+    color: string;
+    priority_level: number;
+    resolution_days: number;
+    requires_immediate_action?: boolean;
+    requires_evidence?: boolean;
+    allows_anonymous?: boolean;
 }
 
-// Icon mapping with ONLY definitely valid Lucide React icons
+interface FormData {
+    code: string;
+    name: string;
+    description: string;
+    category: string;
+    subcategory: string;
+    icon: string;
+    color: string;
+    priority_level: number;
+    resolution_days: number;
+    is_active: boolean;
+    requires_immediate_action: boolean;
+    requires_evidence: boolean;
+    allows_anonymous: boolean;
+    required_fields: RequiredField[];
+    resolution_steps: ResolutionStep[];
+    assigned_to_roles: string[];
+}
+
+interface PageProps {
+    commonTypes: CommonType[];
+    [key: string]: unknown;
+}
+
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: FileText, requiredFields: ['name', 'code', 'category'] },
+    { id: 'fields', label: 'Fields', icon: ListChecks, requiredFields: [] },
+    { id: 'steps', label: 'Steps', icon: Activity, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
+
+const requiredFieldsMap = {
+    basic: ['name', 'code', 'category'],
+    fields: [],
+    steps: [],
+    settings: []
+};
+
+// Icon mapping with valid Lucide React icons
 const ICON_GROUPS = {
     alerts: [
         { value: 'alert-circle', label: 'Alert Circle', icon: AlertCircle },
@@ -222,13 +141,11 @@ const ICON_GROUPS = {
         { value: 'headphones', label: 'Headphones', icon: Headphones },
     ],
     maps: [
-        { value: 'map', label: 'Map', icon: Map },
         { value: 'map-pin', label: 'Map Pin', icon: MapPin },
         { value: 'globe', label: 'Globe', icon: Globe },
     ],
     files: [
         { value: 'file-text', label: 'File Text', icon: FileText },
-        { value: 'image', label: 'Image', icon: Image },
         { value: 'pen', label: 'Pen', icon: Pen },
         { value: 'pencil', label: 'Pencil', icon: Pencil },
         { value: 'scissors', label: 'Scissors', icon: Scissors },
@@ -246,13 +163,9 @@ const ICON_GROUPS = {
     ],
     food: [
         { value: 'coffee', label: 'Coffee', icon: Coffee },
-        { value: 'beer', label: 'Beer', icon: Beer },
-        { value: 'wine', label: 'Wine', icon: Wine },
         { value: 'cake', label: 'Cake', icon: Cake },
-        { value: 'cookie', label: 'Cookie', icon: Cookie },
         { value: 'pizza', label: 'Pizza', icon: Pizza },
         { value: 'hamburger', label: 'Hamburger', icon: Hamburger },
-        { value: 'salad', label: 'Salad', icon: Salad },
     ],
     shapes: [
         { value: 'circle', label: 'Circle', icon: Circle },
@@ -260,7 +173,6 @@ const ICON_GROUPS = {
         { value: 'triangle', label: 'Triangle', icon: Triangle },
         { value: 'hexagon', label: 'Hexagon', icon: Hexagon },
         { value: 'octagon', label: 'Octagon', icon: Octagon },
-        { value: 'infinity', label: 'Infinity', icon: Infinity },
     ],
 };
 
@@ -293,43 +205,50 @@ const categoryOptions = [
     { value: 'inquiry', label: 'Inquiry', description: 'Information request', icon: HelpCircle },
 ];
 
+// Priority options
+const priorityOptions: Record<number, string> = {
+    1: 'Critical',
+    2: 'High',
+    3: 'Medium',
+    4: 'Low'
+};
+
+// Role options
+const roleOptions: Record<string, string> = {
+    admin: 'Administrator',
+    barangay_captain: 'Barangay Captain',
+    barangay_secretary: 'Barangay Secretary',
+    barangay_treasurer: 'Barangay Treasurer',
+    kagawad: 'Kagawad',
+    tanod: 'Tanod'
+};
+
+// Field types
+const fieldTypes: Record<string, string> = {
+    text: 'Text Input',
+    textarea: 'Text Area',
+    select: 'Dropdown Select',
+    checkbox: 'Checkbox',
+    date: 'Date Picker',
+    number: 'Number',
+    email: 'Email',
+    phone: 'Phone Number'
+};
+
 export default function ReportTypeCreate() {
     const { props } = usePage<PageProps>();
-    const { 
-        commonTypes = [], 
-        priorityOptions = {}, 
-        roleOptions = {},
-        fieldTypes = {},
-        defaultRequiredFields = [],
-        defaultResolutionSteps = []
-    } = props;
+    const commonTypes: CommonType[] = props.commonTypes || [];
 
-    // Form state
-    const [formData, setFormData] = useState({
-        code: '',
-        name: '',
-        description: '',
-        category: '',
-        subcategory: '',
-        icon: 'alert-circle',
-        color: '#3B82F6',
-        priority_level: 3,
-        resolution_days: 7,
-        is_active: true,
-        requires_immediate_action: false,
-        requires_evidence: false,
-        allows_anonymous: true,
-        required_fields: defaultRequiredFields,
-        resolution_steps: defaultResolutionSteps,
-        assigned_to_roles: [] as string[],
-    });
-
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [activeTab, setActiveTab] = useState('basic');
+    const [showPreview, setShowPreview] = useState(true);
+    const [autoGenerateCode, setAutoGenerateCode] = useState(true);
     const [selectedIcon, setSelectedIcon] = useState('alert-circle');
+    const [showIconPicker, setShowIconPicker] = useState(false);
+    const [searchIconTerm, setSearchIconTerm] = useState('');
+    const [selectedTemplate, setSelectedTemplate] = useState('');
     const [showCustomFieldForm, setShowCustomFieldForm] = useState(false);
     const [editingFieldIndex, setEditingFieldIndex] = useState<number | null>(null);
+    const [newOption, setNewOption] = useState('');
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [newField, setNewField] = useState<RequiredField>({
         key: '',
         label: '',
@@ -337,85 +256,87 @@ export default function ReportTypeCreate() {
         required: true,
         placeholder: '',
         options: [],
+        rows: 3,
     });
-    const [newOption, setNewOption] = useState('');
-    const [searchIconTerm, setSearchIconTerm] = useState('');
-    const [showIconPicker, setShowIconPicker] = useState(false);
-    const [formProgress, setFormProgress] = useState(25);
-    
-    // Track if code was manually edited
-    const [codeManuallyEdited, setCodeManuallyEdited] = useState(false);
-    const nameInputRef = useRef<HTMLInputElement>(null);
-    const codeInputRef = useRef<HTMLInputElement>(null);
 
-    // Update progress based on completed sections
-    useEffect(() => {
-        let progress = 25;
-        
-        if (formData.code && formData.name) progress += 15;
-        if (formData.category) progress += 15;
-        if (formData.required_fields.length > 0) progress += 15;
-        if (formData.resolution_steps.length > 0) progress += 15;
-        if (formData.assigned_to_roles.length > 0) progress += 15;
-        
-        setFormProgress(Math.min(progress, 100));
-    }, [formData]);
-
-    // Auto-generate code from name when name changes, but only if code hasn't been manually edited
-    useEffect(() => {
-        // Only auto-generate if:
-        // 1. There is a name value
-        // 2. Code hasn't been manually edited
-        // 3. Code is empty OR code matches the auto-generated value from previous name
-        if (formData.name && !codeManuallyEdited) {
-            const generatedCode = formData.name
-                .toUpperCase()
-                .replace(/[^A-Z0-9]/g, '_')
-                .replace(/_+/g, '_')
-                .replace(/^_|_$/g, '');
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm
+    } = useFormManager<FormData>({
+        initialData: {
+            code: '',
+            name: '',
+            description: '',
+            category: '',
+            subcategory: '',
+            icon: 'alert-circle',
+            color: '#3B82F6',
+            priority_level: 3,
+            resolution_days: 7,
+            is_active: true,
+            requires_immediate_action: false,
+            requires_evidence: false,
+            allows_anonymous: true,
+            required_fields: [],
+            resolution_steps: [],
+            assigned_to_roles: [],
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            // Validate before submit
+            const newErrors: Record<string, string> = {};
             
-            // Only update if the generated code is different from current code
-            if (generatedCode !== formData.code) {
-                setFormData(prev => ({ ...prev, code: generatedCode }));
+            if (!data.name?.trim()) {
+                newErrors.name = 'Report name is required';
             }
-        }
-    }, [formData.name, codeManuallyEdited]);
-
-    // Handle manual code edit - set the flag to true
-    const handleCodeEdit = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { value } = e.target;
-        setFormData(prev => ({ ...prev, code: value }));
-        setCodeManuallyEdited(true);
-        
-        // Clear error for this field
-        if (errors.code) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors.code;
-                return newErrors;
+            if (!data.code?.trim()) {
+                newErrors.code = 'Report code is required';
+            }
+            if (!data.category) {
+                newErrors.category = 'Category is required';
+            }
+            if (data.resolution_days < 1) {
+                newErrors.resolution_days = 'Resolution days must be at least 1';
+            }
+            if (data.priority_level < 1 || data.priority_level > 4) {
+                newErrors.priority_level = 'Priority must be between 1 and 4';
+            }
+            
+            if (Object.keys(newErrors).length > 0) {
+                setValidationErrors(newErrors);
+                toast.error('Please fix the validation errors');
+                return;
+            }
+            
+            router.post(route('admin.report-types.store'), data as any, {
+                onSuccess: () => {
+                    toast.success('Report type created successfully');
+                    router.visit(route('admin.report-types.index'));
+                },
+                onError: (errs) => {
+                    setValidationErrors(errs);
+                    toast.error('Failed to create report type');
+                }
             });
         }
-    };
+    });
 
-    // Handle name edit - reset manual edit flag if code is empty or matches generated
-    const handleNameEdit = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { value } = e.target;
-        setFormData(prev => ({ ...prev, name: value }));
-        
-        // If code becomes empty, we can auto-generate again
-        if (!formData.code) {
-            setCodeManuallyEdited(false);
-        }
-        
-        // Clear error for this field
-        if (errors.name) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors.name;
-                return newErrors;
-            });
-        }
-    };
+    // Combine errors from server and validation
+    const allErrors = { ...errors, ...validationErrors };
 
     // Filter icons based on search
     const filteredIcons = searchIconTerm
@@ -424,87 +345,10 @@ export default function ReportTypeCreate() {
           )
         : iconOptions;
 
-    // Handle input changes (for non-code/name fields)
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (errors[name]) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors[name];
-                return newErrors;
-            });
-        }
-    };
-
-    // Handle select changes
-    const handleSelectChange = (name: string, value: string) => {
-        setFormData(prev => ({ ...prev, [name]: value }));
-        if (errors[name]) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors[name];
-                return newErrors;
-            });
-        }
-    };
-
-    // Handle number changes
-    const handleNumberChange = (name: string, value: string) => {
-        const numValue = parseInt(value) || 0;
-        setFormData(prev => ({ ...prev, [name]: numValue }));
-    };
-
-    // Handle switch changes
-    const handleSwitchChange = (name: string, checked: boolean) => {
-        setFormData(prev => ({ ...prev, [name]: checked }));
-    };
-
-    // Handle role selection
-    const toggleRole = (role: string) => {
-        setFormData(prev => {
-            const current = prev.assigned_to_roles;
-            if (current.includes(role)) {
-                return { ...prev, assigned_to_roles: current.filter(r => r !== role) };
-            } else {
-                return { ...prev, assigned_to_roles: [...current, role] };
-            }
-        });
-    };
-
-    // Generate code from name (manual trigger)
-    const generateCode = () => {
-        if (formData.name) {
-            const code = formData.name
-                .toUpperCase()
-                .replace(/[^A-Z0-9]/g, '_')
-                .replace(/_+/g, '_')
-                .replace(/^_|_$/g, '');
-            setFormData(prev => ({ ...prev, code }));
-            // Reset manual edit flag when manually generating
-            setCodeManuallyEdited(false);
-            toast.success('Code generated from name');
-        }
-    };
-
-    // Reset manual edit flag (allow auto-generation again)
-    const resetAutoGenerate = () => {
-        setCodeManuallyEdited(false);
-        if (formData.name) {
-            const generatedCode = formData.name
-                .toUpperCase()
-                .replace(/[^A-Z0-9]/g, '_')
-                .replace(/_+/g, '_')
-                .replace(/^_|_$/g, '');
-            setFormData(prev => ({ ...prev, code: generatedCode }));
-            toast.success('Auto-generation re-enabled');
-        }
-    };
-
-    // Load common type template
-    const loadCommonType = (type: CommonType) => {
-        setFormData({
-            ...formData,
+    // Load template
+    const loadTemplate = useCallback((type: CommonType) => {
+        setSelectedTemplate(type.code);
+        updateFormData({
             code: type.code,
             name: type.name,
             description: type.description,
@@ -514,33 +358,83 @@ export default function ReportTypeCreate() {
             resolution_days: type.resolution_days,
             requires_immediate_action: type.requires_immediate_action || false,
             requires_evidence: type.requires_evidence || false,
-            allows_anonymous: type.allows_anonymous || true,
+            allows_anonymous: type.allows_anonymous !== false,
         });
         setSelectedIcon(type.icon || 'alert-circle');
-        // Reset manual edit flag when loading template
-        setCodeManuallyEdited(false);
-        toast.success(`Template "${type.name}" loaded`);
-    };
+        toast.success(`"${type.name}" template loaded successfully`);
+    }, [updateFormData]);
+
+    // Handle code generation
+    const generateCode = useCallback(() => {
+        if (formData.name) {
+            const code = formData.name
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '');
+            updateFormData({ code });
+            toast.success('Code generated from name');
+        } else {
+            toast.error('Please enter a name first');
+        }
+    }, [formData.name, updateFormData]);
+
+    // Handle copy code
+    const handleCopyCode = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(formData.code);
+            toast.success('Code copied to clipboard');
+        } catch {
+            toast.error('Failed to copy code');
+        }
+    }, [formData.code]);
+
+    // Handle number change
+    const handleNumberChange = useCallback((name: string, value: string) => {
+        const numValue = parseInt(value) || 0;
+        updateFormData({ [name]: numValue });
+        // Clear validation error if exists
+        if (validationErrors[name]) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
+        }
+    }, [updateFormData, validationErrors]);
+
+    // Handle switch change
+    const handleSwitchChange = useCallback((name: string, checked: boolean) => {
+        updateFormData({ [name]: checked });
+    }, [updateFormData]);
+
+    // Handle role toggle
+    const toggleRole = useCallback((role: string) => {
+        const current = formData.assigned_to_roles || [];
+        if (current.includes(role)) {
+            updateFormData({ assigned_to_roles: current.filter((r: string) => r !== role) });
+        } else {
+            updateFormData({ assigned_to_roles: [...current, role] });
+        }
+    }, [formData.assigned_to_roles, updateFormData]);
+
+    // Handle icon select
+    const handleIconSelect = useCallback((iconValue: string) => {
+        handleSelectChange('icon', iconValue);
+        setSelectedIcon(iconValue);
+        setShowIconPicker(false);
+        setSearchIconTerm('');
+    }, [handleSelectChange]);
 
     // Required Fields Management
-    const addRequiredField = () => {
+    const addRequiredField = useCallback(() => {
         if (!newField.key || !newField.label) {
             toast.error('Key and label are required');
             return;
         }
 
-        if (!newField.key) {
-            newField.key = newField.label
-                .toLowerCase()
-                .replace(/[^a-z0-9]/g, '_')
-                .replace(/_+/g, '_')
-                .replace(/^_|_$/g, '');
-        }
-
-        setFormData(prev => ({
-            ...prev,
-            required_fields: [...prev.required_fields, { ...newField }]
-        }));
+        const updatedFields = [...(formData.required_fields || []), { ...newField }];
+        updateFormData({ required_fields: updatedFields });
 
         setNewField({
             key: '',
@@ -549,13 +443,14 @@ export default function ReportTypeCreate() {
             required: true,
             placeholder: '',
             options: [],
+            rows: 3,
         });
         setShowCustomFieldForm(false);
         setEditingFieldIndex(null);
         toast.success('Field added successfully');
-    };
+    }, [newField, formData.required_fields, updateFormData]);
 
-    const updateRequiredField = () => {
+    const updateRequiredField = useCallback(() => {
         if (editingFieldIndex === null) return;
 
         if (!newField.key || !newField.label) {
@@ -563,13 +458,10 @@ export default function ReportTypeCreate() {
             return;
         }
 
-        const updatedFields = [...formData.required_fields];
+        const updatedFields = [...(formData.required_fields || [])];
         updatedFields[editingFieldIndex] = { ...newField };
 
-        setFormData(prev => ({
-            ...prev,
-            required_fields: updatedFields
-        }));
+        updateFormData({ required_fields: updatedFields });
 
         setNewField({
             key: '',
@@ -578,156 +470,147 @@ export default function ReportTypeCreate() {
             required: true,
             placeholder: '',
             options: [],
+            rows: 3,
         });
         setShowCustomFieldForm(false);
         setEditingFieldIndex(null);
         toast.success('Field updated successfully');
-    };
+    }, [editingFieldIndex, newField, formData.required_fields, updateFormData]);
 
-    const editRequiredField = (index: number) => {
-        setNewField({ ...formData.required_fields[index] });
+    const editRequiredField = useCallback((index: number) => {
+        const field = formData.required_fields[index];
+        setNewField({ ...field });
         setEditingFieldIndex(index);
         setShowCustomFieldForm(true);
-    };
+    }, [formData.required_fields]);
 
-    const removeRequiredField = (index: number) => {
-        setFormData(prev => ({
-            ...prev,
-            required_fields: prev.required_fields.filter((_, i) => i !== index)
-        }));
+    const removeRequiredField = useCallback((index: number) => {
+        const updatedFields = (formData.required_fields || []).filter((_, i) => i !== index);
+        updateFormData({ required_fields: updatedFields });
         toast.success('Field removed');
-    };
+    }, [formData.required_fields, updateFormData]);
 
-    const moveFieldUp = (index: number) => {
+    const moveFieldUp = useCallback((index: number) => {
         if (index === 0) return;
-        const newFields = [...formData.required_fields];
-        [newFields[index - 1], newFields[index]] = [newFields[index], newFields[index - 1]];
-        setFormData(prev => ({ ...prev, required_fields: newFields }));
-    };
+        const fields = [...(formData.required_fields || [])];
+        [fields[index - 1], fields[index]] = [fields[index], fields[index - 1]];
+        updateFormData({ required_fields: fields });
+    }, [formData.required_fields, updateFormData]);
 
-    const moveFieldDown = (index: number) => {
-        if (index === formData.required_fields.length - 1) return;
-        const newFields = [...formData.required_fields];
-        [newFields[index], newFields[index + 1]] = [newFields[index + 1], newFields[index]];
-        setFormData(prev => ({ ...prev, required_fields: newFields }));
-    };
+    const moveFieldDown = useCallback((index: number) => {
+        if (index === (formData.required_fields || []).length - 1) return;
+        const fields = [...(formData.required_fields || [])];
+        [fields[index], fields[index + 1]] = [fields[index + 1], fields[index]];
+        updateFormData({ required_fields: fields });
+    }, [formData.required_fields, updateFormData]);
 
-    const addOption = () => {
+    const addOption = useCallback(() => {
         if (!newOption.trim()) return;
         setNewField(prev => ({
             ...prev,
             options: [...(prev.options || []), newOption.trim()]
         }));
         setNewOption('');
-    };
+    }, [newOption]);
 
-    const removeOption = (index: number) => {
+    const removeOption = useCallback((index: number) => {
         setNewField(prev => ({
             ...prev,
             options: prev.options?.filter((_, i) => i !== index)
         }));
-    };
+    }, []);
+
+    const cancelFieldForm = useCallback(() => {
+        setShowCustomFieldForm(false);
+        setEditingFieldIndex(null);
+        setNewField({
+            key: '',
+            label: '',
+            type: 'text',
+            required: true,
+            placeholder: '',
+            options: [],
+            rows: 3,
+        });
+        setNewOption('');
+    }, []);
 
     // Resolution Steps Management
-    const addResolutionStep = () => {
-        const nextStep = formData.resolution_steps.length + 1;
+    const addResolutionStep = useCallback(() => {
+        const nextStep = (formData.resolution_steps || []).length + 1;
         const newStep: ResolutionStep = {
             step: nextStep,
             action: `Step ${nextStep}`,
             description: '',
         };
-        setFormData(prev => ({
-            ...prev,
-            resolution_steps: [...prev.resolution_steps, newStep]
-        }));
-    };
-
-    const updateResolutionStep = (index: number, field: keyof ResolutionStep, value: string) => {
-        const updatedSteps = [...formData.resolution_steps];
-        updatedSteps[index] = { ...updatedSteps[index], [field]: value };
-        setFormData(prev => ({ ...prev, resolution_steps: updatedSteps }));
-    };
-
-    const removeResolutionStep = (index: number) => {
-        setFormData(prev => ({
-            ...prev,
-            resolution_steps: prev.resolution_steps.filter((_, i) => i !== index)
-        }));
-        setTimeout(() => {
-            const reordered = formData.resolution_steps
-                .filter((_, i) => i !== index)
-                .map((step, idx) => ({ ...step, step: idx + 1 }));
-            setFormData(prev => ({ ...prev, resolution_steps: reordered }));
-        }, 0);
-    };
-
-    // Validate form
-    const validateForm = () => {
-        const newErrors: Record<string, string> = {};
-
-        if (!formData.code.trim()) {
-            newErrors.code = 'Code is required';
-        } else if (!/^[A-Z0-9_]+$/.test(formData.code)) {
-            newErrors.code = 'Code must contain only uppercase letters, numbers, and underscores';
-        }
-
-        if (!formData.name.trim()) {
-            newErrors.name = 'Name is required';
-        }
-
-        if (formData.priority_level < 1 || formData.priority_level > 4) {
-            newErrors.priority_level = 'Priority level must be between 1 and 4';
-        }
-
-        if (formData.resolution_days < 1) {
-            newErrors.resolution_days = 'Resolution days must be at least 1';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    // Handle form submit
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!validateForm()) {
-            setActiveTab('basic');
-            toast.error('Please fix the errors in the form');
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        router.post(route('report-types.store'), formData, {
-            onSuccess: () => {
-                toast.success('Report type created successfully');
-                router.visit(route('admin.report-types.index'));
-            },
-            onError: (errors) => {
-                setErrors(errors);
-                toast.error('Failed to create report type');
-
-                if (errors.code || errors.name || errors.category) {
-                    setActiveTab('basic');
-                } else if (errors.required_fields) {
-                    setActiveTab('fields');
-                } else if (errors.resolution_steps) {
-                    setActiveTab('steps');
-                }
-            },
-            onFinish: () => {
-                setIsSubmitting(false);
-            }
+        updateFormData({
+            resolution_steps: [...(formData.resolution_steps || []), newStep]
         });
-    };
+    }, [formData.resolution_steps, updateFormData]);
+
+    const updateResolutionStep = useCallback((index: number, field: keyof ResolutionStep, value: string) => {
+        const updatedSteps = [...(formData.resolution_steps || [])];
+        updatedSteps[index] = { ...updatedSteps[index], [field]: value };
+        updateFormData({ resolution_steps: updatedSteps });
+    }, [formData.resolution_steps, updateFormData]);
+
+    const removeResolutionStep = useCallback((index: number) => {
+        const filtered = (formData.resolution_steps || []).filter((_, i) => i !== index);
+        const reordered = filtered.map((step, idx) => ({ ...step, step: idx + 1 }));
+        updateFormData({ resolution_steps: reordered });
+    }, [formData.resolution_steps, updateFormData]);
+
+    // Get category label
+    const getCategoryLabel = useCallback((categoryValue: string): string => {
+        const category = categoryOptions.find(c => c.value === categoryValue);
+        return category?.label || 'Not selected';
+    }, []);
+
+    // Get role label
+    const getRoleLabel = useCallback((roleValue: string): string => {
+        return roleOptions[roleValue] || roleValue;
+    }, []);
+
+    // Reset form
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
+            resetForm();
+            setSelectedIcon('alert-circle');
+            setSelectedTemplate('');
+            setShowCustomFieldForm(false);
+            setEditingFieldIndex(null);
+            setValidationErrors({});
+            toast.info('Form reset');
+        }
+    }, [resetForm]);
 
     // Handle cancel
-    const handleCancel = () => {
-        if (confirm('Are you sure you want to cancel? Any unsaved changes will be lost.')) {
+    const handleCancel = useCallback(() => {
+        if (formData.name || formData.code || formData.description) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.report-types.index'));
+            }
+        } else {
             router.visit(route('admin.report-types.index'));
         }
+    }, [formData]);
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        fields: getTabStatus('fields'),
+        steps: getTabStatus('steps'),
+        settings: getTabStatus('settings')
     };
+
+    const missingFields = getMissingFields();
+
+    const requiredFieldsList = [
+        { label: 'Name', value: !!formData.name, tabId: 'basic' },
+        { label: 'Code', value: !!formData.code, tabId: 'basic' },
+        { label: 'Category', value: !!formData.category, tabId: 'basic' },
+    ];
+
+    const tabOrder = ['basic', 'fields', 'steps', 'settings'];
 
     return (
         <AppLayout
@@ -738,1074 +621,277 @@ export default function ReportTypeCreate() {
                 { title: 'Create', href: '/admin/report-types/create' }
             ]}
         >
-            <TooltipProvider>
-                <div className="space-y-6">
-                    {/* Header with Progress */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-6">
+                <FormHeader
+                    title="Create Report Type"
+                    description="Add a new report type to the system"
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
                         <div className="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleCancel}
+                            <button
                                 type="button"
-                                className="h-8 w-8"
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
                             >
-                                <ArrowLeft className="h-4 w-4" />
-                            </Button>
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-tight dark:text-gray-100">Create Report Type</h1>
-                                <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                    Add a new report type to the system
+                                <RefreshCw className="h-4 w-4" />
+                                Reset
+                            </button>
+                        </div>
+                    }
+                />
+
+                {/* Template Selection */}
+                {commonTypes.length > 0 && (
+                    <div className="bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                        <div className="flex items-start gap-3">
+                            <Sparkles className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5" />
+                            <div className="flex-1">
+                                <h3 className="font-medium text-orange-800 dark:text-orange-300">Quick start with templates</h3>
+                                <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
+                                    Choose from common report type templates to get started quickly.
                                 </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleCancel}
-                                disabled={isSubmitting}
-                                type="button"
-                                className="dark:border-gray-600 dark:text-gray-300"
-                            >
-                                <X className="h-4 w-4 mr-2" />
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                form="report-type-form"
-                                size="sm"
-                                disabled={isSubmitting}
-                                className="gap-2 min-w-[120px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
-                            >
-                                {isSubmitting ? (
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                        Creating...
-                                    </div>
-                                ) : (
-                                    <>
-                                        <Save className="h-4 w-4" />
-                                        Create Report Type
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span className="dark:text-gray-400">Form Completion</span>
-                            <span className="font-medium dark:text-gray-300">{formProgress}%</span>
-                        </div>
-                        <Progress 
-                            value={formProgress} 
-                            className="h-2 dark:bg-gray-700" 
-                            indicatorClassName="bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700"
-                        />
-                    </div>
-
-                    {/* Template Selection */}
-                    {commonTypes.length > 0 && (
-                        <Card className="border-primary/20 bg-primary/5 dark:bg-blue-900/10 dark:border-blue-800">
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-lg flex items-center gap-2 dark:text-gray-100">
-                                    <Sparkles className="h-5 w-5 text-primary dark:text-blue-400" />
-                                    Quick Start Templates
-                                </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Choose from common report type templates to get started quickly
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                                <div className="flex flex-wrap gap-2 mt-3">
                                     {commonTypes.map((type) => {
                                         const IconComponent = iconOptions.find(i => i.value === type.icon)?.icon || AlertCircle;
                                         return (
-                                            <Tooltip key={type.code}>
-                                                <TooltipTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => loadCommonType(type)}
-                                                        className="h-auto py-3 flex flex-col items-center gap-2 w-full dark:border-gray-700 dark:text-gray-300"
-                                                        style={{ borderColor: type.color + '40' }}
-                                                    >
-                                                        <div className="p-2 rounded-full" style={{ backgroundColor: type.color + '20' }}>
-                                                            <IconComponent className="h-5 w-5" style={{ color: type.color }} />
-                                                        </div>
-                                                        <span className="text-xs font-medium text-center line-clamp-2">
-                                                            {type.name}
-                                                        </span>
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="bottom" className="max-w-[200px] dark:bg-gray-900 dark:text-gray-300">
-                                                    <p className="text-xs">{type.description}</p>
-                                                </TooltipContent>
-                                            </Tooltip>
+                                            <button
+                                                key={type.code}
+                                                type="button"
+                                                onClick={() => loadTemplate(type)}
+                                                className={`inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border ${
+                                                    selectedTemplate === type.code
+                                                        ? 'bg-orange-600 text-white border-orange-600 dark:bg-orange-700'
+                                                        : 'border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30'
+                                                } transition-colors`}
+                                            >
+                                                <IconComponent className="h-3 w-3" />
+                                                {type.name}
+                                            </button>
                                         );
                                     })}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-                    {/* Main Form */}
-                    <form 
-                        id="report-type-form" 
-                        onSubmit={handleSubmit}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                            }
-                        }}
-                    >
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                            <TabsList className="grid w-full grid-cols-4 lg:w-auto ">
-                                <TabsTrigger value="basic" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white " type="button">
-                                    <FileText className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Basic Info</span>
-                                </TabsTrigger>
-                                <TabsTrigger value="fields" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white " type="button">
-                                    <ListChecks className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Required Fields</span>
-                                    {formData.required_fields.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1 dark:bg-gray-700 dark:text-gray-300">
-                                            {formData.required_fields.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                                <TabsTrigger value="steps" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white " type="button">
-                                    <Activity className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Resolution Steps</span>
-                                    {formData.resolution_steps.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1 dark:bg-gray-700 dark:text-gray-300">
-                                            {formData.resolution_steps.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                                <TabsTrigger value="settings" className="gap-2 dark:text-gray-400 dark:data-[state=active]:text-white " type="button">
-                                    <Settings className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Settings</span>
-                                    {formData.assigned_to_roles.length > 0 && (
-                                        <Badge variant="secondary" className="ml-1 dark:bg-gray-700 dark:text-gray-300">
-                                            {formData.assigned_to_roles.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
-                            </TabsList>
+                <FormErrors errors={allErrors} />
 
-                            {/* Basic Information Tab */}
-                            <TabsContent value="basic" className="space-y-4">
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <CardTitle className="dark:text-gray-100">Basic Information</CardTitle>
-                                        <CardDescription className="dark:text-gray-400">
-                                            Enter the basic details for this report type
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-6">
-                                        {/* Code and Name */}
-                                        <div className="grid gap-6 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="code" className="flex items-center gap-1 dark:text-gray-300">
-                                                    Code
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <HelpCircle className="h-4 w-4 text-muted-foreground dark:text-gray-500 cursor-help" />
-                                                        </TooltipTrigger>
-                                                        <TooltipContent className="dark:bg-gray-900 dark:text-gray-300">
-                                                            <p>Unique identifier (uppercase letters, numbers, underscores)</p>
-                                                            {codeManuallyEdited && (
-                                                                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                                                                    Auto-generation disabled (manual edit detected)
-                                                                </p>
-                                                            )}
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </Label>
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        id="code"
-                                                        name="code"
-                                                        value={formData.code}
-                                                        onChange={handleCodeEdit}
-                                                        placeholder="e.g., NOISE_COMPLAINT"
-                                                        className={`${errors.code ? 'border-destructive' : ''} ${codeManuallyEdited ? 'border-yellow-500' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}
-                                                        disabled={isSubmitting}
-                                                        ref={codeInputRef}
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="icon"
-                                                        onClick={generateCode}
-                                                        disabled={!formData.name || isSubmitting}
-                                                        title="Generate from name"
-                                                        className="dark:border-gray-600 dark:text-gray-300"
-                                                    >
-                                                        <Sparkles className="h-4 w-4" />
-                                                    </Button>
-                                                    {codeManuallyEdited && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={resetAutoGenerate}
-                                                            disabled={isSubmitting}
-                                                            title="Re-enable auto-generation"
-                                                            className="text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300"
-                                                        >
-                                                            <RefreshCw className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                                {errors.code && (
-                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.code}</p>
-                                                )}
-                                                {codeManuallyEdited && !errors.code && (
-                                                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                                                        Manual edit - auto-generation disabled
-                                                    </p>
-                                                )}
-                                            </div>
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
 
-                                            <div className="space-y-2">
-                                                <Label htmlFor="name" className="dark:text-gray-300">Name</Label>
-                                                <Input
-                                                    id="name"
-                                                    name="name"
-                                                    value={formData.name}
-                                                    onChange={handleNameEdit}
-                                                    placeholder="e.g., Noise Complaint"
-                                                    className={`${errors.name ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}
-                                                    disabled={isSubmitting}
-                                                    ref={nameInputRef}
-                                                />
-                                                {errors.name && (
-                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.name}</p>
-                                                )}
-                                            </div>
-                                        </div>
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer title="Basic Information" description="Enter the basic details for this report type">
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        categoryOptions={categoryOptions}
+                                        priorityOptions={priorityOptions}
+                                        iconOptions={iconOptions}
+                                        colorPresets={colorPresets}
+                                        selectedIcon={selectedIcon}
+                                        autoGenerateCode={autoGenerateCode}
+                                        showIconPicker={showIconPicker}
+                                        searchIconTerm={searchIconTerm}
+                                        filteredIcons={filteredIcons}
+                                        onInputChange={handleInputChange}
+                                        onSelectChange={handleSelectChange}
+                                        onNumberChange={handleNumberChange}
+                                        onCopyCode={handleCopyCode}
+                                        onGenerateCode={generateCode}
+                                        onAutoGenerateToggle={setAutoGenerateCode}
+                                        onIconSelect={handleIconSelect}
+                                        onToggleIconPicker={() => setShowIconPicker(!showIconPicker)}
+                                        onSearchIconChange={setSearchIconTerm}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.category}
+                                    showPrevious={false}
+                                    nextLabel="Next: Fields"
+                                />
+                            </>
+                        )}
 
-                                        {/* Category and Subcategory */}
-                                        <div className="grid gap-6 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="category" className="dark:text-gray-300">Category</Label>
-                                                <Select
-                                                    value={formData.category}
-                                                    onValueChange={(value) => handleSelectChange('category', value)}
-                                                    disabled={isSubmitting}
-                                                >
-                                                    <SelectTrigger className={`${errors.category ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}>
-                                                        <SelectValue placeholder="Select a category" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                        {categoryOptions.map((option) => {
-                                                            const IconComponent = option.icon;
-                                                            return (
-                                                                <SelectItem key={option.value} value={option.value} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <IconComponent className="h-4 w-4" />
-                                                                        <div>
-                                                                            <div>{option.label}</div>
-                                                                            <div className="text-xs text-muted-foreground dark:text-gray-400">
-                                                                                {option.description}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </SelectItem>
-                                                            );
-                                                        })}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                        {activeTab === 'fields' && (
+                            <>
+                                <FormContainer title="Custom Fields" description="Configure the fields required for this report type">
+                                    <FieldsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        requiredFields={formData.required_fields || []}
+                                        newField={newField}
+                                        newOption={newOption}
+                                        showCustomFieldForm={showCustomFieldForm}
+                                        editingFieldIndex={editingFieldIndex}
+                                        fieldTypes={fieldTypes}
+                                        onAddField={addRequiredField}
+                                        onUpdateField={updateRequiredField}
+                                        onEditField={editRequiredField}
+                                        onRemoveField={removeRequiredField}
+                                        onMoveFieldUp={moveFieldUp}
+                                        onMoveFieldDown={moveFieldDown}
+                                        onCancelFieldForm={cancelFieldForm}
+                                        onNewFieldChange={(field, value) => setNewField(prev => ({ ...prev, [field]: value }))}
+                                        onAddOption={addOption}
+                                        onRemoveOption={removeOption}
+                                        onNewOptionChange={setNewOption}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.category}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Steps"
+                                />
+                            </>
+                        )}
 
-                                            <div className="space-y-2">
-                                                <Label htmlFor="subcategory" className="dark:text-gray-300">Subcategory (Optional)</Label>
-                                                <Input
-                                                    id="subcategory"
-                                                    name="subcategory"
-                                                    value={formData.subcategory}
-                                                    onChange={handleInputChange}
-                                                    placeholder="e.g., neighbor, animals, parking"
-                                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    disabled={isSubmitting}
-                                                />
-                                            </div>
-                                        </div>
+                        {activeTab === 'steps' && (
+                            <>
+                                <FormContainer title="Resolution Steps" description="Define the steps to resolve this type of report">
+                                    <StepsTab
+                                        resolutionSteps={formData.resolution_steps || []}
+                                        onAddStep={addResolutionStep}
+                                        onUpdateStep={updateResolutionStep}
+                                        onRemoveStep={removeResolutionStep}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.category}
+                                    previousLabel="Back: Fields"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
 
-                                        {/* Description */}
-                                        <div className="space-y-2">
-                                            <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
-                                            <Textarea
-                                                id="description"
-                                                name="description"
-                                                value={formData.description}
-                                                onChange={handleInputChange}
-                                                placeholder="Enter a description for this report type"
-                                                rows={4}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                disabled={isSubmitting}
-                                            />
-                                        </div>
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Settings" description="Configure behavior and permissions">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        roleOptions={roleOptions}
+                                        assignedRoles={formData.assigned_to_roles || []}
+                                        onSwitchChange={handleSwitchChange}
+                                        onToggleRole={toggleRole}
+                                        getRoleLabel={getRoleLabel}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.category}
+                                    previousLabel="Back: Steps"
+                                    showNext={false}
+                                    submitLabel="Create Report Type"
+                                />
+                            </>
+                        )}
+                    </div>
 
-                                        {/* Icon and Color */}
-                                        <div className="grid gap-6 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="icon" className="dark:text-gray-300">Icon</Label>
-                                                <div className="relative">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        className="w-full justify-start gap-2 h-10 dark:border-gray-600 dark:text-gray-300"
-                                                        onClick={() => setShowIconPicker(!showIconPicker)}
-                                                    >
-                                                        {selectedIcon && (
-                                                            <>
-                                                                {iconOptions.find(i => i.value === selectedIcon)?.icon && (
-                                                                    <>
-                                                                        {React.createElement(
-                                                                            iconOptions.find(i => i.value === selectedIcon)!.icon,
-                                                                            { className: "h-4 w-4" }
-                                                                        )}
-                                                                    </>
-                                                                )}
-                                                                <span className="flex-1 text-left">
-                                                                    {iconOptions.find(i => i.value === selectedIcon)?.label || 'Select an icon'}
-                                                                </span>
-                                                            </>
-                                                        )}
-                                                        <ChevronDown className="h-4 w-4 opacity-50" />
-                                                    </Button>
-
-                                                    {showIconPicker && (
-                                                        <Card className="absolute z-50 mt-1 w-full max-h-[400px] overflow-hidden dark:bg-gray-900 dark:border-gray-700">
-                                                            <div className="p-2 border-b dark:border-gray-700">
-                                                                <Input
-                                                                    placeholder="Search icons..."
-                                                                    value={searchIconTerm}
-                                                                    onChange={(e) => setSearchIconTerm(e.target.value)}
-                                                                    className="h-8 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                />
-                                                            </div>
-                                                            <ScrollArea className="h-[300px]">
-                                                                <div className="p-2 grid grid-cols-4 gap-1">
-                                                                    {filteredIcons.map((icon) => (
-                                                                        <Button
-                                                                            key={icon.value}
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            className={`h-auto py-2 flex-col gap-1 ${
-                                                                                selectedIcon === icon.value ? 'bg-primary/10 border-primary dark:bg-blue-900/20 dark:border-blue-800' : ''
-                                                                            } dark:text-gray-300 dark:hover:text-white`}
-                                                                            onClick={() => {
-                                                                                handleSelectChange('icon', icon.value);
-                                                                                setSelectedIcon(icon.value);
-                                                                                setShowIconPicker(false);
-                                                                                setSearchIconTerm('');
-                                                                            }}
-                                                                        >
-                                                                            <icon.icon className="h-5 w-5" />
-                                                                            <span className="text-[10px] text-center line-clamp-2">
-                                                                                {icon.label}
-                                                                            </span>
-                                                                        </Button>
-                                                                    ))}
-                                                                </div>
-                                                            </ScrollArea>
-                                                        </Card>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label htmlFor="color" className="dark:text-gray-300">Color</Label>
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        id="color"
-                                                        name="color"
-                                                        type="color"
-                                                        value={formData.color}
-                                                        onChange={handleInputChange}
-                                                        className="w-20 h-10 p-1 dark:bg-gray-900 dark:border-gray-700"
-                                                        disabled={isSubmitting}
-                                                    />
-                                                    <div className="flex-1 grid grid-cols-6 gap-1">
-                                                        {colorPresets.map((preset) => (
-                                                            <Tooltip key={preset.value}>
-                                                                <TooltipTrigger asChild>
-                                                                    <button
-                                                                        type="button"
-                                                                        className="w-8 h-8 rounded-full border-2 transition-all hover:scale-110"
-                                                                        style={{ 
-                                                                            backgroundColor: preset.value,
-                                                                            borderColor: formData.color === preset.value ? '#000' : 'transparent'
-                                                                        }}
-                                                                        onClick={() => handleSelectChange('color', preset.value)}
-                                                                        disabled={isSubmitting}
-                                                                    />
-                                                                </TooltipTrigger>
-                                                                <TooltipContent side="bottom" className="dark:bg-gray-900 dark:text-gray-300">
-                                                                    <p>{preset.name}</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Priority and Resolution */}
-                                        <div className="grid gap-6 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="priority_level" className="dark:text-gray-300">Priority Level</Label>
-                                                <Select
-                                                    value={formData.priority_level.toString()}
-                                                    onValueChange={(value) => handleNumberChange('priority_level', value)}
-                                                    disabled={isSubmitting}
-                                                >
-                                                    <SelectTrigger className={`${errors.priority_level ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}>
-                                                        <SelectValue placeholder="Select priority level" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                        {Object.entries(priorityOptions).map(([value, label]) => (
-                                                            <SelectItem key={value} value={value} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                                <div className="flex items-center gap-2">
-                                                                    {value === '1' && <Zap className="h-4 w-4 text-red-500 dark:text-red-400" />}
-                                                                    {value === '2' && <AlertTriangle className="h-4 w-4 text-orange-500 dark:text-orange-400" />}
-                                                                    {value === '3' && <Clock className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />}
-                                                                    {value === '4' && <Target className="h-4 w-4 text-green-500 dark:text-green-400" />}
-                                                                    {label}
-                                                                </div>
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                {errors.priority_level && (
-                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.priority_level}</p>
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <Label htmlFor="resolution_days" className="dark:text-gray-300">Resolution Days</Label>
-                                                <Input
-                                                    id="resolution_days"
-                                                    name="resolution_days"
-                                                    type="number"
-                                                    min="1"
-                                                    max="365"
-                                                    value={formData.resolution_days}
-                                                    onChange={(e) => handleNumberChange('resolution_days', e.target.value)}
-                                                    className={`${errors.resolution_days ? 'border-destructive' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300`}
-                                                    disabled={isSubmitting}
-                                                />
-                                                {errors.resolution_days && (
-                                                    <p className="text-sm text-destructive dark:text-red-400">{errors.resolution_days}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-
-                            {/* Required Fields Tab */}
-                            <TabsContent value="fields" className="space-y-4">
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <CardTitle className="dark:text-gray-100">Required Fields</CardTitle>
-                                                <CardDescription className="dark:text-gray-400">
-                                                    Configure the fields required for this report type
-                                                </CardDescription>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setNewField({
-                                                        key: '',
-                                                        label: '',
-                                                        type: 'text',
-                                                        required: true,
-                                                        placeholder: '',
-                                                        options: [],
-                                                    });
-                                                    setEditingFieldIndex(null);
-                                                    setShowCustomFieldForm(true);
-                                                }}
-                                                disabled={isSubmitting}
-                                                className="dark:border-gray-600 dark:text-gray-300"
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled && !!formData.name && !!formData.code && !!formData.category}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* Report Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Report Summary</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div 
+                                                className="h-10 w-10 rounded-lg flex items-center justify-center"
+                                                style={{ backgroundColor: formData.color + '20' }}
                                             >
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Field
-                                            </Button>
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        {/* Custom Field Form */}
-                                        {showCustomFieldForm && (
-                                            <Card className="border border-primary/20 bg-primary/5 dark:bg-blue-900/10 dark:border-blue-800">
-                                                <CardContent className="pt-6 space-y-4">
-                                                    <div className="grid gap-4 md:grid-cols-2">
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="field_key" className="dark:text-gray-300">Field Key *</Label>
-                                                            <Input
-                                                                id="field_key"
-                                                                value={newField.key}
-                                                                onChange={(e) => setNewField({ ...newField, key: e.target.value })}
-                                                                placeholder="e.g., complainant_name"
-                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                disabled={isSubmitting}
-                                                            />
-                                                            <p className="text-xs text-muted-foreground dark:text-gray-400">
-                                                                Unique identifier (lowercase, underscores)
-                                                            </p>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="field_label" className="dark:text-gray-300">Field Label *</Label>
-                                                            <Input
-                                                                id="field_label"
-                                                                value={newField.label}
-                                                                onChange={(e) => setNewField({ ...newField, label: e.target.value })}
-                                                                placeholder="e.g., Full Name"
-                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                disabled={isSubmitting}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="grid gap-4 md:grid-cols-2">
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="field_type" className="dark:text-gray-300">Field Type</Label>
-                                                            <Select
-                                                                value={newField.type}
-                                                                onValueChange={(value) => setNewField({ ...newField, type: value })}
-                                                                disabled={isSubmitting}
-                                                            >
-                                                                <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                                    <SelectValue placeholder="Select field type" />
-                                                                </SelectTrigger>
-                                                                <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                                    {Object.entries(fieldTypes).map(([value, label]) => (
-                                                                        <SelectItem key={value} value={value} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                                            {label}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="field_placeholder" className="dark:text-gray-300">Placeholder (Optional)</Label>
-                                                            <Input
-                                                                id="field_placeholder"
-                                                                value={newField.placeholder || ''}
-                                                                onChange={(e) => setNewField({ ...newField, placeholder: e.target.value })}
-                                                                placeholder="Enter placeholder text"
-                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                disabled={isSubmitting}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Options for select/radio fields */}
-                                                    {(newField.type === 'select' || newField.type === 'radio') && (
-                                                        <div className="space-y-2">
-                                                            <Label className="dark:text-gray-300">Options</Label>
-                                                            <div className="flex gap-2">
-                                                                <Input
-                                                                    value={newOption}
-                                                                    onChange={(e) => setNewOption(e.target.value)}
-                                                                    placeholder="Add an option"
-                                                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                    disabled={isSubmitting}
-                                                                />
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={addOption}
-                                                                    disabled={!newOption.trim() || isSubmitting}
-                                                                    className="dark:border-gray-600 dark:text-gray-300"
-                                                                >
-                                                                    Add
-                                                                </Button>
-                                                            </div>
-                                                            {newField.options && newField.options.length > 0 && (
-                                                                <div className="flex flex-wrap gap-2 mt-2">
-                                                                    {newField.options.map((opt, idx) => (
-                                                                        <Badge key={idx} variant="secondary" className="gap-1 dark:bg-gray-700 dark:text-gray-300">
-                                                                            {opt}
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => removeOption(idx)}
-                                                                                className="ml-1 hover:text-destructive dark:hover:text-red-400"
-                                                                            >
-                                                                                <X className="h-3 w-3" />
-                                                                            </button>
-                                                                        </Badge>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {/* Rows for textarea */}
-                                                    {newField.type === 'textarea' && (
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="field_rows" className="dark:text-gray-300">Rows</Label>
-                                                            <Input
-                                                                id="field_rows"
-                                                                type="number"
-                                                                min="1"
-                                                                max="10"
-                                                                value={newField.rows || 4}
-                                                                onChange={(e) => setNewField({ ...newField, rows: parseInt(e.target.value) || 4 })}
-                                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                disabled={isSubmitting}
-                                                            />
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            <Switch
-                                                                checked={newField.required}
-                                                                onCheckedChange={(checked) => setNewField({ ...newField, required: checked })}
-                                                                disabled={isSubmitting}
-                                                                className="dark:data-[state=checked]:bg-blue-600"
-                                                            />
-                                                            <Label className="dark:text-gray-300">Required field</Label>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    setShowCustomFieldForm(false);
-                                                                    setEditingFieldIndex(null);
-                                                                }}
-                                                                disabled={isSubmitting}
-                                                                className="dark:text-gray-400 dark:hover:text-white"
-                                                            >
-                                                                Cancel
-                                                            </Button>
-                                                            <Button
-                                                                type="button"
-                                                                variant="default"
-                                                                size="sm"
-                                                                onClick={editingFieldIndex !== null ? updateRequiredField : addRequiredField}
-                                                                disabled={isSubmitting}
-                                                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
-                                                            >
-                                                                {editingFieldIndex !== null ? 'Update' : 'Add'} Field
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        )}
-
-                                        {/* Fields List */}
-                                        {formData.required_fields.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {formData.required_fields.map((field, index) => (
-                                                    <Card key={index} className="border border-muted hover:border-primary/20 transition-colors dark:bg-gray-900 dark:border-gray-700">
-                                                        <CardContent className="p-4">
-                                                            <div className="flex items-start justify-between">
-                                                                <div className="flex-1">
-                                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                                        <GripVertical className="h-4 w-4 text-muted-foreground dark:text-gray-500 cursor-move" />
-                                                                        <span className="font-medium dark:text-gray-200">{field.label}</span>
-                                                                        {field.required && (
-                                                                            <Badge variant="destructive" className="text-xs dark:bg-red-900/30 dark:text-red-400">Required</Badge>
-                                                                        )}
-                                                                        <Badge variant="outline" className="text-xs dark:border-gray-600 dark:text-gray-300">
-                                                                            {field.type}
-                                                                        </Badge>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground dark:text-gray-400 ml-6">
-                                                                        <code className="px-1 py-0.5 bg-muted dark:bg-gray-900 rounded">
-                                                                            {field.key}
-                                                                        </code>
-                                                                        {field.placeholder && (
-                                                                            <>
-                                                                                <span>•</span>
-                                                                                <span>"{field.placeholder}"</span>
-                                                                            </>
-                                                                        )}
-                                                                    </div>
-                                                                    {field.options && field.options.length > 0 && (
-                                                                        <div className="flex flex-wrap gap-1 mt-2 ml-6">
-                                                                            {field.options.map((opt, optIdx) => (
-                                                                                <Badge key={optIdx} variant="secondary" className="text-xs dark:bg-gray-700 dark:text-gray-300">
-                                                                                    {opt}
-                                                                                </Badge>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 dark:text-gray-400 dark:hover:text-white"
-                                                                        onClick={() => moveFieldUp(index)}
-                                                                        disabled={index === 0 || isSubmitting}
-                                                                        title="Move up"
-                                                                    >
-                                                                        <ChevronUp className="h-4 w-4" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 dark:text-gray-400 dark:hover:text-white"
-                                                                        onClick={() => moveFieldDown(index)}
-                                                                        disabled={index === formData.required_fields.length - 1 || isSubmitting}
-                                                                        title="Move down"
-                                                                    >
-                                                                        <ChevronDown className="h-4 w-4" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 dark:text-gray-400 dark:hover:text-white"
-                                                                        onClick={() => editRequiredField(index)}
-                                                                        disabled={isSubmitting}
-                                                                        title="Edit field"
-                                                                    >
-                                                                        <Settings className="h-4 w-4" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-destructive hover:text-destructive dark:text-red-400 dark:hover:text-red-300"
-                                                                        onClick={() => removeRequiredField(index)}
-                                                                        disabled={isSubmitting}
-                                                                        title="Remove field"
-                                                                    >
-                                                                        <Trash2 className="h-4 w-4" />
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        </CardContent>
-                                                    </Card>
-                                                ))}
+                                                {iconOptions.find(i => i.value === formData.icon)?.icon && React.createElement(
+                                                    iconOptions.find(i => i.value === formData.icon)!.icon,
+                                                    { className: "h-5 w-5", style: { color: formData.color } }
+                                                )}
                                             </div>
-                                        ) : (
-                                            <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
-                                                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900 mb-4">
-                                                    <ListChecks className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
                                                 </div>
-                                                <h3 className="text-lg font-semibold mb-2 dark:text-gray-200">No Custom Fields</h3>
-                                                <p className="text-sm text-muted-foreground dark:text-gray-400 mb-4 max-w-md mx-auto">
-                                                    This report type will use default fields. Add custom fields to collect specific information.
-                                                </p>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setNewField({
-                                                            key: '',
-                                                            label: '',
-                                                            type: 'text',
-                                                            required: true,
-                                                            placeholder: '',
-                                                            options: [],
-                                                        });
-                                                        setShowCustomFieldForm(true);
-                                                    }}
-                                                    className="dark:border-gray-600 dark:text-gray-300"
-                                                >
-                                                    <Plus className="h-4 w-4 mr-2" />
-                                                    Add Your First Field
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-
-                            {/* Resolution Steps Tab */}
-                            <TabsContent value="steps" className="space-y-4">
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <CardTitle className="dark:text-gray-100">Resolution Steps</CardTitle>
-                                                <CardDescription className="dark:text-gray-400">
-                                                    Define the steps to resolve this type of report
-                                                </CardDescription>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={addResolutionStep}
-                                                disabled={isSubmitting}
-                                                className="dark:border-gray-600 dark:text-gray-300"
-                                            >
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Step
-                                            </Button>
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        {formData.resolution_steps.length > 0 ? (
-                                            <div className="space-y-4">
-                                                {formData.resolution_steps.map((step, index) => (
-                                                    <Card key={index} className="border border-muted hover:border-primary/20 transition-colors dark:bg-gray-900 dark:border-gray-700">
-                                                        <CardContent className="p-4">
-                                                            <div className="flex items-start gap-4">
-                                                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 dark:bg-blue-900/30 flex items-center justify-center">
-                                                                    <span className="text-sm font-bold text-primary dark:text-blue-400">{step.step}</span>
-                                                                </div>
-                                                                <div className="flex-1 space-y-2">
-                                                                    <Input
-                                                                        value={step.action}
-                                                                        onChange={(e) => updateResolutionStep(index, 'action', e.target.value)}
-                                                                        placeholder="Action title (e.g., 'Initial Assessment')"
-                                                                        disabled={isSubmitting}
-                                                                        className="font-medium dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                    />
-                                                                    <Textarea
-                                                                        value={step.description}
-                                                                        onChange={(e) => updateResolutionStep(index, 'description', e.target.value)}
-                                                                        placeholder="Step description - explain what happens in this step"
-                                                                        rows={2}
-                                                                        disabled={isSubmitting}
-                                                                        className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                    />
-                                                                </div>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-destructive hover:text-destructive dark:text-red-400 dark:hover:text-red-300"
-                                                                    onClick={() => removeResolutionStep(index)}
-                                                                    disabled={isSubmitting}
-                                                                    title="Remove step"
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                        </CardContent>
-                                                    </Card>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-12 border-2 border-dashed rounded-lg dark:border-gray-700">
-                                                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-900 mb-4">
-                                                    <Activity className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {formData.code || 'No code'}
                                                 </div>
-                                                <h3 className="text-lg font-semibold mb-2 dark:text-gray-200">No Resolution Steps</h3>
-                                                <p className="text-sm text-muted-foreground dark:text-gray-400 mb-4 max-w-md mx-auto">
-                                                    Add steps to define how this report type should be resolved from submission to closure.
-                                                </p>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={addResolutionStep}
-                                                    className="dark:border-gray-600 dark:text-gray-300"
-                                                >
-                                                    <Plus className="h-4 w-4 mr-2" />
-                                                    Add First Step
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-
-                            {/* Settings Tab */}
-                            <TabsContent value="settings" className="space-y-4">
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <CardTitle className="dark:text-gray-100">Report Type Settings</CardTitle>
-                                        <CardDescription className="dark:text-gray-400">
-                                            Configure behavior and permissions
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-6">
-                                        {/* Toggle Switches */}
-                                        <div className="space-y-6">
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-900">
-                                                <div className="space-y-0.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400" />
-                                                        <Label className="text-base dark:text-gray-300">Active Status</Label>
-                                                    </div>
-                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                                        Enable this report type for submission
-                                                    </p>
-                                                </div>
-                                                <Switch
-                                                    checked={formData.is_active}
-                                                    onCheckedChange={(checked) => handleSwitchChange('is_active', checked)}
-                                                    disabled={isSubmitting}
-                                                    className="dark:data-[state=checked]:bg-green-600"
-                                                />
-                                            </div>
-
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-900">
-                                                <div className="space-y-0.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <Zap className="h-5 w-5 text-orange-500 dark:text-orange-400" />
-                                                        <Label className="text-base dark:text-gray-300">Requires Immediate Action</Label>
-                                                    </div>
-                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                                        Mark this report type as high priority requiring immediate response
-                                                    </p>
-                                                </div>
-                                                <Switch
-                                                    checked={formData.requires_immediate_action}
-                                                    onCheckedChange={(checked) => handleSwitchChange('requires_immediate_action', checked)}
-                                                    disabled={isSubmitting}
-                                                    className="dark:data-[state=checked]:bg-orange-600"
-                                                />
-                                            </div>
-
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-900">
-                                                <div className="space-y-0.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <Camera className="h-5 w-5 text-blue-500 dark:text-blue-400" />
-                                                        <Label className="text-base dark:text-gray-300">Requires Evidence</Label>
-                                                    </div>
-                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                                        Require photo/video evidence when submitting reports
-                                                    </p>
-                                                </div>
-                                                <Switch
-                                                    checked={formData.requires_evidence}
-                                                    onCheckedChange={(checked) => handleSwitchChange('requires_evidence', checked)}
-                                                    disabled={isSubmitting}
-                                                    className="dark:data-[state=checked]:bg-blue-600"
-                                                />
-                                            </div>
-
-                                            <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-900">
-                                                <div className="space-y-0.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <EyeOff className="h-5 w-5 text-purple-500 dark:text-purple-400" />
-                                                        <Label className="text-base dark:text-gray-300">Allows Anonymous Reports</Label>
-                                                    </div>
-                                                    <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                                        Allow residents to submit reports anonymously
-                                                    </p>
-                                                </div>
-                                                <Switch
-                                                    checked={formData.allows_anonymous}
-                                                    onCheckedChange={(checked) => handleSwitchChange('allows_anonymous', checked)}
-                                                    disabled={isSubmitting}
-                                                    className="dark:data-[state=checked]:bg-purple-600"
-                                                />
                                             </div>
                                         </div>
 
-                                        <Separator className="dark:bg-gray-700" />
-
-                                        {/* Assigned Roles */}
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2">
-                                                <Users className="h-5 w-5 dark:text-gray-400" />
-                                                <Label className="text-base dark:text-gray-300">Assigned Roles</Label>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground dark:text-gray-400">
-                                                Select which personnel roles should handle this type of report
-                                            </p>
-                                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                                {Object.entries(roleOptions).map(([value, label]) => (
-                                                    <Button
-                                                        key={value}
-                                                        type="button"
-                                                        variant={formData.assigned_to_roles.includes(value) ? 'default' : 'outline'}
-                                                        size="sm"
-                                                        onClick={() => toggleRole(value)}
-                                                        disabled={isSubmitting}
-                                                        className={`justify-start h-auto py-2 px-3 ${
-                                                            formData.assigned_to_roles.includes(value)
-                                                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white dark:from-blue-700 dark:to-indigo-700'
-                                                                : 'dark:border-gray-600 dark:text-gray-300'
-                                                        }`}
-                                                    >
-                                                        <Users className="h-4 w-4 mr-2 flex-shrink-0" />
-                                                        <span className="text-sm truncate">{label}</span>
-                                                        {formData.assigned_to_roles.includes(value) && (
-                                                            <CheckCircle className="h-4 w-4 ml-auto flex-shrink-0" />
-                                                        )}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                            {formData.assigned_to_roles.length === 0 && (
-                                                <p className="text-sm text-muted-foreground dark:text-gray-400 text-center py-4 border rounded-lg bg-muted/50 dark:bg-gray-900/50 dark:border-gray-700">
-                                                    No roles selected. This report type will use default assignment.
-                                                </p>
-                                            )}
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500 dark:text-gray-400">Category:</span>
+                                            <span className="font-medium dark:text-gray-300">
+                                                {getCategoryLabel(formData.category)}
+                                            </span>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        </Tabs>
-                    </form>
-
-                    {/* Form Tips */}
-                    <Card className="bg-muted/50 dark:bg-gray-900">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2 dark:text-gray-300">
-                                <HelpCircle className="h-4 w-4" />
-                                Form Tips
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                                <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary dark:text-blue-400">1</span>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500 dark:text-gray-400">Priority:</span>
+                                            <span className="font-medium dark:text-gray-300">
+                                                {priorityOptions[formData.priority_level] || 'Medium'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500 dark:text-gray-400">Resolution:</span>
+                                            <span className="font-medium dark:text-gray-300">{formData.resolution_days} days</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm pt-2 border-t dark:border-gray-700">
+                                            <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                            <span className={`font-medium ${
+                                                formData.is_active 
+                                                    ? 'text-green-600 dark:text-green-400' 
+                                                    : 'text-gray-500 dark:text-gray-400'
+                                            }`}>
+                                                {formData.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <p className="text-muted-foreground dark:text-gray-400">
-                                        <span className="font-medium text-foreground dark:text-gray-300">Code:</span> Auto-generated from name, but you can edit it manually
-                                    </p>
-                                </div>
-                                <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary dark:text-blue-400">2</span>
-                                    </div>
-                                    <p className="text-muted-foreground dark:text-gray-400">
-                                        <span className="font-medium text-foreground dark:text-gray-300">Priority Level:</span> 1=Critical, 2=High, 3=Medium, 4=Low
-                                    </p>
-                                </div>
-                                <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary dark:text-blue-400">3</span>
-                                    </div>
-                                    <p className="text-muted-foreground dark:text-gray-400">
-                                        <span className="font-medium text-foreground dark:text-gray-300">Required Fields:</span> Add custom fields specific to this report type
-                                    </p>
-                                </div>
-                                <div className="flex items-start gap-2">
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                        <span className="text-xs font-bold text-primary dark:text-blue-400">4</span>
-                                    </div>
-                                    <p className="text-muted-foreground dark:text-gray-400">
-                                        <span className="font-medium text-foreground dark:text-gray-300">Resolution Steps:</span> Define the process from submission to closure
-                                    </p>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    )}
                 </div>
-            </TooltipProvider>
+            </div>
         </AppLayout>
     );
 }

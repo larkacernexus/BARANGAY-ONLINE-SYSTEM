@@ -1,74 +1,128 @@
-// resources/js/Pages/Admin/Positions/Edit.tsx
-
+// pages/admin/positions/edit.tsx
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { 
-    ArrowLeft,
-    Save,
-    Shield,
-    Target,
-    Key,
-    Users,
-    CheckCircle,
-    Trash2,
-    X,
-} from 'lucide-react';
-import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import { PageProps, Position, PositionFormData, Committee } from '@/types/admin/positions/position.types';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Shield, Target, Settings, Info, BookOpen, Tag, Users, History, AlertCircle, Trash2 } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { BasicInfoTab } from '@/components/admin/positions/create/basic-info-tab';
+import { AssignmentTab } from '@/components/admin/positions/create/assignment-tab';
+import { SettingsTab } from '@/components/admin/positions/create/settings-tab';
+import { route } from 'ziggy-js';
 
-interface CommitteeOption {
-    value: number;
-    label: string;
+// Types
+interface Committee {
+    id: number;
     name: string;
+    description?: string;
     is_active: boolean;
 }
 
-interface RoleOption {
+interface Role {
+    id: number;
+    name: string;
+    description?: string;
+}
+
+interface Official {
     id: number;
     name: string;
 }
 
-interface EditPositionProps extends PageProps {
-    position: Position;
-    committees: CommitteeOption[];
-    roles: RoleOption[];
+interface Position {
+    id: number;
+    code: string;
+    name: string;
+    description: string | null;
+    order: number;
+    requires_account: boolean;
+    is_active: boolean;
+    committee_id: number | null;
+    committee?: Committee;
+    role_id?: number | null;
+    role?: Role;
+    officials_count?: number;
+    created_at: string;
+    updated_at: string;
 }
 
-export default function EditPosition({ position, committees = [], roles = [] }: EditPositionProps) {
-    const { data, setData, post, processing, errors, delete: destroy } = useForm<PositionFormData>({
-        code: position.code || '',
-        name: position.name || '',
-        description: position.description || '',
-        order: position.order || 0,
-        requires_account: position.requires_account ?? false,
-        is_active: position.is_active ?? true,
-        committee_id: position.committee_id || null,
-    });
+interface FormData {
+    code: string;
+    name: string;
+    description: string;
+    order: number;
+    requires_account: boolean;
+    is_active: boolean;
+    committee_id: number | null;
+    role_id: number | null;
+}
 
-    // Convert the actual Committee type to CommitteeOption for display
-    const [selectedCommittee, setSelectedCommittee] = useState<CommitteeOption | null>(() => {
-        if (position.committee) {
-            return {
-                value: position.committee.id,
-                label: position.committee.name,
-                name: position.committee.name,
-                is_active: position.committee.is_active
-            };
-        }
-        return null;
-    });
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: Shield, requiredFields: ['name', 'code'] },
+    { id: 'assignment', label: 'Assignment', icon: Target, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
 
-    // Initialize form with current data
-    useEffect(() => {
-        setData({
+const requiredFieldsMap = {
+    basic: ['name', 'code'],
+    assignment: [],
+    settings: []
+};
+
+export default function EditPosition() {
+    const { props } = usePage<{
+        position: Position;
+        committees: Committee[];
+        roles: Role[];
+        officials?: Official[];
+    }>();
+    const { position, committees = [], roles = [], officials = [] } = props;
+    
+    const [showPreview, setShowPreview] = useState(true);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+    const hasOfficials = (position.officials_count ?? 0) > 0;
+
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSwitchChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        setErrors
+    } = useFormManager<FormData>({
+        initialData: {
             code: position.code || '',
             name: position.name || '',
             description: position.description || '',
@@ -76,566 +130,652 @@ export default function EditPosition({ position, committees = [], roles = [] }: 
             requires_account: position.requires_account ?? false,
             is_active: position.is_active ?? true,
             committee_id: position.committee_id || null,
-        });
-        
-        // Update selected committee state when position changes
-        if (position.committee) {
-            setSelectedCommittee({
-                value: position.committee.id,
-                label: position.committee.name,
-                name: position.committee.name,
-                is_active: position.committee.is_active
-            });
-        } else {
-            setSelectedCommittee(null);
-        }
-    }, [position]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(`/admin/positions/${position.id}`, {
-            preserveScroll: true,
-            onError: () => {
-                console.log('Error updating position:', errors);
+            role_id: position.role_id || null,
+        },
+        requiredFields: requiredFieldsMap,
+        validationRules: {
+            name: (value) => !value?.trim() ? 'Position name is required' : undefined,
+            code: (value) => {
+                if (!value?.trim()) return 'Position code is required';
+                if (!/^[A-Z0-9_]+$/.test(value)) return 'Code must contain only uppercase letters, numbers, and underscores';
+                return undefined;
             },
+            order: (value) => value < 0 ? 'Display order cannot be negative' : undefined
+        },
+        onSubmit: (data) => {
+            router.put(route('admin.positions.update', position.id), data as any, {
+                onSuccess: () => {
+                    toast.success('Position updated successfully');
+                    router.visit(route('admin.positions.show', position.id));
+                },
+                onError: (errs) => {
+                    setErrors(errs);
+                    toast.error('Failed to update position');
+                }
+            });
+        }
+    });
+
+    // Check for unsaved changes
+    const hasUnsavedChanges = useMemo(() => {
+        const originalData = {
+            code: position.code || '',
+            name: position.name || '',
+            description: position.description || '',
+            order: position.order || 0,
+            requires_account: position.requires_account ?? false,
+            is_active: position.is_active ?? true,
+            committee_id: position.committee_id || null,
+            role_id: position.role_id || null,
+        };
+
+        return Object.keys(originalData).some(key => {
+            const originalValue = originalData[key as keyof typeof originalData];
+            const currentValue = formData[key as keyof FormData];
+            
+            if (originalValue === null && currentValue === null) return false;
+            if (originalValue === undefined && currentValue === undefined) return false;
+            if (originalValue === '' && currentValue === '') return false;
+            
+            return String(originalValue) !== String(currentValue);
+        });
+    }, [formData, position]);
+
+    // Count changed fields
+    const changedFieldsCount = useMemo(() => {
+        let count = 0;
+        if (formData.code !== position.code) count++;
+        if (formData.name !== position.name) count++;
+        if (formData.description !== (position.description || '')) count++;
+        if (formData.order !== position.order) count++;
+        if (formData.requires_account !== position.requires_account) count++;
+        if (formData.is_active !== position.is_active) count++;
+        if (formData.committee_id !== position.committee_id) count++;
+        if (formData.role_id !== position.role_id) count++;
+        return count;
+    }, [formData, position]);
+
+    // Check if position is Kagawad type
+    const isKagawadPosition = useMemo(() => {
+        return formData.name?.toLowerCase().includes('kagawad') || 
+               formData.code?.toLowerCase().includes('kagawad');
+    }, [formData.name, formData.code]);
+
+    // Get selected committee and role
+    const selectedCommittee = formData.committee_id 
+        ? committees.find(c => c.id === formData.committee_id)
+        : null;
+    
+    const selectedRole = formData.role_id
+        ? roles.find(r => r.id === formData.role_id)
+        : null;
+
+    // Handle delete
+    const handleDelete = () => {
+        if (hasOfficials) {
+            toast.error('Cannot delete position that has assigned officials. Please reassign officials first.');
+            return;
+        }
+        setShowDeleteDialog(true);
+    };
+
+    const confirmDelete = () => {
+        router.delete(route('admin.positions.destroy', position.id), {
             onSuccess: () => {
-                console.log('Position updated successfully');
+                toast.success('Position deleted successfully');
+                router.visit(route('admin.positions.index'));
+            },
+            onError: () => {
+                toast.error('Failed to delete position');
+                setShowDeleteDialog(false);
             }
         });
     };
 
-    const handleDelete = () => {
-        const hasOfficials = (position.officials_count ?? 0) > 0;
-        
-        if (hasOfficials) {
-            alert('Cannot delete position that has assigned officials. Please reassign officials first.');
-            return;
-        }
-        
-        if (confirm('Are you sure you want to delete this position? This action cannot be undone.')) {
-            destroy(`/admin/positions/${position.id}`, {
-                preserveScroll: true,
-                onSuccess: () => {
-                    window.location.href = '/admin/positions';
-                }
-            });
-        }
-    };
-
-    const handleCommitteeSelect = (committeeId: string) => {
-        if (committeeId === "null" || committeeId === "") {
-            setData('committee_id', null);
-            setSelectedCommittee(null);
+    const handleCancel = () => {
+        if (hasUnsavedChanges) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.positions.show', position.id));
+            }
         } else {
-            const id = parseInt(committeeId);
-            setData('committee_id', id);
-            const committee = committees.find(c => c.value === id);
-            setSelectedCommittee(committee || null);
+            router.visit(route('admin.positions.show', position.id));
         }
     };
 
-    const isKagawadPosition = data.name?.toLowerCase().includes('kagawad') || 
-                              data.code?.toLowerCase().includes('kagawad');
-
-    const isFieldChanged = (field: keyof PositionFormData, original: any) => {
-        const currentValue = data[field];
-        const originalValue = original;
-        
-        if (currentValue === null || currentValue === undefined) {
-            return originalValue !== null && originalValue !== undefined;
+    const handleReset = () => {
+        if (confirm('Reset all changes to the original values?')) {
+            updateFormData({
+                code: position.code || '',
+                name: position.name || '',
+                description: position.description || '',
+                order: position.order || 0,
+                requires_account: position.requires_account ?? false,
+                is_active: position.is_active ?? true,
+                committee_id: position.committee_id || null,
+                role_id: position.role_id || null,
+            });
+            setActiveTab('basic');
+            toast.info('Form reset to original values');
         }
-        
-        if (originalValue === null || originalValue === undefined) {
-            return currentValue !== null && currentValue !== undefined;
-        }
-        
-        return JSON.stringify(currentValue) !== JSON.stringify(originalValue);
     };
 
-    const resetForm = () => {
-        setData({
-            code: position.code || '',
-            name: position.name || '',
-            description: position.description || '',
-            order: position.order || 0,
-            requires_account: position.requires_account ?? false,
-            is_active: position.is_active ?? true,
-            committee_id: position.committee_id || null,
+    // Generate code from name
+    const generateCode = () => {
+        if (formData.name) {
+            const code = formData.name
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '');
+            updateFormData({ code });
+            toast.success('Code generated from name');
+        } else {
+            toast.error('Please enter a position name first');
+        }
+    };
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        assignment: getTabStatus('assignment'),
+        settings: getTabStatus('settings')
+    };
+
+    const missingFields = getMissingFields();
+    const requiredFieldsList = [
+        { label: 'Position Name', value: !!formData.name, tabId: 'basic' },
+        { label: 'Position Code', value: !!formData.code, tabId: 'basic' }
+    ];
+
+    const tabOrder = ['basic', 'assignment', 'settings'];
+
+    // Format date
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
         });
-        
-        if (position.committee) {
-            setSelectedCommittee({
-                value: position.committee.id,
-                label: position.committee.name,
-                name: position.committee.name,
-                is_active: position.committee.is_active
-            });
-        } else {
-            setSelectedCommittee(null);
-        }
     };
-
-    const getChangedFieldsCount = () => {
-        const fields: (keyof PositionFormData)[] = [
-            'code', 'name', 'description', 'order', 
-            'requires_account', 'is_active', 'committee_id'
-        ];
-        
-        return fields.filter(field => isFieldChanged(field, position[field as keyof Position])).length;
-    };
-
-    const hasOfficials = (position.officials_count ?? 0) > 0;
 
     return (
         <AppLayout
-            title={`Edit ${position.name}`}
+            title={`Edit Position: ${position.name}`}
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Positions', href: '/admin/positions' },
-                { title: position.name, href: `/admin/positions/${position.id}` },
-                { title: 'Edit', href: `/admin/positions/${position.id}/edit` }
+                { title: position.name, href: route('admin.positions.show', position.id) },
+                { title: 'Edit', href: route('admin.positions.edit', position.id) }
             ]}
         >
-            <form onSubmit={handleSubmit}>
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <Link href="/admin/positions">
-                                <Button variant="ghost" size="sm" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight dark:text-white">Edit Position</h1>
-                                <p className="text-gray-500 dark:text-gray-400">
-                                    Update position information
-                                </p>
+            <div className="space-y-6">
+                {/* Header with custom actions */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancel}
+                            type="button"
+                            className="dark:border-gray-600 dark:text-gray-300"
+                        >
+                            <Shield className="h-4 w-4 mr-2" />
+                            Back to Position
+                        </Button>
+                        <div>
+                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
+                                Edit Position
+                            </h1>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
+                                    <Shield className="h-3 w-3 mr-1" />
+                                    {position.code}
+                                </Badge>
+                                <Badge className={formData.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}>
+                                    {formData.is_active ? 'Active' : 'Inactive'}
+                                </Badge>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                onClick={handleDelete}
-                                disabled={processing || hasOfficials}
-                                className="flex items-center gap-2 dark:bg-red-900 dark:hover:bg-red-800"
-                            >
-                                <Trash2 className="h-4 w-4" />
-                                Delete
-                            </Button>
-                            <Button type="submit" disabled={processing} className="flex items-center gap-2 dark:bg-blue-600 dark:hover:bg-blue-700">
-                                <Save className="h-4 w-4" />
-                                {processing ? 'Saving...' : 'Save Changes'}
-                            </Button>
                         </div>
                     </div>
 
-                    {/* Changed fields indicator */}
-                    {getChangedFieldsCount() > 0 && (
-                        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded flex items-center gap-2 dark:bg-blue-950 dark:border-blue-800 dark:text-blue-400">
-                            <div className="h-2 w-2 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
-                            <span className="font-medium">{getChangedFieldsCount()} field(s) modified</span>
-                            <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={resetForm}
-                                className="ml-auto text-blue-700 hover:text-blue-900 hover:bg-blue-100 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/50"
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowPreview(!showPreview)}
+                            className="dark:border-gray-600 dark:text-gray-300"
+                        >
+                            <Shield className="h-4 w-4 mr-2" />
+                            {showPreview ? 'Hide Preview' : 'Show Preview'}
+                        </Button>
+                        {hasUnsavedChanges && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleReset}
+                                type="button"
+                                className="dark:border-gray-600 dark:text-gray-300"
                             >
-                                Reset All
+                                <History className="h-4 w-4 mr-2" />
+                                Reset
                             </Button>
-                        </div>
-                    )}
+                        )}
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleDelete}
+                            disabled={isSubmitting || hasOfficials}
+                        >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                        </Button>
+                    </div>
+                </div>
 
-                    {/* Warning for positions with officials */}
-                    {hasOfficials && (
-                        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400">
-                            <div className="flex items-center gap-2">
-                                <Users className="h-5 w-5" />
+                {/* Last Updated & Changes Banner */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="dark:bg-gray-900">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <History className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                                 <div>
-                                    <p className="font-medium">This position has {position.officials_count} official(s) assigned</p>
-                                    <p className="text-sm mt-1">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                                        Last updated: {formatDate(position.updated_at)}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Created: {formatDate(position.created_at)}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {hasUnsavedChanges && (
+                        <Card className="border-l-4 border-l-blue-500 dark:bg-gray-900">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse"></div>
+                                        <span className="font-medium dark:text-gray-200">
+                                            {changedFieldsCount} field{changedFieldsCount !== 1 ? 's' : ''} modified
+                                        </span>
+                                    </div>
+                                    <Button 
+                                        type="button" 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={handleReset}
+                                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                    >
+                                        <History className="h-4 w-4 mr-1" />
+                                        Reset All
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+
+                {/* Warning for positions with officials */}
+                {hasOfficials && (
+                    <Card className="border-l-4 border-l-amber-500 dark:bg-gray-900">
+                        <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                                <Users className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-amber-800 dark:text-amber-300">
+                                        This position has {position.officials_count} official(s) assigned
+                                    </p>
+                                    <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                                         Changing position details may affect assigned officials. Deleting is not allowed while officials are assigned.
                                     </p>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        </CardContent>
+                    </Card>
+                )}
 
-                    {/* Error Messages */}
-                    {Object.keys(errors).length > 0 && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded dark:bg-red-950 dark:border-red-800 dark:text-red-400">
-                            <p className="font-bold">Please fix the following errors:</p>
-                            <ul className="list-disc list-inside mt-2">
-                                {Object.entries(errors).map(([field, error]) => (
-                                    <li key={field}><strong>{field.replace('_', ' ')}:</strong> {error}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+                <FormErrors errors={errors} />
 
-                    <div className="grid gap-6 lg:grid-cols-3">
-                        {/* Left Column - Position Details */}
-                        <Card className="lg:col-span-2 dark:bg-gray-900 dark:border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-white">
-                                    <Shield className="h-5 w-5" />
-                                    Position Information
-                                </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Update position details
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name" className="dark:text-gray-300">Position Name *</Label>
-                                        <Input 
-                                            id="name" 
-                                            placeholder="e.g., Barangay Captain, Kagawad - Peace and Order" 
-                                            value={data.name}
-                                            onChange={(e) => setData('name', e.target.value)}
-                                            required
-                                            className={`${isFieldChanged('name', position.name) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
-                                        />
-                                        {isFieldChanged('name', position.name) && (
-                                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                                                Was: {position.name}
-                                            </p>
-                                        )}
-                                        {errors.name && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="code" className="dark:text-gray-300">Code *</Label>
-                                        <Input 
-                                            id="code" 
-                                            placeholder="captain, kagawad_peace" 
-                                            value={data.code}
-                                            onChange={(e) => setData('code', e.target.value)}
-                                            required
-                                            className={`${isFieldChanged('code', position.code) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
-                                        />
-                                        {isFieldChanged('code', position.code) && (
-                                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                                                Was: {position.code}
-                                            </p>
-                                        )}
-                                        {errors.code && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
-                                        )}
-                                    </div>
+                {/* Kagawad Warning */}
+                {isKagawadPosition && !formData.committee_id && (
+                    <Card className="border-l-4 border-l-yellow-500 dark:bg-gray-900">
+                        <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                                <div>
+                                    <p className="font-medium text-yellow-800 dark:text-yellow-300">Kagawad Position Notice</p>
+                                    <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                                        Kagawad positions usually have a committee assigned. Consider selecting a committee in the Assignment tab.
+                                    </p>
                                 </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="order" className="dark:text-gray-300">Display Order</Label>
-                                        <Input 
-                                            id="order" 
-                                            type="number" 
-                                            min="0"
-                                            value={data.order}
-                                            onChange={(e) => setData('order', parseInt(e.target.value) || 0)}
-                                            className={`${isFieldChanged('order', position.order) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
-                                        />
-                                        {isFieldChanged('order', position.order) && (
-                                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                                                Was: {position.order}
-                                            </p>
-                                        )}
-                                        {errors.order && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.order}</p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="committee_id" className="dark:text-gray-300">Committee</Label>
-                                        <Select 
-                                            value={data.committee_id?.toString() || "null"}
-                                            onValueChange={handleCommitteeSelect}
-                                        >
-                                            <SelectTrigger className={`${isFieldChanged('committee_id', position.committee_id) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}>
-                                                <SelectValue placeholder="Select committee" />
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                <SelectItem value="null" className="dark:text-white dark:focus:bg-gray-700">No committee</SelectItem>
-                                                {committees.map((committee) => (
-                                                    <SelectItem key={committee.value} value={committee.value.toString()} className="dark:text-white dark:focus:bg-gray-700">
-                                                        <div className="flex items-center gap-2">
-                                                            <Target className="h-3 w-3" />
-                                                            <span>{committee.label}</span>
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {isFieldChanged('committee_id', position.committee_id) && (
-                                            <p className="text-xs text-blue-600 dark:text-blue-400">
-                                                Was: {position.committee?.name || 'No committee'}
-                                            </p>
-                                        )}
-                                        {isKagawadPosition && !data.committee_id && (
-                                            <p className="text-sm text-amber-600 dark:text-amber-400">
-                                                Kagawad positions usually have a committee assigned
-                                            </p>
-                                        )}
-                                        {errors.committee_id && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.committee_id}</p>
-                                        )}
-                                    </div>
-                                </div>
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
-                                    <Textarea 
-                                        id="description" 
-                                        placeholder="Describe the position's responsibilities and duties..."
-                                        rows={4}
-                                        value={data.description}
-                                        onChange={(e) => setData('description', e.target.value)}
-                                        className={`${isFieldChanged('description', position.description) ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/50' : ''} dark:bg-gray-900 dark:border-gray-700 dark:text-white`}
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer 
+                                    title="Basic Information" 
+                                    description="Update the core details for this position"
+                                >
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={errors}
+                                        onNameChange={(e) => handleInputChange(e)}
+                                        onCodeChange={(e) => handleInputChange(e)}
+                                        onOrderChange={(name, value) => updateFormData({ [name]: value })}
+                                        onDescriptionChange={(e) => handleInputChange(e)}
+                                        onGenerateCode={generateCode}
+                                        isSubmitting={isSubmitting}
+                                        maxOrder={position.order}
+                                        isCodeManuallyEdited={false}
                                     />
-                                    {isFieldChanged('description', position.description) && (
-                                        <p className="text-xs text-blue-600 dark:text-blue-400">
-                                            Description has been modified
-                                        </p>
-                                    )}
-                                    {errors.description && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.description}</p>
-                                    )}
-                                </div>
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    showPrevious={false}
+                                    nextLabel="Next: Assignment"
+                                    submitLabel="Update Position"
+                                />
+                            </>
+                        )}
 
-                                <div className="space-y-2">
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id="requires_account" 
-                                            checked={data.requires_account}
-                                            onCheckedChange={(checked) => setData('requires_account', checked as boolean)}
-                                            className={`${isFieldChanged('requires_account', position.requires_account) ? 'border-blue-300 dark:border-blue-600' : ''} dark:border-gray-600`}
-                                        />
-                                        <Label htmlFor="requires_account" className="cursor-pointer dark:text-gray-300">
-                                            Requires system account
-                                        </Label>
-                                    </div>
-                                    {isFieldChanged('requires_account', position.requires_account) && (
-                                        <p className="text-xs text-blue-600 dark:text-blue-400">
-                                            Was: {position.requires_account ? 'Required' : 'Not required'}
-                                        </p>
-                                    )}
-                                    {errors.requires_account && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.requires_account}</p>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox 
-                                        id="is_active" 
-                                        checked={data.is_active}
-                                        onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                        className={`${isFieldChanged('is_active', position.is_active) ? 'border-blue-300 dark:border-blue-600' : ''} dark:border-gray-600`}
+                        {activeTab === 'assignment' && (
+                            <>
+                                <FormContainer 
+                                    title="Committee & Role Assignment" 
+                                    description="Update committee and system role assignments (optional)"
+                                >
+                                    <AssignmentTab
+                                        formData={formData}
+                                        errors={errors}
+                                        committees={committees}
+                                        roles={roles}
+                                        onCommitteeSelect={(id) => handleSelectChange('committee_id', id)}
+                                        onRoleSelect={(id) => handleSelectChange('role_id', id)}
+                                        isSubmitting={isSubmitting}
+                                        isKagawadPosition={isKagawadPosition}
                                     />
-                                    <Label htmlFor="is_active" className="cursor-pointer dark:text-gray-300">
-                                        Position is active
-                                    </Label>
-                                    {isFieldChanged('is_active', position.is_active) && (
-                                        <p className="text-xs text-blue-600 dark:text-blue-400">
-                                            Was: {position.is_active ? 'Active' : 'Inactive'}
-                                        </p>
-                                    )}
-                                    {errors.is_active && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.is_active}</p>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Settings"
+                                    submitLabel="Update Position"
+                                />
+                            </>
+                        )}
 
-                        {/* Right Column - Preview & Current Info */}
-                        <div className="space-y-6">
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="dark:text-white">Current Position</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${isKagawadPosition ? 'bg-amber-100 dark:bg-amber-900/50' : 'bg-blue-100 dark:bg-blue-900/50'}`}>
-                                            <Shield className={`h-6 w-6 ${isKagawadPosition ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`} />
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer 
+                                    title="Position Settings" 
+                                    description="Update position behavior and access options (optional)"
+                                >
+                                    <SettingsTab
+                                        formData={formData}
+                                        onSwitchChange={handleSwitchChange}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                
+                                {/* Officials List */}
+                                {hasOfficials && officials.length > 0 && (
+                                    <Card className="dark:bg-gray-900">
+                                        <div className="p-4 border-b dark:border-gray-700">
+                                            <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                                <Users className="h-4 w-4" />
+                                                Assigned Officials ({officials.length})
+                                            </h3>
                                         </div>
-                                        <div>
-                                            <h4 className="font-medium dark:text-white">{position.name}</h4>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                {isKagawadPosition ? 'Kagawad Position' : 'Barangay Position'}
-                                            </p>
+                                        <div className="p-4 space-y-2">
+                                            {officials.slice(0, 5).map((official) => (
+                                                <div key={official.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                    <span className="text-sm dark:text-gray-300">{official.name}</span>
+                                                    <Badge variant="outline" className="dark:border-gray-600">
+                                                        Active
+                                                    </Badge>
+                                                </div>
+                                            ))}
+                                            {officials.length > 5 && (
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                                                    +{officials.length - 5} more officials
+                                                </p>
+                                            )}
                                         </div>
+                                    </Card>
+                                )}
+
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled}
+                                    previousLabel="Back: Assignment"
+                                    showNext={false}
+                                    submitLabel="Update Position"
+                                />
+                            </>
+                        )}
+                    </div>
+
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+
+                                {/* Position Summary Preview Card */}
+                                <Card className="dark:bg-gray-900">
+                                    <div className="p-4 border-b dark:border-gray-700">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <Info className="h-4 w-4" />
+                                            Position Summary
+                                        </h3>
                                     </div>
-
-                                    <div className="pt-4 border-t dark:border-gray-700 space-y-3">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                                            <code className="font-mono font-medium bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded text-xs dark:text-gray-300">
-                                                {position.code}
-                                            </code>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Order:</span>
-                                            <span className="font-medium dark:text-white">{position.order}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                            <span className={`font-medium ${position.is_active ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                {position.is_active ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Account Required:</span>
-                                            <span className={`font-medium ${position.requires_account ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                {position.requires_account ? 'Yes' : 'No'}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500 dark:text-gray-400">Officials:</span>
-                                            <span className="font-medium flex items-center gap-1 dark:text-white">
-                                                <Users className="h-3 w-3" />
-                                                {position.officials_count ?? 0}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Current Committee */}
-                                    {position.committee && (
-                                        <div className="pt-4 border-t dark:border-gray-700">
-                                            <h5 className="font-medium mb-2 dark:text-gray-300">Committee:</h5>
-                                            <div className="flex items-center gap-2">
-                                                <Target className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                                                <span className="text-sm dark:text-gray-300">{position.committee.name}</span>
-                                                <Badge variant="outline" className="text-xs dark:border-gray-700 dark:text-gray-300">
-                                                    Assigned
-                                                </Badge>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center">
+                                                <Shield className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <Badge className={formData.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}>
+                                                        {formData.is_active ? 'Active' : 'Inactive'}
+                                                    </Badge>
+                                                    <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                                                        {formData.code || 'No code'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    )}
 
-                                    {position.description && (
-                                        <div className="pt-4 border-t dark:border-gray-700">
-                                            <h5 className="font-medium mb-2 dark:text-gray-300">Current Description:</h5>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400">{position.description}</p>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Display Order:</span>
+                                                <span className="font-medium dark:text-gray-300">{formData.order}</span>
+                                            </div>
+                                            {selectedCommittee && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 dark:text-gray-400">Committee:</span>
+                                                    <span className="font-medium dark:text-gray-300">{selectedCommittee.name}</span>
+                                                </div>
+                                            )}
+                                            {selectedRole && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500 dark:text-gray-400">System Role:</span>
+                                                    <span className="font-medium dark:text-gray-300">{selectedRole.name}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500 dark:text-gray-400">Officials:</span>
+                                                <span className="font-medium dark:text-gray-300">{position.officials_count || 0}</span>
+                                            </div>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
 
-                            {/* Quick Actions */}
-                            <Card className="dark:bg-gray-900 dark:border-gray-700">
-                                <CardHeader>
-                                    <CardTitle className="dark:text-white">Quick Actions</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <Link href={`/admin/positions/${position.id}`}>
-                                        <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
-                                            <Shield className="h-4 w-4 mr-2" />
-                                            View Position Details
-                                        </Button>
-                                    </Link>
-                                    
-                                    {hasOfficials && (
-                                        <Link href={`/admin/officials?position_id=${position.id}`}>
-                                            <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
-                                                <Users className="h-4 w-4 mr-2" />
-                                                View Assigned Officials
-                                            </Button>
-                                        </Link>
-                                    )}
-                                    
-                                    <div className="pt-4 border-t dark:border-gray-700">
-                                        <h4 className="font-medium mb-2 dark:text-gray-300">Status Actions</h4>
+                                        {formData.description && (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3">
+                                                    {formData.description}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <Separator className="dark:bg-gray-700" />
+
                                         <div className="space-y-2">
-                                            <Button
-                                                variant={data.is_active ? "default" : "outline"}
-                                                className="w-full justify-start"
-                                                type="button"
-                                                onClick={() => setData('is_active', true)}
-                                            >
-                                                <CheckCircle className="h-4 w-4 mr-2" />
-                                                Set as Active
-                                            </Button>
-                                            <Button
-                                                variant={!data.is_active ? "default" : "outline"}
-                                                className="w-full justify-start"
-                                                type="button"
-                                                onClick={() => setData('is_active', false)}
-                                            >
-                                                <X className="h-4 w-4 mr-2" />
-                                                Set as Inactive
-                                            </Button>
+                                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Settings</h4>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-2 h-2 rounded-full ${formData.requires_account ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                                        {formData.requires_account ? 'Requires Account' : 'No Account Required'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {hasUnsavedChanges && (
+                                            <>
+                                                <Separator className="dark:bg-gray-700" />
+                                                <div className="p-2 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                                                    <p className="text-xs text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                                                        <div className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse"></div>
+                                                        {changedFieldsCount} field{changedFieldsCount !== 1 ? 's' : ''} modified
+                                                    </p>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </Card>
+
+                                {/* Quick Tips Card */}
+                                <Card className="dark:bg-gray-900">
+                                    <div className="p-4 border-b dark:border-gray-700">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-700 dark:to-cyan-700 flex items-center justify-center">
+                                                <BookOpen className="h-3 w-3 text-white" />
+                                            </div>
+                                            Quick Tips
+                                        </h3>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Tag className="h-3 w-3 text-indigo-500" />
+                                                Position Naming
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Use official position titles (e.g., Punong Barangay)</li>
+                                                <li>For Kagawad, include committee (e.g., Kagawad - Peace and Order)</li>
+                                                <li>Keep names clear and descriptive</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <Separator className="dark:bg-gray-700" />
+                                        
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Target className="h-3 w-3 text-green-500" />
+                                                Committee Assignment
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Kagawad positions should have a committee</li>
+                                                <li>Committee determines oversight responsibilities</li>
+                                                <li>Update when committee assignments change</li>
+                                            </ul>
+                                        </div>
+                                        
+                                        <Separator className="dark:bg-gray-700" />
+                                        
+                                        <div className="space-y-2">
+                                            <h4 className="font-medium text-sm flex items-center gap-2 dark:text-gray-200">
+                                                <Shield className="h-3 w-3 text-purple-500" />
+                                                System Access
+                                            </h4>
+                                            <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                                                <li>Key positions require system accounts</li>
+                                                <li>Assign appropriate system roles</li>
+                                                <li>Account required for dashboard access</li>
+                                            </ul>
                                         </div>
                                     </div>
-
-                                    <div className="pt-4 border-t dark:border-gray-700">
-                                        <h4 className="font-medium mb-2 dark:text-gray-300">Account Requirement</h4>
-                                        <div className="space-y-2">
-                                            <Button
-                                                variant={data.requires_account ? "default" : "outline"}
-                                                className="w-full justify-start"
-                                                type="button"
-                                                onClick={() => setData('requires_account', true)}
-                                            >
-                                                <Key className="h-4 w-4 mr-2" />
-                                                Require Account
-                                            </Button>
-                                            <Button
-                                                variant={!data.requires_account ? "default" : "outline"}
-                                                className="w-full justify-start"
-                                                type="button"
-                                                onClick={() => setData('requires_account', false)}
-                                            >
-                                                <Users className="h-4 w-4 mr-2" />
-                                                No Account Needed
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                </Card>
+                            </div>
                         </div>
-                    </div>
-
-                    {/* Form Actions */}
-                    <div className="flex items-center justify-between pt-6 border-t dark:border-gray-700">
-                        <div className="flex items-center gap-2">
-                            <Link href={`/admin/positions/${position.id}`}>
-                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
-                                    View Details
-                                </Button>
-                            </Link>
-                            <Link href="/admin/positions">
-                                <Button variant="outline" type="button" className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
-                                    Back to List
-                                </Button>
-                            </Link>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                variant="outline" 
-                                type="button"
-                                onClick={resetForm}
-                                disabled={processing}
-                                className="flex items-center gap-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
-                            >
-                                <X className="h-4 w-4" />
-                                Reset Changes
-                            </Button>
-                            <Button 
-                                type="submit" 
-                                disabled={processing}
-                                className={`flex items-center gap-2 ${Object.keys(errors).length === 0 ? '' : 'opacity-50'} dark:bg-blue-600 dark:hover:bg-blue-700`}
-                            >
-                                <Save className="h-4 w-4" />
-                                {processing ? 'Saving...' : 'Save Changes'}
-                            </Button>
-                        </div>
-                    </div>
+                    )}
                 </div>
-            </form>
+            </div>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <AlertDialogContent className="dark:bg-gray-900">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                            <Trash2 className="h-5 w-5" />
+                            Delete Position
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="dark:text-gray-400">
+                            Are you sure you want to delete position "{position.name}"? This action cannot be undone.
+                            {hasOfficials && (
+                                <span className="block mt-2 text-yellow-600 dark:text-yellow-400">
+                                    Warning: This position has {position.officials_count} official(s) assigned.
+                                </span>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
+                            disabled={hasOfficials}
+                        >
+                            Delete Position
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

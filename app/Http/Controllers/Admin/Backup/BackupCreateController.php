@@ -30,7 +30,7 @@ class BackupCreateController extends BaseBackupController
         ]);
 
         if ($validator->fails()) {
-            return redirect()->route('backup.index')
+            return redirect()->route('admin.backup.index')
                 ->withErrors($validator)
                 ->withInput();
         }
@@ -54,7 +54,7 @@ class BackupCreateController extends BaseBackupController
                 'size_human' => $this->formatBytes($result['zipSize']),
             ]);
 
-            return redirect()->route('backup.index')
+            return redirect()->route('admin.backup.index')
                 ->with('success', 'Backup created successfully!');
 
         } catch (\Exception $e) {
@@ -65,7 +65,7 @@ class BackupCreateController extends BaseBackupController
                 'error_trace' => $e->getTraceAsString(),
             ]);
             
-            return redirect()->route('backup.index')
+            return redirect()->route('admin.backup.index')
                 ->with('error', 'Backup failed: ' . $e->getMessage());
         }
     }

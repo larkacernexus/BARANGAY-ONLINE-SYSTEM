@@ -1,7 +1,7 @@
 // components/admin/households/create/CredentialsModal.tsx
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 
@@ -13,7 +13,7 @@ interface Credentials {
     user_id?: number;
 }
 
-interface PageProps {
+interface PageProps extends Record<string, any> {
     flash?: {
         user_credentials?: Credentials;
     };

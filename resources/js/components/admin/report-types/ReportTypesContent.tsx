@@ -24,7 +24,7 @@ import ReportTypesGridView from './ReportTypesGridView';
 import ReportTypesBulkActions from './ReportTypesBulkActions';
 
 // Import types
-import { ReportType, BulkOperation, BulkEditField, SelectionMode, FilterState, SelectionStats } from '@/types/report-types';
+import { ReportType, BulkOperation, BulkEditField, SelectionMode, FilterState, SelectionStats } from '@/types/admin/report-types/report-types';
 
 interface ReportTypesContentProps {
     reportTypes: ReportType[];

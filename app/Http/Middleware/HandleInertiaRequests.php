@@ -21,6 +21,20 @@ use App\Models\Form;
 use App\Models\Announcement;
 use App\Models\Payment;
 use App\Models\Privilege;
+use App\Models\Fee;
+use App\Models\Role;
+use App\Models\Permission;
+use App\Models\ClearanceType;
+use App\Models\FeeType;
+use App\Models\ReportType;
+use App\Models\DocumentType;
+use App\Models\Committee;
+use App\Models\Position;
+use App\Models\SecurityAudit;
+use App\Models\AccessLog;
+use App\Models\AuditLog;
+use App\Models\ActivityLog;
+use App\Models\LoginLog;
 use App\Helpers\NotificationHelper;
 
 class HandleInertiaRequests extends Middleware
@@ -34,7 +48,6 @@ class HandleInertiaRequests extends Middleware
 
     /**
      * Get all active privileges with their discount types - DYNAMIC FROM DATABASE
-     * ✅ FIXED: Verification fields now come from DiscountType, not Privilege
      */
     private function getAllPrivileges(): array
     {
@@ -65,9 +78,160 @@ class HandleInertiaRequests extends Middleware
         });
     }
 
+  /**
+ * Get report statistics for sidebar badges
+ */
+private function getReportStats(): array
+{
+    return Cache::remember('sidebar_report_stats', 300, function () {
+        // Try to get report type IDs safely
+        $communityReportTypeId = null;
+        $blotterTypeId = null;
+        
+        try {
+            if (class_exists(ReportType::class)) {
+                $communityReportTypeId = ReportType::where('code', 'community_report')
+                    ->orWhere('name', 'like', '%community%')
+                    ->value('id');
+                $blotterTypeId = ReportType::where('code', 'blotter')
+                    ->orWhere('name', 'like', '%blotter%')
+                    ->value('id');
+            }
+        } catch (\Exception $e) {
+            Log::warning('Could not fetch report types: ' . $e->getMessage());
+        }
+        
+        return [
+            'total' => CommunityReport::count(),
+            'pending' => CommunityReport::where('status', 'pending')->count(),
+            'community_reports' => $communityReportTypeId 
+                ? CommunityReport::where('report_type_id', $communityReportTypeId)->count() 
+                : CommunityReport::where('title', 'like', '%community%')->orWhere('description', 'like', '%community%')->count(),
+            'blotters' => $blotterTypeId 
+                ? CommunityReport::where('report_type_id', $blotterTypeId)->count() 
+                : CommunityReport::where('title', 'like', '%blotter%')->orWhere('description', 'like', '%blotter%')->count(),
+            'today' => CommunityReport::whereDate('created_at', today())->count(),
+            'under_review' => CommunityReport::where('status', 'under_review')->count(),
+            'assigned' => CommunityReport::where('status', 'assigned')->count(),
+            'in_progress' => CommunityReport::where('status', 'in_progress')->count(),
+            'resolved' => CommunityReport::where('status', 'resolved')->count(),
+            'rejected' => CommunityReport::where('status', 'rejected')->count(),
+            'high_priority' => CommunityReport::where(function($q) {
+                $q->whereIn('priority', ['high', 'critical'])
+                  ->orWhere('urgency_level', 'high');
+            })->count(),
+            'pending_clearances' => ClearanceRequest::where('status', 'pending')->count(),
+        ];
+    });
+}
+
+ /**
+ * Get resident statistics for sidebar badges
+ */
+private function getResidentStats(): array
+{
+    return Cache::remember('sidebar_resident_stats', 600, function () {
+        return [
+            'total' => Resident::count(),
+            'active' => Resident::where('status', 'active')->count(),
+            'inactive' => Resident::where('status', 'inactive')->count(),
+            'households' => Household::count(),
+            'businesses' => Business::count(),
+            'voters' => Resident::where('is_voter', true)->count(),
+            'senior_citizens' => Resident::where(function($q) {
+                $q->whereHas('activeResidentPrivileges', function($q2) {
+                    $q2->whereHas('privilege', function($q3) {
+                        $q3->where('code', 'SENIOR');
+                    });
+                })->orWhere(function($q3) {
+                    $q3->whereNotNull('birth_date')
+                      ->whereRaw('TIMESTAMPDIFF(YEAR, birth_date, CURDATE()) >= 60');
+                });
+            })->count(),
+            'pwd' => Resident::whereHas('activeResidentPrivileges', function($q) {
+                $q->whereHas('privilege', function($q2) {
+                    $q2->where('code', 'PWD');
+                });
+            })->count(),
+            'solo_parents' => Resident::whereHas('activeResidentPrivileges', function($q) {
+                $q->whereHas('privilege', function($q2) {
+                    $q2->where('code', 'SOLO_PARENT');
+                });
+            })->count(),
+        ];
+    });
+}
+/**
+ * Get payment statistics for sidebar badges
+ */
+private function getPaymentStats(): array
+{
+    return Cache::remember('sidebar_payment_stats', 300, function () {
+        $totalRevenue = Payment::where('status', 'completed')->sum('total_amount');
+        $todayCollections = Payment::where('status', 'completed')
+            ->whereDate('payment_date', today())
+            ->sum('total_amount');
+        $monthlyCollections = Payment::where('status', 'completed')
+            ->whereYear('payment_date', now()->year)
+            ->whereMonth('payment_date', now()->month)
+            ->sum('total_amount');
+
+        return [
+            'total_fees' => Fee::count(),
+            'total_payments' => Payment::count(),
+            'pending_payments' => Payment::where('status', 'pending')->count(),
+            'total_revenue' => $totalRevenue,
+            'today_collections' => $todayCollections,
+            'monthly_collections' => $monthlyCollections,
+        ];
+    });
+}
+
+   /**
+ * Get service statistics for sidebar badges
+ */
+private function getServiceStats(): array
+{
+    return Cache::remember('sidebar_service_stats', 300, function () {
+        return [
+            'total_forms' => Form::where('is_active', true)->count(),
+            'total_privileges' => Privilege::where('is_active', true)->count(),
+            'active_announcements' => Announcement::where('is_active', true)
+                ->where(function ($q) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                })
+                ->count(),
+            'total_clearances' => ClearanceRequest::count(),
+            'pending_clearances' => ClearanceRequest::where('status', 'pending')->count(),
+            'approved_clearances' => ClearanceRequest::where('status', 'approved')->count(),
+        ];
+    });
+}
+
+  /**
+ * Get system statistics for sidebar badges
+ */
+private function getSystemStats(): array
+{
+    return Cache::remember('sidebar_system_stats', 3600, function () {
+        return [
+            'total_users' => User::count(),
+            'total_roles' => class_exists(Role::class) ? Role::count() : 0,
+            'total_permissions' => class_exists(Permission::class) ? Permission::count() : 0,
+            'total_puroks' => Purok::count(),
+            'total_positions' => class_exists(Position::class) ? Position::count() : 0,
+            'total_committees' => class_exists(Committee::class) ? Committee::count() : 0,
+            'total_officials' => Official::where('status', 'active')->count(),
+            'total_clearance_types' => class_exists(ClearanceType::class) ? ClearanceType::count() : 0,
+            'total_fee_types' => class_exists(FeeType::class) ? FeeType::count() : 0,
+            'total_report_types' => class_exists(ReportType::class) ? ReportType::count() : 0,
+            'total_document_types' => class_exists(DocumentType::class) ? DocumentType::count() : 0,
+            'active_sessions' => cache()->get('active_sessions_count', 0),
+        ];
+    });
+}
     /**
      * Get resident's active privileges with discount info
-     * ✅ FIXED: Get discount percentage from DiscountType using 'percentage'
      */
     private function getResidentPrivileges(Resident $resident): array
     {
@@ -117,6 +281,13 @@ class HandleInertiaRequests extends Middleware
         
         // Get all privileges for frontend
         $allPrivileges = $this->getAllPrivileges();
+        
+        // ============ FETCH STATISTICS FOR SIDEBAR ============
+        $reportStats = $this->getReportStats();
+        $residentStats = $this->getResidentStats();
+        $paymentStats = $this->getPaymentStats();
+        $serviceStats = $this->getServiceStats();
+        $systemStats = $this->getSystemStats();
         
         // Handle search queries
         $searchResults = [];
@@ -289,6 +460,13 @@ class HandleInertiaRequests extends Middleware
                 'unreadCount' => $unreadNotificationCount,
             ],
             // ==================================================
+            // ============ SIDEBAR STATISTICS ============
+            'reportStats' => $reportStats,
+            'residentStats' => $residentStats,
+            'paymentStats' => $paymentStats,
+            'serviceStats' => $serviceStats,
+            'systemStats' => $systemStats,
+            // ============================================
             // Search results
             'searchResults' => $searchResults,
             'quickResults' => $quickResults,

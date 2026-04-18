@@ -1,12 +1,9 @@
 import AppLayout from '@/layouts/admin-app-layout';
-import { Head, router } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import { toast } from 'sonner';
-
-// Custom hooks
-import { usePaymentsManagement } from '@/hooks/usePaymentsManagement';
 
 // Components
 import PaymentsHeader from '@/components/admin/payments/PaymentsHeader';
@@ -19,11 +16,17 @@ import PrintableReceipt from '@/components/admin/receipts/PrintableReceipt';
 // Types
 import { PaginationData, Filters, Stats, Payment } from '@/types/admin/payments/payments';
 import { route } from 'ziggy-js';
+import { Loader2, KeyRound } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-interface PaymentsIndexProps {
-    payments: PaginationData;
-    filters: Filters;
-    stats: Stats;
+// Debounce utility
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
 }
 
 // Helper function to format currency
@@ -44,16 +47,18 @@ const getSafeString = (value: any, defaultValue: string = ''): string => {
     return defaultValue;
 };
 
-const getSafeSortOrder = (value: any): 'asc' | 'desc' => {
-    if (value === 'asc') return 'asc';
-    if (value === 'desc') return 'desc';
-    return 'desc';
-};
+interface PaymentsIndexProps {
+    payments: PaginationData;
+    filters: Filters;
+    stats: Stats;
+    clearanceTypes?: Array<{ id: number; name: string; code: string; fee: number }>;
+}
 
 export default function PaymentsIndex({
-    payments: rawPayments,
-    filters,
-    stats
+    payments: initialPayments,
+    filters: initialFilters = {},  // ✅ FIXED: Default to empty object, not a function
+    stats: initialStats,
+    clearanceTypes = []
 }: PaymentsIndexProps) {
     
     const [selectedPaymentForPrint, setSelectedPaymentForPrint] = useState<any>(null);
@@ -70,25 +75,30 @@ export default function PaymentsIndex({
     });
 
     // Safe data extraction
-    const safePaymentsData = rawPayments?.data || [];
-    const safeMeta = rawPayments || { current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 };
-    const safeFilters = filters || {};
-    const safeStats = stats || { total: 0, today: 0, monthly: 0, total_amount: 0, today_amount: 0, monthly_amount: 0 };
+    const safePayments = initialPayments || { 
+        data: [], current_page: 1, last_page: 1, total: 0, per_page: 20, from: 0, to: 0 
+    };
+    const safeStats = initialStats || { 
+        total: 0, today: 0, monthly: 0, total_amount: 0, today_amount: 0, monthly_amount: 0 
+    };
     
-    // Filter states - client-side only
-    const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
-    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
-    const [methodFilter, setMethodFilter] = useState<string>(getSafeString(safeFilters.payment_method, 'all'));
-    const [payerTypeFilter, setPayerTypeFilter] = useState<string>(getSafeString(safeFilters.payer_type, 'all'));
-    const [dateFrom, setDateFrom] = useState<string>(getSafeString(safeFilters.date_from));
-    const [dateTo, setDateTo] = useState<string>(getSafeString(safeFilters.date_to));
-    const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'payment_date'));
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
+    // Filter states - server-side
+    const [search, setSearch] = useState<string>(getSafeString(initialFilters.search));
+    const [statusFilter, setStatusFilter] = useState<string>(getSafeString(initialFilters.status, 'all'));
+    const [methodFilter, setMethodFilter] = useState<string>(getSafeString(initialFilters.payment_method, 'all'));
+    const [payerTypeFilter, setPayerTypeFilter] = useState<string>(getSafeString(initialFilters.payer_type, 'all'));
+    const [clearanceTypeFilter, setClearanceTypeFilter] = useState<string>(getSafeString(initialFilters.clearance_type_id, 'all'));
+    const [dateFrom, setDateFrom] = useState<string>(getSafeString(initialFilters.date_from));
+    const [dateTo, setDateTo] = useState<string>(getSafeString(initialFilters.date_to));
     
-    const [currentPage, setCurrentPage] = useState<number>(1);
-    const itemsPerPage = 15;
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    // Sorting states
+    const [sortBy, setSortBy] = useState<string>('payment_date');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
+    // UI states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
     const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
     const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     
@@ -101,14 +111,16 @@ export default function PaymentsIndex({
     const [showBulkStatusDialog, setShowBulkStatusDialog] = useState<boolean>(false);
     const [isPerformingBulkAction, setIsPerformingBulkAction] = useState<boolean>(false);
     const [bulkEditValue, setBulkEditValue] = useState<string>('');
-    const [showBulkActions, setShowBulkActions] = useState<boolean>(false);
-    const [showSelectionOptions, setShowSelectionOptions] = useState<boolean>(false);
     const [expandedPayments, setExpandedPayments] = useState<Set<number>>(new Set());
     
     // Refs
-    const bulkActionRef = useRef<HTMLDivElement>(null);
-    const selectionRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const isFirstMount = useRef(true);
+
+    // Debounce filters
+    const debouncedSearch = useDebounce(search, 300);
+    const debouncedDateFrom = useDebounce(dateFrom, 500);
+    const debouncedDateTo = useDebounce(dateTo, 500);
 
     // Track window resize
     useEffect(() => {
@@ -128,225 +140,119 @@ export default function PaymentsIndex({
         return () => window.removeEventListener('resize', handleResize);
     }, [viewMode]);
 
-    // Reset to first page when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [search, statusFilter, methodFilter, payerTypeFilter, dateFrom, dateTo, sortBy, sortOrder]);
+    // Get current page data
+    const currentPayments = safePayments.data || [];
+    const paginationData = useMemo(() => ({
+        current_page: safePayments.current_page || 1,
+        last_page: safePayments.last_page || 1,
+        total: safePayments.total || 0,
+        from: safePayments.from || 0,
+        to: safePayments.to || 0,
+        per_page: safePayments.per_page || 20,
+        path: typeof window !== 'undefined' ? window.location.pathname : '/admin/payments',
+        links: safePayments.links || []
+    }), [safePayments]);
 
-    // Filter payments client-side
-    const filteredPayments = useMemo(() => {
-        if (!safePaymentsData || safePaymentsData.length === 0) {
-            return [];
-        }
-        
-        let filtered = [...safePaymentsData];
-        
-        // Search filter
-        if (search) {
-            const searchLower = search.toLowerCase();
-            filtered = filtered.filter(payment =>
-                payment?.or_number?.toLowerCase().includes(searchLower) ||
-                payment?.payer_name?.toLowerCase().includes(searchLower) ||
-                payment?.reference_number?.toLowerCase().includes(searchLower)
-            );
-        }
-        
-        // Status filter
-        if (statusFilter && statusFilter !== 'all') {
-            filtered = filtered.filter(payment => payment?.status === statusFilter);
-        }
-        
-        // Payment method filter
-        if (methodFilter && methodFilter !== 'all') {
-            filtered = filtered.filter(payment => payment?.payment_method === methodFilter);
-        }
-        
-        // Payer type filter
-        if (payerTypeFilter && payerTypeFilter !== 'all') {
-            filtered = filtered.filter(payment => payment?.payer_type === payerTypeFilter);
-        }
-        
-        // Date range filter
-        if (dateFrom) {
-            filtered = filtered.filter(payment => payment?.payment_date >= dateFrom);
-        }
-        if (dateTo) {
-            filtered = filtered.filter(payment => payment?.payment_date <= dateTo);
-        }
-        
-        // Apply sorting
-        if (filtered.length > 0) {
-            filtered.sort((a, b) => {
-                let valueA: any;
-                let valueB: any;
-                
-                switch (sortBy) {
-                    case 'or_number':
-                        valueA = a?.or_number || '';
-                        valueB = b?.or_number || '';
-                        break;
-                    case 'payer_name':
-                        valueA = a?.payer_name || '';
-                        valueB = b?.payer_name || '';
-                        break;
-                    case 'payment_method':
-                        valueA = a?.payment_method || '';
-                        valueB = b?.payment_method || '';
-                        break;
-                    case 'total_amount':
-                        valueA = Number(a?.total_amount) || 0;
-                        valueB = Number(b?.total_amount) || 0;
-                        break;
-                    case 'amount_paid':
-                        valueA = Number(a?.amount_paid) || 0;
-                        valueB = Number(b?.amount_paid) || 0;
-                        break;
-                    case 'status':
-                        valueA = a?.status || '';
-                        valueB = b?.status || '';
-                        break;
-                    case 'payment_date':
-                        valueA = a?.payment_date ? new Date(a.payment_date).getTime() : 0;
-                        valueB = b?.payment_date ? new Date(b.payment_date).getTime() : 0;
-                        break;
-                    default:
-                        valueA = a?.payment_date ? new Date(a.payment_date).getTime() : 0;
-                        valueB = b?.payment_date ? new Date(b.payment_date).getTime() : 0;
-                }
-                
-                if (typeof valueA === 'string') {
-                    valueA = valueA.toLowerCase();
-                    valueB = valueB.toLowerCase();
-                }
-                
-                if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
-                if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
-        
-        return filtered;
-    }, [safePaymentsData, search, statusFilter, methodFilter, payerTypeFilter, dateFrom, dateTo, sortBy, sortOrder]);
+    const getCurrentFilters = useCallback(() => ({
+        search: debouncedSearch,
+        status: statusFilter,
+        payment_method: methodFilter,
+        payer_type: payerTypeFilter,
+        clearance_type_id: clearanceTypeFilter,
+        date_from: debouncedDateFrom,
+        date_to: debouncedDateTo,
+    }), [
+        debouncedSearch, statusFilter, methodFilter, payerTypeFilter, 
+        clearanceTypeFilter, debouncedDateFrom, debouncedDateTo
+    ]);
 
-    // Calculate display stats that match the Stats interface
-    const displayStats = useMemo(() => {
-        if (!filteredPayments || filteredPayments.length === 0) {
-            return safeStats;
-        }
+    const reloadData = useCallback((page = 1) => {
+        setIsLoading(true);
         
-        const today = new Date().toISOString().split('T')[0];
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
+        const filters = { ...getCurrentFilters(), page };
         
-        const todayPayments = filteredPayments.filter(p => p?.payment_date === today);
-        const monthlyPayments = filteredPayments.filter(p => {
-            const paymentDate = new Date(p?.payment_date);
-            return paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear;
+        // ✅ FIXED: Use a properly typed object with index signature
+        const cleanedFilters: Record<string, any> = {};
+        
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== 'all' && value !== '' && value !== null && value !== undefined) {
+                cleanedFilters[key] = value;
+            }
         });
         
-        const totalAmount = filteredPayments.reduce((sum, p) => sum + (Number(p?.total_amount) || 0), 0);
-        const todayAmount = todayPayments.reduce((sum, p) => sum + (Number(p?.total_amount) || 0), 0);
-        const monthlyAmount = monthlyPayments.reduce((sum, p) => sum + (Number(p?.total_amount) || 0), 0);
+        router.get('/admin/payments', cleanedFilters, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsLoading(false);
+                setSelectedPayments([]);
+                setIsSelectAll(false);
+            },
+            onError: () => {
+                setIsLoading(false);
+                toast.error('Failed to load payments');
+            }
+        });
+    }, [getCurrentFilters]);
+
+    // Server-side filtering - reload data when filters change
+    useEffect(() => {
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            return;
+        }
         
-        return {
-            total: filteredPayments.length,
-            today: todayPayments.length,
-            monthly: monthlyPayments.length,
-            total_amount: totalAmount,
-            today_amount: todayAmount,
-            monthly_amount: monthlyAmount
-        };
-    }, [filteredPayments, safeStats]);
+        reloadData();
+    }, [
+        debouncedSearch, statusFilter, methodFilter, payerTypeFilter,
+        clearanceTypeFilter, debouncedDateFrom, debouncedDateTo
+    ]);
 
-    // Pagination
-    const totalItems = filteredPayments.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-    const paginatedPayments = filteredPayments.slice(startIndex, endIndex);
-
-    // Pagination meta for filters component
-    const paginationMeta = useMemo(() => {
-        return {
-            current_page: currentPage,
-            from: startIndex + 1,
-            last_page: totalPages,
-            per_page: itemsPerPage,
-            to: endIndex,
-            total: totalItems,
-            path: window.location.pathname,
-            links: []
-        };
-    }, [currentPage, totalPages, itemsPerPage, startIndex, endIndex, totalItems]);
+    // Reset selection when exiting bulk mode
+    useEffect(() => {
+        if (!isBulkMode) {
+            setSelectedPayments([]);
+            setIsSelectAll(false);
+        }
+    }, [isBulkMode]);
 
     // Selection handlers
     const handleSelectAllOnPage = useCallback(() => {
-        const pageIds = paginatedPayments.map(payment => payment.id);
+        const pageIds = currentPayments.map(payment => payment.id);
         if (isSelectAll) {
             setSelectedPayments(prev => prev.filter(id => !pageIds.includes(id)));
         } else {
-            const newSelected = [...new Set([...selectedPayments, ...pageIds])];
-            setSelectedPayments(newSelected);
+            setSelectedPayments(prev => [...new Set([...prev, ...pageIds])]);
         }
         setIsSelectAll(!isSelectAll);
         setSelectionMode('page');
-    }, [paginatedPayments, isSelectAll, selectedPayments]);
-
-    const handleSelectAllFiltered = useCallback(() => {
-        const allIds = filteredPayments.map(payment => payment.id);
-        if (selectedPayments.length === allIds.length && allIds.every(id => selectedPayments.includes(id))) {
-            setSelectedPayments(prev => prev.filter(id => !allIds.includes(id)));
-        } else {
-            const newSelected = [...new Set([...selectedPayments, ...allIds])];
-            setSelectedPayments(newSelected);
-            setSelectionMode('filtered');
-        }
-    }, [filteredPayments, selectedPayments]);
-
-    const handleSelectAll = useCallback(() => {
-        if (confirm(`This will select ALL ${totalItems} payments. This action may take a moment.`)) {
-            const allIds = filteredPayments.map(payment => payment.id);
-            setSelectedPayments(allIds);
-            setSelectionMode('all');
-        }
-    }, [filteredPayments, totalItems]);
+    }, [currentPayments, isSelectAll]);
 
     const handleItemSelect = useCallback((id: number) => {
-        setSelectedPayments(prev => {
-            if (prev.includes(id)) {
-                return prev.filter(itemId => itemId !== id);
-            } else {
-                return [...prev, id];
-            }
-        });
+        setSelectedPayments(prev => 
+            prev.includes(id) ? prev.filter(itemId => itemId !== id) : [...prev, id]
+        );
     }, []);
 
     // Check if all items on current page are selected
     useEffect(() => {
-        const allPageIds = paginatedPayments.map(payment => payment.id);
+        const allPageIds = currentPayments.map(payment => payment.id);
         const allSelected = allPageIds.length > 0 && allPageIds.every(id => selectedPayments.includes(id));
         setIsSelectAll(allSelected);
-    }, [selectedPayments, paginatedPayments]);
+    }, [selectedPayments, currentPayments]);
 
     // Get selected payments data
     const selectedPaymentsData = useMemo(() => {
-        return filteredPayments.filter(payment => selectedPayments.includes(payment.id));
-    }, [selectedPayments, filteredPayments]);
+        return currentPayments.filter(payment => selectedPayments.includes(payment.id));
+    }, [selectedPayments, currentPayments]);
 
     // Calculate selection stats
     const selectionStats = useMemo(() => {
         if (!selectedPaymentsData || selectedPaymentsData.length === 0) {
             return {
-                total: 0,
-                completed: 0,
-                pending: 0,
-                cancelled: 0,
-                totalAmount: 0,
-                avgAmount: 0,
-                cashPayments: 0,
-                digitalPayments: 0,
-                residents: 0,
-                households: 0
+                total: 0, completed: 0, pending: 0, cancelled: 0,
+                totalAmount: 0, avgAmount: 0, cashPayments: 0, digitalPayments: 0,
+                residents: 0, households: 0
             };
         }
         
@@ -373,20 +279,14 @@ export default function PaymentsIndex({
         };
     }, [selectedPaymentsData]);
 
-    // Handle sort change from dropdown
-    const handleSortChange = useCallback((value: string) => {
-        const [newSortBy, newSortOrder] = value.split('-');
-        setSortBy(newSortBy);
-        setSortOrder(newSortOrder as 'asc' | 'desc');
-    }, []);
-
-    // Get current sort value for dropdown
-    const getCurrentSortValue = useCallback((): string => {
-        return `${sortBy}-${sortOrder}`;
-    }, [sortBy, sortOrder]);
+    // Handle page change
+    const handlePageChange = useCallback((page: number) => {
+        reloadData(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [reloadData]);
 
     // Bulk operations
-    const handleBulkOperation = useCallback(async (operation: any, customData?: any) => {
+    const handleBulkOperation = useCallback(async (operation: any) => {
         if (selectedPayments.length === 0) {
             toast.error('Please select at least one payment');
             return;
@@ -477,17 +377,14 @@ export default function PaymentsIndex({
         setStatusFilter('all');
         setMethodFilter('all');
         setPayerTypeFilter('all');
+        setClearanceTypeFilter('all');
         setDateFrom('');
         setDateTo('');
-        setSortBy('payment_date');
-        setSortOrder('desc');
-        setCurrentPage(1);
     }, []);
 
     const handleClearSelection = useCallback(() => {
         setSelectedPayments([]);
         setIsSelectAll(false);
-        setIsBulkMode(false);
     }, []);
 
     const handleExport = useCallback(() => {
@@ -511,6 +408,7 @@ export default function PaymentsIndex({
         (statusFilter && statusFilter !== 'all') || 
         (methodFilter && methodFilter !== 'all') ||
         (payerTypeFilter && payerTypeFilter !== 'all') ||
+        (clearanceTypeFilter && clearanceTypeFilter !== 'all') ||
         dateFrom ||
         dateTo
     );
@@ -534,12 +432,6 @@ export default function PaymentsIndex({
         { value: 'household', label: 'Household' },
         { value: 'business', label: 'Business' }
     ];
-
-    // Handle page change
-    const handlePageChange = useCallback((page: number) => {
-        setCurrentPage(page);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, []);
 
     // Prepare receipt data for printing
     const prepareReceiptData = (payment: any) => {
@@ -598,8 +490,7 @@ export default function PaymentsIndex({
     const handleCopyToClipboard = (text: string, label: string) => {
         navigator.clipboard.writeText(text).then(() => {
             toast.success(`${label} copied to clipboard`);
-        }).catch(err => {
-            console.error('Failed to copy:', err);
+        }).catch(() => {
             toast.error('Failed to copy to clipboard');
         });
     };
@@ -609,6 +500,7 @@ export default function PaymentsIndex({
             router.delete(`/admin/payments/${payment.id}`, {
                 preserveScroll: true,
                 onSuccess: () => {
+                    reloadData(paginationData.current_page);
                     toast.success('Payment deleted successfully');
                 },
                 onError: () => {
@@ -622,51 +514,79 @@ export default function PaymentsIndex({
         router.get(route('admin.payments.show', payment.id));
     };
 
-    const handleSort = (column: string) => {
-        const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
-        setSortBy(column);
-        setSortOrder(newSortOrder);
-    };
+    // Keyboard shortcuts - using refs to avoid dependency issues
+    const bulkModeRef = useRef(isBulkMode);
+    const selectedPaymentsRef = useRef(selectedPayments);
+    
+    useEffect(() => {
+        bulkModeRef.current = isBulkMode;
+        selectedPaymentsRef.current = selectedPayments;
+    }, [isBulkMode, selectedPayments]);
 
-    // Keyboard shortcuts
     useEffect(() => {
         if (isMobile) return;
-        
+
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isBulkMode) {
+            // Ctrl+Shift+B - Toggle bulk mode
+            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
                 e.preventDefault();
-                if (e.shiftKey) {
-                    handleSelectAllFiltered();
-                } else {
-                    handleSelectAllOnPage();
-                }
+                setIsBulkMode(prev => !prev);
             }
-            if (e.key === 'Escape') {
-                if (isBulkMode) {
-                    if (selectedPayments.length > 0) {
-                        setSelectedPayments([]);
+            
+            // Ctrl+A - Select all on page (only in bulk mode)
+            if (e.ctrlKey && e.key.toLowerCase() === 'a' && bulkModeRef.current) {
+                e.preventDefault();
+                const pageIds = currentPayments.map(payment => payment.id);
+                setSelectedPayments(prev => {
+                    const allSelected = pageIds.length > 0 && pageIds.every(id => prev.includes(id));
+                    if (allSelected) {
+                        return prev.filter(id => !pageIds.includes(id));
                     } else {
-                        setIsBulkMode(false);
+                        return [...new Set([...prev, ...pageIds])];
                     }
+                });
+                setIsSelectAll(prev => !prev);
+                setSelectionMode('page');
+            }
+            
+            // Escape - Exit bulk mode or clear selection
+            if (e.key === 'Escape' && bulkModeRef.current) {
+                e.preventDefault();
+                if (selectedPaymentsRef.current.length > 0) {
+                    setSelectedPayments([]);
+                    setIsSelectAll(false);
+                } else {
+                    setIsBulkMode(false);
                 }
             }
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'B') {
-                e.preventDefault();
-                setIsBulkMode(!isBulkMode);
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            
+            // Ctrl+F - Focus search
+            if (e.ctrlKey && e.key.toLowerCase() === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
-            if (e.key === 'Delete' && isBulkMode && selectedPayments.length > 0) {
+            
+            // Delete - Bulk delete (only in bulk mode)
+            if (e.key === 'Delete' && bulkModeRef.current && selectedPaymentsRef.current.length > 0) {
                 e.preventDefault();
                 setShowBulkDeleteDialog(true);
             }
         };
 
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isBulkMode, selectedPayments, isMobile]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isMobile, currentPayments]);
+
+    // Filters state for component
+    const filtersStateForComponent = useMemo(() => ({
+        search,
+        status: statusFilter,
+        payment_method: methodFilter,
+        payer_type: payerTypeFilter,
+        clearance_type_id: clearanceTypeFilter,
+        date_from: dateFrom,
+        date_to: dateTo
+    }), [search, statusFilter, methodFilter, payerTypeFilter, clearanceTypeFilter, dateFrom, dateTo]);
 
     return (
         <AppLayout
@@ -677,6 +597,14 @@ export default function PaymentsIndex({
             ]}
         >
             <TooltipProvider>
+                {/* Loading Indicator */}
+                {isLoading && (
+                    <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Loading...</span>
+                    </div>
+                )}
+                
                 {/* Hidden Print Preview */}
                 {showPrintPreview && selectedPaymentForPrint && (
                     <div className="fixed top-0 left-0 w-0 h-0 overflow-hidden opacity-0 pointer-events-none">
@@ -694,11 +622,11 @@ export default function PaymentsIndex({
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         handleExport={handleExport}
-                        isLoading={false}
+                        isLoading={isLoading}
                     />
                     
-                    {/* Stats Cards - Now passing displayStats which matches the Stats interface */}
-                    <PaymentsStats stats={displayStats} />
+                    {/* Stats Cards */}
+                    <PaymentsStats stats={safeStats} />
                     
                     {/* Search and Filters */}
                     <PaymentsFilters
@@ -710,6 +638,8 @@ export default function PaymentsIndex({
                         setMethodFilter={setMethodFilter}
                         payerTypeFilter={payerTypeFilter}
                         setPayerTypeFilter={setPayerTypeFilter}
+                        clearanceTypeFilter={clearanceTypeFilter}
+                        setClearanceTypeFilter={setClearanceTypeFilter}
                         dateFrom={dateFrom}
                         setDateFrom={setDateFrom}
                         dateTo={dateTo}
@@ -719,34 +649,25 @@ export default function PaymentsIndex({
                         handleClearFilters={handleClearFilters}
                         handleExport={handleExport}
                         hasActiveFilters={hasActiveFilters}
-                        isLoading={isPerformingBulkAction}
+                        isLoading={isLoading}
                         paymentMethods={paymentMethods}
                         statusOptions={statusOptions}
                         payerTypeOptions={payerTypeOptions}
+                        clearanceTypes={clearanceTypes}
                         searchInputRef={searchInputRef}
-                        payments={{ meta: paginationMeta }}
+                        payments={{ meta: paginationData }}
                         isBulkMode={isBulkMode}
                         selectedPayments={selectedPayments}
                         handleSelectAllOnPage={handleSelectAllOnPage}
-                        handleSelectAllFiltered={handleSelectAllFiltered}
-                        handleSelectAll={handleSelectAll}
-                        selectionRef={selectionRef}
-                        showSelectionOptions={showSelectionOptions}
-                        setShowSelectionOptions={setShowSelectionOptions}
+                        handleSelectAllFiltered={() => {}}
+                        handleSelectAll={() => {}}
                         setSelectedPayments={setSelectedPayments}
                     />
                     
                     {/* Main Content */}
                     <PaymentsContent
-                        payments={paginatedPayments}
-                        paymentsMeta={{
-                            current_page: currentPage,
-                            last_page: totalPages,
-                            total: totalItems,
-                            per_page: itemsPerPage,
-                            from: startIndex + 1,
-                            to: endIndex
-                        }}
+                        payments={currentPayments}
+                        paymentsMeta={paginationData}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -754,14 +675,14 @@ export default function PaymentsIndex({
                         viewMode={viewMode}
                         setViewMode={setViewMode}
                         hasActiveFilters={hasActiveFilters}
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={totalItems}
-                        itemsPerPage={itemsPerPage}
+                        currentPage={paginationData.current_page}
+                        totalPages={paginationData.last_page}
+                        totalItems={paginationData.total}
+                        itemsPerPage={paginationData.per_page}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
-                        onSelectAllFiltered={handleSelectAllFiltered}
-                        onSelectAll={handleSelectAll}
+                        onSelectAllFiltered={() => {}}
+                        onSelectAll={() => {}}
                         onItemSelect={handleItemSelect}
                         onClearFilters={handleClearFilters}
                         onClearSelection={handleClearSelection}
@@ -770,17 +691,10 @@ export default function PaymentsIndex({
                         onPrintReceipt={handlePrintReceipt}
                         onCopyToClipboard={handleCopyToClipboard}
                         onCopySelectedData={handleCopySelectedData}
-                        onSort={handleSort}
+                        onSort={() => {}}
                         onBulkOperation={handleBulkOperation}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
-                        filtersState={{
-                            search,
-                            status: statusFilter,
-                            payment_method: methodFilter,
-                            payer_type: payerTypeFilter,
-                            date_from: dateFrom,
-                            date_to: dateTo
-                        }}
+                        filtersState={filtersStateForComponent}
                         isPerformingBulkAction={isPerformingBulkAction}
                         selectionMode={selectionMode}
                         selectionStats={selectionStats}
@@ -789,16 +703,40 @@ export default function PaymentsIndex({
                         paymentMethods={paymentMethods}
                         statusOptions={statusOptions}
                         payerTypeOptions={payerTypeOptions}
-                        isLoading={false}
+                        isLoading={isLoading}
                         windowWidth={windowWidth}
-                        bulkActionRef={bulkActionRef}
-                        showBulkActions={showBulkActions}
-                        setShowBulkActions={setShowBulkActions}
                         sortBy={sortBy}
                         sortOrder={sortOrder}
-                        onSortChange={handleSortChange}
-                        getCurrentSortValue={getCurrentSortValue}
+                        onSortChange={() => {}}
+                        getCurrentSortValue={() => `${sortBy}-${sortOrder}`}
                     />
+
+                    {/* Keyboard Shortcuts */}
+                    {isBulkMode && !isMobile && (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <KeyRound className="h-4 w-4 text-gray-500" />
+                                    <span className="text-sm font-medium">Keyboard Shortcuts</span>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsBulkMode(false)}
+                                    className="h-7 text-xs"
+                                    disabled={isPerformingBulkAction}
+                                >
+                                    Exit Bulk Mode
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs text-gray-600">
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Ctrl+A</kbd> Select page</div>
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Delete</kbd> Delete selected</div>
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Esc</kbd> Exit/clear</div>
+                                <div><kbd className="px-2 py-1 bg-gray-200 rounded">Ctrl+F</kbd> Focus search</div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </TooltipProvider>
             

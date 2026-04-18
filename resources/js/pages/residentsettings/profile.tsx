@@ -1,4 +1,4 @@
-import { type BreadcrumbItem, type SharedData } from '@/types';
+import { type BreadcrumbItem } from '@/types/breadcrumbs';
 import { Head, usePage } from '@inertiajs/react';
 import { Shield } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +17,12 @@ import { HouseholdTab } from '@/components/portal/settings/components/HouseholdT
 import { MembersTab } from '@/components/portal/settings/components/MembersTab';
 import { QRTab } from '@/components/portal/settings/components/QRTab';
 import { ProfileUserData, ProfileProps } from '@/components/portal/settings/components/types';
+
+// ✅ Define the page props type
+interface PageProps {
+  user: ProfileUserData;
+  [key: string]: any;
+}
 
 // Barangay contact information
 const BARANGAY_INFO = {
@@ -40,7 +46,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Profile({ mustVerifyEmail, status }: ProfileProps) {
-  const { props, url } = usePage<SharedData & { user: ProfileUserData }>();
+  const { props, url } = usePage<PageProps>(); // ✅ Fixed type
   const { user } = props;
   
   const resident = user?.resident;

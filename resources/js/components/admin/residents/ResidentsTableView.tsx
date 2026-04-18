@@ -26,14 +26,17 @@ import { Resident, FilterState } from '@/types/admin/residents/residents-types';
 import {
     getFullName,
     getStatusLabel,
-    getTruncationLength
+    getTruncationLength,
+    truncateText, 
+    truncateAddress, 
+    getPhotoUrl
 } from '@/admin-utils/residentsUtils';
 import { 
     extractResidentDisplayData,
     getTruncationLengths,
-    safeFormatContactNumber} from '@/admin-utils/residentsDisplayUtils';
+    safeFormatContactNumber
+} from '@/admin-utils/residentsDisplayUtils';
 import { usePhotoModal } from '@/hooks/admin/usePhotoModal';
-import { truncateText, truncateAddress, getPhotoUrl } from '@/admin-utils/residentsUtils';
 import { useState, useCallback, memo, useMemo } from 'react';
 
 interface ResidentsTableViewProps {
@@ -52,6 +55,9 @@ interface ResidentsTableViewProps {
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
     onToggleStatus?: (resident: Resident) => void;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    isLoading?: boolean;
 }
 
 // Memoized Table Row Component
@@ -65,7 +71,7 @@ const ResidentsTableRow = memo(({
     onViewPhoto,
     onCopyToClipboard,
     onToggleStatus,
-    onSort
+    isLoading = false
 }: {
     resident: Resident;
     isBulkMode: boolean;
@@ -76,7 +82,7 @@ const ResidentsTableRow = memo(({
     onViewPhoto?: (resident: Resident) => void;
     onCopyToClipboard?: (text: string, label: string) => void;
     onToggleStatus?: (resident: Resident) => void;
-    onSort?: (column: string) => void;
+    isLoading?: boolean;
 }) => {
     // Extract all display data using the centralized utility
     const displayData = extractResidentDisplayData(resident);
@@ -104,7 +110,7 @@ const ResidentsTableRow = memo(({
         if (onCopyToClipboard) {
             onCopyToClipboard(text, label);
         } else {
-            navigator.clipboard.writeText(text);
+            navigator.clipboard.writeText(text).catch(() => {});
         }
     }, [onCopyToClipboard]);
 
@@ -129,9 +135,11 @@ const ResidentsTableRow = memo(({
                 hover:bg-gray-100/50 dark:hover:bg-gray-800/40
                 ${isSelected ? 'bg-blue-50/80 dark:bg-blue-900/20 border-l-4 border-l-blue-500' : ''} 
                 ${isHead && !isSelected ? 'bg-amber-50/40 dark:bg-amber-900/10' : ''}
+                ${isLoading ? 'pointer-events-none opacity-60' : ''}
             `}
             onClick={(e) => {
-                if (isBulkMode && e.target instanceof HTMLElement && !e.target.closest('button, a, input')) {
+                if (isLoading) return;
+                if (isBulkMode && e.target instanceof HTMLElement && !e.target.closest('button, a, input, [role="menuitem"]')) {
                     onItemSelect(resident.id);
                 }
             }}
@@ -142,6 +150,7 @@ const ResidentsTableRow = memo(({
                         checked={isSelected}
                         onCheckedChange={() => onItemSelect(resident.id)}
                         onClick={(e) => e.stopPropagation()}
+                        disabled={isLoading}
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                     />
                 </TableCell>
@@ -225,7 +234,11 @@ const ResidentsTableRow = memo(({
             <TableCell className="px-3 py-2 sm:px-4 sm:py-3 text-right sticky right-0 bg-white dark:bg-gray-900/95 backdrop-blur-sm shadow-[-10px_0_15px_-10px_rgba(0,0,0,0.1)]">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <Button 
+                            variant="ghost" 
+                            className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            disabled={isLoading}
+                        >
                             <MoreVertical className="h-4 w-4 text-gray-500" />
                         </Button>
                     </DropdownMenuTrigger>
@@ -275,10 +288,10 @@ const EmptyStateComponent = ({
         title="No residents found"
         description={hasActiveFilters ? 'Try changing your filters or search criteria.' : 'Get started by adding a resident.'}
         icon={<User className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
-        hasFilters={hasActiveFilters}
-        onClearFilters={onClearFilters}
-        onCreateNew={() => window.location.href = '/admin/residents/create'}
-        createLabel="Add Resident"
+        action={hasActiveFilters ? {
+            label: "Clear Filters",
+            onClick: onClearFilters
+        } : undefined}
     />
 );
 
@@ -311,22 +324,21 @@ export default function ResidentsTableView({
     onCopyToClipboard,
     onSelectAllOnPage,
     isSelectAll,
-    onToggleStatus
+    onToggleStatus,
+    sortBy = 'last_name',
+    sortOrder = 'asc',
+    isLoading = false
 }: ResidentsTableViewProps) {
     const { isOpen, selectedResident, openModal, closeModal } = usePhotoModal();
     
     // Sort Icon Logic
     const getSortIcon = useCallback((column: string) => {
-        if (!filtersState || filtersState.sort_by !== column) return null;
-        return filtersState.sort_order === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
-    }, [filtersState]);
+        if (sortBy !== column) return null;
+        return sortOrder === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+    }, [sortBy, sortOrder]);
 
     // Memoize selected set for quick lookup
     const selectedSet = useMemo(() => new Set(selectedResidents), [selectedResidents]);
-
-    const calculateColumnSpan = useCallback(() => 
-        (isMobile ? 5 : 7) + (isBulkMode ? 1 : 0), 
-    [isMobile, isBulkMode]);
 
     // Early return for empty state
     if (residents.length === 0) {
@@ -349,18 +361,28 @@ export default function ResidentsTableView({
                                         <Checkbox
                                             checked={isSelectAll && residents.length > 0}
                                             onCheckedChange={onSelectAllOnPage}
+                                            disabled={isLoading}
                                             className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                                         />
                                     </TableHead>
                                 )}
-                                <TableHead className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-gray-200" onClick={() => onSort('last_name')}>
+                                <TableHead 
+                                    className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-gray-200" 
+                                    onClick={() => !isLoading && onSort('last_name')}
+                                >
                                     <div className="flex items-center gap-1">Name {getSortIcon('last_name')}</div>
                                 </TableHead>
-                                <TableHead className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-gray-200" onClick={() => onSort('age')}>
+                                <TableHead 
+                                    className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-gray-200" 
+                                    onClick={() => !isLoading && onSort('age')}
+                                >
                                     <div className="flex items-center gap-1">Age {getSortIcon('age')}</div>
                                 </TableHead>
                                 <TableHead className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Contact</TableHead>
-                                <TableHead className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-gray-200" onClick={() => onSort('purok_id')}>
+                                <TableHead 
+                                    className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:text-gray-900 dark:hover:text-gray-200" 
+                                    onClick={() => !isLoading && onSort('purok_id')}
+                                >
                                     <div className="flex items-center gap-1">Address {getSortIcon('purok_id')}</div>
                                 </TableHead>
                                 {!isMobile && (
@@ -385,7 +407,7 @@ export default function ResidentsTableView({
                                     onViewPhoto={onViewPhoto || openModal}
                                     onCopyToClipboard={onCopyToClipboard}
                                     onToggleStatus={onToggleStatus}
-                                    onSort={onSort}
+                                    isLoading={isLoading}
                                 />
                             ))}
                         </TableBody>

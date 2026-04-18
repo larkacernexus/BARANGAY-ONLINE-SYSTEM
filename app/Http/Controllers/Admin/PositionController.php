@@ -90,6 +90,73 @@ class PositionController extends Controller
         ]);
     }
 
+
+    /**
+ * Show form to create new position
+ */
+public function create()
+{
+    // Get committees for dropdown
+    $committees = Committee::orderBy('name')->get(['id', 'name']);
+    
+    // Get roles for dropdown
+    $roles = Role::orderBy('name')->get(['id', 'name']);
+    
+    // Get existing positions for order suggestion
+    $maxOrder = Position::max('order') ?? 0;
+    
+    // Get common position templates
+    $templates = [
+        [
+            'name' => 'Punong Barangay',
+            'code' => 'PUNONG_BARANGAY',
+            'description' => 'Chief executive of the barangay',
+            'order' => 1,
+            'requires_account' => true,
+            'is_active' => true,
+        ],
+        [
+            'name' => 'Barangay Kagawad',
+            'code' => 'KAGAWAD',
+            'description' => 'Barangay council member',
+            'order' => 2,
+            'requires_account' => true,
+            'is_active' => true,
+        ],
+        [
+            'name' => 'Barangay Secretary',
+            'code' => 'SECRETARY',
+            'description' => 'Records keeper and administrative officer',
+            'order' => 3,
+            'requires_account' => true,
+            'is_active' => true,
+        ],
+        [
+            'name' => 'Barangay Treasurer',
+            'code' => 'TREASURER',
+            'description' => 'Financial officer of the barangay',
+            'order' => 4,
+            'requires_account' => true,
+            'is_active' => true,
+        ],
+        [
+            'name' => 'SK Chairperson',
+            'code' => 'SK_CHAIRPERSON',
+            'description' => 'Sangguniang Kabataan chairperson',
+            'order' => 5,
+            'requires_account' => true,
+            'is_active' => true,
+        ],
+    ];
+    
+    return Inertia::render('admin/Positions/Create', [
+        'committees' => $committees,
+        'roles' => $roles,
+        'maxOrder' => $maxOrder,
+        'templates' => $templates,
+    ]);
+}
+
     /**
      * Show position details with complete data
      */
@@ -166,6 +233,88 @@ class PositionController extends Controller
         return redirect()->route('positions.index')
             ->with('success', 'Position created successfully.');
     }
+
+    /**
+ * Show form to edit position
+ */
+public function edit(Position $position)
+{
+    // Load relationships
+    $position->load(['committee', 'role']);
+    
+    // Get committees for dropdown
+    $committees = Committee::orderBy('name')->get(['id', 'name']);
+    
+    // Get roles for dropdown
+    $roles = Role::orderBy('name')->get(['id', 'name']);
+    
+    // Get existing positions for order reference
+    $maxOrder = Position::max('order') ?? 0;
+    
+    // Handle additional committees - check if it's already an array or needs decoding
+    $additionalCommittees = [];
+    if ($position->additional_committees) {
+        if (is_string($position->additional_committees)) {
+            $additionalCommittees = json_decode($position->additional_committees, true) ?? [];
+        } else {
+            $additionalCommittees = $position->additional_committees;
+        }
+    }
+    
+    // Get officials count for this position using position_id
+    $officialsCount = Official::where('position_id', $position->id)->count();
+    
+    // Get officials assigned to this position (for reference)
+    $assignedOfficials = Official::where('position_id', $position->id)
+        ->with(['user', 'resident'])
+        ->get()
+        ->map(function ($official) {
+            return [
+                'id' => $official->id,
+                'full_name' => $official->resident?->full_name ?? 'N/A',
+                'term_start' => $official->term_start?->format('Y-m-d'),
+                'term_end' => $official->term_end?->format('Y-m-d'),
+                'status' => $official->status,
+            ];
+        });
+    
+    return Inertia::render('admin/Positions/Edit', [
+        'position' => [
+            'id' => $position->id,
+            'code' => $position->code,
+            'name' => $position->name,
+            'description' => $position->description,
+            'committee_id' => $position->committee_id,
+            'committee' => $position->committee ? [
+                'id' => $position->committee->id,
+                'name' => $position->committee->name,
+            ] : null,
+            'additional_committees' => $additionalCommittees,
+            'order' => $position->order,
+            'role_id' => $position->role_id,
+            'role' => $position->role ? [
+                'id' => $position->role->id,
+                'name' => $position->role->name,
+            ] : null,
+            'requires_account' => $position->requires_account,
+            'is_active' => $position->is_active,
+            'created_at' => $position->created_at?->format('Y-m-d H:i:s'),
+            'updated_at' => $position->updated_at?->format('Y-m-d H:i:s'),
+        ],
+        'committees' => $committees,
+        'roles' => $roles,
+        'maxOrder' => $maxOrder,
+        'officialsCount' => $officialsCount,
+        'assignedOfficials' => $assignedOfficials,
+        'allPositions' => Position::orderBy('order')
+            ->get(['id', 'name', 'order'])
+            ->map(fn($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'order' => $p->order,
+            ]),
+    ]);
+}
 
     /**
      * Update position

@@ -3,7 +3,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { type NavItem } from '@/types';
+import { type NavItem } from '@/types/breadcrumbs';
 import { Link, usePage } from '@inertiajs/react';
 import { type PropsWithChildren, useState, useEffect, useRef } from 'react';
 import { 
@@ -119,7 +119,7 @@ type SearchResult = {
   id: string;
   title: string;
   description?: string;
-  href: string;
+  href: string;  // Fixed: Changed from 'src' to 'href'
   category: string;
   icon?: React.ComponentType<any>;
   keywords?: string[];
@@ -154,7 +154,7 @@ const SearchModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void
     { id: '3', title: 'Two-Factor Authentication', description: 'Enable 2FA for extra security', href: '/residentsettings/security/two-factor', category: 'Security', icon: Shield, keywords: ['2fa', 'two factor', 'authentication', 'security'] },
     { id: '4', title: 'Appearance Settings', description: 'Customize theme and display', href: '/residentsettings/preferences/appearance', category: 'Preferences', icon: Palette, keywords: ['theme', 'dark', 'light', 'display', 'appearance'] },
     { id: '5', title: 'Notification Preferences', description: 'Manage your notifications', href: '/residentsettings/preferences/notifications', category: 'Preferences', icon: Bell, keywords: ['notifications', 'alerts', 'email'] },
-    { id: '6', title: 'Connected Devices', description: 'View and manage devices', src: '/residentsettings/devices', category: 'Devices', icon: Smartphone, keywords: ['devices', 'sessions', 'active'] },
+    { id: '6', title: 'Connected Devices', description: 'View and manage devices', href: '/residentsettings/devices', category: 'Devices', icon: Smartphone, keywords: ['devices', 'sessions', 'active'] },
     { id: '7', title: 'Privacy Settings', description: 'Control your data privacy', href: '/residentsettings/privacy', category: 'Privacy', icon: Shield, keywords: ['privacy', 'data', 'share'] },
     { id: '8', title: 'Activity Log', description: 'View your account activity', href: '/residentsettings/activities', category: 'Activities', icon: ActivityIcon, keywords: ['activity', 'log', 'history', 'audit'] },
     { id: '9', title: 'Help & Instructions', description: 'Guides and tutorials', href: '/portal/instructions', category: 'Help', icon: HelpCircle, keywords: ['help', 'guide', 'instructions', 'support', 'tutorial'] },
@@ -446,7 +446,7 @@ const DropdownMenu = ({
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.description}</p>
           </div>
           <div className="p-2">
-            {item.children.map((child) => {
+            {item.children.map((child: { title: string; href: string; icon?: React.ComponentType<any> }) => {
               const childActive = isActivePath(currentPath, child.href, true);
               const ChildIcon = child.icon;
               
@@ -574,7 +574,7 @@ const MobileDropdownNav = ({
 
                   {isExpanded && item.children && (
                     <div className="ml-4 pl-4 space-y-1 border-l border-gray-200 dark:border-gray-700">
-                      {item.children.map((child) => {
+                      {item.children.map((child: { title: string; href: string; icon?: React.ComponentType<any> }) => {
                         const childActive = isActivePath(currentPath, child.href, true);
                         const ChildIcon = child.icon;
                         

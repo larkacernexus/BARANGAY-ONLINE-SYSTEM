@@ -1,46 +1,22 @@
 // pages/admin/fee-types/edit.tsx
-
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { 
-    ArrowLeft,
-    Save,
-    DollarSign,
-    Calendar,
-    Percent,
-    FileText,
-    Tag,
-    Users,
-    Clock,
-    Hash,
-    Sparkles,
-    Copy,
-    RefreshCw,
-    Info,
-    AlertCircle,
-    X,
-    Plus,
-    Shield,
-    Award,
-    HeartHandshake,
-    Heart,
-    Briefcase,
-    Home,
-    Trash2,
-    AlertTriangle
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { DollarSign, Percent, Award, Settings, History, Trash2, RefreshCw } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/fee-types/create/basic-info-tab';
+import { PricingTab } from '@/components/admin/fee-types/create/pricing-tab';
+import { DiscountsTab } from '@/components/admin/fee-types/create/discounts-tab';
+import { SettingsTab } from '@/components/admin/fee-types/create/settings-tab';
+import { route } from 'ziggy-js';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -51,53 +27,21 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import type { FeeType, CategoryOption, FeeFormData, EditFeeTypeProps } from '@/types/admin/fee-types/fee.types';
 
-// Import types from centralized location
-import type { EditFeeTypeProps, CategoryOption } from '@/types/admin/fee-types/fee.types';
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: DollarSign, requiredFields: ['name', 'document_category_id', 'base_amount', 'effective_date'] },
+    { id: 'pricing', label: 'Pricing', icon: Percent, requiredFields: [] },
+    { id: 'discounts', label: 'Discounts', icon: Award, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
 
-interface FeeFormData {
-    code: string;
-    name: string;
-    short_name: string;
-    document_category_id: string;
-    base_amount: number;
-    amount_type: string;
-    unit: string;
-    description: string;
-    frequency: string;
-    validity_days: number | null;
-    applicable_to: string;
-    applicable_puroks: string[];
-    requirements: string[];
-    effective_date: string;
-    expiry_date: string;
-    is_active: boolean;
-    is_mandatory: boolean;
-    auto_generate: boolean;
-    due_day: number | null;
-    sort_order: number;
-    
-    // Separate discount fields for each type
-    has_senior_discount: boolean;
-    senior_discount_percentage: number | null;
-    
-    has_pwd_discount: boolean;
-    pwd_discount_percentage: number | null;
-    
-    has_solo_parent_discount: boolean;
-    solo_parent_discount_percentage: number | null;
-    
-    has_indigent_discount: boolean;
-    indigent_discount_percentage: number | null;
-    
-    has_surcharge: boolean;
-    surcharge_percentage: number | null;
-    surcharge_fixed: number | null;
-    has_penalty: boolean;
-    penalty_percentage: number | null;
-    penalty_fixed: number | null;
-    notes: string;
-}
+const requiredFieldsMap = {
+    basic: ['name', 'document_category_id', 'base_amount', 'effective_date'],
+    pricing: [],
+    discounts: [],
+    settings: []
+};
 
 // Philippine standard discount rates
 const PHILIPPINE_STANDARD_DISCOUNTS = {
@@ -129,142 +73,220 @@ function generateFeeCode(name: string, categoryId: string, categories: CategoryO
     return `${prefix}-${nameInitials}-${timestamp}`;
 }
 
-export default function FeeTypesEdit() {
+export default function EditFeeType() {
     const { props } = usePage<EditFeeTypeProps>();
-    const { 
+    const {
         feeType,
-        categories = [], 
-        amountTypes = {}, 
-        frequencies = {}, 
-        applicableTo = {}, 
-        puroks = [],
-        errors
+        categories = [],
+        amountTypes = {},
+        frequencies = {},
+        applicableTo = {},
+        puroks = []
     } = props;
-    
-    const [selectedPuroks, setSelectedPuroks] = useState<string[]>(feeType?.applicable_puroks || []);
-    const [selectedRequirements, setSelectedRequirements] = useState<string[]>(feeType?.requirements || []);
+
+    const [showPreview, setShowPreview] = useState(true);
+    const [autoGenerateCode, setAutoGenerateCode] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
+    const [selectedPuroks, setSelectedPuroks] = useState<string[]>(feeType.applicable_puroks || []);
+    const [selectedRequirements, setSelectedRequirements] = useState<string[]>(feeType.requirements || []);
     const [newRequirement, setNewRequirement] = useState('');
-    const [autoGenerateCode, setAutoGenerateCode] = useState<boolean>(false);
-    const [isGenerating, setIsGenerating] = useState<boolean>(false);
-    const [showDiscountInfo, setShowDiscountInfo] = useState<boolean>(false);
-    const [showDeleteDialog, setShowDeleteDialog] = useState<boolean>(false);
-    const [showResetDialog, setShowResetDialog] = useState<boolean>(false);
-    const [isSaving, setIsSaving] = useState<boolean>(false);
-    
-    // Convert base_amount to number safely
-    const getBaseAmountNumber = (amount: string | number | undefined): number => {
-        if (amount === undefined || amount === null) return 0;
-        if (typeof amount === 'number') return amount;
-        const parsed = parseFloat(amount);
-        return isNaN(parsed) ? 0 : parsed;
-    };
-    
-    const { data, setData, put, processing, reset } = useForm<FeeFormData>({
-        code: feeType?.code || '',
-        name: feeType?.name || '',
-        short_name: feeType?.short_name || '',
-        document_category_id: feeType?.document_category_id?.toString() || (categories.length > 0 ? categories[0].id.toString() : ''),
-        base_amount: getBaseAmountNumber(feeType?.base_amount),
-        amount_type: feeType?.amount_type || 'fixed',
-        unit: feeType?.unit || '',
-        description: feeType?.description || '',
-        frequency: feeType?.frequency || 'one_time',
-        validity_days: feeType?.validity_days || null,
-        applicable_to: feeType?.applicable_to || 'all_residents',
-        applicable_puroks: feeType?.applicable_puroks || [],
-        requirements: feeType?.requirements || [],
-        effective_date: feeType?.effective_date || new Date().toISOString().split('T')[0],
-        expiry_date: feeType?.expiry_date || '',
-        is_active: feeType?.is_active ?? true,
-        is_mandatory: feeType?.is_mandatory ?? false,
-        auto_generate: feeType?.auto_generate ?? false,
-        due_day: feeType?.due_day || null,
-        sort_order: feeType?.sort_order || 0,
-        
-        has_senior_discount: feeType?.has_senior_discount ?? false,
-        senior_discount_percentage: feeType?.senior_discount_percentage || null,
-        
-        has_pwd_discount: feeType?.has_pwd_discount ?? false,
-        pwd_discount_percentage: feeType?.pwd_discount_percentage || null,
-        
-        has_solo_parent_discount: feeType?.has_solo_parent_discount ?? false,
-        solo_parent_discount_percentage: feeType?.solo_parent_discount_percentage || null,
-        
-        has_indigent_discount: feeType?.has_indigent_discount ?? false,
-        indigent_discount_percentage: feeType?.indigent_discount_percentage || null,
-        
-        has_surcharge: feeType?.has_surcharge ?? false,
-        surcharge_percentage: feeType?.surcharge_percentage || null,
-        surcharge_fixed: feeType?.surcharge_fixed || null,
-        has_penalty: feeType?.has_penalty ?? false,
-        penalty_percentage: feeType?.penalty_percentage || null,
-        penalty_fixed: feeType?.penalty_fixed || null,
-        notes: feeType?.notes || '',
+    const [showDiscountInfo, setShowDiscountInfo] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [showResetDialog, setShowResetDialog] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm,
+        hasUnsavedChanges
+    } = useFormManager<FeeFormData>({
+        initialData: {
+            code: feeType.code || '',
+            name: feeType.name || '',
+            short_name: feeType.short_name || '',
+            document_category_id: feeType.document_category_id?.toString() || (categories.length > 0 ? categories[0].id.toString() : ''),
+            base_amount: typeof feeType.base_amount === 'string' ? parseFloat(feeType.base_amount) : (feeType.base_amount || 0),
+            amount_type: feeType.amount_type || 'fixed',
+            unit: feeType.unit || '',
+            description: feeType.description || '',
+            frequency: feeType.frequency || 'one_time',
+            validity_days: feeType.validity_days || null,
+            applicable_to: feeType.applicable_to || 'all_residents',
+            applicable_puroks: feeType.applicable_puroks || [],
+            requirements: feeType.requirements || [],
+            effective_date: feeType.effective_date || new Date().toISOString().split('T')[0],
+            expiry_date: feeType.expiry_date || '',
+            is_active: feeType.is_active ?? true,
+            is_mandatory: feeType.is_mandatory ?? false,
+            auto_generate: feeType.auto_generate ?? false,
+            due_day: feeType.due_day || null,
+            sort_order: feeType.sort_order || 0,
+            has_senior_discount: feeType.has_senior_discount ?? false,
+            senior_discount_percentage: feeType.senior_discount_percentage || null,
+            has_pwd_discount: feeType.has_pwd_discount ?? false,
+            pwd_discount_percentage: feeType.pwd_discount_percentage || null,
+            has_solo_parent_discount: feeType.has_solo_parent_discount ?? false,
+            solo_parent_discount_percentage: feeType.solo_parent_discount_percentage || null,
+            has_indigent_discount: feeType.has_indigent_discount ?? false,
+            indigent_discount_percentage: feeType.indigent_discount_percentage || null,
+            has_surcharge: feeType.has_surcharge ?? false,
+            surcharge_percentage: feeType.surcharge_percentage || null,
+            surcharge_fixed: feeType.surcharge_fixed || null,
+            has_penalty: feeType.has_penalty ?? false,
+            penalty_percentage: feeType.penalty_percentage || null,
+            penalty_fixed: feeType.penalty_fixed || null,
+            notes: feeType.notes || '',
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            // Validate before submit
+            const newErrors: Record<string, string> = {};
+            
+            if (!data.name?.trim()) {
+                newErrors.name = 'Fee name is required';
+            }
+            if (!data.code?.trim()) {
+                newErrors.code = 'Fee code is required';
+            }
+            if (!data.document_category_id) {
+                newErrors.document_category_id = 'Category is required';
+            }
+            if (data.base_amount < 0) {
+                newErrors.base_amount = 'Base amount cannot be negative';
+            }
+            if (!data.effective_date) {
+                newErrors.effective_date = 'Effective date is required';
+            }
+            if (data.sort_order < 0) {
+                newErrors.sort_order = 'Sort order cannot be negative';
+            }
+            
+            if (Object.keys(newErrors).length > 0) {
+                setValidationErrors(newErrors);
+                toast.error('Please fix the validation errors');
+                return;
+            }
+            
+            router.put(route('admin.fee-types.update', feeType.id), data as any, {
+                onSuccess: () => {
+                    toast.success('Fee type updated successfully');
+                    router.visit(route('admin.fee-types.show', feeType.id));
+                },
+                onError: (errs) => {
+                    setValidationErrors(errs);
+                    toast.error('Failed to update fee type');
+                }
+            });
+        }
     });
+
+    // Combine errors from server and validation
+    const allErrors = { ...errors, ...validationErrors };
 
     // Auto-generate code when name or category changes (if auto-generate is enabled)
     useEffect(() => {
-        if (autoGenerateCode && data.name.trim() && data.document_category_id) {
-            const generatedCode = generateFeeCode(data.name, data.document_category_id, categories);
-            setData('code', generatedCode);
+        if (autoGenerateCode && formData.name.trim() && formData.document_category_id) {
+            const generatedCode = generateFeeCode(formData.name, formData.document_category_id, categories);
+            if (generatedCode !== formData.code) {
+                updateFormData({ code: generatedCode });
+            }
         }
-    }, [data.name, data.document_category_id, autoGenerateCode, categories]);
+    }, [formData.name, formData.document_category_id, autoGenerateCode, categories, updateFormData, formData.code]);
 
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        setIsSaving(true);
-        
-        // If code is empty but auto-generation is on, generate one
-        if (!data.code.trim() && autoGenerateCode) {
-            const generatedCode = generateFeeCode(data.name || 'New Fee', data.document_category_id, categories);
-            setData('code', generatedCode);
+    // Handle number input changes - accepts string for PricingTab compatibility
+    const handleNumberChange = useCallback((name: string, value: number | null) => {
+        updateFormData({ [name]: value } as any);
+        // Clear validation error if exists
+        if (validationErrors[name]) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
         }
-        
-        put(`/admin/fee-types/${feeType?.id}`);
-        
-        // Reset saving state after a short delay
-        setTimeout(() => setIsSaving(false), 1000);
-    };
+    }, [updateFormData, validationErrors]);
 
-    const handleGenerateCode = () => {
-        setIsGenerating(true);
-        const generatedCode = generateFeeCode(data.name || 'New Fee', data.document_category_id, categories);
-        setData('code', generatedCode);
-        
-        setTimeout(() => setIsGenerating(false), 500);
-    };
+    // Handle switch changes - accepts string for PricingTab compatibility
+    const handleSwitchChange = useCallback((name: string, checked: boolean) => {
+        updateFormData({ [name]: checked } as any);
+    }, [updateFormData]);
 
-    const handleCopyCode = async () => {
-        try {
-            await navigator.clipboard.writeText(data.code);
-            // You can add a toast notification here
-        } catch (err) {
-            console.error('Failed to copy code:', err);
+    // Individual discount handlers for PricingTab
+    const handleSeniorDiscountChange = useCallback((checked: boolean) => {
+        updateFormData({
+            has_senior_discount: checked,
+            senior_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.senior : null
+        });
+    }, [updateFormData]);
+
+    const handlePwdDiscountChange = useCallback((checked: boolean) => {
+        updateFormData({
+            has_pwd_discount: checked,
+            pwd_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.pwd : null
+        });
+    }, [updateFormData]);
+
+    const handleSoloParentDiscountChange = useCallback((checked: boolean) => {
+        updateFormData({
+            has_solo_parent_discount: checked,
+            solo_parent_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.solo_parent : null
+        });
+    }, [updateFormData]);
+
+    const handleIndigentDiscountChange = useCallback((checked: boolean) => {
+        updateFormData({
+            has_indigent_discount: checked,
+            indigent_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.indigent : null
+        });
+    }, [updateFormData]);
+
+    // Single discount handler for DiscountsTab
+    const handleDiscountChange = useCallback((type: 'senior' | 'pwd' | 'solo_parent' | 'indigent', checked: boolean) => {
+        switch (type) {
+            case 'senior':
+                updateFormData({
+                    has_senior_discount: checked,
+                    senior_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.senior : null
+                });
+                break;
+            case 'pwd':
+                updateFormData({
+                    has_pwd_discount: checked,
+                    pwd_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.pwd : null
+                });
+                break;
+            case 'solo_parent':
+                updateFormData({
+                    has_solo_parent_discount: checked,
+                    solo_parent_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.solo_parent : null
+                });
+                break;
+            case 'indigent':
+                updateFormData({
+                    has_indigent_discount: checked,
+                    indigent_discount_percentage: checked ? PHILIPPINE_STANDARD_DISCOUNTS.indigent : null
+                });
+                break;
         }
-    };
+    }, [updateFormData]);
 
-    const handleReset = () => {
-        reset();
-        setShowResetDialog(false);
-    };
-
-    const addRequirement = () => {
-        if (newRequirement.trim()) {
-            const updatedRequirements = [...selectedRequirements, newRequirement.trim()];
-            setSelectedRequirements(updatedRequirements);
-            setData('requirements', updatedRequirements);
-            setNewRequirement('');
-        }
-    };
-
-    const removeRequirement = (index: number) => {
-        const newRequirements = selectedRequirements.filter((_, i) => i !== index);
-        setSelectedRequirements(newRequirements);
-        setData('requirements', newRequirements);
-    };
-
-    const handlePurokChange = (purok: string, checked: boolean) => {
+    // Handle purok selection
+    const handlePurokChange = useCallback((purok: string, checked: boolean) => {
         let newPuroks: string[];
         if (checked) {
             newPuroks = [...selectedPuroks, purok];
@@ -272,1066 +294,480 @@ export default function FeeTypesEdit() {
             newPuroks = selectedPuroks.filter(p => p !== purok);
         }
         setSelectedPuroks(newPuroks);
-        setData('applicable_puroks', newPuroks);
-    };
+        updateFormData({ applicable_puroks: newPuroks });
+    }, [selectedPuroks, updateFormData]);
 
-    // Discount handlers
-    const handleSeniorDiscountChange = (checked: boolean) => {
-        setData('has_senior_discount', checked);
-        if (checked) {
-            setData('senior_discount_percentage', PHILIPPINE_STANDARD_DISCOUNTS.senior);
-        } else {
-            setData('senior_discount_percentage', null);
+    // Handle requirements
+    const addRequirement = useCallback(() => {
+        if (newRequirement.trim()) {
+            const updatedRequirements = [...selectedRequirements, newRequirement.trim()];
+            setSelectedRequirements(updatedRequirements);
+            updateFormData({ requirements: updatedRequirements });
+            setNewRequirement('');
+            toast.success('Requirement added');
         }
-    };
+    }, [newRequirement, selectedRequirements, updateFormData]);
 
-    const handlePwdDiscountChange = (checked: boolean) => {
-        setData('has_pwd_discount', checked);
-        if (checked) {
-            setData('pwd_discount_percentage', PHILIPPINE_STANDARD_DISCOUNTS.pwd);
-        } else {
-            setData('pwd_discount_percentage', null);
-        }
-    };
+    const removeRequirement = useCallback((index: number) => {
+        const newRequirements = selectedRequirements.filter((_, i) => i !== index);
+        setSelectedRequirements(newRequirements);
+        updateFormData({ requirements: newRequirements });
+        toast.info('Requirement removed');
+    }, [selectedRequirements, updateFormData]);
 
-    const handleSoloParentDiscountChange = (checked: boolean) => {
-        setData('has_solo_parent_discount', checked);
-        if (checked) {
-            setData('solo_parent_discount_percentage', PHILIPPINE_STANDARD_DISCOUNTS.solo_parent);
-        } else {
-            setData('solo_parent_discount_percentage', null);
-        }
-    };
+    // Handle code generation
+    const handleGenerateCode = useCallback(() => {
+        setIsGenerating(true);
+        const generatedCode = generateFeeCode(formData.name || 'New Fee', formData.document_category_id, categories);
+        updateFormData({ code: generatedCode });
+        setTimeout(() => setIsGenerating(false), 500);
+        toast.success('Code generated');
+    }, [formData.name, formData.document_category_id, categories, updateFormData]);
 
-    const handleIndigentDiscountChange = (checked: boolean) => {
-        setData('has_indigent_discount', checked);
-        if (checked) {
-            setData('indigent_discount_percentage', PHILIPPINE_STANDARD_DISCOUNTS.indigent);
-        } else {
-            setData('indigent_discount_percentage', null);
-        }
-    };
-
-    // Helper to get category label
-    const getCategoryLabel = (categoryId: string): string => {
-        const category = categories.find(c => c.id.toString() === categoryId);
-        return category?.name || categoryId;
-    };
-
-    // Check if any changes have been made
-    const hasChanges = () => {
-        // Compare with original feeType data
-        return JSON.stringify(data) !== JSON.stringify({
-            code: feeType?.code || '',
-            name: feeType?.name || '',
-            short_name: feeType?.short_name || '',
-            document_category_id: feeType?.document_category_id?.toString() || '',
-            base_amount: getBaseAmountNumber(feeType?.base_amount),
-            amount_type: feeType?.amount_type || 'fixed',
-            unit: feeType?.unit || '',
-            description: feeType?.description || '',
-            frequency: feeType?.frequency || 'one_time',
-            validity_days: feeType?.validity_days || null,
-            applicable_to: feeType?.applicable_to || 'all_residents',
-            applicable_puroks: feeType?.applicable_puroks || [],
-            requirements: feeType?.requirements || [],
-            effective_date: feeType?.effective_date || '',
-            expiry_date: feeType?.expiry_date || '',
-            is_active: feeType?.is_active ?? true,
-            is_mandatory: feeType?.is_mandatory ?? false,
-            auto_generate: feeType?.auto_generate ?? false,
-            due_day: feeType?.due_day || null,
-            sort_order: feeType?.sort_order || 0,
-            has_senior_discount: feeType?.has_senior_discount ?? false,
-            senior_discount_percentage: feeType?.senior_discount_percentage || null,
-            has_pwd_discount: feeType?.has_pwd_discount ?? false,
-            pwd_discount_percentage: feeType?.pwd_discount_percentage || null,
-            has_solo_parent_discount: feeType?.has_solo_parent_discount ?? false,
-            solo_parent_discount_percentage: feeType?.solo_parent_discount_percentage || null,
-            has_indigent_discount: feeType?.has_indigent_discount ?? false,
-            indigent_discount_percentage: feeType?.indigent_discount_percentage || null,
-            has_surcharge: feeType?.has_surcharge ?? false,
-            surcharge_percentage: feeType?.surcharge_percentage || null,
-            surcharge_fixed: feeType?.surcharge_fixed || null,
-            has_penalty: feeType?.has_penalty ?? false,
-            penalty_percentage: feeType?.penalty_percentage || null,
-            penalty_fixed: feeType?.penalty_fixed || null,
-            notes: feeType?.notes || '',
+    // Handle copy to clipboard
+    const handleCopyCode = useCallback(() => {
+        if (!formData.code) return;
+        navigator.clipboard.writeText(formData.code).then(() => {
+            setCopiedField('Code');
+            setTimeout(() => setCopiedField(null), 2000);
+            toast.success('Code copied to clipboard');
         });
+    }, [formData.code]);
+
+    // Handle reset
+    const handleReset = useCallback(() => {
+        resetForm();
+        setSelectedPuroks(feeType.applicable_puroks || []);
+        setSelectedRequirements(feeType.requirements || []);
+        setValidationErrors({});
+        setShowResetDialog(false);
+        toast.info('Form reset to original values');
+    }, [resetForm, feeType]);
+
+    // Handle cancel
+    const handleCancel = useCallback(() => {
+        if (hasUnsavedChanges) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.fee-types.show', feeType.id));
+            }
+        } else {
+            router.visit(route('admin.fee-types.show', feeType.id));
+        }
+    }, [hasUnsavedChanges, feeType.id]);
+
+    // Handle delete
+    const handleDelete = useCallback(() => {
+        setShowDeleteDialog(true);
+    }, []);
+
+    const confirmDelete = useCallback(() => {
+        router.delete(route('admin.fee-types.destroy', feeType.id), {
+            onSuccess: () => {
+                toast.success('Fee type deleted successfully');
+                router.visit(route('admin.fee-types.index'));
+            },
+            onError: () => {
+                toast.error('Failed to delete fee type');
+                setShowDeleteDialog(false);
+            }
+        });
+    }, [feeType.id]);
+
+    // Get active discount count
+    const activeDiscountCount = useMemo(() => {
+        let count = 0;
+        if (formData.has_senior_discount) count++;
+        if (formData.has_pwd_discount) count++;
+        if (formData.has_solo_parent_discount) count++;
+        if (formData.has_indigent_discount) count++;
+        return count;
+    }, [formData]);
+
+    // Count changed fields
+    const changedFieldsCount = useMemo(() => {
+        let count = 0;
+        if (formData.name !== feeType.name) count++;
+        if (formData.code !== feeType.code) count++;
+        if (formData.base_amount !== feeType.base_amount) count++;
+        if (formData.document_category_id !== feeType.document_category_id?.toString()) count++;
+        if (formData.is_active !== feeType.is_active) count++;
+        if (formData.is_mandatory !== feeType.is_mandatory) count++;
+        if (JSON.stringify(selectedPuroks) !== JSON.stringify(feeType.applicable_puroks || [])) count++;
+        if (JSON.stringify(selectedRequirements) !== JSON.stringify(feeType.requirements || [])) count++;
+        return count;
+    }, [formData, feeType, selectedPuroks, selectedRequirements]);
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        pricing: getTabStatus('pricing'),
+        discounts: getTabStatus('discounts'),
+        settings: getTabStatus('settings')
     };
+
+    const missingFields = getMissingFields();
+
+    const requiredFieldsList = [
+        { label: 'Name', value: !!formData.name, tabId: 'basic' },
+        { label: 'Category', value: !!formData.document_category_id, tabId: 'basic' },
+        { label: 'Base Amount', value: formData.base_amount > 0, tabId: 'basic' },
+        { label: 'Effective Date', value: !!formData.effective_date, tabId: 'basic' },
+    ];
+
+    const tabOrder = ['basic', 'pricing', 'discounts', 'settings'];
+
+    // Format currency
+    const formatCurrency = useCallback((amount: number) => {
+        return new Intl.NumberFormat('en-PH', {
+            style: 'currency',
+            currency: 'PHP',
+            minimumFractionDigits: 2
+        }).format(amount);
+    }, []);
+
+    // Format date
+    const formatDate = useCallback((dateString: string) => {
+        if (!dateString) return 'Not set';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }, []);
+
+    // Get category name
+    const getCategoryName = useCallback((categoryId: string) => {
+        const category = categories.find(c => c.id.toString() === categoryId);
+        return category?.name || 'Unknown';
+    }, [categories]);
 
     return (
         <AppLayout
-            title="Edit Fee Type"
+            title={`Edit Fee Type: ${feeType.name}`}
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Fee Types', href: '/admin/fee-types' },
-                { title: 'Edit Fee Type', href: `/admin/fee-types/${feeType?.id}/edit` }
+                { title: feeType.name, href: route('admin.fee-types.show', feeType.id) },
+                { title: 'Edit', href: route('admin.fee-types.edit', feeType.id) }
             ]}
         >
-            <Head title={`Edit Fee Type: ${feeType?.name}`} />
-            
-            <form onSubmit={submit}>
-                <div className="space-y-6">
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Link href="/admin/fee-types">
-                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                    <DollarSign className="h-6 w-6 text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
-                                        Edit Fee Type
-                                    </h1>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Update fee type configuration for {feeType?.name}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+            <div className="space-y-6">
+                <FormHeader
+                    title="Edit Fee Type"
+                    description={`Editing ${feeType.name}`}
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
                         <div className="flex items-center gap-2">
-                            <Button 
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowResetDialog(true)}
-                                disabled={processing || !hasChanges()}
-                                className="dark:border-gray-600 dark:text-gray-300"
-                            >
-                                <RefreshCw className="h-4 w-4 mr-2" />
-                                Reset
-                            </Button>
-                            <Button 
-                                type="button"
-                                variant="destructive"
-                                onClick={() => setShowDeleteDialog(true)}
-                                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                            </Button>
-                            <Button 
-                                type="submit" 
-                                disabled={processing || !hasChanges()}
-                                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
-                            >
-                                <Save className="h-4 w-4 mr-2" />
-                                {processing || isSaving ? 'Updating...' : 'Update Fee Type'}
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Error Alert */}
-                    {errors && Object.keys(errors).length > 0 && (
-                        <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
-                            <CardContent className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
-                                    <div>
-                                        <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
-                                        <ul className="list-disc list-inside mt-2 space-y-1">
-                                            {Object.entries(errors).map(([field, message]) => (
-                                                <li key={field} className="text-sm text-red-600 dark:text-red-400">
-                                                    <span className="font-medium capitalize">{field.replace('_', ' ')}:</span> {message as string}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Info Alert for editing */}
-                    {hasChanges() && (
-                        <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-                            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                            <AlertDescription className="text-sm text-yellow-700 dark:text-yellow-400">
-                                You have unsaved changes. Don't forget to save your updates.
-                            </AlertDescription>
-                        </Alert>
-                    )}
-
-                    <div className="grid gap-6 lg:grid-cols-3">
-                        {/* Left Column - Basic Info */}
-                        <div className="lg:col-span-2 space-y-6">
-                            {/* Basic Information */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
-                                            <FileText className="h-3 w-3 text-white" />
-                                        </div>
-                                        Basic Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Update basic details about the fee type
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        {/* Code Field */}
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <Label htmlFor="code" className="dark:text-gray-300">Code</Label>
-                                                <div className="flex items-center gap-2">
-                                                    <Switch
-                                                        checked={autoGenerateCode}
-                                                        onCheckedChange={setAutoGenerateCode}
-                                                        id="auto-generate-code"
-                                                        className="dark:data-[state=checked]:bg-blue-600"
-                                                    />
-                                                    <Label htmlFor="auto-generate-code" className="text-xs cursor-pointer dark:text-gray-400">
-                                                        Auto-generate
-                                                    </Label>
-                                                </div>
-                                            </div>
-                                            <div className="relative">
-                                                <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input
-                                                    id="code"
-                                                    value={data.code}
-                                                    onChange={(e) => setData('code', e.target.value.toUpperCase())}
-                                                    placeholder="e.g., TAX-BRT-1234"
-                                                    className="pl-10 pr-24 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    disabled={autoGenerateCode}
-                                                />
-                                                <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-1">
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={handleCopyCode}
-                                                        disabled={!data.code}
-                                                        className="h-7 w-7 p-0 dark:text-gray-400 dark:hover:text-white"
-                                                        title="Copy code"
-                                                    >
-                                                        <Copy className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={handleGenerateCode}
-                                                        disabled={autoGenerateCode}
-                                                        className="h-7 w-7 p-0 dark:text-gray-400 dark:hover:text-white"
-                                                        title="Generate new code"
-                                                    >
-                                                        <RefreshCw className={`h-3 w-3 ${isGenerating ? 'animate-spin' : ''}`} />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                            {errors?.code && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
-                                            )}
-                                            {autoGenerateCode && (
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                                    <Sparkles className="h-3 w-3" />
-                                                    Code will be auto-generated based on name and category
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="name" className="dark:text-gray-300">Name *</Label>
-                                            <Input
-                                                id="name"
-                                                required
-                                                value={data.name}
-                                                onChange={(e) => setData('name', e.target.value)}
-                                                placeholder="e.g., Barangay Tax, Business Clearance"
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                            {errors?.name && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="short_name" className="dark:text-gray-300">Short Name</Label>
-                                            <Input
-                                                id="short_name"
-                                                value={data.short_name}
-                                                onChange={(e) => setData('short_name', e.target.value)}
-                                                placeholder="e.g., Tax, Clearance"
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="document_category_id" className="dark:text-gray-300">Category *</Label>
-                                            <select
-                                                id="document_category_id"
-                                                required
-                                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                value={data.document_category_id}
-                                                onChange={(e) => setData('document_category_id', e.target.value)}
-                                            >
-                                                <option value="">Select a category</option>
-                                                {categories.map((category: CategoryOption) => (
-                                                    <option key={category.id} value={category.id}>
-                                                        {category.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            {errors?.document_category_id && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.document_category_id}</p>
-                                            )}
-                                        </div>
-                                        <div className="md:col-span-2 space-y-2">
-                                            <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
-                                            <Textarea
-                                                id="description"
-                                                rows={3}
-                                                value={data.description}
-                                                onChange={(e) => setData('description', e.target.value)}
-                                                placeholder="Description of this fee type..."
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Pricing */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
-                                            <DollarSign className="h-3 w-3 text-white" />
-                                        </div>
-                                        Pricing
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Update pricing details for the fee
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="base_amount" className="dark:text-gray-300">Base Amount *</Label>
-                                            <div className="relative">
-                                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input
-                                                    id="base_amount"
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    required
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    value={data.base_amount}
-                                                    onChange={(e) => setData('base_amount', parseFloat(e.target.value) || 0)}
-                                                />
-                                            </div>
-                                            {errors?.base_amount && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.base_amount}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="amount_type" className="dark:text-gray-300">Amount Type *</Label>
-                                            <select
-                                                id="amount_type"
-                                                required
-                                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                value={data.amount_type}
-                                                onChange={(e) => setData('amount_type', e.target.value)}
-                                            >
-                                                {Object.entries(amountTypes).map(([value, label]) => (
-                                                    <option key={value} value={value}>
-                                                        {label as string}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="unit" className="dark:text-gray-300">Unit (Optional)</Label>
-                                            <Input
-                                                id="unit"
-                                                placeholder="e.g., per square meter, per month"
-                                                value={data.unit}
-                                                onChange={(e) => setData('unit', e.target.value)}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Frequency & Validity */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
-                                            <Calendar className="h-3 w-3 text-white" />
-                                        </div>
-                                        Frequency & Validity
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Update how often this fee is charged and its validity period
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="frequency" className="dark:text-gray-300">Frequency *</Label>
-                                            <select
-                                                id="frequency"
-                                                required
-                                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                value={data.frequency}
-                                                onChange={(e) => setData('frequency', e.target.value)}
-                                            >
-                                                {Object.entries(frequencies).map(([value, label]) => (
-                                                    <option key={value} value={value}>
-                                                        {label as string}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="validity_days" className="dark:text-gray-300">Validity Days (for certificates)</Label>
-                                            <Input
-                                                id="validity_days"
-                                                type="number"
-                                                min="1"
-                                                value={data.validity_days || ''}
-                                                onChange={(e) => setData('validity_days', e.target.value ? parseInt(e.target.value) : null)}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="effective_date" className="dark:text-gray-300">Effective Date *</Label>
-                                            <Input
-                                                id="effective_date"
-                                                type="date"
-                                                required
-                                                value={data.effective_date}
-                                                onChange={(e) => setData('effective_date', e.target.value)}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="expiry_date" className="dark:text-gray-300">Expiry Date (Optional)</Label>
-                                            <Input
-                                                id="expiry_date"
-                                                type="date"
-                                                value={data.expiry_date}
-                                                onChange={(e) => setData('expiry_date', e.target.value)}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Right Column - Settings */}
-                        <div className="space-y-6">
-                            {/* Applicability */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
-                                            <Users className="h-3 w-3 text-white" />
-                                        </div>
-                                        Applicability
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Update who this fee applies to
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="applicable_to" className="dark:text-gray-300">Applicable To *</Label>
-                                        <select
-                                            id="applicable_to"
-                                            required
-                                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            value={data.applicable_to}
-                                            onChange={(e) => {
-                                                setData('applicable_to', e.target.value);
-                                                if (e.target.value !== 'specific_purok') {
-                                                    setSelectedPuroks([]);
-                                                    setData('applicable_puroks', []);
-                                                }
-                                            }}
-                                        >
-                                            {Object.entries(applicableTo).map(([value, label]) => (
-                                                <option key={value} value={value}>
-                                                    {label as string}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {data.applicable_to === 'specific_purok' && (
-                                        <div className="space-y-2">
-                                            <Label className="dark:text-gray-300">Select Puroks</Label>
-                                            <div className="space-y-2 max-h-60 overflow-y-auto p-3 border rounded-md dark:border-gray-700">
-                                                {(puroks as string[]).map((purok: string, index: number) => (
-                                                    <div key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
-                                                        <Checkbox
-                                                            id={`purok-${index}`}
-                                                            checked={selectedPuroks.includes(purok)}
-                                                            onCheckedChange={(checked) => 
-                                                                handlePurokChange(purok, checked as boolean)
-                                                            }
-                                                            className="dark:border-gray-600"
-                                                        />
-                                                        <Label 
-                                                            htmlFor={`purok-${index}`}
-                                                            className="text-sm cursor-pointer dark:text-gray-300"
-                                                        >
-                                                            {purok}
-                                                        </Label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Requirements */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-700 dark:to-blue-700 flex items-center justify-center">
-                                            <Tag className="h-3 w-3 text-white" />
-                                        </div>
-                                        Requirements
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Update requirements for this fee
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="new-requirement" className="dark:text-gray-300">Add Requirements</Label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                id="new-requirement"
-                                                placeholder="e.g., Valid ID, Proof of Residency"
-                                                value={newRequirement}
-                                                onChange={(e) => setNewRequirement(e.target.value)}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                onKeyPress={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        e.preventDefault();
-                                                        addRequirement();
-                                                    }
-                                                }}
-                                            />
-                                            <Button 
-                                                type="button" 
-                                                variant="outline" 
-                                                onClick={addRequirement}
-                                                className="dark:border-gray-600 dark:text-gray-300"
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="dark:text-gray-300">Selected Requirements</Label>
-                                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                                            {selectedRequirements.map((req: string, index: number) => (
-                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                                                    <span className="text-sm dark:text-gray-300">{req}</span>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => removeRequirement(index)}
-                                                        className="h-6 w-6 p-0 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                            {selectedRequirements.length === 0 && (
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 italic">No requirements added</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Status & Settings */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-gray-600 to-slate-600 dark:from-gray-700 dark:to-slate-700 flex items-center justify-center">
-                                            <Clock className="h-3 w-3 text-white" />
-                                        </div>
-                                        Status & Settings
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Update fee status and behavior
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-3">
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                            <Checkbox
-                                                id="is_active"
-                                                checked={data.is_active}
-                                                onCheckedChange={(checked) => setData('is_active', checked as boolean)}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <Label htmlFor="is_active" className="cursor-pointer dark:text-gray-300">Active</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                            <Checkbox
-                                                id="is_mandatory"
-                                                checked={data.is_mandatory}
-                                                onCheckedChange={(checked) => setData('is_mandatory', checked as boolean)}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <Label htmlFor="is_mandatory" className="cursor-pointer dark:text-gray-300">Mandatory</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                            <Checkbox
-                                                id="auto_generate"
-                                                checked={data.auto_generate}
-                                                onCheckedChange={(checked) => setData('auto_generate', checked as boolean)}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <Label htmlFor="auto_generate" className="cursor-pointer dark:text-gray-300">Auto-generate bills</Label>
-                                        </div>
-                                        {data.auto_generate && (
-                                            <div className="space-y-2 pl-6 pt-2">
-                                                <Label htmlFor="due_day" className="dark:text-gray-300">Due Day of Month</Label>
-                                                <Input
-                                                    id="due_day"
-                                                    type="number"
-                                                    min="1"
-                                                    max="31"
-                                                    value={data.due_day || ''}
-                                                    onChange={(e) => setData('due_day', e.target.value ? parseInt(e.target.value) : null)}
-                                                    className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                />
-                                            </div>
-                                        )}
-                                        <div className="space-y-2">
-                                            <Label htmlFor="sort_order" className="dark:text-gray-300">Sort Order</Label>
-                                            <Input
-                                                id="sort_order"
-                                                type="number"
-                                                value={data.sort_order}
-                                                onChange={(e) => setData('sort_order', parseInt(e.target.value) || 0)}
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-
-                    {/* Discounts Configuration */}
-                    <Card className="dark:bg-gray-900">
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-yellow-600 to-amber-600 dark:from-yellow-700 dark:to-amber-700 flex items-center justify-center">
-                                            <Award className="h-3 w-3 text-white" />
-                                        </div>
-                                        Discount Configuration
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Update discount configurations for eligible groups
-                                    </CardDescription>
-                                </div>
-                                <Button
+                            {hasUnsavedChanges && (
+                                <button
                                     type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setShowDiscountInfo(!showDiscountInfo)}
-                                    className="dark:text-gray-400 dark:hover:text-white"
+                                    onClick={() => setShowResetDialog(true)}
+                                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
                                 >
-                                    <Info className="h-4 w-4 mr-1" />
-                                    Philippine Guidelines
-                                </Button>
+                                    <RefreshCw className="h-4 w-4" />
+                                    Reset
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 flex items-center gap-1"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Delete
+                            </button>
+                            <div className="px-2 py-1 rounded-md text-xs bg-gray-100 dark:bg-gray-800">
+                                Code: {feeType.code}
                             </div>
-                        </CardHeader>
-                        
-                        {showDiscountInfo && (
-                            <div className="px-6 pb-4">
-                                <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                                    <div className="flex items-start gap-2">
-                                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                                        <AlertDescription className="text-sm text-blue-700 dark:text-blue-400">
-                                            <div className="space-y-2">
-                                                <p><strong>Philippine Discount Rules:</strong></p>
-                                                <ul className="list-disc pl-4 space-y-1">
-                                                    <li><strong>Senior Citizens (RA 9994):</strong> 20% discount mandated</li>
-                                                    <li><strong>PWD (RA 10754):</strong> 20% discount mandated</li>
-                                                    <li><strong>Solo Parents (RA 8972):</strong> Typically 10% discount</li>
-                                                    <li><strong>Indigents:</strong> Varies (50-100% depending on LGU)</li>
-                                                    <li><strong>Important:</strong> Only highest applicable discount applies</li>
-                                                </ul>
-                                            </div>
-                                        </AlertDescription>
-                                    </div>
-                                </Alert>
+                            <div className={`px-2 py-1 rounded-md text-xs ${
+                                formData.is_active 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                                {formData.is_active ? 'Active' : 'Inactive'}
                             </div>
-                        )}
-                        
-                        <CardContent>
-                            <div className="grid gap-6 md:grid-cols-2">
-                                {/* Senior Citizen Discount */}
-                                <div className="space-y-4 border rounded-lg p-4 dark:border-gray-700">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id="has_senior_discount"
-                                                checked={data.has_senior_discount}
-                                                onCheckedChange={handleSeniorDiscountChange}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <div>
-                                                <Label htmlFor="has_senior_discount" className="font-medium dark:text-gray-200">
-                                                    Senior Citizen Discount
-                                                </Label>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">RA 9994</p>
-                                            </div>
-                                        </div>
-                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-                                            Mandatory 20%
-                                        </Badge>
-                                    </div>
-                                    
-                                    {data.has_senior_discount && (
-                                        <div className="pl-6 space-y-2">
-                                            <Label htmlFor="senior_discount_percentage" className="dark:text-gray-300">Discount Percentage</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    id="senior_discount_percentage"
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    value={data.senior_discount_percentage || ''}
-                                                    onChange={(e) => setData('senior_discount_percentage', e.target.value ? parseFloat(e.target.value) : null)}
-                                                />
-                                                <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                            </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Philippine law mandates 20% for senior citizens
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                {/* PWD Discount */}
-                                <div className="space-y-4 border rounded-lg p-4 dark:border-gray-700">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id="has_pwd_discount"
-                                                checked={data.has_pwd_discount}
-                                                onCheckedChange={handlePwdDiscountChange}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <div>
-                                                <Label htmlFor="has_pwd_discount" className="font-medium dark:text-gray-200">
-                                                    PWD Discount
-                                                </Label>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">RA 10754</p>
-                                            </div>
-                                        </div>
-                                        <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                                            Mandatory 20%
-                                        </Badge>
-                                    </div>
-                                    
-                                    {data.has_pwd_discount && (
-                                        <div className="pl-6 space-y-2">
-                                            <Label htmlFor="pwd_discount_percentage" className="dark:text-gray-300">Discount Percentage</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    id="pwd_discount_percentage"
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    value={data.pwd_discount_percentage || ''}
-                                                    onChange={(e) => setData('pwd_discount_percentage', e.target.value ? parseFloat(e.target.value) : null)}
-                                                />
-                                                <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                {/* Solo Parent Discount */}
-                                <div className="space-y-4 border rounded-lg p-4 dark:border-gray-700">
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id="has_solo_parent_discount"
-                                            checked={data.has_solo_parent_discount}
-                                            onCheckedChange={handleSoloParentDiscountChange}
-                                            className="dark:border-gray-600"
-                                        />
-                                        <div>
-                                            <Label htmlFor="has_solo_parent_discount" className="font-medium dark:text-gray-200">
-                                                Solo Parent Discount
-                                            </Label>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">RA 8972</p>
-                                        </div>
-                                    </div>
-                                    
-                                    {data.has_solo_parent_discount && (
-                                        <div className="pl-6 space-y-2">
-                                            <Label htmlFor="solo_parent_discount_percentage" className="dark:text-gray-300">Discount Percentage</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    id="solo_parent_discount_percentage"
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    value={data.solo_parent_discount_percentage || ''}
-                                                    onChange={(e) => setData('solo_parent_discount_percentage', e.target.value ? parseFloat(e.target.value) : null)}
-                                                />
-                                                <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                            </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Typically 10% discount for solo parents
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                {/* Indigent Discount */}
-                                <div className="space-y-4 border rounded-lg p-4 dark:border-gray-700">
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id="has_indigent_discount"
-                                            checked={data.has_indigent_discount}
-                                            onCheckedChange={handleIndigentDiscountChange}
-                                            className="dark:border-gray-600"
-                                        />
-                                        <div>
-                                            <Label htmlFor="has_indigent_discount" className="font-medium dark:text-gray-200">
-                                                Indigent Discount
-                                            </Label>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">LGU Ordinance</p>
-                                        </div>
-                                    </div>
-                                    
-                                    {data.has_indigent_discount && (
-                                        <div className="pl-6 space-y-2">
-                                            <Label htmlFor="indigent_discount_percentage" className="dark:text-gray-300">Discount Percentage</Label>
-                                            <div className="relative">
-                                                <Input
-                                                    id="indigent_discount_percentage"
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    value={data.indigent_discount_percentage || ''}
-                                                    onChange={(e) => setData('indigent_discount_percentage', e.target.value ? parseFloat(e.target.value) : null)}
-                                                />
-                                                <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                            </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Often 50-100% depending on LGU classification
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    }
+                />
 
-                    {/* Late Payment Penalties */}
-                    <Card className="dark:bg-gray-900">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-red-600 to-rose-600 dark:from-red-700 dark:to-rose-700 flex items-center justify-center">
-                                    <AlertCircle className="h-3 w-3 text-white" />
-                                </div>
-                                Late Payment Penalties
-                            </CardTitle>
-                            <CardDescription className="dark:text-gray-400">
-                                Update surcharges and penalties for late payments
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-6 md:grid-cols-2">
-                                {/* Surcharge */}
-                                <div className="space-y-4">
-                                    <h3 className="font-medium text-lg dark:text-gray-200">Surcharge</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                            <Checkbox
-                                                id="has_surcharge"
-                                                checked={data.has_surcharge}
-                                                onCheckedChange={(checked) => setData('has_surcharge', checked as boolean)}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <Label htmlFor="has_surcharge" className="cursor-pointer dark:text-gray-300">Apply Surcharge for Late Payments</Label>
-                                        </div>
-                                        {data.has_surcharge && (
-                                            <div className="space-y-4 pl-6">
-                                                <div className="space-y-2">
-                                                    <Label className="dark:text-gray-300">Monthly Surcharge Rate</Label>
-                                                    <div className="relative">
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            max="100"
-                                                            placeholder="Percentage per month"
-                                                            className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                            value={data.surcharge_percentage || ''}
-                                                            onChange={(e) => setData('surcharge_percentage', e.target.value ? parseFloat(e.target.value) : null)}
-                                                        />
-                                                        <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                        Percentage added monthly (e.g., 2% per month)
-                                                    </p>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label className="dark:text-gray-300">Fixed Surcharge Amount</Label>
-                                                    <div className="relative">
-                                                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            placeholder="Fixed amount"
-                                                            className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                            value={data.surcharge_fixed || ''}
-                                                            onChange={(e) => setData('surcharge_fixed', e.target.value ? parseFloat(e.target.value) : null)}
-                                                        />
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                        Fixed amount charged for late payment
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Penalty */}
-                                <div className="space-y-4">
-                                    <h3 className="font-medium text-lg dark:text-gray-200">Additional Penalty</h3>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center space-x-2 p-2 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                            <Checkbox
-                                                id="has_penalty"
-                                                checked={data.has_penalty}
-                                                onCheckedChange={(checked) => setData('has_penalty', checked as boolean)}
-                                                className="dark:border-gray-600"
-                                            />
-                                            <Label htmlFor="has_penalty" className="cursor-pointer dark:text-gray-300">Apply Additional Penalty</Label>
-                                        </div>
-                                        {data.has_penalty && (
-                                            <div className="space-y-4 pl-6">
-                                                <div className="space-y-2">
-                                                    <Label className="dark:text-gray-300">Penalty Percentage</Label>
-                                                    <div className="relative">
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            max="100"
-                                                            placeholder="One-time percentage"
-                                                            className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                            value={data.penalty_percentage || ''}
-                                                            onChange={(e) => setData('penalty_percentage', e.target.value ? parseFloat(e.target.value) : null)}
-                                                        />
-                                                        <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                        One-time penalty percentage
-                                                    </p>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label className="dark:text-gray-300">Fixed Penalty Amount</Label>
-                                                    <div className="relative">
-                                                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            placeholder="Fixed amount"
-                                                            className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                            value={data.penalty_fixed || ''}
-                                                            onChange={(e) => setData('penalty_fixed', e.target.value ? parseFloat(e.target.value) : null)}
-                                                        />
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                        Fixed penalty amount
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                {/* Last Updated & Changes Banner */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm p-4">
+                        <div className="flex items-center gap-3">
+                            <History className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                            <div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Last updated: {formatDate(feeType.updated_at)}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Created: {formatDate(feeType.created_at)}
+                                </p>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
-                    {/* Additional Notes */}
-                    <Card className="dark:bg-gray-900">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-gray-600 to-slate-600 dark:from-gray-700 dark:to-slate-700 flex items-center justify-center">
-                                    <FileText className="h-3 w-3 text-white" />
+                    {hasUnsavedChanges && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-blue-600 dark:bg-blue-400 animate-pulse"></div>
+                                    <span className="font-medium text-blue-800 dark:text-blue-300">
+                                        {changedFieldsCount} field{changedFieldsCount !== 1 ? 's' : ''} modified
+                                    </span>
                                 </div>
-                                Additional Notes
-                            </CardTitle>
-                            <CardDescription className="dark:text-gray-400">
-                                Update any additional notes or instructions for this fee type
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Textarea
-                                rows={3}
-                                value={data.notes}
-                                onChange={(e) => setData('notes', e.target.value)}
-                                placeholder="Any additional notes or instructions for this fee type..."
-                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                            />
-                        </CardContent>
-                    </Card>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setShowResetDialog(true)}
+                                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                                >
+                                    Reset All
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
-            </form>
+
+                <FormErrors errors={allErrors} />
+
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer title="Basic Information" description="Update the core details for this fee type">
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        categories={categories}
+                                        autoGenerateCode={autoGenerateCode}
+                                        isGenerating={isGenerating}
+                                        copiedField={copiedField}
+                                        originalName={feeType.name}
+                                        originalCode={feeType.code}
+                                        originalBaseAmount={typeof feeType.base_amount === 'string' ? parseFloat(feeType.base_amount) : feeType.base_amount}
+                                        onInputChange={handleInputChange}
+                                        onSelectChange={handleSelectChange}
+                                        onCopyCode={handleCopyCode}
+                                        onGenerateCode={handleGenerateCode}
+                                        onAutoGenerateToggle={setAutoGenerateCode}
+                                        formatCurrency={formatCurrency}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.document_category_id && formData.base_amount > 0 && !!formData.effective_date}
+                                    showPrevious={false}
+                                    nextLabel="Next: Pricing"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'pricing' && (
+                            <>
+                                <FormContainer title="Pricing Configuration" description="Update pricing details for the fee">
+                                    <PricingTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        amountTypes={amountTypes}
+                                        frequencies={frequencies}
+                                        showDiscountInfo={showDiscountInfo}
+                                        onNumberChange={handleNumberChange}
+                                        onSelectChange={handleSelectChange}
+                                        onInputChange={handleInputChange}
+                                        onCheckboxChange={handleSwitchChange}
+                                        onSeniorDiscountChange={handleSeniorDiscountChange}
+                                        onPwdDiscountChange={handlePwdDiscountChange}
+                                        onSoloParentDiscountChange={handleSoloParentDiscountChange}
+                                        onIndigentDiscountChange={handleIndigentDiscountChange}
+                                        onToggleDiscountInfo={() => setShowDiscountInfo(!showDiscountInfo)}
+                                        formatCurrency={formatCurrency}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.document_category_id && formData.base_amount > 0 && !!formData.effective_date}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Discounts"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'discounts' && (
+                            <>
+                                <FormContainer title="Discount Configuration" description="Update discount configurations for eligible groups">
+                                    <DiscountsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        showDiscountInfo={showDiscountInfo}
+                                        activeDiscountCount={activeDiscountCount}
+                                        onNumberChange={handleNumberChange}
+                                        onDiscountChange={handleDiscountChange}
+                                        onToggleDiscountInfo={() => setShowDiscountInfo(!showDiscountInfo)}
+                                        isSubmitting={isSubmitting}
+                                        isEdit={true}
+                                        originalSeniorDiscount={feeType.has_senior_discount}
+                                        originalPwdDiscount={feeType.has_pwd_discount}
+                                        originalSoloParentDiscount={feeType.has_solo_parent_discount}
+                                        originalIndigentDiscount={feeType.has_indigent_discount}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.document_category_id && formData.base_amount > 0 && !!formData.effective_date}
+                                    previousLabel="Back: Pricing"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Settings" description="Update fee status and behavior">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        onNumberChange={handleNumberChange}
+                                        onSwitchChange={handleSwitchChange}
+                                        onInputChange={handleInputChange}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.document_category_id && formData.base_amount > 0 && !!formData.effective_date}
+                                    previousLabel="Back: Discounts"
+                                    showNext={false}
+                                    submitLabel="Update Fee Type"
+                                />
+                            </>
+                        )}
+                    </div>
+
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled && !!formData.name && !!formData.document_category_id && formData.base_amount > 0 && !!formData.effective_date}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* Fee Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Fee Summary</h3>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center">
+                                                <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
+                                                </div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {formData.code || 'No code'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg text-center">
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Base Amount</p>
+                                            <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                                                {formatCurrency(formData.base_amount)}
+                                            </p>
+                                        </div>
+
+                                        {activeDiscountCount > 0 && (
+                                            <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                                <p className="text-xs text-green-700 dark:text-green-300 text-center">
+                                                    {activeDiscountCount} discount{activeDiscountCount !== 1 ? 's' : ''} available
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between text-sm pt-2 border-t dark:border-gray-700">
+                                            <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                                            <span className={`font-medium ${
+                                                formData.is_active 
+                                                    ? 'text-green-600 dark:text-green-400' 
+                                                    : 'text-gray-500 dark:text-gray-400'
+                                            }`}>
+                                                {formData.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500 dark:text-gray-400">Category:</span>
+                                            <span className="font-medium dark:text-gray-300">
+                                                {getCategoryName(formData.document_category_id)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500 dark:text-gray-400">Effective:</span>
+                                            <span className="font-medium dark:text-gray-300">
+                                                {formatDate(formData.effective_date)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
 
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                 <AlertDialogContent className="dark:bg-gray-900">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="dark:text-gray-100">Delete Fee Type</AlertDialogTitle>
+                        <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                            <Trash2 className="h-5 w-5" />
+                            Delete Fee Type
+                        </AlertDialogTitle>
                         <AlertDialogDescription className="dark:text-gray-400">
-                            Are you sure you want to delete "{feeType?.name}"? This action cannot be undone.
-                            All associated bills and transactions will be affected.
+                            Are you sure you want to delete "{feeType.name}"? This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="dark:border-gray-600 dark:text-gray-300">Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction 
-                            onClick={() => {
-                                // Handle delete - you'll need to implement this
-                                window.location.href = `/admin/fee-types/${feeType?.id}`;
-                            }}
-                            className="bg-red-600 hover:bg-red-700 text-white"
+                            onClick={confirmDelete}
+                            className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
                         >
-                            Delete
+                            Delete Fee Type
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1347,7 +783,9 @@ export default function FeeTypesEdit() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="dark:border-gray-600 dark:text-gray-300">Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction onClick={handleReset} className="bg-yellow-600 hover:bg-yellow-700 text-white">
                             Reset
                         </AlertDialogAction>

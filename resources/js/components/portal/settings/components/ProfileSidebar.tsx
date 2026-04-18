@@ -1,19 +1,20 @@
 import React from 'react';
-import { Camera, Home, Users, Mail, Phone } from 'lucide-react';
+import { Camera, Home, Users, Mail, Phone, MapPin } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { getInitials, formatDate, getAvatarUrl } from './utils';
-import { ProfileUserData } from './types';
+import { ProfileUserData, ResidentData, HouseholdData } from './types';
 
 interface ProfileSidebarProps {
   user: ProfileUserData;
-  resident?: ProfileUserData['resident'];
-  household?: ProfileUserData['resident']['household'];
-  purok?: ProfileUserData['resident']['purok'] | ProfileUserData['resident']['household']['purok'];
+  resident?: ResidentData;
+  household?: HouseholdData;
+  purok?: { id: number; name: string };
   barangayEmail?: string;
   barangayContact?: string;
+  barangayAddress?: string;
 }
 
 export const ProfileSidebar = ({ 
@@ -23,6 +24,7 @@ export const ProfileSidebar = ({
   purok,
   barangayEmail = "barangay.hall@example.com",
   barangayContact = "(02) 1234-5678",
+  barangayAddress = "Barangay Hall, Main Street, Barangay Example, City",
 }: ProfileSidebarProps) => {
   const avatarUrl = getAvatarUrl(resident?.photo_path);
 
@@ -113,6 +115,16 @@ export const ProfileSidebar = ({
                 {barangayContact}
               </a>
             </div>
+            
+            {/* Address Display */}
+            {barangayAddress && (
+              <div className="flex items-start gap-2">
+                <MapPin className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                <span className="text-amber-700 text-[11px] leading-tight">
+                  {barangayAddress}
+                </span>
+              </div>
+            )}
             
             <p className="text-[10px] text-amber-600 pt-1">
               Admin updates only

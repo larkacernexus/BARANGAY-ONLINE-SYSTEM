@@ -67,6 +67,7 @@ export interface Household {
 }
 
 export interface Resident {
+    photo_url: any;
     full_name: string;
     photo_path(photo_path: any): unknown;
     place_of_birth: string | number | boolean | null | undefined;

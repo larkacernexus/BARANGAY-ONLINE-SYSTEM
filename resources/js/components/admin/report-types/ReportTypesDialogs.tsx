@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { BulkOperation, BulkEditField, SelectionStats } from '@/types/report-types';
+import { BulkOperation, BulkEditField, SelectionStats } from '@/types/admin/report-types/report-types';
 
 interface ReportTypesDialogsProps {
     showBulkDeleteDialog: boolean;

@@ -9,6 +9,8 @@ use App\Models\ClearanceType;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class PaymentIndexController extends BasePaymentController
 {
@@ -33,12 +35,23 @@ class PaymentIndexController extends BasePaymentController
         // Get clearance types for filter
         $clearanceTypes = $this->getClearanceTypesForFilter();
 
-        // Calculate statistics
-        $stats = $this->calculateStatistics();
+        // Calculate statistics (cached for 5 minutes)
+        $stats = Cache::remember('payments.statistics', 300, function () {
+            return $this->calculateStatistics();
+        });
+
+        Log::info('Payments index (Server-Side)', [
+            'total_payments' => $payments->total(),
+            'current_page' => $payments->currentPage(),
+            'filters_applied' => $request->only(['search', 'status', 'payment_method', 'payer_type'])
+        ]);
 
         return Inertia::render('admin/Payments/Index', [
             'payments' => $payments,
-            'filters' => $request->only(['search', 'status', 'payment_method', 'date_from', 'date_to', 'payer_type', 'clearance_type_id', 'clearance_request_id']),
+            'filters' => $request->only([
+                'search', 'status', 'payment_method', 'date_from', 'date_to', 
+                'payer_type', 'clearance_type_id', 'clearance_request_id'
+            ]),
             'clearanceTypes' => $clearanceTypes,
             'stats' => $stats,
             'hasClearanceTypes' => $clearanceTypes->count() > 0,
@@ -50,6 +63,7 @@ class PaymentIndexController extends BasePaymentController
      */
     private function applyFilters($query, Request $request): void
     {
+        // Search filter
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
@@ -61,14 +75,17 @@ class PaymentIndexController extends BasePaymentController
             });
         }
 
-        if ($request->filled('status')) {
+        // Status filter - FIXED: Skip 'all' value
+        if ($request->filled('status') && $request->input('status') !== 'all') {
             $query->where('status', $request->input('status'));
         }
 
-        if ($request->filled('payment_method')) {
+        // Payment method filter - FIXED: Skip 'all' value
+        if ($request->filled('payment_method') && $request->input('payment_method') !== 'all') {
             $query->where('payment_method', $request->input('payment_method'));
         }
 
+        // Date range filters
         if ($request->filled('date_from')) {
             $query->whereDate('payment_date', '>=', $request->input('date_from'));
         }
@@ -77,22 +94,33 @@ class PaymentIndexController extends BasePaymentController
             $query->whereDate('payment_date', '<=', $request->input('date_to'));
         }
 
-        if ($request->filled('payer_type')) {
+        // Payer type filter - FIXED: Skip 'all' value
+        if ($request->filled('payer_type') && $request->input('payer_type') !== 'all') {
             $query->where('payer_type', $request->input('payer_type'));
         }
 
-        if ($request->filled('clearance_type_id')) {
+        // Clearance type filter - FIXED: Skip 'all' value and validate numeric
+        if ($request->filled('clearance_type_id') && $request->input('clearance_type_id') !== 'all') {
             $clearanceTypeId = $request->input('clearance_type_id');
-            $query->whereHas('items.clearanceRequest', function ($q) use ($clearanceTypeId) {
-                $q->where('clearance_type_id', $clearanceTypeId);
-            });
+            
+            // Only apply if it's a valid numeric ID
+            if (is_numeric($clearanceTypeId) && $clearanceTypeId > 0) {
+                $query->whereHas('items.clearanceRequest', function ($q) use ($clearanceTypeId) {
+                    $q->where('clearance_type_id', $clearanceTypeId);
+                });
+            }
         }
 
+        // Clearance request filter - FIXED: Validate numeric
         if ($request->filled('clearance_request_id')) {
             $clearanceRequestId = $request->input('clearance_request_id');
-            $query->whereHas('items', function ($q) use ($clearanceRequestId) {
-                $q->where('clearance_request_id', $clearanceRequestId);
-            });
+            
+            // Only apply if it's a valid numeric ID
+            if (is_numeric($clearanceRequestId) && $clearanceRequestId > 0) {
+                $query->whereHas('items', function ($q) use ($clearanceRequestId) {
+                    $q->where('clearance_request_id', $clearanceRequestId);
+                });
+            }
         }
     }
 
@@ -101,17 +129,19 @@ class PaymentIndexController extends BasePaymentController
      */
     private function getClearanceTypesForFilter()
     {
-        return ClearanceType::where('is_active', true)
-            ->orderBy('name')
-            ->get()
-            ->map(function ($type) {
-                return [
-                    'id' => $type->id,
-                    'name' => $type->name,
-                    'code' => $type->code ?? strtoupper(str_replace(' ', '_', $type->name)),
-                    'fee' => floatval($type->fee),
-                ];
-            });
+        return Cache::remember('clearance.types.active', 3600, function () {
+            return ClearanceType::where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function ($type) {
+                    return [
+                        'id' => $type->id,
+                        'name' => $type->name,
+                        'code' => $type->code ?? strtoupper(str_replace(' ', '_', $type->name)),
+                        'fee' => floatval($type->fee),
+                    ];
+                });
+        });
     }
 
     /**
@@ -122,16 +152,23 @@ class PaymentIndexController extends BasePaymentController
         return [
             'total' => Payment::count(),
             'today' => Payment::whereDate('payment_date', today())->count(),
-            'monthly' => Payment::whereMonth('payment_date', now()->month)->count(),
-            'total_amount' => Payment::sum('amount_paid'),
-            'today_amount' => Payment::whereDate('payment_date', today())->sum('amount_paid'),
-            'monthly_amount' => Payment::whereMonth('payment_date', now()->month)->sum('amount_paid'),
+            'monthly' => Payment::whereMonth('payment_date', now()->month)
+                ->whereYear('payment_date', now()->year)
+                ->count(),
+            'total_amount' => (float) Payment::sum('amount_paid'),
+            'today_amount' => (float) Payment::whereDate('payment_date', today())->sum('amount_paid'),
+            'monthly_amount' => (float) Payment::whereMonth('payment_date', now()->month)
+                ->whereYear('payment_date', now()->year)
+                ->sum('amount_paid'),
             'clearance_payments' => Payment::whereHas('items', function ($q) {
                 $q->whereNotNull('clearance_request_id');
             })->count(),
-            'clearance_amount' => Payment::whereHas('items', function ($q) {
+            'clearance_amount' => (float) Payment::whereHas('items', function ($q) {
                 $q->whereNotNull('clearance_request_id');
             })->sum('amount_paid'),
+            'pending_count' => Payment::where('status', 'pending')->count(),
+            'completed_count' => Payment::where('status', 'completed')->count(),
+            'cancelled_count' => Payment::where('status', 'cancelled')->count(),
         ];
     }
 
@@ -140,33 +177,48 @@ class PaymentIndexController extends BasePaymentController
      */
     public function statistics(Request $request)
     {
-        $dateFrom = $request->input('date_from', now()->startOfMonth());
-        $dateTo = $request->input('date_to', now()->endOfMonth());
+        $dateFrom = $request->input('date_from', now()->startOfMonth()->toDateString());
+        $dateTo = $request->input('date_to', now()->endOfMonth()->toDateString());
 
         $stats = [
             'total_payments' => Payment::whereBetween('payment_date', [$dateFrom, $dateTo])->count(),
-            'total_amount' => Payment::whereBetween('payment_date', [$dateFrom, $dateTo])->sum('total_amount'),
+            'total_amount' => (float) Payment::whereBetween('payment_date', [$dateFrom, $dateTo])->sum('total_amount'),
             'by_method' => Payment::whereBetween('payment_date', [$dateFrom, $dateTo])
                 ->select('payment_method', DB::raw('COUNT(*) as count'), DB::raw('SUM(total_amount) as total'))
                 ->groupBy('payment_method')
-                ->get(),
+                ->get()
+                ->map(fn($item) => [
+                    'method' => $item->payment_method,
+                    'count' => (int) $item->count,
+                    'total' => (float) $item->total,
+                ]),
             'by_category' => \App\Models\PaymentItem::whereHas('payment', function ($query) use ($dateFrom, $dateTo) {
                     $query->whereBetween('payment_date', [$dateFrom, $dateTo]);
                 })
                 ->select('category', DB::raw('COUNT(*) as count'), DB::raw('SUM(total_amount) as total'))
                 ->groupBy('category')
-                ->get(),
+                ->get()
+                ->map(fn($item) => [
+                    'category' => $item->category,
+                    'count' => (int) $item->count,
+                    'total' => (float) $item->total,
+                ]),
             'daily_trend' => Payment::whereBetween('payment_date', [$dateFrom, $dateTo])
                 ->select(DB::raw('DATE(payment_date) as date'), DB::raw('COUNT(*) as count'), DB::raw('SUM(total_amount) as total'))
                 ->groupBy(DB::raw('DATE(payment_date)'))
                 ->orderBy('date')
-                ->get(),
+                ->get()
+                ->map(fn($item) => [
+                    'date' => $item->date,
+                    'count' => (int) $item->count,
+                    'total' => (float) $item->total,
+                ]),
             'clearance_payments' => Payment::whereBetween('payment_date', [$dateFrom, $dateTo])
                 ->whereHas('items', function ($q) {
                     $q->whereNotNull('clearance_request_id');
                 })
                 ->count(),
-            'clearance_amount' => Payment::whereBetween('payment_date', [$dateFrom, $dateTo])
+            'clearance_amount' => (float) Payment::whereBetween('payment_date', [$dateFrom, $dateTo])
                 ->whereHas('items', function ($q) {
                     $q->whereNotNull('clearance_request_id');
                 })
@@ -174,5 +226,16 @@ class PaymentIndexController extends BasePaymentController
         ];
 
         return response()->json($stats);
+    }
+
+    /**
+     * Clear payment cache (call this when payments are created/updated/deleted)
+     */
+    public function clearCache()
+    {
+        Cache::forget('payments.statistics');
+        Cache::forget('clearance.types.active');
+        
+        return response()->json(['message' => 'Payment cache cleared successfully']);
     }
 }

@@ -1,17 +1,19 @@
 // @/components/adminui/grid-layout.tsx
 import { ReactNode } from 'react';
 
+type GridColumns = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+
 interface GridLayoutProps {
     children: ReactNode;
     isEmpty: boolean;
     emptyState: ReactNode;
-    gridCols?: {
-        base?: number;
-        sm?: number;
-        md?: number;
-        lg?: number;
-        xl?: number;
-        '2xl'?: number;
+    gridCols?: {                    // ✅ Make it optional with ?
+        base?: GridColumns;
+        sm?: GridColumns;
+        md?: GridColumns;
+        lg?: GridColumns;
+        xl?: GridColumns;
+        '2xl'?: GridColumns;
     };
     gap?: {
         base?: string;
@@ -28,12 +30,18 @@ export function GridLayout({
     children,
     isEmpty,
     emptyState,
-    gridCols = { base: 1, sm: 2, lg: 3, xl: 4 },
+    gridCols = {                     // ✅ Default values
+        base: 1,
+        sm: 2,
+        md: 3,
+        lg: 3,
+        xl: 4,
+        '2xl': 4
+    },
     gap = { base: '3', sm: '4' },
     padding = 'p-4',
     className = ''
 }: GridLayoutProps) {
-    // Build responsive grid classes
     const gridClass = [
         'grid',
         `grid-cols-${gridCols.base || 1}`,
@@ -51,7 +59,6 @@ export function GridLayout({
         .filter(Boolean)
         .join(' ');
 
-    // When empty, show centered empty state with proper background
     if (isEmpty) {
         return (
             <div className={`${padding} ${className} bg-gray-50 dark:bg-gray-950 min-h-[400px] flex items-center justify-center`}>
@@ -60,7 +67,6 @@ export function GridLayout({
         );
     }
 
-    // When not empty, show grid with proper background
     return (
         <div className={`${padding} ${className} bg-gray-50 dark:bg-gray-950`}>
             <div className={gridClass}>

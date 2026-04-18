@@ -1,104 +1,30 @@
 // pages/admin/clearance-types/create.tsx
-
+import { router, usePage } from '@inertiajs/react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-    ArrowLeft,
-    Save,
-    FileText,
-    DollarSign,
-    Calendar,
-    Clock,
-    XCircle,
-    Plus,
-    Trash2,
-    AlertCircle,
-    Copy,
-    Loader2,
-    File,
-    Filter,
-    Award,
-    Shield,
-    Heart,
-    HeartHandshake,
-    Home,
-    Briefcase,
-    User,
-    GraduationCap,
-    Scale,
-    Gavel,
-    Wallet,
-    Vote,
-    Hash,
-    Tag,
-    Settings,
-    Eye
-} from 'lucide-react';
-import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { FormContainer } from '@/components/adminui/form/form-container';
+import { FormTabs, TabConfig } from '@/components/adminui/form/form-tabs';
+import { FormProgress } from '@/components/adminui/form/form-progress';
+import { FormNavigation } from '@/components/adminui/form/form-navigation';
+import { FormHeader } from '@/components/adminui/form/form-header';
+import { FormErrors } from '@/components/adminui/form/form-errors';
+import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
+import { useFormManager } from '@/hooks/admin/use-form-manager';
+import { FileText, DollarSign, File, Settings, Sparkles, Copy, RefreshCw } from 'lucide-react';
+import { BasicInfoTab } from '@/components/admin/clearance-types/create/basic-info-tab';
+import { FeesTab } from '@/components/admin/clearance-types/create/fees-tab';
+import { RequirementsTab } from '@/components/admin/clearance-types/create/requirements-tab';
+import { SettingsTab } from '@/components/admin/clearance-types/create/settings-tab';
 import { route } from 'ziggy-js';
-
-// Import types from centralized types file
-import {
-    type ClearanceTypeFormData,
-    type PrivilegeData,
-    type ClearanceType
+import type { 
+    ClearanceTypeFormData, 
+    CommonType, 
+    DocumentType, 
+    PrivilegeData,
+    EligibilityCriterion,
+    DiscountConfig
 } from '@/types/admin/clearance-types/clearance-types';
-
-// Import helper functions
-import {
-    getPrivilegeIcon,
-    getPrivilegeColor
-} from '@/components/admin/clearance-types/show/utils/helpers';
-
-// Local interfaces for document types and other structures not in the central types
-interface DocumentType {
-    id: number;
-    name: string;
-    code: string;
-    description: string;
-    category: string;
-    is_required: boolean;
-    sort_order: number;
-    accepted_formats?: string[];
-    max_file_size?: number;
-    is_active: boolean;
-}
-
-interface CommonType {
-    name: string;
-    code: string;
-    description: string;
-    fee: number;
-    processing_days: number;
-    validity_days: number;
-    requires_payment?: boolean;
-}
-
-interface EligibilityCriterion {
-    field: string;
-    operator: string;
-    value: string;
-}
-
-interface DiscountConfig {
-    privilege_id: number;
-    privilege_code: string;
-    privilege_name: string;
-    discount_percentage: number;
-    is_active: boolean;
-    requires_verification: boolean;
-    requires_id_number: boolean;
-}
 
 interface PageProps {
     commonTypes: Record<string, CommonType>;
@@ -106,23 +32,55 @@ interface PageProps {
     defaultPurposeOptions: string[];
     eligibilityOperators: Array<{ value: string; label: string }>;
     privileges?: PrivilegeData[];
+    [key: string]: unknown;
 }
 
-// Extended form data for create page (includes fields not in base ClearanceTypeFormData)
-interface CreateClearanceTypeFormData extends ClearanceTypeFormData {
+interface FormData extends ClearanceTypeFormData {
+    // Additional form-specific fields
+    purpose_options: string;
     document_type_ids: number[];
     eligibility_criteria: EligibilityCriterion[];
     discount_configs: DiscountConfig[];
 }
 
-export default function CreateClearanceType({ 
-    commonTypes, 
-    documentTypes: initialDocumentTypes,
-    defaultPurposeOptions,
-    eligibilityOperators,
-    privileges = []
-}: PageProps) {
-    // State Management
+const tabs: TabConfig[] = [
+    { id: 'basic', label: 'Basic Info', icon: FileText, requiredFields: ['name', 'code'] },
+    { id: 'fees', label: 'Fees', icon: DollarSign, requiredFields: [] },
+    { id: 'requirements', label: 'Requirements', icon: File, requiredFields: [] },
+    { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] }
+];
+
+const requiredFieldsMap = {
+    basic: ['name', 'code'],
+    fees: [],
+    requirements: [],
+    settings: []
+};
+
+// Define residentFields for eligibility criteria
+const residentFields = [
+    { value: 'age', label: 'Age', icon: <span className="text-sm">👤</span> },
+    { value: 'years_of_residency', label: 'Years of Residency', icon: <span className="text-sm">🏠</span> },
+    { value: 'is_employed', label: 'Employment Status', icon: <span className="text-sm">💼</span> },
+    { value: 'has_business', label: 'Has Business', icon: <span className="text-sm">🏪</span> },
+    { value: 'is_registered_voter', label: 'Registered Voter', icon: <span className="text-sm">🗳️</span> },
+    { value: 'no_pending_case', label: 'No Pending Case', icon: <span className="text-sm">⚖️</span> },
+    { value: 'good_standing', label: 'Good Standing', icon: <span className="text-sm">⭐</span> },
+    { value: 'has_clearance', label: 'Has Previous Clearance', icon: <span className="text-sm">📄</span> },
+    { value: 'is_head_of_household', label: 'Head of Household', icon: <span className="text-sm">👨‍👩‍👧‍👦</span> },
+];
+
+export default function CreateClearanceType() {
+    const { props } = usePage<PageProps>();
+    const {
+        commonTypes = {},
+        documentTypes = [],
+        defaultPurposeOptions = [],
+        eligibilityOperators = [],
+        privileges = []
+    } = props;
+
+    const [showPreview, setShowPreview] = useState(true);
     const [selectedCommonType, setSelectedCommonType] = useState<string>('');
     const [purposeOptions, setPurposeOptions] = useState<string[]>(defaultPurposeOptions);
     const [newPurposeOption, setNewPurposeOption] = useState('');
@@ -131,34 +89,119 @@ export default function CreateClearanceType({
     ]);
     const [showEligibilityForm, setShowEligibilityForm] = useState(false);
     const [selectedDocumentTypes, setSelectedDocumentTypes] = useState<number[]>([]);
-    const [documentTypes] = useState<DocumentType[]>(initialDocumentTypes);
     const [documentCategory, setDocumentCategory] = useState<string>('all');
     const [searchDocument, setSearchDocument] = useState('');
     const [discountConfigs, setDiscountConfigs] = useState<DiscountConfig[]>([]);
     const [showDiscounts, setShowDiscounts] = useState(false);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-    // Form Setup using extended form data
-    const { data, setData, post, processing, errors } = useForm<CreateClearanceTypeFormData>({
-        name: '',
-        code: '',
-        description: '',
-        fee: 0,
-        processing_days: 1,
-        validity_days: 30,
-        is_active: true,
-        requires_payment: true,
-        requires_approval: false,
-        is_online_only: false,
-        is_discountable: false,
-        purpose_options: defaultPurposeOptions.join(', '),
-        document_type_ids: [],
-        eligibility_criteria: [],
-        discount_configs: [],
+    const {
+        formData,
+        errors,
+        isSubmitting,
+        activeTab,
+        formProgress,
+        allRequiredFieldsFilled,
+        handleInputChange,
+        handleSelectChange,
+        handleSubmit,
+        setActiveTab,
+        getTabStatus,
+        getMissingFields,
+        goToNextTab,
+        goToPrevTab,
+        updateFormData,
+        resetForm
+    } = useFormManager<FormData>({
+        initialData: {
+            name: '',
+            code: '',
+            description: '',
+            fee: 0,
+            processing_days: 1,
+            validity_days: 30,
+            is_active: true,
+            requires_payment: true,
+            requires_approval: false,
+            is_online_only: false,
+            is_discountable: false,
+            purpose_options: defaultPurposeOptions.join(', '),
+            document_type_ids: [],
+            eligibility_criteria: [],
+            discount_configs: [],
+        },
+        requiredFields: requiredFieldsMap,
+        onSubmit: (data) => {
+            // Validate before submit
+            const newErrors: Record<string, string> = {};
+            
+            if (!data.name?.trim()) {
+                newErrors.name = 'Clearance name is required';
+            }
+            if (!data.code?.trim()) {
+                newErrors.code = 'Clearance code is required';
+            }
+            
+            // Safe number conversion
+            const feeAmount = typeof data.fee === 'string' ? parseFloat(data.fee) : data.fee;
+            const processingDays = typeof data.processing_days === 'string' ? parseInt(data.processing_days) : data.processing_days;
+            const validityDays = typeof data.validity_days === 'string' ? parseInt(data.validity_days) : data.validity_days;
+            
+            if (isNaN(feeAmount) || feeAmount < 0) {
+                newErrors.fee = 'Fee must be a valid non-negative number';
+            }
+            if (isNaN(processingDays) || processingDays < 1) {
+                newErrors.processing_days = 'Processing days must be at least 1';
+            }
+            if (isNaN(validityDays) || validityDays < 1) {
+                newErrors.validity_days = 'Validity days must be at least 1';
+            }
+            
+            if (Object.keys(newErrors).length > 0) {
+                setValidationErrors(newErrors);
+                toast.error('Please fix the validation errors');
+                return;
+            }
+            
+            router.post(route('clearance-types.store'), data as any, {
+                onSuccess: () => {
+                    toast.success('Clearance type created successfully');
+                    router.visit(route('admin.clearance-types.index'));
+                },
+                onError: (errs) => {
+                    setValidationErrors(errs);
+                    toast.error('Failed to create clearance type');
+                }
+            });
+        }
     });
+
+    // Combine errors from server and validation
+    const allErrors = { ...errors, ...validationErrors };
+
+    // Memoized Values
+    const documentCategories = useMemo(() => [
+        'all',
+        ...Array.from(new Set(
+            documentTypes
+                .map(doc => doc.category)
+                .filter((category): category is string => category != null && category !== '')
+        ))
+    ], [documentTypes]);
+
+    const filteredDocumentTypes = useMemo(() => {
+        return documentTypes.filter(doc => {
+            const matchesCategory = documentCategory === 'all' || doc.category === documentCategory;
+            const matchesSearch = searchDocument === '' || 
+                doc.name.toLowerCase().includes(searchDocument.toLowerCase()) ||
+                (doc.description && doc.description.toLowerCase().includes(searchDocument.toLowerCase()));
+            return matchesCategory && matchesSearch;
+        });
+    }, [documentTypes, documentCategory, searchDocument]);
 
     // Initialize discount configs from privileges
     useEffect(() => {
-        if (privileges && privileges.length > 0) {
+        if (privileges && privileges.length > 0 && discountConfigs.length === 0) {
             const initialConfigs: DiscountConfig[] = privileges
                 .filter(p => p.is_active)
                 .map(p => ({
@@ -172,44 +215,9 @@ export default function CreateClearanceType({
                 }));
             setDiscountConfigs(initialConfigs);
         }
-    }, [privileges]);
+    }, [privileges, discountConfigs.length]);
 
-    // Memoized Values
-    const documentCategories = useMemo(() => [
-        'all', 
-        ...Array.from(new Set(
-            documentTypes
-                .map(doc => doc.category)
-                .filter((category): category is string => category != null && category !== '')
-        ))
-    ], [documentTypes]);
-
-    const filteredDocumentTypes = useMemo(() => {
-        return documentTypes.filter(doc => {
-            const matchesCategory = documentCategory === 'all' || doc.category === documentCategory;
-            const matchesSearch = doc.name.toLowerCase().includes(searchDocument.toLowerCase()) ||
-                                (doc.description && doc.description.toLowerCase().includes(searchDocument.toLowerCase()));
-            return matchesCategory && matchesSearch;
-        });
-    }, [documentTypes, documentCategory, searchDocument]);
-
-    const residentFields = useMemo(() => [
-        { value: 'age', label: 'Age', icon: <Calendar className="h-4 w-4" /> },
-        { value: 'civil_status', label: 'Civil Status', icon: <Heart className="h-4 w-4" /> },
-        { value: 'educational_attainment', label: 'Educational Attainment', icon: <GraduationCap className="h-4 w-4" /> },
-        { value: 'occupation', label: 'Occupation', icon: <Briefcase className="h-4 w-4" /> },
-        { value: 'monthly_income', label: 'Monthly Income', icon: <Wallet className="h-4 w-4" /> },
-        { value: 'is_registered_voter', label: 'Registered Voter', icon: <Vote className="h-4 w-4" /> },
-        { value: 'years_in_barangay', label: 'Years in Barangay', icon: <Clock className="h-4 w-4" /> },
-        { value: 'has_pending_case', label: 'Has Pending Case', icon: <Gavel className="h-4 w-4" /> },
-        ...privileges.map(p => ({
-            value: `has_${p.code.toLowerCase()}`,
-            label: p.name,
-            icon: getPrivilegeIcon(p.code)
-        }))
-    ], [privileges]);
-
-    // Event Handlers
+    // Handle common type select
     const handleCommonTypeSelect = useCallback((typeKey: string) => {
         if (typeKey === 'custom') {
             setSelectedCommonType('custom');
@@ -219,8 +227,7 @@ export default function CreateClearanceType({
         const commonType = commonTypes[typeKey];
         if (commonType) {
             setSelectedCommonType(typeKey);
-            setData({
-                ...data,
+            updateFormData({
                 name: commonType.name,
                 code: commonType.code,
                 description: commonType.description,
@@ -229,37 +236,38 @@ export default function CreateClearanceType({
                 validity_days: commonType.validity_days,
                 requires_payment: commonType.requires_payment !== false,
             });
+            toast.success('Template loaded successfully');
         }
-    }, [commonTypes, data, setData]);
+    }, [commonTypes, updateFormData]);
 
+    // Handle document type toggle
     const handleDocumentTypeToggle = useCallback((documentTypeId: number) => {
         setSelectedDocumentTypes(prev => {
-            let updatedSelection;
-            if (prev.includes(documentTypeId)) {
-                updatedSelection = prev.filter(id => id !== documentTypeId);
-            } else {
-                updatedSelection = [...prev, documentTypeId];
-            }
-            setData('document_type_ids', updatedSelection);
+            const updatedSelection = prev.includes(documentTypeId)
+                ? prev.filter(id => id !== documentTypeId)
+                : [...prev, documentTypeId];
+            updateFormData({ document_type_ids: updatedSelection });
             return updatedSelection;
         });
-    }, [setData]);
+    }, [updateFormData]);
 
+    // Handle purpose options
     const handleAddPurposeOption = useCallback(() => {
         if (newPurposeOption.trim()) {
             const updatedOptions = [...purposeOptions, newPurposeOption.trim()];
             setPurposeOptions(updatedOptions);
-            setData('purpose_options', updatedOptions.join(', '));
+            updateFormData({ purpose_options: updatedOptions.join(', ') });
             setNewPurposeOption('');
         }
-    }, [newPurposeOption, purposeOptions, setData]);
+    }, [newPurposeOption, purposeOptions, updateFormData]);
 
     const handleRemovePurposeOption = useCallback((index: number) => {
         const updatedOptions = purposeOptions.filter((_, i) => i !== index);
         setPurposeOptions(updatedOptions);
-        setData('purpose_options', updatedOptions.join(', '));
-    }, [purposeOptions, setData]);
+        updateFormData({ purpose_options: updatedOptions.join(', ') });
+    }, [purposeOptions, updateFormData]);
 
+    // Handle eligibility criteria
     const handleAddEligibilityCriterion = useCallback(() => {
         setEligibilityCriteria(prev => [
             ...prev,
@@ -271,52 +279,122 @@ export default function CreateClearanceType({
         setEligibilityCriteria(prev => {
             const updatedCriteria = [...prev];
             updatedCriteria[index][field] = value;
-            setData('eligibility_criteria', updatedCriteria);
+            updateFormData({ eligibility_criteria: updatedCriteria });
             return updatedCriteria;
         });
-    }, [setData]);
+    }, [updateFormData]);
 
     const handleRemoveEligibilityCriterion = useCallback((index: number) => {
         setEligibilityCriteria(prev => {
             const updatedCriteria = prev.filter((_, i) => i !== index);
-            setData('eligibility_criteria', updatedCriteria);
+            updateFormData({ eligibility_criteria: updatedCriteria });
             return updatedCriteria;
         });
-    }, [setData]);
+    }, [updateFormData]);
 
+    // Handle discount configs
     const handleDiscountToggle = useCallback((index: number, checked: boolean) => {
         setDiscountConfigs(prev => {
             const updatedConfigs = [...prev];
             updatedConfigs[index].is_active = checked;
-            
-            // Update form data with active discounts
+
             const activeDiscounts = updatedConfigs.filter(c => c.is_active);
-            setData('discount_configs', activeDiscounts);
-            setData('is_discountable', activeDiscounts.length > 0);
-            
+            updateFormData({
+                discount_configs: activeDiscounts,
+                is_discountable: activeDiscounts.length > 0
+            });
+
             return updatedConfigs;
         });
-    }, [setData]);
+    }, [updateFormData]);
 
     const handleDiscountPercentageChange = useCallback((index: number, percentage: number) => {
         setDiscountConfigs(prev => {
             const updatedConfigs = [...prev];
             updatedConfigs[index].discount_percentage = percentage;
-            
-            // Update form data if discount is active
+
             if (updatedConfigs[index].is_active) {
                 const activeDiscounts = updatedConfigs.filter(c => c.is_active);
-                setData('discount_configs', activeDiscounts);
+                updateFormData({ discount_configs: activeDiscounts });
             }
-            
+
             return updatedConfigs;
         });
-    }, [setData]);
+    }, [updateFormData]);
 
-        const submit = useCallback((e: React.FormEvent) => {
-            e.preventDefault();
-            post(route('clearance-types.store'));
-        }, [post]);
+    // Generate code from name
+    const generateCode = useCallback(() => {
+        if (formData.name) {
+            const code = formData.name
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^_|_$/g, '');
+            updateFormData({ code });
+            toast.success('Code generated from name');
+        } else {
+            toast.error('Please enter a name first');
+        }
+    }, [formData.name, updateFormData]);
+
+    // Handle number input changes
+    const handleNumberChange = useCallback((name: string, value: number) => {
+        updateFormData({ [name]: value });
+        // Clear validation error if exists
+        if (validationErrors[name]) {
+            setValidationErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[name];
+                return newErrors;
+            });
+        }
+    }, [updateFormData, validationErrors]);
+
+    // Handle switch changes
+    const handleSwitchChange = useCallback((name: string, checked: boolean) => {
+        updateFormData({ [name]: checked });
+    }, [updateFormData]);
+
+    // Handle reset
+    const handleReset = useCallback(() => {
+        if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
+            resetForm();
+            setSelectedDocumentTypes([]);
+            setPurposeOptions(defaultPurposeOptions);
+            setEligibilityCriteria([{ field: 'age', operator: 'greater_than_or_equal', value: '18' }]);
+            setSelectedCommonType('');
+            setDiscountConfigs([]);
+            setValidationErrors({});
+            toast.info('Form reset');
+        }
+    }, [resetForm, defaultPurposeOptions]);
+
+    // Handle cancel
+    const handleCancel = useCallback(() => {
+        if (formData.name || formData.code || formData.description) {
+            if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+                router.visit(route('admin.clearance-types.index'));
+            }
+        } else {
+            router.visit(route('admin.clearance-types.index'));
+        }
+    }, [formData]);
+
+    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
+        basic: getTabStatus('basic'),
+        fees: getTabStatus('fees'),
+        requirements: getTabStatus('requirements'),
+        settings: getTabStatus('settings')
+    };
+
+    const missingFields = getMissingFields();
+
+    const requiredFieldsList = [
+        { label: 'Name', value: !!formData.name, tabId: 'basic' },
+        { label: 'Code', value: !!formData.code, tabId: 'basic' },
+    ];
+
+    const tabOrder = ['basic', 'fees', 'requirements', 'settings'];
 
     return (
         <AppLayout
@@ -324,885 +402,263 @@ export default function CreateClearanceType({
             breadcrumbs={[
                 { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Clearance Types', href: '/admin/clearance-types' },
-                { title: 'Create Type', href: '/admin/clearance-types/create' }
+                { title: 'Create', href: '/admin/clearance-types/create' }
             ]}
         >
-            <form onSubmit={submit}>
-                <div className="space-y-6">
-                    {/* Header - Same as before */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Link href="/admin/clearance-types">
-                                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-300">
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-700 dark:to-emerald-700 flex items-center justify-center shadow-lg shadow-teal-500/20">
-                                    <FileText className="h-6 w-6 text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight dark:text-gray-100">
-                                        Create Clearance Type
-                                    </h1>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Configure a new type of clearance or certificate
-                                    </p>
+            <div className="space-y-6">
+                <FormHeader
+                    title="Create Clearance Type"
+                    description="Configure a new type of clearance or certificate"
+                    onBack={handleCancel}
+                    showPreview={showPreview}
+                    onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleReset}
+                                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 flex items-center gap-1"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Reset
+                            </button>
+                        </div>
+                    }
+                />
+
+                {/* Template Selection */}
+                {Object.keys(commonTypes).length > 0 && (
+                    <div className="bg-teal-50 dark:bg-teal-950/20 p-4 rounded-lg border border-teal-200 dark:border-teal-800">
+                        <div className="flex items-start gap-3">
+                            <Sparkles className="h-5 w-5 text-teal-600 dark:text-teal-400 mt-0.5" />
+                            <div className="flex-1">
+                                <h3 className="font-medium text-teal-800 dark:text-teal-300">Quick start with templates</h3>
+                                <p className="text-sm text-teal-600 dark:text-teal-400 mt-1">
+                                    Choose from common clearance type templates to get started quickly.
+                                </p>
+                                <div className="flex flex-wrap gap-2 mt-3">
+                                    {Object.entries(commonTypes).map(([key, type]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => handleCommonTypeSelect(key)}
+                                            className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors"
+                                        >
+                                            <Copy className="h-3 w-3" />
+                                            {type.name}
+                                        </button>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCommonTypeSelect('custom')}
+                                        className="inline-flex items-center gap-2 px-3 py-1 text-sm rounded-md border border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/30 transition-colors"
+                                    >
+                                        Custom Type
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Link href="/admin/clearance-types">
-                                <Button variant="outline" type="button" className="dark:border-gray-600 dark:text-gray-300">
-                                    Cancel
-                                </Button>
-                            </Link>
-                            <Button 
-                                type="submit" 
-                                disabled={processing}
-                                className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white dark:from-teal-700 dark:to-emerald-700"
-                            >
-                                {processing ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                        Creating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="h-4 w-4 mr-2" />
-                                        Create Type
-                                    </>
-                                )}
-                            </Button>
-                        </div>
+                    </div>
+                )}
+
+                <FormErrors errors={allErrors} />
+
+                <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
+                    <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
+                        <FormTabs
+                            tabs={tabs}
+                            activeTab={activeTab}
+                            onTabChange={setActiveTab}
+                            tabStatuses={tabStatuses}
+                        />
+
+                        {activeTab === 'basic' && (
+                            <>
+                                <FormContainer title="Basic Information" description="Enter the core details for this clearance type">
+                                    <BasicInfoTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        onInputChange={handleInputChange}
+                                        onGenerateCode={generateCode}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    showPrevious={false}
+                                    nextLabel="Next: Fees"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'fees' && (
+                            <>
+                                <FormContainer title="Fees & Duration" description="Configure processing time and validity period">
+                                    <FeesTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        purposeOptions={purposeOptions}
+                                        newPurposeOption={newPurposeOption}
+                                        onNumberChange={handleNumberChange}
+                                        onAddPurposeOption={handleAddPurposeOption}
+                                        onRemovePurposeOption={handleRemovePurposeOption}
+                                        onNewPurposeOptionChange={setNewPurposeOption}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    previousLabel="Back: Basic Info"
+                                    nextLabel="Next: Requirements"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'requirements' && (
+                            <>
+                                <FormContainer 
+                                    title="Requirements" 
+                                    description="Configure document requirements and eligibility criteria"
+                                >
+                                    <RequirementsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        documentTypes={documentTypes}
+                                        filteredDocumentTypes={filteredDocumentTypes}
+                                        documentCategories={documentCategories}
+                                        selectedDocumentTypes={selectedDocumentTypes}
+                                        documentCategory={documentCategory}
+                                        searchDocument={searchDocument}
+                                        eligibilityCriteria={eligibilityCriteria}
+                                        eligibilityOperators={eligibilityOperators}
+                                        showEligibilityForm={showEligibilityForm}
+                                        residentFields={residentFields}
+                                        onDocumentCategoryChange={setDocumentCategory}
+                                        onSearchDocumentChange={setSearchDocument}
+                                        onDocumentTypeToggle={handleDocumentTypeToggle}
+                                        onAddEligibilityCriterion={handleAddEligibilityCriterion}
+                                        onUpdateEligibilityCriterion={handleUpdateEligibilityCriterion}
+                                        onRemoveEligibilityCriterion={handleRemoveEligibilityCriterion}
+                                        onToggleEligibilityForm={() => setShowEligibilityForm(!showEligibilityForm)}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onNext={() => goToNextTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    previousLabel="Back: Fees"
+                                    nextLabel="Next: Settings"
+                                />
+                            </>
+                        )}
+
+                        {activeTab === 'settings' && (
+                            <>
+                                <FormContainer title="Settings" description="Configure behavior and discount options">
+                                    <SettingsTab
+                                        formData={formData}
+                                        errors={allErrors}
+                                        discountConfigs={discountConfigs}
+                                        showDiscounts={showDiscounts}
+                                        onSwitchChange={handleSwitchChange}
+                                        onDiscountToggle={handleDiscountToggle}
+                                        onDiscountPercentageChange={handleDiscountPercentageChange}
+                                        onToggleDiscounts={() => setShowDiscounts(!showDiscounts)}
+                                        isSubmitting={isSubmitting}
+                                    />
+                                </FormContainer>
+                                <FormNavigation
+                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onCancel={handleCancel}
+                                    onSubmit={handleSubmit}
+                                    isSubmitting={isSubmitting}
+                                    isSubmittable={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    previousLabel="Back: Requirements"
+                                    showNext={false}
+                                    submitLabel="Create Clearance Type"
+                                />
+                            </>
+                        )}
                     </div>
 
-                    {/* Error Alert */}
-                    {Object.keys(errors).length > 0 && (
-                        <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
-                            <CardContent className="p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
-                                    <div>
-                                        <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
-                                        <ul className="list-disc list-inside mt-2 space-y-1">
-                                            {Object.entries(errors).map(([field, message]) => (
-                                                <li key={field} className="text-sm text-red-600 dark:text-red-400">
-                                                    {message as string}
-                                                </li>
-                                            ))}
-                                        </ul>
+                    {showPreview && (
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-4 space-y-4">
+                                <FormProgress
+                                    progress={formProgress}
+                                    isComplete={allRequiredFieldsFilled && !!formData.name && !!formData.code}
+                                    missingFields={missingFields}
+                                    onMissingFieldClick={(tabId) => setActiveTab(tabId)}
+                                />
+                                <RequiredFieldsChecklist
+                                    fields={requiredFieldsList}
+                                    onTabClick={(tabId) => setActiveTab(tabId)}
+                                    missingFields={missingFields}
+                                />
+                                
+                                {/* Clearance Summary Preview Card */}
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
+                                    <div className="p-4 border-b">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Clearance Summary</h3>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    <div className="grid gap-6 lg:grid-cols-3">
-                        {/* Left Column - Basic Information */}
-                        <div className="lg:col-span-2 space-y-6">
-                            {/* Quick Start Templates */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
-                                            <Copy className="h-3 w-3 text-white" />
-                                        </div>
-                                        Quick Start Templates
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Select a common clearance type or create custom
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                        {Object.entries(commonTypes).map(([key, type]) => (
-                                            <Button
-                                                key={key}
-                                                type="button"
-                                                variant={selectedCommonType === key ? "default" : "outline"}
-                                                className={`h-auto py-4 px-3 justify-start text-left ${
-                                                    selectedCommonType === key
-                                                        ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white dark:from-teal-700 dark:to-emerald-700'
-                                                        : 'dark:border-gray-600 dark:text-gray-300'
-                                                }`}
-                                                onClick={() => handleCommonTypeSelect(key)}
-                                            >
-                                                <div className="flex-1">
-                                                    <div className="font-medium">{type.name}</div>
-                                                    <div className="text-xs opacity-80 mt-1">
-                                                        ₱{type.fee.toFixed(2)} • {type.processing_days} days
-                                                    </div>
-                                                </div>
-                                            </Button>
-                                        ))}
-                                        <Button
-                                            type="button"
-                                            variant={selectedCommonType === 'custom' ? "default" : "outline"}
-                                            className={`h-auto py-4 px-3 justify-start text-left ${
-                                                selectedCommonType === 'custom'
-                                                    ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white dark:from-teal-700 dark:to-emerald-700'
-                                                    : 'dark:border-gray-600 dark:text-gray-300'
-                                            }`}
-                                            onClick={() => handleCommonTypeSelect('custom')}
-                                        >
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-teal-100 to-emerald-100 dark:from-teal-900/30 dark:to-emerald-900/30 flex items-center justify-center">
+                                                <FileText className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                                            </div>
                                             <div className="flex-1">
-                                                <div className="font-medium">Custom Type</div>
-                                                <div className="text-xs opacity-80 mt-1">
-                                                    Configure all settings manually
+                                                <div className="font-medium dark:text-gray-200">
+                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
+                                                </div>
+                                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                    {formData.code || 'No code'}
                                                 </div>
                                             </div>
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                        </div>
 
-                            {/* Basic Information */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center">
-                                            <FileText className="h-3 w-3 text-white" />
-                                        </div>
-                                        Basic Information
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Core details of the clearance type
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="name" className="dark:text-gray-300">
-                                                Name <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Input
-                                                id="name"
-                                                value={data.name}
-                                                onChange={e => setData('name', e.target.value)}
-                                                placeholder="e.g., Business Clearance"
-                                                required
-                                                className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            />
-                                            {errors.name && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="code" className="dark:text-gray-300">
-                                                Code <span className="text-red-500">*</span>
-                                            </Label>
-                                            <div className="relative">
-                                                <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input
-                                                    id="code"
-                                                    value={data.code}
-                                                    onChange={e => setData('code', e.target.value.toUpperCase().replace(/\s+/g, '_'))}
-                                                    placeholder="e.g., BUSINESS_CLEARANCE"
-                                                    required
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                />
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+                                                <p className="text-gray-500 dark:text-gray-400 text-xs">Fee</p>
+                                                <p className="font-bold text-teal-600 dark:text-teal-400">
+                                                    ₱{Number(formData.fee).toFixed(2)}
+                                                </p>
                                             </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                Unique identifier for system use
-                                            </p>
-                                            {errors.code && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.code}</p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description" className="dark:text-gray-300">Description</Label>
-                                        <Textarea
-                                            id="description"
-                                            value={data.description}
-                                            onChange={e => setData('description', e.target.value)}
-                                            placeholder="Brief description of this clearance type..."
-                                            rows={3}
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                        />
-                                        {errors.description && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.description}</p>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Fees & Duration */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 dark:from-green-700 dark:to-emerald-700 flex items-center justify-center">
-                                            <DollarSign className="h-3 w-3 text-white" />
-                                        </div>
-                                        Fees & Duration
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Configure processing time and validity period
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="fee" className="dark:text-gray-300">
-                                                Fee (₱) <span className="text-red-500">*</span>
-                                            </Label>
-                                            <div className="relative">
-                                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input
-                                                    id="fee"
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    value={data.fee}
-                                                    onChange={e => setData('fee', parseFloat(e.target.value) || 0)}
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    required
-                                                />
-                                            </div>
-                                            {errors.fee && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.fee}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="processing_days" className="dark:text-gray-300">
-                                                Processing Days <span className="text-red-500">*</span>
-                                            </Label>
-                                            <div className="relative">
-                                                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input
-                                                    id="processing_days"
-                                                    type="number"
-                                                    min="1"
-                                                    value={data.processing_days}
-                                                    onChange={e => setData('processing_days', parseInt(e.target.value) || 1)}
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    required
-                                                />
-                                            </div>
-                                            {errors.processing_days && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.processing_days}</p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="validity_days" className="dark:text-gray-300">
-                                                Validity (Days) <span className="text-red-500">*</span>
-                                            </Label>
-                                            <div className="relative">
-                                                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input
-                                                    id="validity_days"
-                                                    type="number"
-                                                    min="1"
-                                                    value={data.validity_days}
-                                                    onChange={e => setData('validity_days', parseInt(e.target.value) || 30)}
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                    required
-                                                />
-                                            </div>
-                                            {errors.validity_days && (
-                                                <p className="text-sm text-red-600 dark:text-red-400">{errors.validity_days}</p>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-                                        <div className="font-medium dark:text-gray-300">Estimated Completion:</div>
-                                        <div>Clearance will be processed within {data.processing_days} business day{data.processing_days !== 1 ? 's' : ''}</div>
-                                        <div>Valid for {data.validity_days} day{data.validity_days !== 1 ? 's' : ''} from issue date</div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Document Requirements */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 dark:from-purple-700 dark:to-pink-700 flex items-center justify-center">
-                                            <File className="h-3 w-3 text-white" />
-                                        </div>
-                                        Document Requirements
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Select required documents for this clearance type from the system database
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {/* Filters */}
-                                    <div className="flex flex-col sm:flex-row gap-4">
-                                        <div className="flex-1">
-                                            <div className="relative">
-                                                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                                                <Input
-                                                    placeholder="Search documents..."
-                                                    value={searchDocument}
-                                                    onChange={(e) => setSearchDocument(e.target.value)}
-                                                    className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                />
+                                            <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg text-center">
+                                                <p className="text-gray-500 dark:text-gray-400 text-xs">Processing</p>
+                                                <p className="font-semibold dark:text-gray-300">{formData.processing_days} days</p>
                                             </div>
                                         </div>
-                                        <Select value={documentCategory} onValueChange={setDocumentCategory}>
-                                            <SelectTrigger className="w-full sm:w-[180px] dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                <SelectValue placeholder="Filter by category" />
-                                            </SelectTrigger>
-                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                {documentCategories.map(category => (
-                                                    <SelectItem key={category} value={category} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                        {category === 'all' ? 'All Categories' : category}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
 
-                                    {/* Selected Documents */}
-                                    {selectedDocumentTypes.length > 0 && (
-                                        <div className="space-y-2">
-                                            <Label className="dark:text-gray-300">Selected Documents ({selectedDocumentTypes.length})</Label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {selectedDocumentTypes.map(docId => {
-                                                    const doc = documentTypes.find(d => d.id === docId);
-                                                    return doc ? (
-                                                        <Badge
-                                                            key={doc.id}
-                                                            variant="secondary"
-                                                            className="flex items-center gap-1 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
-                                                        >
-                                                            {doc.name}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDocumentTypeToggle(doc.id)}
-                                                                className="ml-1 hover:text-red-600 dark:hover:text-red-400"
-                                                            >
-                                                                <XCircle className="h-3 w-3" />
-                                                            </button>
-                                                        </Badge>
-                                                    ) : null;
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Document List */}
-                                    <div className="border rounded-lg dark:border-gray-700 divide-y dark:divide-gray-700 max-h-[400px] overflow-y-auto">
-                                        {filteredDocumentTypes.length === 0 ? (
-                                            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                                                No documents found. Try a different search or category.
-                                            </div>
-                                        ) : (
-                                            filteredDocumentTypes.map((docType) => (
-                                                <div
-                                                    key={docType.id}
-                                                    className="flex items-start gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-                                                >
-                                                    <Checkbox
-                                                        checked={selectedDocumentTypes.includes(docType.id)}
-                                                        onCheckedChange={() => handleDocumentTypeToggle(docType.id)}
-                                                        id={`doc-${docType.id}`}
-                                                        className="mt-0.5 dark:border-gray-600"
-                                                    />
-                                                    <div className="flex-1 space-y-1">
-                                                        <div className="flex items-start justify-between">
-                                                            <div>
-                                                                <Label
-                                                                    htmlFor={`doc-${docType.id}`}
-                                                                    className="font-medium cursor-pointer dark:text-gray-200"
-                                                                >
-                                                                    {docType.name}
-                                                                    {docType.is_required && (
-                                                                        <Badge className="ml-2 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
-                                                                            Required
-                                                                        </Badge>
-                                                                    )}
-                                                                </Label>
-                                                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                                    {docType.description}
-                                                                </p>
-                                                            </div>
-                                                            {docType.category && (
-                                                                <Badge variant="outline" className="ml-2 dark:border-gray-600 dark:text-gray-300">
-                                                                    {docType.category}
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                                                            <span>Formats: {docType.accepted_formats?.length 
-                                                                ? docType.accepted_formats.join(', ') 
-                                                                : 'PDF, JPG, PNG'}</span>
-                                                            <span>Max: {docType.max_file_size 
-                                                                ? (docType.max_file_size / 1024).toFixed(1) 
-                                                                : 2} MB</span>
-                                                            <span className={docType.is_active ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
-                                                                {docType.is_active ? 'Active' : 'Inactive'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                        <p>Documents are managed in the <Link href="/admin/document-types" className="text-blue-600 dark:text-blue-400 hover:underline">Document Types</Link> section.</p>
-                                        <p>Selected documents will be required when applying for this clearance type.</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Purpose Options */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-700 dark:to-blue-700 flex items-center justify-center">
-                                            <Tag className="h-3 w-3 text-white" />
-                                        </div>
-                                        Purpose Options
-                                    </CardTitle>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Common purposes for this clearance type
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex flex-wrap gap-2">
-                                        {purposeOptions.map((option, index) => (
-                                            <Badge
-                                                key={index}
-                                                variant="secondary"
-                                                className="flex items-center gap-1 dark:bg-gray-700 dark:text-gray-300"
-                                            >
-                                                {option}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemovePurposeOption(index)}
-                                                    className="ml-1 hover:text-red-600 dark:hover:text-red-400"
-                                                >
-                                                    <XCircle className="h-3 w-3" />
-                                                </button>
-                                            </Badge>
-                                        ))}
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={newPurposeOption}
-                                            onChange={e => setNewPurposeOption(e.target.value)}
-                                            placeholder="Add a new purpose option..."
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    handleAddPurposeOption();
-                                                }
-                                            }}
-                                        />
-                                        <Button
-                                            type="button"
-                                            onClick={handleAddPurposeOption}
-                                            variant="outline"
-                                            className="dark:border-gray-600 dark:text-gray-300"
-                                        >
-                                            <Plus className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Discount Configuration Section */}
-                            {privileges.length > 0 && (
-                                <Card className="dark:bg-gray-900">
-                                    <CardHeader>
-                                        <div className="flex items-center justify-between">
-                                            <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                                <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-yellow-600 to-amber-600 dark:from-yellow-700 dark:to-amber-700 flex items-center justify-center">
-                                                    <Award className="h-3 w-3 text-white" />
-                                                </div>
-                                                Discount Configuration
-                                            </CardTitle>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setShowDiscounts(!showDiscounts)}
-                                                className="dark:text-gray-400 dark:hover:text-white"
-                                            >
-                                                {showDiscounts ? 'Hide' : 'Configure'}
-                                            </Button>
-                                        </div>
-                                        <CardDescription className="dark:text-gray-400">
-                                            Configure which privileges are eligible for discounts on this clearance type
-                                        </CardDescription>
-                                    </CardHeader>
-                                    {showDiscounts && (
-                                        <CardContent className="space-y-4">
-                                            <div className="space-y-3">
-                                                {discountConfigs.map((config, index) => (
-                                                    <div
-                                                        key={config.privilege_id}
-                                                        className={`flex items-center gap-3 p-3 border rounded-lg ${
-                                                            config.is_active 
-                                                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-                                                                : 'border-gray-200 dark:border-gray-700'
-                                                        }`}
-                                                    >
-                                                        <Checkbox
-                                                            checked={config.is_active}
-                                                            onCheckedChange={(checked) => 
-                                                                handleDiscountToggle(index, checked as boolean)
-                                                            }
-                                                            id={`discount-${config.privilege_code}`}
-                                                            className="dark:border-gray-600"
-                                                        />
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <Label
-                                                                    htmlFor={`discount-${config.privilege_code}`}
-                                                                    className="font-medium cursor-pointer dark:text-gray-200"
-                                                                >
-                                                                    {config.privilege_name}
-                                                                </Label>
-                                                                {config.requires_verification && (
-                                                                    <TooltipProvider>
-                                                                        <Tooltip>
-                                                                            <TooltipTrigger asChild>
-                                                                                <Shield className="h-3 w-3 text-amber-500 dark:text-amber-400" />
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                <p>Requires verification</p>
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    </TooltipProvider>
-                                                                )}
-                                                                {config.requires_id_number && (
-                                                                    <TooltipProvider>
-                                                                        <Tooltip>
-                                                                            <TooltipTrigger asChild>
-                                                                                <File className="h-3 w-3 text-blue-500 dark:text-blue-400" />
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent>
-                                                                                <p>Requires ID number</p>
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    </TooltipProvider>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                                Code: {config.privilege_code}
-                                                            </p>
-                                                        </div>
-                                                        <div className="w-32">
-                                                            <div className="relative">
-                                                                <Input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max="100"
-                                                                    value={config.discount_percentage}
-                                                                    onChange={(e) => handleDiscountPercentageChange(
-                                                                        index, 
-                                                                        parseFloat(e.target.value) || 0
-                                                                    )}
-                                                                    className="h-8 text-right pr-7 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                                    disabled={!config.is_active}
-                                                                    placeholder="%"
-                                                                />
-                                                                <span className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-gray-500 dark:text-gray-400">
-                                                                    %
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                                                <p>Configure which privileges are eligible for discounts on this clearance type.</p>
-                                                <p>Discount percentages will be applied during payment calculation.</p>
-                                            </div>
-                                        </CardContent>
-                                    )}
-                                </Card>
-                            )}
-                        </div>
-
-                        {/* Right Column - Settings & Eligibility */}
-                        <div className="space-y-6">
-                            {/* Settings */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-gray-600 to-slate-600 dark:from-gray-700 dark:to-slate-700 flex items-center justify-center">
-                                            <Settings className="h-3 w-3 text-white" />
-                                        </div>
-                                        Settings
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <div className="space-y-0.5">
-                                            <Label htmlFor="is_active" className="dark:text-gray-300">Active Status</Label>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                Make this clearance type available for use
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            id="is_active"
-                                            checked={data.is_active}
-                                            onCheckedChange={(checked) => setData('is_active', checked)}
-                                            className="dark:data-[state=checked]:bg-green-600"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <div className="space-y-0.5">
-                                            <Label htmlFor="requires_payment" className="dark:text-gray-300">Requires Payment</Label>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                Must payment be collected for this clearance?
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            id="requires_payment"
-                                            checked={data.requires_payment}
-                                            onCheckedChange={(checked) => setData('requires_payment', checked)}
-                                            className="dark:data-[state=checked]:bg-green-600"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <div className="space-y-0.5">
-                                            <Label htmlFor="requires_approval" className="dark:text-gray-300">Requires Approval</Label>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                Needs barangay official approval
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            id="requires_approval"
-                                            checked={data.requires_approval}
-                                            onCheckedChange={(checked) => setData('requires_approval', checked)}
-                                            className="dark:data-[state=checked]:bg-blue-600"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-3 border rounded-lg dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                        <div className="space-y-0.5">
-                                            <Label htmlFor="is_online_only" className="dark:text-gray-300">Online Only</Label>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                Available for online application only
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            id="is_online_only"
-                                            checked={data.is_online_only}
-                                            onCheckedChange={(checked) => setData('is_online_only', checked)}
-                                            className="dark:data-[state=checked]:bg-purple-600"
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Eligibility Criteria */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                            <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-700 dark:to-purple-700 flex items-center justify-center">
-                                                <Scale className="h-3 w-3 text-white" />
-                                            </div>
-                                            Eligibility Criteria
-                                        </CardTitle>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setShowEligibilityForm(!showEligibilityForm)}
-                                            className="dark:text-gray-400 dark:hover:text-white"
-                                        >
-                                            {showEligibilityForm ? 'Hide' : 'Configure'}
-                                        </Button>
-                                    </div>
-                                    <CardDescription className="dark:text-gray-400">
-                                        Define who can apply for this clearance
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    {showEligibilityForm ? (
-                                        <div className="space-y-4">
-                                            {eligibilityCriteria.map((criterion, index) => (
-                                                <div key={index} className="p-3 border rounded-lg dark:border-gray-700 space-y-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <Label className="text-sm dark:text-gray-300">Criterion {index + 1}</Label>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleRemoveEligibilityCriterion(index)}
-                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Select
-                                                            value={criterion.field}
-                                                            onValueChange={(value) => 
-                                                                handleUpdateEligibilityCriterion(index, 'field', value)
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                                <SelectValue placeholder="Select field" />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                                {residentFields.map((field) => (
-                                                                    <SelectItem key={field.value} value={field.value} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                                        <div className="flex items-center gap-2">
-                                                                            {field.icon}
-                                                                            <span>{field.label}</span>
-                                                                        </div>
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Select
-                                                            value={criterion.operator}
-                                                            onValueChange={(value) => 
-                                                                handleUpdateEligibilityCriterion(index, 'operator', value)
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                                                                <SelectValue placeholder="Select operator" />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                                                {eligibilityOperators.map((operator) => (
-                                                                    <SelectItem key={operator.value} value={operator.value} className="dark:text-gray-300 dark:focus:bg-gray-700">
-                                                                        {operator.label}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Input
-                                                            value={criterion.value}
-                                                            onChange={(e) => 
-                                                                handleUpdateEligibilityCriterion(index, 'value', e.target.value)
-                                                            }
-                                                            placeholder="Value to compare"
-                                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                className="w-full dark:border-gray-600 dark:text-gray-300"
-                                                onClick={handleAddEligibilityCriterion}
-                                            >
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Criterion
-                                            </Button>
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                                                Leave empty if no eligibility restrictions
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-4">
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                {eligibilityCriteria.length > 0 
-                                                    ? `${eligibilityCriteria.length} criterion${eligibilityCriteria.length !== 1 ? 's' : ''} configured`
-                                                    : 'No eligibility criteria defined'
-                                                }
-                                            </p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Preview */}
-                            <Card className="dark:bg-gray-900">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 dark:text-gray-100">
-                                        <div className="h-6 w-6 rounded-lg bg-gradient-to-r from-amber-600 to-orange-600 dark:from-amber-700 dark:to-orange-700 flex items-center justify-center">
-                                            <Eye className="h-3 w-3 text-white" />
-                                        </div>
-                                        Preview
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3 text-sm">
-                                        <div className="flex justify-between py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Type:</span>
-                                            <span className="font-medium dark:text-gray-200">{data.name || 'Unnamed'}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Code:</span>
-                                            <span className="font-mono dark:text-gray-300">{data.code || 'N/A'}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Fee:</span>
-                                            <span className="font-medium dark:text-gray-200">₱{typeof data.fee === 'number' ? data.fee.toFixed(2) : parseFloat(data.fee).toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Processing:</span>
-                                            <span className="dark:text-gray-300">{data.processing_days} day{data.processing_days !== 1 ? 's' : ''}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Validity:</span>
-                                            <span className="dark:text-gray-300">{data.validity_days} day{data.validity_days !== 1 ? 's' : ''}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Required Documents:</span>
-                                            <span className="font-medium dark:text-gray-200">{selectedDocumentTypes.length}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b dark:border-gray-700">
-                                            <span className="text-gray-500 dark:text-gray-400">Discounts:</span>
-                                            <span className="font-medium dark:text-gray-200">{discountConfigs.filter(c => c.is_active).length}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2">
+                                        <div className="flex justify-between text-sm pt-2 border-t dark:border-gray-700">
                                             <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                            <span className={data.is_active ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}>
-                                                {data.is_active ? 'Active' : 'Inactive'}
+                                            <span className={`font-medium ${
+                                                formData.is_active 
+                                                    ? 'text-green-600 dark:text-green-400' 
+                                                    : 'text-gray-500 dark:text-gray-400'
+                                            }`}>
+                                                {formData.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </div>
                                     </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Form Actions */}
-                            <Card className="dark:bg-gray-900">
-                                <CardContent className="pt-6">
-                                    <div className="space-y-3">
-                                        <Button 
-                                            type="submit" 
-                                            className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white dark:from-teal-700 dark:to-emerald-700"
-                                            disabled={processing}
-                                        >
-                                            {processing ? (
-                                                <>
-                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                    Creating...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Save className="h-4 w-4 mr-2" />
-                                                    Create Clearance Type
-                                                </>
-                                            )}
-                                        </Button>
-                                        <Link href="/admin/clearance-types">
-                                            <Button 
-                                                type="button" 
-                                                variant="outline" 
-                                                className="w-full dark:border-gray-600 dark:text-gray-300"
-                                                disabled={processing}
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </Link>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-            </form>
+            </div>
         </AppLayout>
     );
 }
