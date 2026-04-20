@@ -1,5 +1,5 @@
 // pages/admin/settings.tsx (or wherever your admin settings page is)
-import { type BreadcrumbItem, type SharedData } from '@/types';
+import { type BreadcrumbItem, type SharedData } from '@/types/breadcrumbs';
 import { Transition } from '@headlessui/react';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import DeleteUser from '@/components/delete-user';

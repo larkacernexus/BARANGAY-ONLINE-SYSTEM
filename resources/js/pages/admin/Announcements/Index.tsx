@@ -56,6 +56,22 @@ const defaultStats: AnnouncementStats = {
     with_attachments: 0
 };
 
+// ✅ Sort options configuration
+const SORT_OPTIONS = [
+    { value: 'created_at-desc', label: 'Newest First' },
+    { value: 'created_at-asc', label: 'Oldest First' },
+    { value: 'title-asc', label: 'Title (A-Z)' },
+    { value: 'title-desc', label: 'Title (Z-A)' },
+    { value: 'priority-desc', label: 'Priority (High to Low)' },
+    { value: 'priority-asc', label: 'Priority (Low to High)' },
+    { value: 'type-asc', label: 'Type (A-Z)' },
+    { value: 'type-desc', label: 'Type (Z-A)' },
+    { value: 'status-asc', label: 'Status (A-Z)' },
+    { value: 'status-desc', label: 'Status (Z-A)' },
+    { value: 'audience_type-asc', label: 'Audience (A-Z)' },
+    { value: 'audience_type-desc', label: 'Audience (Z-A)' },
+] as const;
+
 export default function AnnouncementsIndex({ 
     announcements: initialAnnouncements, 
     filters: initialFilters, 
@@ -81,9 +97,11 @@ export default function AnnouncementsIndex({
     const [toDate, setToDate] = useState<string>(initialFilters.to_date || '');
     const [dateRangePreset, setDateRangePreset] = useState<string>('');
     
-    // Sorting states - client-side only for table header
-    const [sortBy, setSortBy] = useState<string>('created_at');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    // ✅ Sorting states - NOW SERVER-SIDE
+    const [sortBy, setSortBy] = useState<string>(initialFilters.sort_by || 'created_at');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
+        (initialFilters.sort_order as 'asc' | 'desc') || 'desc'
+    );
     
     // UI states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -149,9 +167,11 @@ export default function AnnouncementsIndex({
         priority: priorityFilter,
         from_date: debouncedFromDate,
         to_date: debouncedToDate,
+        sort_by: sortBy,        // ✅ Include sorting in filters
+        sort_order: sortOrder,  // ✅ Include sorting in filters
     }), [
         debouncedSearch, typeFilter, statusFilter, audienceTypeFilter, 
-        priorityFilter, debouncedFromDate, debouncedToDate
+        priorityFilter, debouncedFromDate, debouncedToDate, sortBy, sortOrder
     ]);
 
     const reloadData = useCallback((page = 1) => {
@@ -174,7 +194,7 @@ export default function AnnouncementsIndex({
         });
     }, [getCurrentFilters]);
 
-    // Server-side filtering - reload data when filters change
+    // ✅ Server-side filtering & sorting - reload when filters OR sort changes
     useEffect(() => {
         if (isFirstMount.current) {
             isFirstMount.current = false;
@@ -184,7 +204,7 @@ export default function AnnouncementsIndex({
         reloadData();
     }, [
         debouncedSearch, typeFilter, statusFilter, audienceTypeFilter,
-        priorityFilter, debouncedFromDate, debouncedToDate
+        priorityFilter, debouncedFromDate, debouncedToDate, sortBy, sortOrder
     ]);
 
     // Reset selection when exiting bulk mode
@@ -236,66 +256,17 @@ export default function AnnouncementsIndex({
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [reloadData]);
 
-    // Handle sort - client-side only (since we're on a single page)
-    const handleSort = useCallback((column: string) => {
-        if (sortBy === column) {
-            setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortBy(column);
-            setSortOrder('asc');
-        }
-    }, [sortBy]);
+    // ✅ Handle sort change - server-side
+    const handleSortChange = useCallback((value: string) => {
+        const [newSortBy, newSortOrder] = value.split('-');
+        setSortBy(newSortBy);
+        setSortOrder(newSortOrder as 'asc' | 'desc');
+    }, []);
 
-    // Sort current page data client-side
-    const sortedAnnouncements = useMemo(() => {
-        const sorted = [...currentAnnouncements];
-        
-        sorted.sort((a, b) => {
-            let valueA: any;
-            let valueB: any;
-            
-            switch (sortBy) {
-                case 'title':
-                    valueA = a?.title || '';
-                    valueB = b?.title || '';
-                    break;
-                case 'type':
-                    valueA = a?.type || '';
-                    valueB = b?.type || '';
-                    break;
-                case 'priority':
-                    valueA = a?.priority ?? 0;
-                    valueB = b?.priority ?? 0;
-                    break;
-                case 'audience_type':
-                    valueA = a?.audience_type || '';
-                    valueB = b?.audience_type || '';
-                    break;
-                case 'status':
-                    valueA = a?.status || '';
-                    valueB = b?.status || '';
-                    break;
-                case 'created_at':
-                    valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
-                    valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
-                    break;
-                default:
-                    valueA = a?.created_at ? new Date(a.created_at).getTime() : 0;
-                    valueB = b?.created_at ? new Date(b.created_at).getTime() : 0;
-            }
-            
-            if (typeof valueA === 'string') {
-                valueA = valueA.toLowerCase();
-                valueB = valueB.toLowerCase();
-            }
-            
-            if (valueA < valueB) return sortOrder === 'asc' ? -1 : 1;
-            if (valueA > valueB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-        
-        return sorted;
-    }, [currentAnnouncements, sortBy, sortOrder]);
+    // ✅ Get current sort value for dropdown
+    const getCurrentSortValue = useCallback(() => {
+        return `${sortBy}-${sortOrder}`;
+    }, [sortBy, sortOrder]);
 
     // Bulk operations
     const handleBulkOperation = useCallback(async (operation: BulkOperation) => {
@@ -436,6 +407,8 @@ export default function AnnouncementsIndex({
         setFromDate('');
         setToDate('');
         setDateRangePreset('');
+        setSortBy('created_at');
+        setSortOrder('desc');
     }, []);
 
     const handleClearSelection = useCallback(() => {
@@ -500,7 +473,7 @@ export default function AnnouncementsIndex({
         priority: priorityFilter
     }), [typeFilter, statusFilter, audienceTypeFilter, fromDate, toDate, search, priorityFilter]);
 
-    // Keyboard shortcuts - using refs to avoid dependency issues
+    // Keyboard shortcuts
     const bulkModeRef = useRef(isBulkMode);
     const selectedRef = useRef(selectedAnnouncements);
     
@@ -609,7 +582,7 @@ export default function AnnouncementsIndex({
                     />
 
                     <AnnouncementsContent
-                        announcements={sortedAnnouncements}
+                        announcements={currentAnnouncements}
                         isBulkMode={isBulkMode}
                         setIsBulkMode={setIsBulkMode}
                         isSelectAll={isSelectAll}
@@ -631,7 +604,6 @@ export default function AnnouncementsIndex({
                         onClearSelection={handleClearSelection}
                         onDelete={handleDelete}
                         onToggleStatus={handleToggleStatus}
-                        onSort={handleSort}
                         onBulkOperation={handleBulkOperation}
                         onCopySelectedData={handleCopySelectedData}
                         setShowBulkDeleteDialog={setShowBulkDeleteDialog}
@@ -641,14 +613,12 @@ export default function AnnouncementsIndex({
                         selectionStats={selectionStats}
                         types={types}
                         priorities={priorities}
+                        // ✅ Pass clean sorting props
                         sortBy={sortBy}
                         sortOrder={sortOrder}
-                        onSortChange={(value) => {
-                            const [newSortBy, newSortOrder] = value.split('-');
-                            setSortBy(newSortBy);
-                            setSortOrder(newSortOrder as 'asc' | 'desc');
-                        }}
-                        getCurrentSortValue={() => `${sortBy}-${sortOrder}`}
+                        onSortChange={handleSortChange}
+                        getCurrentSortValue={getCurrentSortValue}
+                        sortOptions={SORT_OPTIONS}
                     />
 
                     {/* Keyboard Shortcuts Help */}

@@ -87,6 +87,7 @@ use App\Http\Controllers\Admin\CommunityReport\CommunityReportPrintController;
 use App\Http\Controllers\Admin\CommunityReport\CommunityReportStatsController;
 use App\Http\Controllers\Admin\CommunityReport\CommunityReportResponseController;
 use App\Http\Controllers\Admin\CommunityReport\CommunityReportRelatedController;
+use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\GoogleMapsController;
 use App\Http\Controllers\Admin\PrivilegeController;
 use Inertia\Inertia;
@@ -103,6 +104,12 @@ Route::get('/instructions', function () {
         // 'userRole' => auth()->user()->role ?? 'staff'
     ]);
 })->name('instructions');
+
+
+    // Banner Management
+    Route::resource('banners', BannerController::class);
+    Route::post('banners/{banner}/toggle', [BannerController::class, 'toggleActive'])->name('banners.toggle');
+    Route::post('banners/reorder', [BannerController::class, 'reorder'])->name('banners.reorder');
 
 // Search routes
 Route::get('/search', function () {

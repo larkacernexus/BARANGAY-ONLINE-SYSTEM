@@ -4,28 +4,28 @@ namespace App\Http\Controllers\Resident;
 
 use App\Http\Controllers\Controller;
 use App\Models\Resident;
-use App\Models\HouseholdMember;
 use App\Models\Household;
 use App\Models\Payment;
 use App\Models\ClearanceRequest;
 use App\Models\Announcement;
 use App\Models\Privilege;
+use App\Models\Banner;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class ResidentDashboardController extends Controller
 {
     /**
      * Get all active privileges - DYNAMIC FROM DATABASE
-     * FIXED: Uses discountType relationship instead of default_discount_percentage column
      */
     private function getAllPrivileges(): array
     {
         return Cache::remember('all_active_privileges', 3600, function () {
-            return Privilege::with('discountType') // Eager load discount type
+            return Privilege::with('discountType')
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
@@ -55,7 +55,6 @@ class ResidentDashboardController extends Controller
 
     /**
      * Get resident's active privileges - DYNAMIC
-     * FIXED: Uses discountType relationship for percentage
      */
     private function getResidentPrivileges(Resident $resident): array
     {
@@ -119,17 +118,200 @@ class ResidentDashboardController extends Controller
         return 'active';
     }
 
-    public function residentdashboard()
+    /**
+     * Get banner slides from database
+     */
+    private function getBannerSlides(): array
+    {
+        try {
+            $banners = Banner::active()
+                ->ordered()
+                ->take(5)
+                ->get();
+            
+            if ($banners->isEmpty()) {
+                return [];
+            }
+            
+            return $banners->map(function ($banner) {
+                return [
+                    'id' => $banner->id,
+                    'image' => $banner->image_url,
+                    'mobileImage' => $banner->mobile_image_url,
+                    'title' => $banner->title,
+                    'description' => $banner->description,
+                    'link' => $banner->link_url,
+                    'buttonText' => $banner->button_text ?? 'Learn More',
+                    'alt' => $banner->alt_text ?? $banner->title,
+                ];
+            })->toArray();
+            
+        } catch (\Exception $e) {
+            \Log::error('Error getting banners: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get upcoming events
+     */
+    private function getUpcomingEvents(): array
+    {
+        try {
+            if (!class_exists('\App\Models\Event')) {
+                return [];
+            }
+            
+            $user = Auth::user();
+            
+            return \App\Models\Event::where('is_active', true)
+                ->where('event_date', '>=', now())
+                ->when($user && $user->resident, function ($query) use ($user) {
+                    if (method_exists(\App\Models\Event::class, 'visibleToUser')) {
+                        return $query->visibleToUser($user);
+                    }
+                    return $query;
+                })
+                ->orderBy('event_date', 'asc')
+                ->take(3)
+                ->get()
+                ->map(function ($e) {
+                    return [
+                        'id' => $e->id,
+                        'title' => $e->title,
+                        'description' => $this->createExcerpt($e->description ?? '', 80),
+                        'event_date' => $e->event_date->toISOString(),
+                        'start_time' => $e->start_time,
+                        'end_time' => $e->end_time,
+                        'location' => $e->location,
+                        'type' => $e->type ?? 'event',
+                    ];
+                })
+                ->toArray();
+        } catch (\Exception $e) {
+            \Log::error('Error getting upcoming events: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Create excerpt from content
+     */
+    private function createExcerpt($content, $length = 100): string
+    {
+        if (empty($content)) {
+            return '';
+        }
+        
+        $content = strip_tags($content);
+        if (strlen($content) <= $length) {
+            return $content;
+        }
+        return substr($content, 0, $length) . '...';
+    }
+
+    /**
+     * Get date range from filter - SERVER SIDE
+     */
+    private function getDateRangeFromFilter(?string $filter): ?array
+    {
+        if (!$filter || $filter === 'all') {
+            return null;
+        }
+        
+        $now = Carbon::now();
+        
+        switch ($filter) {
+            case 'today':
+                return [
+                    'start' => $now->copy()->startOfDay(),
+                    'end' => $now->copy()->endOfDay(),
+                ];
+            case 'week':
+                return [
+                    'start' => $now->copy()->subDays(7)->startOfDay(),
+                    'end' => $now->copy()->endOfDay(),
+                ];
+            case 'month':
+                return [
+                    'start' => $now->copy()->subDays(30)->startOfDay(),
+                    'end' => $now->copy()->endOfDay(),
+                ];
+            case 'year':
+                return [
+                    'start' => $now->copy()->subDays(365)->startOfDay(),
+                    'end' => $now->copy()->endOfDay(),
+                ];
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Get previous period date range for trend calculation
+     */
+    private function getPreviousPeriodRange(string $filter): ?array
+    {
+        $now = Carbon::now();
+        
+        switch ($filter) {
+            case 'today':
+                return [
+                    'start' => $now->copy()->subDay()->startOfDay(),
+                    'end' => $now->copy()->subDay()->endOfDay(),
+                ];
+            case 'week':
+                return [
+                    'start' => $now->copy()->subDays(14)->startOfDay(),
+                    'end' => $now->copy()->subDays(7)->endOfDay(),
+                ];
+            case 'month':
+                return [
+                    'start' => $now->copy()->subDays(60)->startOfDay(),
+                    'end' => $now->copy()->subDays(30)->endOfDay(),
+                ];
+            case 'year':
+                return [
+                    'start' => $now->copy()->subDays(730)->startOfDay(),
+                    'end' => $now->copy()->subDays(365)->endOfDay(),
+                ];
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Calculate percentage change between two periods
+     */
+    private function calculatePercentageChange(float $current, float $previous): float
+    {
+        if ($previous == 0) {
+            return $current > 0 ? 100 : 0;
+        }
+        return (($current - $previous) / $previous) * 100;
+    }
+
+    /**
+     * Main dashboard method
+     */
+    public function residentdashboard(Request $request)
     {
         $user = Auth::user();
         
-        // Get all privileges from database - NO HARDCODING
+        // Get date filter from request (default to 'week')
+        $dateFilter = $request->input('date_filter', 'week');
+        
+        // Get date range based on filter
+        $dateRange = $this->getDateRangeFromFilter($dateFilter);
+        $previousRange = $this->getPreviousPeriodRange($dateFilter);
+        
+        // Get all privileges from database
         $allPrivileges = $this->getAllPrivileges();
         
         $resident = $user->resident;
         
         if (!$resident) {
-            return $this->handleNoResidentProfile($user, $allPrivileges);
+            return $this->handleNoResidentProfile($user, $allPrivileges, $dateFilter);
         }
         
         // Load privileges
@@ -159,42 +341,48 @@ class ResidentDashboardController extends Controller
                 ->toArray();
         }
         
-        $data = $this->getDashboardData($resident, $household, $householdResidentIds, $isHouseholdHead, $allPrivileges);
-        $data['allPrivileges'] = $allPrivileges;
+        // Get all data with server-side filtering
+        $stats = $this->getStats($householdResidentIds, $dateRange, $previousRange);
+        $recentPayments = $this->getRecentPayments($householdResidentIds, $dateRange);
+        $pendingClearances = $this->getPendingClearances($householdResidentIds, $dateRange);
+        $recentActivities = $this->getRecentActivities($householdResidentIds, $dateRange);
+        $paymentSummary = $this->getPaymentSummary($householdResidentIds, $dateRange);
         
-        return Inertia::render('resident/residentdashboard', $data);
-    }
-
-    private function getDashboardData(Resident $resident, ?Household $household, array $householdResidentIds, bool $isHouseholdHead, array $allPrivileges): array
-    {
-        return [
-            'stats' => $this->getStats($resident, $householdResidentIds, $household, $allPrivileges),
-            'recentActivities' => $this->getRecentActivities($resident, $householdResidentIds, $allPrivileges),
-            'recentPayments' => $this->getRecentPayments($resident, $householdResidentIds, $allPrivileges),
-            'pendingClearances' => $this->getPendingClearances($resident, $householdResidentIds, $allPrivileges),
+        return Inertia::render('resident/residentdashboard', [
+            'stats' => $stats,
+            'recentActivities' => $recentActivities,
+            'recentPayments' => $recentPayments,
+            'pendingClearances' => $pendingClearances,
             'announcements' => $this->getAnnouncements($allPrivileges),
-            'paymentSummary' => $this->getPaymentSummary($resident, $householdResidentIds, $allPrivileges),
+            'paymentSummary' => $paymentSummary,
             'resident' => $this->getResidentData($resident, $household, $isHouseholdHead, $allPrivileges),
-        ];
+            'allPrivileges' => $allPrivileges,
+            'bannerSlides' => $this->getBannerSlides(),
+            'upcomingEvents' => $this->getUpcomingEvents(),
+            'dateFilter' => $dateFilter,
+        ]);
     }
 
-    private function handleNoResidentProfile($user, array $allPrivileges): \Inertia\Response
+    private function handleNoResidentProfile($user, array $allPrivileges, string $dateFilter = 'week'): \Inertia\Response
     {
         return Inertia::render('resident/residentdashboard', [
             'stats' => [
                 'total_payments' => 0,
+                'total_payments_amount' => 0,
                 'total_clearances' => 0,
+                'total_complaints' => 0,
                 'pending_clearances' => 0,
                 'pending_requests' => 0,
                 'household_members' => 0,
-                'privileges_count' => 0,
-                'has_privileges' => false,
+                'percentage_change' => 0,
+                'trend' => 'neutral',
             ],
             'recentActivities' => [],
             'recentPayments' => [],
             'pendingClearances' => [],
-            'announcements' => [],
+            'announcements' => $this->getPublicAnnouncements(),
             'paymentSummary' => [],
+            'upcomingEvents' => $this->getUpcomingEvents(),
             'resident' => [
                 'id' => null,
                 'full_name' => 'Guest Resident',
@@ -215,65 +403,108 @@ class ResidentDashboardController extends Controller
                 'has_privileges' => false,
             ],
             'allPrivileges' => $allPrivileges,
+            'bannerSlides' => $this->getBannerSlides(),
+            'dateFilter' => $dateFilter,
         ]);
     }
 
-    private function getStats(Resident $resident, array $householdResidentIds, ?Household $household, array $allPrivileges): array
+    /**
+     * Get stats with server-side filtering
+     */
+    private function getStats(array $householdResidentIds, ?array $dateRange, ?array $previousRange = null): array
     {
         try {
-            $householdMemberCount = count($householdResidentIds);
+            // Current period stats
+            $paymentsQuery = Payment::whereIn('payer_id', $householdResidentIds)
+                ->where('payer_type', 'resident');
             
-            $totalPayments = Payment::whereIn('payer_id', $householdResidentIds)
-                ->where('payer_type', 'resident')
-                ->count();
+            if ($dateRange) {
+                $paymentsQuery->whereBetween('payment_date', [$dateRange['start'], $dateRange['end']]);
+            }
             
-            $totalClearances = ClearanceRequest::whereIn('resident_id', $householdResidentIds)->count();
-            $pendingClearances = ClearanceRequest::whereIn('resident_id', $householdResidentIds)
-                ->whereIn('status', ['pending', 'processing', 'under_review', 'pending_payment'])
-                ->count();
+            $totalPayments = $paymentsQuery->count();
+            $totalPaymentsAmount = (float) $paymentsQuery->sum('total_amount');
             
-            $pendingRequests = $pendingClearances;
-            $activePrivileges = $this->getResidentPrivileges($resident);
+            $clearancesQuery = ClearanceRequest::whereIn('resident_id', $householdResidentIds);
+            
+            if ($dateRange) {
+                $clearancesQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+            }
+            
+            $totalClearances = $clearancesQuery->count();
+            $pendingClearances = $clearancesQuery->whereIn('status', ['pending', 'processing', 'under_review', 'pending_payment'])->count();
+            
+            $totalComplaints = 0;
+            if (class_exists('\App\Models\Complaint')) {
+                $complaintsQuery = \App\Models\Complaint::whereIn('resident_id', $householdResidentIds);
+                if ($dateRange) {
+                    $complaintsQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+                }
+                $totalComplaints = $complaintsQuery->count();
+            }
+            
+            // Calculate trend percentage
+            $percentageChange = 0;
+            $trend = 'neutral';
+            
+            if ($previousRange && $dateRange && $dateRange['start']) {
+                $previousPaymentsQuery = Payment::whereIn('payer_id', $householdResidentIds)
+                    ->where('payer_type', 'resident')
+                    ->whereBetween('payment_date', [$previousRange['start'], $previousRange['end']]);
+                
+                $previousAmount = (float) $previousPaymentsQuery->sum('total_amount');
+                $percentageChange = $this->calculatePercentageChange($totalPaymentsAmount, $previousAmount);
+                $trend = $percentageChange > 0 ? 'up' : ($percentageChange < 0 ? 'down' : 'neutral');
+            }
             
             return [
                 'total_payments' => $totalPayments,
+                'total_payments_amount' => $totalPaymentsAmount,
                 'total_clearances' => $totalClearances,
+                'total_complaints' => $totalComplaints,
                 'pending_clearances' => $pendingClearances,
-                'pending_requests' => $pendingRequests,
-                'household_members' => $householdMemberCount,
-                'privileges_count' => count($activePrivileges),
-                'has_privileges' => count($activePrivileges) > 0,
-                'privileges' => $activePrivileges,
+                'pending_requests' => $pendingClearances,
+                'household_members' => count($householdResidentIds),
+                'percentage_change' => round($percentageChange, 1),
+                'trend' => $trend,
             ];
         } catch (\Exception $e) {
             \Log::error('Error getting dashboard stats: ' . $e->getMessage());
             return [
                 'total_payments' => 0,
+                'total_payments_amount' => 0,
                 'total_clearances' => 0,
+                'total_complaints' => 0,
                 'pending_clearances' => 0,
                 'pending_requests' => 0,
                 'household_members' => 0,
-                'privileges_count' => 0,
-                'has_privileges' => false,
-                'privileges' => [],
+                'percentage_change' => 0,
+                'trend' => 'neutral',
             ];
         }
     }
 
-    private function getRecentActivities(Resident $resident, array $householdResidentIds, array $allPrivileges): array
+    /**
+     * Get recent activities with server-side filtering
+     */
+    private function getRecentActivities(array $householdResidentIds, ?array $dateRange): array
     {
         $activities = collect([]);
         
         try {
-            // Payments
-            $recentPayments = Payment::whereIn('payer_id', $householdResidentIds)
-                ->where('payer_type', 'resident')
-                ->whereDate('payment_date', '>=', now()->subMonths(3))
+            $paymentsQuery = Payment::whereIn('payer_id', $householdResidentIds)
+                ->where('payer_type', 'resident');
+            
+            if ($dateRange) {
+                $paymentsQuery->whereBetween('payment_date', [$dateRange['start'], $dateRange['end']]);
+            }
+            
+            $recentPayments = $paymentsQuery
                 ->orderBy('payment_date', 'desc')
                 ->take(5)
                 ->get()
-                ->map(function ($payment) use ($allPrivileges) {
-                    $payerResident = Resident::with(['residentPrivileges.privilege.discountType'])->find($payment->payer_id);
+                ->map(function ($payment) {
+                    $payerResident = Resident::find($payment->payer_id);
                     
                     return [
                         'id' => 'payment-' . $payment->id,
@@ -284,17 +515,21 @@ class ResidentDashboardController extends Controller
                         'amount' => '₱' . number_format($payment->total_amount ?? 0, 2),
                         'originalId' => $payment->id,
                         'payer_name' => $payerResident?->first_name ?? 'Household Member',
-                        'privileges' => $payerResident ? $this->getResidentPrivileges($payerResident) : [],
                     ];
                 });
 
-            // Clearances
-            $recentClearances = ClearanceRequest::whereIn('resident_id', $householdResidentIds)
+            $clearancesQuery = ClearanceRequest::whereIn('resident_id', $householdResidentIds);
+            
+            if ($dateRange) {
+                $clearancesQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+            }
+            
+            $recentClearances = $clearancesQuery
                 ->orderBy('created_at', 'desc')
                 ->take(5)
                 ->get()
-                ->map(function ($clearance) use ($allPrivileges) {
-                    $applicantResident = Resident::with(['residentPrivileges.privilege.discountType'])->find($clearance->resident_id);
+                ->map(function ($clearance) {
+                    $applicantResident = Resident::find($clearance->resident_id);
                     
                     return [
                         'id' => 'clearance-' . $clearance->id,
@@ -304,7 +539,6 @@ class ResidentDashboardController extends Controller
                         'date' => $clearance->created_at->toISOString(),
                         'originalId' => $clearance->id,
                         'applicant_name' => $applicantResident?->first_name ?? 'Household Member',
-                        'privileges' => $applicantResident ? $this->getResidentPrivileges($applicantResident) : [],
                     ];
                 });
 
@@ -321,19 +555,26 @@ class ResidentDashboardController extends Controller
         }
     }
 
-    private function getRecentPayments(Resident $resident, array $householdResidentIds, array $allPrivileges): array
+    /**
+     * Get recent payments with server-side filtering
+     */
+    private function getRecentPayments(array $householdResidentIds, ?array $dateRange): array
     {
         try {
-            return Payment::whereIn('payer_id', $householdResidentIds)
+            $paymentsQuery = Payment::whereIn('payer_id', $householdResidentIds)
                 ->where('payer_type', 'resident')
-                ->with(['items', 'items.clearanceRequest'])
-                ->whereDate('payment_date', '>=', now()->subMonths(3))
+                ->with(['items', 'items.clearanceRequest']);
+            
+            if ($dateRange) {
+                $paymentsQuery->whereBetween('payment_date', [$dateRange['start'], $dateRange['end']]);
+            }
+            
+            return $paymentsQuery
                 ->orderBy('payment_date', 'desc')
                 ->take(8)
                 ->get()
-                ->map(function ($payment) use ($allPrivileges) {
-                    $payerResident = Resident::with(['residentPrivileges.privilege.discountType'])->find($payment->payer_id);
-                    $activePrivileges = $payerResident ? $this->getResidentPrivileges($payerResident) : [];
+                ->map(function ($payment) {
+                    $payerResident = Resident::find($payment->payer_id);
                     
                     return [
                         'id' => $payment->id,
@@ -347,8 +588,6 @@ class ResidentDashboardController extends Controller
                         'payer_name' => $payerResident ? $payerResident->first_name . ' ' . $payerResident->last_name : 'Household Member',
                         'payer_id' => $payment->payer_id,
                         'is_current_user' => $payerResident && $payerResident->user && $payerResident->user->id === Auth::id(),
-                        'privileges' => $activePrivileges,
-                        'has_privileges' => count($activePrivileges) > 0,
                     ];
                 })
                 ->toArray();
@@ -358,6 +597,9 @@ class ResidentDashboardController extends Controller
         }
     }
 
+    /**
+     * Get payment fee type
+     */
     private function getPaymentFeeType(Payment $payment): string
     {
         if ($payment->clearance_type) {
@@ -375,18 +617,26 @@ class ResidentDashboardController extends Controller
         return 'Barangay Fee';
     }
 
-    private function getPendingClearances(Resident $resident, array $householdResidentIds, array $allPrivileges): array
+    /**
+     * Get pending clearances with server-side filtering
+     */
+    private function getPendingClearances(array $householdResidentIds, ?array $dateRange): array
     {
         try {
-            return ClearanceRequest::whereIn('resident_id', $householdResidentIds)
-                ->with(['clearanceType', 'documents', 'resident.residentPrivileges.privilege.discountType'])
-                ->whereIn('status', ['pending', 'processing', 'under_review', 'pending_payment'])
+            $clearancesQuery = ClearanceRequest::whereIn('resident_id', $householdResidentIds)
+                ->with(['clearanceType', 'documents'])
+                ->whereIn('status', ['pending', 'processing', 'under_review', 'pending_payment']);
+            
+            if ($dateRange) {
+                $clearancesQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+            }
+            
+            return $clearancesQuery
                 ->orderBy('created_at', 'desc')
                 ->take(8)
                 ->get()
-                ->map(function ($clearance) use ($allPrivileges) {
-                    $applicantResident = $clearance->resident;
-                    $activePrivileges = $applicantResident ? $this->getResidentPrivileges($applicantResident) : [];
+                ->map(function ($clearance) {
+                    $applicantResident = Resident::find($clearance->resident_id);
                     
                     return [
                         'id' => $clearance->id,
@@ -400,8 +650,6 @@ class ResidentDashboardController extends Controller
                         'applicant_name' => $applicantResident ? $applicantResident->first_name . ' ' . $applicantResident->last_name : 'Household Member',
                         'applicant_id' => $clearance->resident_id,
                         'is_current_user' => $applicantResident && $applicantResident->user && $applicantResident->user->id === Auth::id(),
-                        'privileges' => $activePrivileges,
-                        'has_privileges' => count($activePrivileges) > 0,
                     ];
                 })
                 ->toArray();
@@ -411,24 +659,53 @@ class ResidentDashboardController extends Controller
         }
     }
 
+    /**
+     * Get announcements
+     */
     private function getAnnouncements(array $allPrivileges): array
     {
         try {
-            return Announcement::where('is_active', true)
-                ->where(fn($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', now()))
-                ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', now()))
+            $user = Auth::user();
+            
+            $query = Announcement::where('is_active', true)
+                ->where(function ($q) {
+                    $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+                })
+                ->where(function ($q) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                });
+            
+            // Filter by audience if user has resident profile
+            if ($user && $user->resident) {
+                $query->visibleToUser($user);
+            } else {
+                $query->where('audience_type', Announcement::AUDIENCE_ALL);
+            }
+            
+            return $query->with(['creator:id,first_name,last_name'])
                 ->orderBy('priority', 'desc')
                 ->orderBy('created_at', 'desc')
                 ->take(5)
                 ->get()
-                ->map(fn($a) => [
-                    'id' => $a->id,
-                    'title' => $a->title ?? 'Announcement',
-                    'content' => $a->content,
-                    'priority' => $a->priority,
-                    'author' => $a->author ?? 'Barangay Official',
-                    'created_at' => $a->created_at->toISOString(),
-                ])
+                ->map(function ($a) {
+                    return [
+                        'id' => $a->id,
+                        'title' => $a->title ?? 'Announcement',
+                        'content' => $a->content,
+                        'type' => $a->type ?? 'general',
+                        'priority' => $a->priority ?? 0,
+                        'author' => $a->creator?->first_name . ' ' . $a->creator?->last_name ?? 'Barangay Official',
+                        'created_at' => $a->created_at->toISOString(),
+                        'status' => $a->status,
+                        'status_color' => $a->status_color,
+                        'status_label' => $a->status_label,
+                        'priority_label' => $a->priority_label,
+                        'type_label' => $a->type_label,
+                        'has_attachments' => $a->has_attachments,
+                        'attachments_count' => $a->attachments_count,
+                        'formatted_date_range' => $a->formatted_date_range,
+                    ];
+                })
                 ->toArray();
         } catch (\Exception $e) {
             \Log::error('Error getting announcements: ' . $e->getMessage());
@@ -436,12 +713,57 @@ class ResidentDashboardController extends Controller
         }
     }
 
-    private function getPaymentSummary(Resident $resident, array $householdResidentIds, array $allPrivileges): array
+    /**
+     * Get public announcements for guests
+     */
+    private function getPublicAnnouncements(): array
     {
         try {
-            return Payment::whereIn('payer_id', $householdResidentIds)
-                ->where('payer_type', 'resident')
-                ->whereYear('payment_date', now()->year)
+            return Announcement::where('is_active', true)
+                ->where('audience_type', Announcement::AUDIENCE_ALL)
+                ->where(function ($q) {
+                    $q->whereNull('start_date')->orWhere('start_date', '<=', now());
+                })
+                ->where(function ($q) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', now());
+                })
+                ->with(['creator:id,first_name,last_name'])
+                ->orderBy('priority', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get()
+                ->map(function ($a) {
+                    return [
+                        'id' => $a->id,
+                        'title' => $a->title ?? 'Announcement',
+                        'content' => $a->content,
+                        'type' => $a->type ?? 'general',
+                        'priority' => $a->priority ?? 0,
+                        'author' => $a->creator?->first_name . ' ' . $a->creator?->last_name ?? 'Barangay Official',
+                        'created_at' => $a->created_at->toISOString(),
+                    ];
+                })
+                ->toArray();
+        } catch (\Exception $e) {
+            \Log::error('Error getting public announcements: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get payment summary with server-side filtering
+     */
+    private function getPaymentSummary(array $householdResidentIds, ?array $dateRange): array
+    {
+        try {
+            $paymentsQuery = Payment::whereIn('payer_id', $householdResidentIds)
+                ->where('payer_type', 'resident');
+            
+            if ($dateRange) {
+                $paymentsQuery->whereBetween('payment_date', [$dateRange['start'], $dateRange['end']]);
+            }
+            
+            return $paymentsQuery
                 ->selectRaw('
                     CASE 
                         WHEN clearance_type IS NOT NULL THEN clearance_type
@@ -467,6 +789,9 @@ class ResidentDashboardController extends Controller
         }
     }
 
+    /**
+     * Get resident data
+     */
     private function getResidentData(Resident $resident, ?Household $household = null, bool $isHouseholdHead = false, array $allPrivileges = []): array
     {
         $activePrivileges = $this->getResidentPrivileges($resident);
@@ -491,14 +816,12 @@ class ResidentDashboardController extends Controller
             'profile_photo_url' => $resident->photo_path ? asset('storage/' . $resident->photo_path) : null,
             'profile_completion' => $this->calculateProfileCompletion($resident),
             'is_household_head' => $isHouseholdHead,
-            
-            // DYNAMIC privilege data - NO HARDCODING
             'privileges' => $activePrivileges,
             'privileges_count' => count($activePrivileges),
             'has_privileges' => count($activePrivileges) > 0,
         ];
 
-        // DYNAMICALLY create flags for EVERY privilege
+        // Dynamic flags for privileges
         foreach ($activePrivileges as $priv) {
             $code = strtolower($priv['code']);
             $data["is_{$code}"] = true;
@@ -517,7 +840,7 @@ class ResidentDashboardController extends Controller
             $data['household_member_count'] = $household->householdMembers->count();
             
             $data['household_members'] = $household->householdMembers
-                ->map(function ($member) use ($allPrivileges) {
+                ->map(function ($member) {
                     $mr = $member->resident;
                     if (!$mr) return null;
                     
@@ -537,7 +860,6 @@ class ResidentDashboardController extends Controller
                         'has_privileges' => count($memberPrivileges) > 0,
                     ];
                     
-                    // DYNAMIC flags for each member
                     foreach ($memberPrivileges as $priv) {
                         $code = strtolower($priv['code']);
                         $memberData["is_{$code}"] = true;
@@ -569,6 +891,9 @@ class ResidentDashboardController extends Controller
         return $data;
     }
 
+    /**
+     * Calculate profile completion percentage
+     */
     private function calculateProfileCompletion(Resident $resident): int
     {
         $fields = [
@@ -586,6 +911,9 @@ class ResidentDashboardController extends Controller
         return (int) round(($filled / count($fields)) * 100);
     }
 
+    /**
+     * Profile setup page
+     */
     public function profileSetup()
     {
         $user = Auth::user();
@@ -602,6 +930,9 @@ class ResidentDashboardController extends Controller
         ]);
     }
 
+    /**
+     * Save profile setup
+     */
     public function saveProfileSetup(Request $request)
     {
         $validated = $request->validate([
@@ -635,6 +966,9 @@ class ResidentDashboardController extends Controller
             ->with('success', 'Profile created successfully!');
     }
 
+    /**
+     * Profile page
+     */
     public function profile()
     {
         $user = Auth::user();
@@ -670,14 +1004,11 @@ class ResidentDashboardController extends Controller
             'purok' => $resident->purok?->name,
             'purok_id' => $resident->purok_id,
             'is_voter' => $resident->is_voter,
-            
-            // DYNAMIC privilege data
             'privileges' => $activePrivileges,
             'privileges_count' => count($activePrivileges),
             'has_privileges' => count($activePrivileges) > 0,
         ];
 
-        // DYNAMIC flags
         foreach ($activePrivileges as $priv) {
             $code = strtolower($priv['code']);
             $data["is_{$code}"] = true;
@@ -694,7 +1025,7 @@ class ResidentDashboardController extends Controller
                     'purok' => $household->purok,
                     'address' => $household->address,
                     'members' => $household->householdMembers
-                        ->map(function ($member) use ($user, $allPrivileges) {
+                        ->map(function ($member) use ($user) {
                             $mr = $member->resident;
                             if (!$mr) return null;
                             
@@ -731,18 +1062,24 @@ class ResidentDashboardController extends Controller
         ]);
     }
 
+    /**
+     * Emergency contacts API
+     */
     public function emergencyContacts()
     {
         return response()->json([
             'data' => [
-                ['name' => 'Police', 'number' => '117'],
-                ['name' => 'Fire', 'number' => '160'],
-                ['name' => 'Ambulance', 'number' => '161'],
-                ['name' => 'Barangay', 'number' => '(082) 123-4567'],
+                ['name' => 'Police', 'number' => '911'],
+                ['name' => 'Fire', 'number' => '911'],
+                ['name' => 'Ambulance', 'number' => '911'],
+                ['name' => 'Barangay Hall', 'number' => '(082) 123-4567'],
             ]
         ]);
     }
     
+    /**
+     * Create resident record for existing user
+     */
     public function createResidentRecord()
     {
         $user = Auth::user();

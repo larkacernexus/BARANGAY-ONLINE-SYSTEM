@@ -1,3 +1,5 @@
+// resources/js/components/admin/announcements/AnnouncementsTableView.tsx
+
 import {
     Table,
     TableBody,
@@ -8,7 +10,24 @@ import {
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ChevronUp, ChevronDown, Eye, Edit, Trash2, MoreVertical, Calendar, Clock, AlertCircle, Megaphone, Copy, PlayCircle, PauseCircle, CheckCircle, Bell, BellRing, BarChart } from 'lucide-react';
+import { 
+    ChevronUp, 
+    ChevronDown, 
+    Eye, 
+    Edit, 
+    Trash2, 
+    MoreVertical, 
+    Calendar, 
+    Clock, 
+    Megaphone, 
+    Copy, 
+    PlayCircle, 
+    PauseCircle, 
+    CheckCircle, 
+    Bell, 
+    BellRing, 
+    BarChart 
+} from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { EmptyState } from '@/components/adminui/empty-state';
@@ -23,18 +42,24 @@ interface AnnouncementsTableViewProps {
     isMobile: boolean;
     filtersState?: AnnouncementFilters;
     onItemSelect: (id: number) => void;
-    onSort: (column: string) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
     onDelete: (announcement: Announcement) => void;
     onToggleStatus: (announcement: Announcement) => void;
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
+    
     // Notification-related props
     onSendNotifications?: (announcement: Announcement) => void;
     onResendNotifications?: (announcement: Announcement) => void;
     onViewNotificationStats?: (announcement: Announcement) => void;
     onDuplicate?: (announcement: Announcement) => void;
+    
+    // ✅ CLEAN SORTING PROPS
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    onSortChange: (value: string) => void;
+    getCurrentSortValue: () => string;
 }
 
 export default function AnnouncementsTableView({
@@ -43,15 +68,15 @@ export default function AnnouncementsTableView({
     selectedAnnouncements,
     isMobile,
     filtersState = {
-        sort_by: 'created_at',
-        sort_order: 'desc',
+        search: '',
         type: 'all',
         status: 'all',
+        audience_type: 'all',
+        priority: 'all',
         from_date: '',
         to_date: ''
     },
     onItemSelect,
-    onSort,
     hasActiveFilters,
     onClearFilters,
     onDelete,
@@ -61,11 +86,27 @@ export default function AnnouncementsTableView({
     onSendNotifications,
     onResendNotifications,
     onViewNotificationStats,
-    onDuplicate
+    onDuplicate,
+    
+    // ✅ CLEAN SORTING PROPS
+    sortBy,
+    sortOrder,
+    onSortChange,
+    getCurrentSortValue,
 }: AnnouncementsTableViewProps) {
+    
+    // ✅ SIMPLE: Get sort icon based on current sort
     const getSortIcon = (column: string) => {
-        if (!filtersState || filtersState.sort_by !== column) return null;
-        return filtersState.sort_order === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+        if (sortBy !== column) return null;
+        return sortOrder === 'asc' ? 
+            <ChevronUp className="h-4 w-4" /> : 
+            <ChevronDown className="h-4 w-4" />;
+    };
+
+    // ✅ SIMPLE: Handle sort click
+    const handleSort = (column: string) => {
+        const newOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
+        onSortChange(`${column}-${newOrder}`);
     };
 
     const getTruncationLength = (): number => {
@@ -183,25 +224,18 @@ export default function AnnouncementsTableView({
                 </TableCell>
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3 text-right sticky right-0 bg-white dark:bg-gray-900">
                     <ActionDropdown>
-                        {/* View Action */}
                         <Link href={route('admin.announcements.show', announcement.id)}>
-                            <ActionDropdownItem
-                                icon={<Eye className="h-4 w-4" />}
-                            >
+                            <ActionDropdownItem icon={<Eye className="h-4 w-4" />}>
                                 View Details
                             </ActionDropdownItem>
                         </Link>
 
-                        {/* Edit Action */}
                         <Link href={route('admin.announcements.edit', announcement.id)}>
-                            <ActionDropdownItem
-                                icon={<Edit className="h-4 w-4" />}
-                            >
+                            <ActionDropdownItem icon={<Edit className="h-4 w-4" />}>
                                 Edit Announcement
                             </ActionDropdownItem>
                         </Link>
 
-                        {/* Duplicate Action */}
                         {onDuplicate && (
                             <ActionDropdownItem
                                 icon={<Copy className="h-4 w-4" />}
@@ -213,7 +247,6 @@ export default function AnnouncementsTableView({
 
                         <ActionDropdownSeparator />
 
-                        {/* Send Notification Actions */}
                         {onSendNotifications && announcement.is_active && announcement.is_currently_active && (
                             <ActionDropdownItem
                                 icon={<Bell className="h-4 w-4" />}
@@ -243,7 +276,6 @@ export default function AnnouncementsTableView({
 
                         <ActionDropdownSeparator />
 
-                        {/* Copy Title Action */}
                         <ActionDropdownItem
                             icon={<Copy className="h-4 w-4" />}
                             onClick={() => handleCopyTitle(announcement.title)}
@@ -251,7 +283,6 @@ export default function AnnouncementsTableView({
                             Copy Title
                         </ActionDropdownItem>
 
-                        {/* Toggle Status Action */}
                         <ActionDropdownItem
                             icon={announcement.is_active ? <PauseCircle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
                             onClick={() => onToggleStatus(announcement)}
@@ -259,7 +290,6 @@ export default function AnnouncementsTableView({
                             {announcement.is_active ? 'Deactivate' : 'Activate'}
                         </ActionDropdownItem>
 
-                        {/* Bulk Mode Actions */}
                         {isBulkMode && (
                             <>
                                 <ActionDropdownSeparator />
@@ -274,7 +304,6 @@ export default function AnnouncementsTableView({
 
                         <ActionDropdownSeparator />
 
-                        {/* Delete Action */}
                         <ActionDropdownItem
                             icon={<Trash2 className="h-4 w-4" />}
                             onClick={() => onDelete(announcement)}
@@ -312,37 +341,42 @@ export default function AnnouncementsTableView({
                                         </div>
                                     </TableHead>
                                 )}
+                                
+                                {/* ✅ SORTABLE HEADERS */}
                                 <TableHead 
                                     className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] sm:min-w-[200px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('title')}
+                                    onClick={() => handleSort('title')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Title & Details
                                         {getSortIcon('title')}
                                     </div>
                                 </TableHead>
+                                
                                 <TableHead 
                                     className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('type')}
+                                    onClick={() => handleSort('type')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Type
                                         {getSortIcon('type')}
                                     </div>
                                 </TableHead>
+                                
                                 <TableHead 
                                     className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('priority')}
+                                    onClick={() => handleSort('priority')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Priority
                                         {getSortIcon('priority')}
                                     </div>
                                 </TableHead>
+                                
                                 {!isMobile && (
                                     <TableHead 
                                         className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] cursor-pointer hover:bg-gray-100"
-                                        onClick={() => onSort('start_date')}
+                                        onClick={() => handleSort('start_date')}
                                     >
                                         <div className="flex items-center gap-1">
                                             Date Range
@@ -350,15 +384,17 @@ export default function AnnouncementsTableView({
                                         </div>
                                     </TableHead>
                                 )}
+                                
                                 <TableHead 
                                     className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px] sm:min-w-[120px] cursor-pointer hover:bg-gray-100"
-                                    onClick={() => onSort('status')}
+                                    onClick={() => handleSort('status')}
                                 >
                                     <div className="flex items-center gap-1">
                                         Status
                                         {getSortIcon('status')}
                                     </div>
                                 </TableHead>
+                                
                                 <TableHead className="px-3 py-2 sm:px-4 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider sticky right-0 bg-gray-50 dark:bg-gray-900 min-w-[60px] sm:min-w-[80px]">
                                     Actions
                                 </TableHead>
@@ -376,7 +412,7 @@ export default function AnnouncementsTableView({
                                             icon={<Megaphone className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
                                             hasFilters={hasActiveFilters}
                                             onClearFilters={onClearFilters}
-                                            onCreateNew={() => window.location.href = '/announcements/create'}
+                                            onCreateNew={() => window.location.href = '/admin/announcements/create'}
                                             createLabel="Create Announcement"
                                         />
                                     </TableCell>

@@ -5,26 +5,24 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { 
     Megaphone, 
-    Download, 
     FileSpreadsheet, 
-    Printer, 
     Send, 
     Archive,
     Copy,
-    Edit,
     Trash2,
     Bell,
     BellRing,
-    Calendar,
-    AlertCircle,
-    CheckSquare,
-    Square,
-    Eye,
     Users,
-    BarChart
+    ArrowUpDown
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -38,15 +36,18 @@ import AnnouncementsBulkActions from './AnnouncementsBulkActions';
 import { 
     Announcement, 
     AnnouncementFilters, 
-    AnnouncementStats, 
     SelectionMode, 
     SelectionStats,
     BulkOperation
 } from '@/types/admin/announcements/announcement.types';
 
+interface SortOption {
+    value: string;
+    label: string;
+}
+
 interface AnnouncementsContentProps {
     announcements: Announcement[];
-    stats?: AnnouncementStats;
     isBulkMode: boolean;
     setIsBulkMode: (value: boolean) => void;
     isSelectAll: boolean;
@@ -72,7 +73,6 @@ interface AnnouncementsContentProps {
     onResendNotifications?: (announcement: Announcement) => void;
     onViewNotificationStats?: (announcement: Announcement) => void;
     onDuplicate?: (announcement: Announcement) => void;
-    onSort: (column: string) => void;
     onBulkOperation: (operation: BulkOperation, additionalData?: any) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
@@ -83,12 +83,30 @@ interface AnnouncementsContentProps {
     selectionStats?: SelectionStats;
     types?: Record<string, string>;
     priorities?: Record<string, string>;
-    audienceTypes?: Record<string, string>;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    onSortChange: (value: string) => void;
+    getCurrentSortValue: () => string;
+    sortOptions?: readonly SortOption[];
 }
+
+const DEFAULT_SORT_OPTIONS: readonly SortOption[] = [
+    { value: 'created_at-desc', label: 'Newest First' },
+    { value: 'created_at-asc', label: 'Oldest First' },
+    { value: 'title-asc', label: 'Title (A-Z)' },
+    { value: 'title-desc', label: 'Title (Z-A)' },
+    { value: 'priority-desc', label: 'Priority (High to Low)' },
+    { value: 'priority-asc', label: 'Priority (Low to High)' },
+    { value: 'type-asc', label: 'Type (A-Z)' },
+    { value: 'type-desc', label: 'Type (Z-A)' },
+    { value: 'status-asc', label: 'Status (A-Z)' },
+    { value: 'status-desc', label: 'Status (Z-A)' },
+    { value: 'audience_type-asc', label: 'Audience (A-Z)' },
+    { value: 'audience_type-desc', label: 'Audience (Z-A)' },
+] as const;
 
 export default function AnnouncementsContent({
     announcements,
-    stats,
     isBulkMode,
     setIsBulkMode,
     isSelectAll,
@@ -114,7 +132,6 @@ export default function AnnouncementsContent({
     onResendNotifications,
     onViewNotificationStats,
     onDuplicate,
-    onSort,
     onBulkOperation,
     onCopySelectedData,
     setShowBulkDeleteDialog,
@@ -125,10 +142,13 @@ export default function AnnouncementsContent({
     selectionStats,
     types = {},
     priorities = {},
-    audienceTypes = {}
+    sortBy,
+    sortOrder,
+    onSortChange,
+    getCurrentSortValue,
+    sortOptions = DEFAULT_SORT_OPTIONS,
 }: AnnouncementsContentProps) {
     
-    // Bulk action items configuration
     const bulkActions = {
         primary: [
             {
@@ -194,13 +214,14 @@ export default function AnnouncementsContent({
         ]
     };
 
-    // Toggle handler for bulk mode
     const handleBulkModeToggle = () => {
         setIsBulkMode(!isBulkMode);
         if (isBulkMode) {
             onClearSelection();
         }
     };
+
+    const hasAnnouncements = announcements.length > 0;
 
     return (
         <>
@@ -227,7 +248,7 @@ export default function AnnouncementsContent({
             )}
 
             {/* Floating Select All for Grid View */}
-            {viewMode === 'grid' && announcements.length > 0 && selectedAnnouncements.length < announcements.length && isBulkMode && (
+            {viewMode === 'grid' && hasAnnouncements && selectedAnnouncements.length < announcements.length && isBulkMode && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
                     onSelectAll={onSelectAllOnPage}
@@ -237,7 +258,7 @@ export default function AnnouncementsContent({
                 />
             )}
 
-            {/* Announcements List/Grid View with dark mode */}
+            {/* Announcements List/Grid View */}
             <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-3">
@@ -259,8 +280,30 @@ export default function AnnouncementsContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Sort Dropdown */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={getCurrentSortValue()}
+                                    onValueChange={onSortChange}
+                                >
+                                    <SelectTrigger className="w-[180px] h-8 text-xs">
+                                        <SelectValue placeholder="Sort by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {sortOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Grid view select all checkbox */}
-                        {viewMode === 'grid' && isBulkMode && announcements.length > 0 && (
+                        {viewMode === 'grid' && isBulkMode && hasAnnouncements && (
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="select-all-grid"
@@ -305,21 +348,21 @@ export default function AnnouncementsContent({
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 dark:bg-gray-900">
-                    {/* Empty State with dark mode */}
-                    {announcements.length === 0 ? (
-                       <div className="py-12 sm:py-16 dark:bg-gray-900">
-                        <EmptyState
-                            icon={<Megaphone className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
-                            title="No announcements found"
-                            description={hasActiveFilters 
-                                ? "No announcements match your current filters. Try adjusting your search or filters."
-                                : "No announcements have been created yet."}
-                            action={hasActiveFilters ? {
-                                label: "Clear Filters",
-                                onClick: onClearFilters
-                            } : undefined}
-                        />
-                    </div>
+                    {/* Empty State */}
+                    {!hasAnnouncements ? (
+                        <div className="py-12 sm:py-16 dark:bg-gray-900">
+                            <EmptyState
+                                icon={<Megaphone className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
+                                title="No announcements found"
+                                description={hasActiveFilters 
+                                    ? "No announcements match your current filters. Try adjusting your search or filters."
+                                    : "No announcements have been created yet."}
+                                action={hasActiveFilters ? {
+                                    label: "Clear Filters",
+                                    onClick: onClearFilters
+                                } : undefined}
+                            />
+                        </div>
                     ) : (
                         <>
                             {/* Table View */}
@@ -331,7 +374,6 @@ export default function AnnouncementsContent({
                                     isMobile={isMobile}
                                     filtersState={filtersState}
                                     onItemSelect={onItemSelect}
-                                    onSort={onSort}
                                     hasActiveFilters={hasActiveFilters}
                                     onClearFilters={onClearFilters}
                                     onDelete={onDelete}
@@ -342,6 +384,10 @@ export default function AnnouncementsContent({
                                     onDuplicate={onDuplicate}
                                     onSelectAllOnPage={onSelectAllOnPage}
                                     isSelectAll={isSelectAll}
+                                    sortBy={sortBy}
+                                    sortOrder={sortOrder}
+                                    onSortChange={onSortChange}
+                                    getCurrentSortValue={getCurrentSortValue}
                                 />
                             ) : (
                                 // Grid View
@@ -362,7 +408,7 @@ export default function AnnouncementsContent({
                                 />
                             )}
 
-                            {/* Grid Selection Summary with dark mode */}
+                            {/* Grid Selection Summary */}
                             {viewMode === 'grid' && isBulkMode && selectedAnnouncements.length > 0 && (
                                 <GridSelectionSummary
                                     selectedCount={selectedAnnouncements.length}
@@ -374,7 +420,7 @@ export default function AnnouncementsContent({
                                 />
                             )}
 
-                            {/* Pagination with dark mode */}
+                            {/* Pagination */}
                             {totalPages > 1 && (
                                 <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
                                     <Pagination

@@ -20,6 +20,7 @@ export interface AnnouncementAttachment {
 }
 
 export interface Announcement {
+    days_remaining: any;
     id: number;
     title: string;
     content: string;

@@ -39,6 +39,7 @@ export interface Complaint {
 }
 
 export interface Announcement {
+    type: any;
     id: string;
     title: string;
     priority: 'high' | 'medium' | 'low';
