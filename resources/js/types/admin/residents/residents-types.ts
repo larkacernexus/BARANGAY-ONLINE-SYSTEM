@@ -260,6 +260,7 @@ export interface SelectionStats {
 // ============================================================================
 
 export interface FilterState {
+    per_page: string;
     status: string;
     purok_id: string;
     gender: string;

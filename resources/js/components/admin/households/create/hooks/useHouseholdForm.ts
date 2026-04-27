@@ -1,4 +1,5 @@
 // components/admin/households/create/hooks/useHouseholdForm.ts
+import { Resident } from '@/types/admin/households/household.types';
 import { useForm } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 
@@ -36,7 +37,7 @@ interface HouseholdFormData {
     create_user_account: boolean;
 }
 
-export function useHouseholdForm() {
+export function useHouseholdForm(p0: { selected_head: Resident; head_of_family: string; } | undefined) {
     const { data, setData, post, processing, errors, reset } = useForm<HouseholdFormData>({
         household_number: '',
         head_of_family: '',

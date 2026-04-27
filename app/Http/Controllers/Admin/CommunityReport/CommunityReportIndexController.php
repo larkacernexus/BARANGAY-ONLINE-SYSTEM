@@ -13,6 +13,16 @@ use Illuminate\Support\Facades\DB;
 
 class CommunityReportIndexController extends BaseCommunityReportController
 {
+    /**
+     * Allowed per page options
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500'];
+    
+    /**
+     * Default per page value
+     */
+    protected const DEFAULT_PER_PAGE = 15;
+
     public function index(Request $request)
     {
         // Start with base query
@@ -31,8 +41,8 @@ class CommunityReportIndexController extends BaseCommunityReportController
         // Calculate statistics
         $stats = $this->getStats();
         
-        // Get reports with pagination
-        $perPage = $request->get('per_page', 15);
+        // Get reports with dynamic pagination
+        $perPage = $this->getPerPage($request);
         $reports = $query->paginate($perPage)->withQueryString();
         
         // Format reports data
@@ -78,7 +88,7 @@ class CommunityReportIndexController extends BaseCommunityReportController
                 'search', 'status', 'priority', 'urgency', 'report_type', 
                 'category', 'impact_level', 'from_date', 'to_date', 
                 'has_evidences', 'safety_concern', 'environmental_impact',
-                'recurring_issue', 'is_anonymous', 'affected_people'
+                'recurring_issue', 'is_anonymous', 'affected_people', 'per_page'
             ]),
             'statuses' => $statuses,
             'priorities' => $priorities,
@@ -88,6 +98,25 @@ class CommunityReportIndexController extends BaseCommunityReportController
             'puroks' => $puroks,
             'staff' => $staff,
         ]);
+    }
+
+    /**
+     * Get the per page value from request
+     *
+     * @param Request $request
+     * @return int
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
     }
 
     private function applyFilters($query, Request $request)

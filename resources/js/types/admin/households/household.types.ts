@@ -101,6 +101,8 @@ export interface HouseholdMember {
 }
 
 export interface Resident {
+    household_status: string;
+    current_household: any;
     id: number;
     first_name: string;
     last_name: string;

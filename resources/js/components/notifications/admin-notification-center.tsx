@@ -172,10 +172,6 @@ export function NotificationCenter({
   useEffect(() => {
     setLocalNotifications(notifications);
     setLocalUnreadCount(unreadCount);
-    console.log('📊 NotificationCenter received updates:', {
-      count: notifications.length,
-      unread: unreadCount
-    });
   }, [notifications, unreadCount]);
 
   const filteredNotifications = localNotifications.filter(n => 
@@ -185,12 +181,9 @@ export function NotificationCenter({
   const handleNotificationClick = (notification: Notification) => {
     // Prevent double clicks while navigating
     if (isNavigating) return;
-    
-    console.log('🔔 Notification clicked:', notification);
-    
+
     // Mark as read if unread
     if (!notification.read_at) {
-      console.log('📝 Calling onMarkAsRead for:', notification.id);
       onMarkAsRead(notification.id);
       
       // Update local state immediately for better UX
@@ -204,7 +197,6 @@ export function NotificationCenter({
 
     // Check for link
     const notificationLink = notification.link || notification.url;
-    console.log('🔗 Notification link:', notificationLink);
     
     if (notificationLink && notificationLink !== '#') {
       let targetUrl = notificationLink;
@@ -222,7 +214,7 @@ export function NotificationCenter({
           targetUrl = urlObj.pathname + urlObj.search + urlObj.hash;
         }
       } catch (e) {
-        console.log('Not a valid URL, using as is');
+        // Not a valid URL, use as is
       }
       
       // Remove prefixes and ensure leading slash
@@ -238,7 +230,6 @@ export function NotificationCenter({
       }
       
       targetUrl = basePath + targetUrl;
-      console.log('📍 Final navigation URL:', targetUrl);
       
       // Close sheet and navigate
       onClose();
@@ -250,7 +241,6 @@ export function NotificationCenter({
         });
       }, 150);
     } else {
-      console.log('No link, just closing');
       onClose();
     }
   };

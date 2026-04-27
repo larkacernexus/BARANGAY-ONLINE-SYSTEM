@@ -119,6 +119,7 @@ export interface AnnouncementStats {
 }
 
 export interface AnnouncementFilters {
+    per_page: string;
     search?: string;
     type?: string;
     priority?: string;

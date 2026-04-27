@@ -1,5 +1,4 @@
-// pages/admin/Blotters/Create.tsx (Complete Fixed Version)
-
+// pages/admin/Blotters/Create.tsx
 import { useState, useMemo, ChangeEvent, FormEvent } from 'react';
 import { Link, useForm } from '@inertiajs/react';
 import AdminLayout from '@/layouts/admin-app-layout';
@@ -21,8 +20,8 @@ import { ProgressSidebar } from '@/components/admin/blotters/create/components/P
 
 // Import types
 import type { Resident, IncidentType } from '@/types/admin/blotters/blotter';
+
 interface Props {
-    residents: Resident[];
     barangayName?: string;
 }
 
@@ -32,7 +31,7 @@ const steps = [
     { number: 3, title: 'Submit', description: 'Review & submit', icon: Send },
 ];
 
-export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Props) {
+export default function CreateBlotter({ barangayName = 'Kibawe' }: Props) {
     const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
     const [selectedType, setSelectedType] = useState<IncidentType | null>(null);
     const [selectedResidents, setSelectedResidents] = useState<Resident[]>([]);
@@ -41,7 +40,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
     const [selectedReporterResident, setSelectedReporterResident] = useState<Resident | null>(null);
     const [selectedRespondentResident, setSelectedRespondentResident] = useState<Resident | null>(null);
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm({
         incident_type: '',
         incident_description: '',
         incident_datetime: '',
@@ -58,9 +57,9 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         respondent_resident_id: null as number | null,
         witnesses: '',
         evidence: '',
-        priority: 'medium',
+        priority: 'medium' as string,
         involved_residents: [] as number[],
-        attachments: [] as File[], // Using browser File type
+        attachments: [] as File[],
     });
 
     // Filter incident types
@@ -176,15 +175,12 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         setData('respondent_resident_id', null);
     };
 
-    // FIXED: Properly typed file change handler
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>): void => {
         const files = e.target.files;
         if (files && files.length > 0) {
             const fileArray: File[] = Array.from(files);
-            const currentAttachments = [...data.attachments];
-            setData('attachments', [...currentAttachments, ...fileArray]);
+            setData('attachments', [...data.attachments, ...fileArray]);
             
-            // Generate previews for image files
             fileArray.forEach((file: File) => {
                 if (file.type.startsWith('image/')) {
                     const reader = new FileReader();
@@ -199,40 +195,37 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         }
     };
 
-    // FIXED: removeFile accepts index parameter
     const handleRemoveNewFile = (index: number): void => {
         const updatedAttachments = data.attachments.filter((_, i) => i !== index);
         setData('attachments', updatedAttachments);
-        
-        const updatedPreviews = attachmentPreviews.filter((_, i) => i !== index);
-        setAttachmentPreviews(updatedPreviews);
+        setAttachmentPreviews(prev => prev.filter((_, i) => i !== index));
     };
 
     const toggleResident = (resident: Resident): void => {
         const isSelected = selectedResidents.some(r => r.id === resident.id);
         if (isSelected) {
-            setSelectedResidents(selectedResidents.filter(r => r.id !== resident.id));
+            setSelectedResidents(prev => prev.filter(r => r.id !== resident.id));
             setData('involved_residents', data.involved_residents.filter(id => id !== resident.id));
         } else {
-            setSelectedResidents([...selectedResidents, resident]);
+            setSelectedResidents(prev => [...prev, resident]);
             setData('involved_residents', [...data.involved_residents, resident.id]);
         }
     };
 
-    // FIXED: Proper FormData handling
     const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
         e.preventDefault();
         if (!isStepValid()) return;
         
-        // Create FormData for file uploads
         const formData = new FormData();
         
-        // Append all form fields
         Object.entries(data).forEach(([key, value]) => {
             if (key === 'attachments' && Array.isArray(value)) {
-                // Append each file individually
                 (value as File[]).forEach((file: File, index: number) => {
                     formData.append(`attachments[${index}]`, file);
+                });
+            } else if (key === 'involved_residents' && Array.isArray(value)) {
+                (value as number[]).forEach((id: number, index: number) => {
+                    formData.append(`involved_residents[${index}]`, id.toString());
                 });
             } else if (value !== null && value !== undefined && value !== '') {
                 formData.append(key, value.toString());
@@ -242,6 +235,14 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
         post('/admin/blotters', {
             data: formData,
             forceFormData: true,
+            onSuccess: () => {
+                reset();
+                setSelectedType(null);
+                setSelectedResidents([]);
+                setAttachmentPreviews([]);
+                setSelectedReporterResident(null);
+                setSelectedRespondentResident(null);
+            },
         });
     };
 
@@ -291,13 +292,18 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/blotters">
-                                <Button type="button" variant="outline" size="sm">
+                                <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="dark:border-gray-600 dark:text-gray-300 hover:dark:bg-gray-800"
+                                >
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
                                 </Button>
                             </Link>
                             <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 flex items-center justify-center shadow-lg shadow-red-500/20">
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-red-600 to-orange-600 dark:from-red-700 dark:to-orange-700 flex items-center justify-center shadow-lg shadow-red-500/20">
                                     <FileText className="h-6 w-6 text-white" />
                                 </div>
                                 <div>
@@ -313,7 +319,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                         <Button 
                             type="submit" 
                             disabled={processing || !isStepValid()}
-                            className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white"
+                            className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all"
                         >
                             <Save className="h-4 w-4 mr-2" />
                             {processing ? 'Saving...' : 'File Blotter'}
@@ -328,7 +334,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                         <Card className="border-l-4 border-l-red-500 dark:bg-gray-900">
                             <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
-                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5" />
+                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
                                     <div>
                                         <p className="font-medium text-red-800 dark:text-red-300">Please fix the following errors:</p>
                                         <ul className="list-disc list-inside mt-2 space-y-1">
@@ -382,7 +388,6 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                             {activeStep === 2 && (
                                 <>
                                     <ReporterInfoCard
-                                        residents={residents}
                                         isResident={data.reporter_is_resident}
                                         selectedResident={selectedReporterResident}
                                         reporterName={data.reporter_name}
@@ -397,7 +402,6 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                                         errors={errors}
                                     />
                                     <RespondentInfoCard
-                                        residents={residents}
                                         isResident={data.respondent_is_resident}
                                         selectedResident={selectedRespondentResident}
                                         respondentName={data.respondent_name}
@@ -416,7 +420,6 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                                         showTips={true}
                                     />
                                     <InvolvedResidentsCard
-                                        residents={residents}
                                         selectedResidents={selectedResidents}
                                         onToggle={toggleResident}
                                     />
@@ -447,20 +450,25 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                             )}
 
                             {/* Navigation Buttons */}
-                            <div className="flex items-center justify-between pt-4">
+                            <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                                 <div>
                                     {activeStep > 1 ? (
                                         <Button
                                             type="button"
                                             variant="outline"
                                             onClick={prevStep}
+                                            className="dark:border-gray-600 dark:text-gray-300 hover:dark:bg-gray-800"
                                         >
                                             <ArrowLeft className="h-4 w-4 mr-2" />
                                             Previous
                                         </Button>
                                     ) : (
                                         <Link href="/admin/blotters">
-                                            <Button type="button" variant="outline">
+                                            <Button 
+                                                type="button" 
+                                                variant="outline"
+                                                className="dark:border-gray-600 dark:text-gray-300 hover:dark:bg-gray-800"
+                                            >
                                                 Cancel
                                             </Button>
                                         </Link>
@@ -472,7 +480,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                                             type="button"
                                             onClick={nextStep}
                                             disabled={!isStepValid()}
-                                            className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+                                            className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white"
                                         >
                                             Next
                                             <ArrowRight className="h-4 w-4 ml-2" />
@@ -481,7 +489,7 @@ export default function CreateBlotter({ residents, barangayName = 'Kibawe' }: Pr
                                         <Button 
                                             type="submit"
                                             disabled={processing}
-                                            className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
+                                            className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all"
                                         >
                                             <Send className="h-4 w-4 mr-2" />
                                             {processing ? 'Submitting...' : 'Submit Blotter'}

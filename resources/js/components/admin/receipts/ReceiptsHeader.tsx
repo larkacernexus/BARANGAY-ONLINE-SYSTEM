@@ -58,14 +58,13 @@ export default function ReceiptsHeader({
                     </TooltipContent>
                 </Tooltip>
                 
-                <Link href={route('receipts.create')}>
-                    <Button asChild>
-                        <a>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Generate Receipt
-                        </a>
-                    </Button>
-                </Link>
+                {/* FIXED: Removed asChild and inner <a> tag - Button handles the styling, Link handles navigation */}
+                <Button asChild>
+                    <Link href={route('receipts.create')}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Generate Receipt
+                    </Link>
+                </Button>
             </div>
         </div>
     );

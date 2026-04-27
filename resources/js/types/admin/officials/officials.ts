@@ -6,6 +6,7 @@ import { Gender, CivilStatus } from '@/types/admin/households/household.types';
 // ========== CORE MODELS ==========
 
 export interface Resident {
+    name: string | undefined;
     id: number;
     first_name: string;
     last_name: string;
@@ -354,6 +355,23 @@ export interface OfficialsBulkActionsProps {
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
 }
+
+export interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    total: number;
+    per_page: number;
+    from: number;
+    to: number;
+    has_more: boolean;
+    has_more_pages?: boolean;
+    links?: Array<{
+        url: string | null;
+        label: string;
+        active: boolean;
+    }>;
+}
+
 
 // ========== TABLE/GRID PROPS TYPES ==========
 

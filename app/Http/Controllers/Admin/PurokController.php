@@ -9,6 +9,7 @@ use App\Models\Resident;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 
 class PurokController extends Controller
 {
@@ -22,7 +23,6 @@ class PurokController extends Controller
             ->withCount(['households', 'residents'])
             ->orderBy('name');
 
-        // Apply search filter
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -37,7 +37,6 @@ class PurokController extends Controller
             });
         }
 
-        // Apply status filter
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
@@ -60,7 +59,6 @@ class PurokController extends Controller
                 ];
             });
 
-        // Calculate stats
         $stats = [
             ['label' => 'Total Puroks', 'value' => Purok::count()],
             ['label' => 'Active Puroks', 'value' => Purok::where('status', 'active')->count()],
@@ -78,29 +76,77 @@ class PurokController extends Controller
     /**
      * Show the form for creating a new purok.
      */
-   public function create()
-{
-    $residents = Resident::select('id', 'first_name', 'last_name', 'middle_name', 'contact_number', 'email', 'photo_path')
-        ->orderBy('last_name')
-        ->orderBy('first_name')
-        ->get()
-        ->map(function ($resident) {
+    public function create()
+    {
+        return Inertia::render('admin/Puroks/Create');
+    }
+
+    /**
+     * Search residents via AJAX for purok leader selection
+     */
+    public function searchResidents(Request $request)
+    {
+        $search = $request->get('search', '');
+        $page = $request->get('page', 1);
+        $perPage = 50;
+        
+        $query = Resident::with('purok')
+            ->select([
+                'id',
+                'first_name',
+                'last_name',
+                'middle_name',
+                'suffix',
+                'contact_number',
+                'email',
+                'address',
+                'photo_path',
+                'purok_id',
+            ])
+            ->orderBy('last_name')
+            ->orderBy('first_name');
+        
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('middle_name', 'like', "%{$search}%")
+                  ->orWhere('contact_number', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('address', 'like', "%{$search}%");
+            });
+        }
+        
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        
+        $data = $paginator->map(function($resident) {
             return [
                 'id' => $resident->id,
                 'name' => $resident->full_name,
                 'first_name' => $resident->first_name,
                 'last_name' => $resident->last_name,
                 'middle_name' => $resident->middle_name,
+                'suffix' => $resident->suffix,
                 'contact_number' => $resident->contact_number,
                 'email' => $resident->email,
-                'photo_url' => $resident->photo_url,
+                'address' => $resident->address,
+                'photo_url' => $resident->photo_path ? Storage::url($resident->photo_path) : null,
+                'purok' => $resident->purok?->name,
+                'purok_id' => $resident->purok_id,
             ];
         });
-
-    return Inertia::render('admin/Puroks/Create', [
-        'availableResidents' => $residents,
-    ]);
-}
+        
+        return response()->json([
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ]);
+    }
 
     /**
      * Store a newly created purok.
@@ -125,18 +171,15 @@ class PurokController extends Controller
 
         $data = $request->except(['leader_name', 'leader_contact']);
         
-        // Handle empty google_maps_url
         if (empty($data['google_maps_url'])) {
             $data['google_maps_url'] = null;
         }
         
-        // Extract coordinates from URL if provided
         if ($data['google_maps_url']) {
             $coordinates = $this->extractCoordinatesFromUrl($data['google_maps_url']);
             if ($coordinates) {
                 $data['latitude'] = $coordinates['lat'];
                 $data['longitude'] = $coordinates['lng'];
-                \Log::info('Coordinates extracted on create', $coordinates);
             }
         }
 
@@ -152,27 +195,21 @@ class PurokController extends Controller
     public function show(Purok $purok, Request $request)
     {
         $purok->load(['leader']);
-        
-        // Load counts for the purok
         $purok->loadCount(['households', 'residents']);
         
-        // Get accurate counts
         $householdsCount = $purok->households_count;
         $residentsCount = $purok->residents_count;
 
-        // Load households with pagination
         $householdsQuery = $purok->households()
             ->withCount(['householdMembers'])
             ->with(['householdMembers' => function ($query) {
-                $query->where('is_head', true)
-                    ->with('resident');
+                $query->where('is_head', true)->with('resident');
             }])
             ->orderBy('household_number');
         
         $households = $householdsQuery->paginate(20, ['*'], 'household_page')
             ->withQueryString();
 
-        // Load residents with pagination
         $residentsQuery = $purok->residents()
             ->orderBy('last_name')
             ->orderBy('first_name');
@@ -180,7 +217,6 @@ class PurokController extends Controller
         $residents = $residentsQuery->paginate(20, ['*'], 'resident_page')
             ->withQueryString();
 
-        // Get statistics for this purok
         $stats = [
             ['label' => 'Total Households', 'value' => $householdsCount, 'icon' => 'home', 'color' => 'blue'],
             ['label' => 'Total Residents', 'value' => $residentsCount, 'icon' => 'users', 'color' => 'green'],
@@ -191,11 +227,9 @@ class PurokController extends Controller
             ['label' => 'Map Location', 'value' => $purok->google_maps_url ? 'Available' : 'Not Set', 'icon' => 'globe', 'color' => $purok->google_maps_url ? 'orange' : 'gray'],
         ];
 
-        // Get recent activities
         $recentHouseholds = $purok->households()
             ->with(['householdMembers' => function ($query) {
-                $query->where('is_head', true)
-                    ->with('resident');
+                $query->where('is_head', true)->with('resident');
             }])
             ->latest()
             ->take(5)
@@ -206,7 +240,6 @@ class PurokController extends Controller
             ->take(5)
             ->get();
 
-        // Get demographic data
         $demographics = [
             'gender' => [
                 'male' => $purok->residents()->where('gender', 'male')->count(),
@@ -220,7 +253,6 @@ class PurokController extends Controller
             ]
         ];
 
-        // Transform households for the view
         $householdsData = $households->through(function ($household) {
             $headMember = $household->householdMembers->firstWhere('is_head', true);
             $headOfFamily = 'No head assigned';
@@ -245,7 +277,6 @@ class PurokController extends Controller
             ];
         });
 
-        // Transform residents for the view
         $residentsData = $residents->through(function ($resident) {
             return [
                 'id' => $resident->id,
@@ -287,11 +318,9 @@ class PurokController extends Controller
             'recentHouseholds' => $recentHouseholds->map(function ($household) {
                 $headMember = $household->householdMembers->firstWhere('is_head', true);
                 $headOfFamily = 'No head assigned';
-                
                 if ($headMember && $headMember->resident) {
                     $headOfFamily = $headMember->resident->first_name . ' ' . $headMember->resident->last_name;
                 }
-                
                 return [
                     'id' => $household->id,
                     'household_number' => $household->household_number,
@@ -334,52 +363,33 @@ class PurokController extends Controller
     /**
      * Show the form for editing the specified purok.
      */
-   public function edit(Purok $purok)
-{
-    $purok->load(['leader']);
-    
-    $residents = Resident::select('id', 'first_name', 'last_name', 'middle_name', 'contact_number', 'email', 'photo_path')
-        ->orderBy('last_name')
-        ->orderBy('first_name')
-        ->get()
-        ->map(function ($resident) {
-            return [
-                'id' => $resident->id,
-                'name' => $resident->full_name,
-                'first_name' => $resident->first_name,
-                'last_name' => $resident->last_name,
-                'middle_name' => $resident->middle_name,
-                'contact_number' => $resident->contact_number,
-                'email' => $resident->email,
-                'photo_url' => $resident->photo_url,
-            ];
-        });
-    
-    $purok->loadCount(['households', 'residents']);
-    
-    return Inertia::render('admin/Puroks/Edit', [
-        'purok' => [
-            'id' => $purok->id,
-            'name' => $purok->name,
-            'description' => $purok->description,
-            'leader_id' => $purok->leader_id,
-            'leader_name' => $purok->leader_name,
-            'leader_contact' => $purok->leader_contact,
-            'status' => $purok->status,
-            'google_maps_url' => $purok->google_maps_url,
-            'latitude' => $purok->latitude,
-            'longitude' => $purok->longitude,
-            'created_at' => $purok->created_at,
-            'updated_at' => $purok->updated_at,
-            'households_count' => $purok->households_count,
-            'residents_count' => $purok->residents_count,
-        ],
-        'availableResidents' => $residents,
-    ]);
-}
+    public function edit(Purok $purok)
+    {
+        $purok->load(['leader']);
+        $purok->loadCount(['households', 'residents']);
+        
+        return Inertia::render('admin/Puroks/Edit', [
+            'purok' => [
+                'id' => $purok->id,
+                'name' => $purok->name,
+                'description' => $purok->description,
+                'leader_id' => $purok->leader_id,
+                'leader_name' => $purok->leader_name,
+                'leader_contact' => $purok->leader_contact,
+                'status' => $purok->status,
+                'google_maps_url' => $purok->google_maps_url,
+                'latitude' => $purok->latitude,
+                'longitude' => $purok->longitude,
+                'created_at' => $purok->created_at,
+                'updated_at' => $purok->updated_at,
+                'households_count' => $purok->households_count,
+                'residents_count' => $purok->residents_count,
+            ],
+        ]);
+    }
 
     /**
-     * Update the specified purok in storage.
+     * Update the specified purok.
      */
     public function update(Request $request, Purok $purok)
     {
@@ -401,25 +411,16 @@ class PurokController extends Controller
 
         $data = $request->except(['leader_name', 'leader_contact']);
         
-        // Handle empty google_maps_url
         if (empty($data['google_maps_url'])) {
             $data['google_maps_url'] = null;
         }
         
-        // If URL changed or is new, extract coordinates
         if ($data['google_maps_url'] && $data['google_maps_url'] !== $purok->google_maps_url) {
             $coordinates = $this->extractCoordinatesFromUrl($data['google_maps_url']);
-            
             if ($coordinates) {
                 $data['latitude'] = $coordinates['lat'];
                 $data['longitude'] = $coordinates['lng'];
-                \Log::info('Coordinates extracted successfully', [
-                    'url' => $data['google_maps_url'],
-                    'lat' => $coordinates['lat'],
-                    'lng' => $coordinates['lng']
-                ]);
             } else {
-                \Log::warning('Could not extract coordinates from URL', ['url' => $data['google_maps_url']]);
                 $data['latitude'] = null;
                 $data['longitude'] = null;
             }
@@ -436,7 +437,6 @@ class PurokController extends Controller
      */
     public function destroy(Purok $purok)
     {
-        // Check if purok has households or residents
         if ($purok->households()->count() > 0 || $purok->residents()->count() > 0) {
             return redirect()->back()
                 ->with('error', 'Cannot delete purok that has households or residents. Update them first.');
@@ -486,12 +486,10 @@ class PurokController extends Controller
         }
 
         try {
-            // Handle Google Maps short URLs (maps.app.goo.gl)
             if (strpos($url, 'maps.app.goo.gl') !== false) {
                 return $this->extractFromShortUrl($url);
             }
             
-            // Try to parse coordinates from URL with @ symbol
             if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
                 return [
                     'lat' => (float) $matches[1],
@@ -499,7 +497,6 @@ class PurokController extends Controller
                 ];
             }
             
-            // Try to parse from query parameter q=
             if (preg_match('/[?&]q=([^&]+)/', $url, $matches)) {
                 $query = urldecode($matches[1]);
                 if (preg_match('/(-?\d+\.\d+),(-?\d+\.\d+)/', $query, $coordMatches)) {
@@ -527,7 +524,6 @@ class PurokController extends Controller
     private function extractFromShortUrl($shortUrl)
     {
         try {
-            // Initialize cURL to follow redirects
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $shortUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -542,21 +538,12 @@ class PurokController extends Controller
             
             $response = curl_exec($ch);
             $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            
-            \Log::info('cURL resolved short URL', [
-                'original' => $shortUrl,
-                'resolved' => $finalUrl,
-                'http_code' => $httpCode
-            ]);
             
             if (!$finalUrl) {
                 return null;
             }
             
-            // Extract coordinates from the resolved URL
-            // Pattern: @lat,lng
             if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $finalUrl, $matches)) {
                 return [
                     'lat' => (float) $matches[1],
@@ -564,7 +551,6 @@ class PurokController extends Controller
                 ];
             }
             
-            // Pattern: q=lat,lng
             if (preg_match('/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/', $finalUrl, $matches)) {
                 return [
                     'lat' => (float) $matches[1],
@@ -572,7 +558,6 @@ class PurokController extends Controller
                 ];
             }
             
-            // Pattern: /lat,lng/ in path
             if (preg_match('/(\d+\.\d+),(\d+\.\d+)/', $finalUrl, $matches)) {
                 return [
                     'lat' => (float) $matches[1],

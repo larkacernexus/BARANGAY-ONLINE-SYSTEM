@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
@@ -57,9 +57,9 @@ export default function ClearancesIndex({
 }: ClearancesPageProps) {
     const { flash } = usePage().props as any;
     
-    // Safe data extraction
+    // Safe data extraction - ✅ per_page default is 15
     const safeClearances = initialClearances || { 
-        data: [], current_page: 1, last_page: 1, total: 0, per_page: 20, from: 0, to: 0 
+        data: [], current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 
     };
     
     // Filter states - server-side
@@ -79,6 +79,9 @@ export default function ClearancesIndex({
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
         (initialFilters.sort_order as 'asc' | 'desc') || 'desc'
     );
+    
+    // Per page state - ✅ default is '15'
+    const [perPage, setPerPage] = useState<string>('15');
     
     // UI states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
@@ -124,21 +127,7 @@ export default function ClearancesIndex({
         if (flash?.error) toast.error(flash.error);
     }, [flash]);
 
-    // Server-side filtering - reload data when filters change
-    useEffect(() => {
-        const currentFilters = getCurrentFilters();
-        const hasFilterChanges = JSON.stringify(initialFilters) !== JSON.stringify(currentFilters);
-        
-        if (hasFilterChanges) {
-            reloadData();
-        }
-    }, [
-        debouncedSearch, statusFilter, typeFilter, urgencyFilter, paymentStatusFilter,
-        debouncedFromDate, debouncedToDate, debouncedClearanceNumber, applicantTypeFilter,
-        amountRange, sortBy, sortOrder
-    ]);
-
-    const getCurrentFilters = () => ({
+    const getCurrentFilters = useCallback(() => ({
         search: debouncedSearch,
         status: statusFilter,
         type: typeFilter,
@@ -151,9 +140,14 @@ export default function ClearancesIndex({
         amount_range: amountRange,
         sort_by: sortBy,
         sort_order: sortOrder,
-    });
+        per_page: perPage,
+    }), [
+        debouncedSearch, statusFilter, typeFilter, urgencyFilter, paymentStatusFilter,
+        debouncedFromDate, debouncedToDate, debouncedClearanceNumber, applicantTypeFilter,
+        amountRange, sortBy, sortOrder, perPage
+    ]);
 
-    const reloadData = (page = 1) => {
+    const reloadData = useCallback((page = 1) => {
         setIsLoading(true);
         
         const filters = { ...getCurrentFilters(), page };
@@ -171,7 +165,22 @@ export default function ClearancesIndex({
                 toast.error('Failed to load clearances');
             }
         });
-    };
+    }, [getCurrentFilters]);
+
+    // Server-side filtering - reload data when filters change
+    useEffect(() => {
+        reloadData();
+    }, [
+        debouncedSearch, statusFilter, typeFilter, urgencyFilter, paymentStatusFilter,
+        debouncedFromDate, debouncedToDate, debouncedClearanceNumber, applicantTypeFilter,
+        amountRange, sortBy, sortOrder, perPage
+    ]);
+
+    // Handle per page change
+    const handlePerPageChange = useCallback((value: string) => {
+        setPerPage(value);
+        reloadData(1);
+    }, [reloadData]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -189,7 +198,7 @@ export default function ClearancesIndex({
         total: safeClearances.total || 0,
         from: safeClearances.from || 0,
         to: safeClearances.to || 0,
-        per_page: safeClearances.per_page || 20,
+        per_page: safeClearances.per_page || parseInt(perPage) || 15,  // ✅ fallback 15
     };
 
     // Selection handlers
@@ -294,6 +303,7 @@ export default function ClearancesIndex({
         }
     };
 
+    // ✅ Clear filters - reset perPage to '15'
     const handleClearFilters = () => {
         setSearch('');
         setStatusFilter('');
@@ -308,6 +318,7 @@ export default function ClearancesIndex({
         setDateRangePreset('');
         setSortBy('created_at');
         setSortOrder('desc');
+        setPerPage('15');
     };
 
     const handleClearSelection = () => {
@@ -323,6 +334,7 @@ export default function ClearancesIndex({
             case 'payment_status': setPaymentStatusFilter(value); break;
             case 'from_date': setFromDate(value); break;
             case 'to_date': setToDate(value); break;
+            case 'per_page': handlePerPageChange(value); break;
         }
     };
 
@@ -338,7 +350,8 @@ export default function ClearancesIndex({
         urgency: urgencyFilter,
         payment_status: paymentStatusFilter,
         from_date: fromDate,
-        to_date: toDate
+        to_date: toDate,
+        per_page: perPage
     };
 
     // Keyboard shortcuts
@@ -451,6 +464,8 @@ export default function ClearancesIndex({
                         setApplicantTypeFilter={setApplicantTypeFilter}
                         amountRange={amountRange}
                         setAmountRange={setAmountRange}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                     />
 
                     <ClearancesContent
@@ -468,6 +483,8 @@ export default function ClearancesIndex({
                         currentPage={paginationData.current_page}
                         totalPages={paginationData.last_page}
                         itemsPerPage={paginationData.per_page}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onSelectAllFiltered={() => {}}

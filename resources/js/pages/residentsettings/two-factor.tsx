@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useResidentTwoFactorAuth } from '@/hooks/use-resident-two-factor-auth';
 import AppLayout from '@/layouts/resident-app-layout';
 import SettingsLayout from '@/layouts/settings/residentlayout';
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem } from '@/types/breadcrumbs';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { 
     ShieldBan, 
@@ -26,10 +26,12 @@ import {
     Lock,
     RefreshCw
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { route } from 'ziggy-js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+// SECURITY NOTE: Import DOMPurify for SVG sanitization
+import DOMPurify from 'dompurify';
 
 interface TwoFactorProps {
     twoFactorEnabled?: boolean;
@@ -38,12 +40,33 @@ interface TwoFactorProps {
         qrCodeSvg: string;
         manualSetupKey: string;
     } | null;
+    requiresTwoFactor?: boolean;
+    userNeedsToSetup?: boolean;
+    lastUsedAt?: string | null;
+    backupCodesRemaining?: number;
+}
+
+// Form data interfaces for type safety
+interface DisableFormData {
+    password: string;
+    two_factor_code: string;
+    confirmation: boolean;
+}
+
+interface CancelFormData {
+    password: string;
+}
+
+interface RegenerateFormData {
+    password: string;
+    two_factor_code: string;
+    confirmation: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Two-Factor Authentication',
-        href: route('resident.two-factor.show'),
+        href: '/residentsettings/security/two-factor',
     },
 ];
 
@@ -51,8 +74,18 @@ export default function TwoFactor({
     twoFactorEnabled = false,
     requiresConfirmation = false,
     initialSetupData = null,
+    requiresTwoFactor = false,
+    userNeedsToSetup = false,
+    lastUsedAt = null,
+    backupCodesRemaining = 0,
 }: TwoFactorProps) {
     const { flash, errors: pageErrors } = usePage().props as any;
+    
+    // SECURITY NOTE: Use refs for sensitive data that shouldn't trigger re-renders
+    const sensitiveDataRef = useRef<{
+        recoveryCodes?: string[];
+        qrSecret?: string;
+    }>({});
     
     const {
         qrCodeSvg,
@@ -64,15 +97,18 @@ export default function TwoFactor({
         fetchRecoveryCodes,
         regenerateRecoveryCodes,
         confirmSetup,
-        errors,
+        errors: hookErrors,
     } = useResidentTwoFactorAuth();
     
     const [showSetupModal, setShowSetupModal] = useState<boolean>(false);
     const [showDisableModal, setShowDisableModal] = useState<boolean>(false);
     const [showCancelModal, setShowCancelModal] = useState<boolean>(false);
-    const [disablePassword, setDisablePassword] = useState<string>('');
-    const [cancelPassword, setCancelPassword] = useState<string>('');
+    const [showRegenerateModal, setShowRegenerateModal] = useState<boolean>(false);
     const [showFlashMessages, setShowFlashMessages] = useState<boolean>(true);
+    
+    // SECURITY NOTE: Form state with proper validation
+    const [twoFactorCode, setTwoFactorCode] = useState<string>('');
+    const [codeError, setCodeError] = useState<string>('');
 
     // Initialize setup data from props
     useEffect(() => {
@@ -81,9 +117,18 @@ export default function TwoFactor({
         }
     }, [requiresConfirmation, twoFactorEnabled]);
 
-    // Show flash messages from backend
+    // SECURITY NOTE: Clear sensitive data on unmount
+    useEffect(() => {
+        return () => {
+            sensitiveDataRef.current = {};
+            clearSetupData();
+        };
+    }, [clearSetupData]);
+
+    // Show flash messages from backend with auto-dismiss
     useEffect(() => {
         if (flash?.success || flash?.error) {
+            setShowFlashMessages(true);
             const timer = setTimeout(() => {
                 setShowFlashMessages(false);
             }, 5000);
@@ -92,58 +137,103 @@ export default function TwoFactor({
         }
     }, [flash]);
 
-    // Use Inertia forms with proper error handling
+    // SECURITY NOTE: Validate 2FA code format
+    const validateTwoFactorCode = useCallback((code: string): boolean => {
+        const isValid = /^\d{6}$/.test(code);
+        setCodeError(isValid ? '' : 'Code must be exactly 6 digits');
+        return isValid;
+    }, []);
+
+    // Use Inertia forms with proper error handling and types
     const { post: enablePost, processing: enabling } = useForm();
+    
     const { 
         post: disablePost, 
         processing: disabling, 
         errors: disableErrors, 
         reset: resetDisableForm,
+        data: disableFormData,
         setData: setDisableData,
-    } = useForm({
+    } = useForm<DisableFormData>({
         password: '',
+        two_factor_code: '',
+        confirmation: true,
     });
+    
     const { 
         post: cancelPost, 
         processing: cancelling, 
         errors: cancelErrors,
         reset: resetCancelForm,
+        data: cancelFormData,
         setData: setCancelData,
-    } = useForm({
+    } = useForm<CancelFormData>({
         password: '',
+    });
+    
+    const { 
+        post: regeneratePost, 
+        processing: regenerating, 
+        errors: regenerateErrors,
+        reset: resetRegenerateForm,
+        data: regenerateFormData,
+        setData: setRegenerateData,
+    } = useForm<RegenerateFormData>({
+        password: '',
+        two_factor_code: '',
+        confirmation: true,
     });
 
     const handleEnable = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // LOGIC NOTE: Clear any existing setup data before enabling
+        clearSetupData();
+        
         enablePost(route('resident.two-factor.enable'), {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
                 setShowSetupModal(true);
             },
+            onError: (errors) => {
+                console.error('Enable 2FA failed:', errors);
+            },
         });
     };
 
     const handleDisableClick = () => {
+        // SECURITY NOTE: Require re-authentication for sensitive operation
+        if (!twoFactorEnabled) return;
+        
         setShowDisableModal(true);
         resetDisableForm();
+        setTwoFactorCode('');
+        setCodeError('');
     };
 
     const handleDisableConfirm = (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!disablePassword.trim()) {
+        // SECURITY NOTE: Validate all required fields
+        if (!disableFormData.password?.trim()) {
             return;
         }
         
-        setDisableData('password', disablePassword);
+        if (!validateTwoFactorCode(disableFormData.two_factor_code || '')) {
+            return;
+        }
+        
         disablePost(route('resident.two-factor.disable'), {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
                 setShowDisableModal(false);
-                setDisablePassword('');
                 resetDisableForm();
+                setTwoFactorCode('');
+                // SECURITY NOTE: Clear sensitive data on success
+                sensitiveDataRef.current = {};
+                clearSetupData();
             },
         });
     };
@@ -156,41 +246,69 @@ export default function TwoFactor({
     const handleCancelConfirm = (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!cancelPassword.trim()) {
+        if (!cancelFormData.password?.trim()) {
             return;
         }
         
-        setCancelData('password', cancelPassword);
-        cancelPost(route('resident.two-factor.cancel-setup'), {
+        // SECURITY NOTE: Use the correct route name
+        cancelPost(route('resident.two-factor.cancel'), {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
                 setShowCancelModal(false);
-                setCancelPassword('');
                 resetCancelForm();
+                setShowSetupModal(false);
+                clearSetupData();
             },
         });
     };
 
-    // Update form data when password changes
-    useEffect(() => {
-        if (showDisableModal) {
-            setDisableData('password', disablePassword);
-        }
-    }, [disablePassword, showDisableModal]);
+    const handleRegenerateClick = () => {
+        setShowRegenerateModal(true);
+        resetRegenerateForm();
+        setTwoFactorCode('');
+        setCodeError('');
+    };
 
-    useEffect(() => {
-        if (showCancelModal) {
-            setCancelData('password', cancelPassword);
+    const handleRegenerateConfirm = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!regenerateFormData.password?.trim()) {
+            return;
         }
-    }, [cancelPassword, showCancelModal]);
+        
+        if (!validateTwoFactorCode(regenerateFormData.two_factor_code || '')) {
+            return;
+        }
+        
+        regeneratePost(route('resident.two-factor.recovery.regenerate'), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setShowRegenerateModal(false);
+                resetRegenerateForm();
+                setTwoFactorCode('');
+                // SECURITY NOTE: Refresh recovery codes after regeneration
+                fetchRecoveryCodes();
+            },
+        });
+    };
+
+    // SECURITY NOTE: Sanitize QR code SVG before rendering
+    const sanitizedQrCode = useCallback((svg: string): string => {
+        return DOMPurify.sanitize(svg, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+            ADD_TAGS: ['path', 'circle', 'rect', 'svg'],
+            ADD_ATTR: ['viewBox', 'width', 'height', 'xmlns'],
+        });
+    }, []);
 
     // Determine which state to show
     const isFullyEnabled = twoFactorEnabled;
     const isPartiallySetup = requiresConfirmation && !twoFactorEnabled;
 
-    // Helper function to render modal
-    const renderModal = (
+    // SECURITY NOTE: Helper function to render modal with proper keyboard handling
+    const renderSecureModal = (
         title: string, 
         description: string, 
         icon: React.ReactNode, 
@@ -198,8 +316,22 @@ export default function TwoFactor({
         children: React.ReactNode, 
         onClose: () => void
     ) => (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div 
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" 
+            onClick={onClose}
+            onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                    onClose();
+                }
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+        >
+            <div 
+                className="bg-white rounded-lg p-6 max-w-md w-full shadow-xl" 
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="space-y-4">
                     <div className={`flex items-center gap-3 p-3 rounded-lg ${
                         variant === 'destructive' ? 'bg-red-50 border border-red-200' :
@@ -214,7 +346,7 @@ export default function TwoFactor({
                             {icon}
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold">{title}</h3>
+                            <h3 id="modal-title" className="text-lg font-semibold">{title}</h3>
                             <p className="text-sm text-muted-foreground mt-1">
                                 {description}
                             </p>
@@ -228,12 +360,48 @@ export default function TwoFactor({
     );
 
     // Helper to get error message
-    const getErrorMessage = (field: string, inertiaErrors: any) => {
+    const getErrorMessage = (field: string, inertiaErrors: Record<string, string> | undefined) => {
         if (inertiaErrors && inertiaErrors[field]) {
-            return Array.isArray(inertiaErrors[field]) ? inertiaErrors[field][0] : inertiaErrors[field];
+            return inertiaErrors[field];
         }
         return null;
     };
+
+    // SECURITY NOTE: Check if user is required to set up 2FA
+    if (requiresTwoFactor && userNeedsToSetup && !isFullyEnabled && !isPartiallySetup) {
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Security Setup Required" />
+                <SettingsLayout>
+                    <div className="space-y-6">
+                        <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                                Two-factor authentication is required for your account. Please set it up to continue.
+                            </AlertDescription>
+                        </Alert>
+                        
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Required Security Setup</CardTitle>
+                                <CardDescription>
+                                    You must enable two-factor authentication to access all features
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <form onSubmit={handleEnable}>
+                                    <Button type="submit" disabled={enabling} className="w-full">
+                                        <ShieldCheck className="mr-2 h-4 w-4" />
+                                        {enabling ? 'Setting up...' : 'Set Up Two-Factor Authentication'}
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </SettingsLayout>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -335,6 +503,12 @@ export default function TwoFactor({
                                                     <Smartphone className="h-4 w-4 text-muted-foreground" />
                                                     <span>Use authenticator apps like Google Authenticator, Authy, or Microsoft Authenticator</span>
                                                 </div>
+                                                
+                                                {lastUsedAt && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Last used: {lastUsedAt}
+                                                    </p>
+                                                )}
                                             </div>
                                             
                                             <Separator />
@@ -342,7 +516,8 @@ export default function TwoFactor({
                                             <TwoFactorRecoveryCodes
                                                 recoveryCodesList={recoveryCodesList}
                                                 fetchRecoveryCodes={fetchRecoveryCodes}
-                                                errors={errors.recoveryCodes ? [errors.recoveryCodes] : []}
+                                                errors={hookErrors.recoveryCodes ? [hookErrors.recoveryCodes] : []}
+                                                backupCodesRemaining={backupCodesRemaining}
                                             />
                                             
                                             <Separator />
@@ -358,12 +533,12 @@ export default function TwoFactor({
                                                     {disabling ? 'Disabling...' : 'Disable 2FA'}
                                                 </Button>
                                                 <Button
+                                                    onClick={handleRegenerateClick}
                                                     variant="outline"
                                                     className="flex-1"
-                                                    onClick={fetchRecoveryCodes}
                                                 >
                                                     <RefreshCw className="mr-2 h-4 w-4" />
-                                                    Refresh Recovery Codes
+                                                    Regenerate Codes
                                                 </Button>
                                             </div>
                                         </div>
@@ -449,7 +624,7 @@ export default function TwoFactor({
                                 </CardContent>
                             </Card>
 
-                            {/* Best Practices & Recovery Tips Section - Below Security Status Card */}
+                            {/* Best Practices & Recovery Tips Section */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Best Practices Card */}
                                 <Card>
@@ -477,12 +652,12 @@ export default function TwoFactor({
                                             </li>
                                             <li className="flex items-start gap-3">
                                                 <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                    <RefreshCw className="h-3 w-3 text-primary" />
+                                                    <Key className="h-3 w-3 text-primary" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-medium">Generate new recovery codes periodically</p>
+                                                    <p className="text-sm font-medium">Store recovery codes securely</p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        Refresh your recovery codes every 3-6 months for enhanced security
+                                                        Keep recovery codes in a password manager or printed in a secure location
                                                     </p>
                                                 </div>
                                             </li>
@@ -491,31 +666,9 @@ export default function TwoFactor({
                                                     <AlertTriangle className="h-3 w-3 text-amber-500" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-medium">Avoid sharing screenshots</p>
+                                                    <p className="text-sm font-medium">Never share verification codes</p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        Don't share screenshots of QR codes or recovery codes digitally
-                                                    </p>
-                                                </div>
-                                            </li>
-                                            <li className="flex items-start gap-3">
-                                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                    <Smartphone className="h-3 w-3 text-primary" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium">Setup on a regular device</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Set up 2FA on a device you regularly carry with you
-                                                    </p>
-                                                </div>
-                                            </li>
-                                            <li className="flex items-start gap-3">
-                                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                    <CheckCircle className="h-3 w-3 text-green-500" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium">Test immediately after setup</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Always test your setup immediately after enabling 2FA
+                                                        Legitimate services will never ask for your 2FA codes
                                                     </p>
                                                 </div>
                                             </li>
@@ -527,42 +680,27 @@ export default function TwoFactor({
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2">
-                                            <Download className="h-5 w-5" />
+                                            <Printer className="h-5 w-5" />
                                             Recovery Tips
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="space-y-4">
                                             <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                                                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                                                    <Printer className="h-4 w-4 text-primary" />
-                                                </div>
+                                                <Download className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                                                 <div>
-                                                    <p className="text-sm font-medium">Print recovery codes and store securely</p>
+                                                    <p className="text-sm font-medium">Download recovery codes</p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        Store printed codes in a safe, physical location like a locked drawer
+                                                        Save recovery codes as a text file and store it in a secure location
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                                                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                                                    <Key className="h-4 w-4 text-primary" />
-                                                </div>
+                                                <Key className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                                                 <div>
-                                                    <p className="text-sm font-medium">Use one recovery code per login attempt</p>
+                                                    <p className="text-sm font-medium">One-time use only</p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        Each recovery code can only be used once for account access
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
-                                                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                                                    <RefreshCw className="h-4 w-4 text-primary" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium">Regenerate if you suspect compromise</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Immediately generate new codes if you suspect your codes have been seen by others
+                                                        Each recovery code can only be used once. Generate new ones after use
                                                     </p>
                                                 </div>
                                             </div>
@@ -581,9 +719,6 @@ export default function TwoFactor({
                                         <Info className="h-5 w-5" />
                                         Important Notes
                                     </CardTitle>
-                                    <CardDescription>
-                                        Keep this information in mind
-                                    </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-4">
@@ -606,62 +741,6 @@ export default function TwoFactor({
                                                 </p>
                                             </div>
                                         </div>
-                                        
-                                        <div className="flex items-start gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                            <Key className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <p className="text-sm font-medium text-green-800">Secure Backup</p>
-                                                <p className="text-xs text-green-700">
-                                                    Consider printing or writing down recovery codes. Don't store them digitally unless encrypted.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Quick Actions Card */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <ShieldCheck className="h-5 w-5" />
-                                        Quick Actions
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        <Button 
-                                            variant="outline" 
-                                            className="w-full justify-start"
-                                            onClick={fetchRecoveryCodes}
-                                        >
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download Recovery Codes
-                                        </Button>
-                                        {isFullyEnabled && (
-                                            <Button 
-                                                variant="outline" 
-                                                className="w-full justify-start"
-                                                onClick={() => fetchRecoveryCodes()}
-                                            >
-                                                <RefreshCw className="mr-2 h-4 w-4" />
-                                                Regenerate Recovery Codes
-                                            </Button>
-                                        )}
-                                        <Button 
-                                            variant="outline" 
-                                            className="w-full justify-start"
-                                            onClick={() => {
-                                                if (isPartiallySetup || isFullyEnabled) {
-                                                    setShowSetupModal(true);
-                                                } else {
-                                                    handleEnable({ preventDefault: () => {} } as React.FormEvent);
-                                                }
-                                            }}
-                                        >
-                                            <ShieldCheck className="mr-2 h-4 w-4" />
-                                            {isFullyEnabled ? 'View Setup' : 'Enable 2FA'}
-                                        </Button>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -684,32 +763,32 @@ export default function TwoFactor({
                         clearSetupData={clearSetupData}
                         fetchSetupData={fetchSetupData}
                         confirmSetup={confirmSetup}
-                        errors={errors}
+                        errors={hookErrors}
                         onSuccess={() => {
                             setShowSetupModal(false);
+                            // SECURITY NOTE: Clear sensitive data after successful setup
+                            sensitiveDataRef.current = {};
                         }}
                     />
                     
                     {/* Disable Confirmation Modal */}
-                    {showDisableModal && renderModal(
+                    {showDisableModal && renderSecureModal(
                         "Disable Two-Factor Authentication",
-                        "Enter your password to confirm you want to disable 2FA. This will remove all your recovery codes and make your account less secure.",
+                        "This action will remove 2FA protection from your account. You'll need to enter your password and current 2FA code to confirm.",
                         <ShieldBan className="h-5 w-5" />,
                         'destructive',
                         <form onSubmit={handleDisableConfirm} className="space-y-4 pt-2">
                             <div className="space-y-2">
-                                <Label htmlFor="disable-password" className="text-sm font-medium">
-                                    Confirm Password
-                                </Label>
+                                <Label htmlFor="disable-password">Password</Label>
                                 <Input
                                     id="disable-password"
                                     type="password"
-                                    value={disablePassword}
-                                    onChange={(e) => setDisablePassword(e.target.value)}
+                                    value={disableFormData.password}
+                                    onChange={(e) => setDisableData('password', e.target.value)}
                                     placeholder="Enter your current password"
                                     required
                                     disabled={disabling}
-                                    autoFocus
+                                    autoComplete="current-password"
                                     className={getErrorMessage('password', disableErrors) ? "border-destructive" : ""}
                                 />
                                 {getErrorMessage('password', disableErrors) && (
@@ -719,25 +798,49 @@ export default function TwoFactor({
                                 )}
                             </div>
                             
+                            <div className="space-y-2">
+                                <Label htmlFor="disable-2fa-code">2FA Code</Label>
+                                <Input
+                                    id="disable-2fa-code"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="\d{6}"
+                                    maxLength={6}
+                                    value={disableFormData.two_factor_code}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        setDisableData('two_factor_code', value);
+                                        validateTwoFactorCode(value);
+                                    }}
+                                    placeholder="Enter 6-digit code"
+                                    required
+                                    disabled={disabling}
+                                    autoComplete="one-time-code"
+                                    className={codeError ? "border-destructive" : ""}
+                                />
+                                {codeError && (
+                                    <p className="text-sm text-destructive">{codeError}</p>
+                                )}
+                            </div>
+                            
                             <div className="flex gap-2 justify-end pt-2">
                                 <Button
                                     type="button"
                                     variant="outline"
                                     onClick={() => {
                                         setShowDisableModal(false);
-                                        setDisablePassword('');
                                         resetDisableForm();
+                                        setTwoFactorCode('');
+                                        setCodeError('');
                                     }}
                                     disabled={disabling}
-                                    className="flex-1"
                                 >
                                     Cancel
                                 </Button>
                                 <Button
                                     type="submit"
                                     variant="destructive"
-                                    disabled={disabling || !disablePassword.trim()}
-                                    className="flex-1"
+                                    disabled={disabling || !disableFormData.password || !validateTwoFactorCode(disableFormData.two_factor_code || '')}
                                 >
                                     {disabling ? 'Disabling...' : 'Disable 2FA'}
                                 </Button>
@@ -745,31 +848,30 @@ export default function TwoFactor({
                         </form>,
                         () => {
                             setShowDisableModal(false);
-                            setDisablePassword('');
                             resetDisableForm();
+                            setTwoFactorCode('');
+                            setCodeError('');
                         }
                     )}
                     
-                    {/* Cancel Setup Confirmation Modal */}
-                    {showCancelModal && renderModal(
+                    {/* Cancel Setup Modal */}
+                    {showCancelModal && renderSecureModal(
                         "Cancel Setup",
                         "Enter your password to confirm you want to cancel the 2FA setup process. All progress will be lost.",
                         <XCircle className="h-5 w-5" />,
                         'warning',
                         <form onSubmit={handleCancelConfirm} className="space-y-4 pt-2">
                             <div className="space-y-2">
-                                <Label htmlFor="cancel-password" className="text-sm font-medium">
-                                    Confirm Password
-                                </Label>
+                                <Label htmlFor="cancel-password">Confirm Password</Label>
                                 <Input
                                     id="cancel-password"
                                     type="password"
-                                    value={cancelPassword}
-                                    onChange={(e) => setCancelPassword(e.target.value)}
+                                    value={cancelFormData.password}
+                                    onChange={(e) => setCancelData('password', e.target.value)}
                                     placeholder="Enter your current password"
                                     required
                                     disabled={cancelling}
-                                    autoFocus
+                                    autoComplete="current-password"
                                     className={getErrorMessage('password', cancelErrors) ? "border-destructive" : ""}
                                 />
                                 {getErrorMessage('password', cancelErrors) && (
@@ -785,19 +887,16 @@ export default function TwoFactor({
                                     variant="outline"
                                     onClick={() => {
                                         setShowCancelModal(false);
-                                        setCancelPassword('');
                                         resetCancelForm();
                                     }}
                                     disabled={cancelling}
-                                    className="flex-1"
                                 >
                                     Keep Setup
                                 </Button>
                                 <Button
                                     type="submit"
                                     variant="destructive"
-                                    disabled={cancelling || !cancelPassword.trim()}
-                                    className="flex-1"
+                                    disabled={cancelling || !cancelFormData.password}
                                 >
                                     {cancelling ? 'Cancelling...' : 'Confirm Cancel'}
                                 </Button>
@@ -805,8 +904,89 @@ export default function TwoFactor({
                         </form>,
                         () => {
                             setShowCancelModal(false);
-                            setCancelPassword('');
                             resetCancelForm();
+                        }
+                    )}
+                    
+                    {/* Regenerate Recovery Codes Modal */}
+                    {showRegenerateModal && renderSecureModal(
+                        "Regenerate Recovery Codes",
+                        "This will invalidate all existing recovery codes. Enter your password and 2FA code to confirm.",
+                        <RefreshCw className="h-5 w-5" />,
+                        'warning',
+                        <form onSubmit={handleRegenerateConfirm} className="space-y-4 pt-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="regenerate-password">Password</Label>
+                                <Input
+                                    id="regenerate-password"
+                                    type="password"
+                                    value={regenerateFormData.password}
+                                    onChange={(e) => setRegenerateData('password', e.target.value)}
+                                    placeholder="Enter your current password"
+                                    required
+                                    disabled={regenerating}
+                                    autoComplete="current-password"
+                                    className={getErrorMessage('password', regenerateErrors) ? "border-destructive" : ""}
+                                />
+                                {getErrorMessage('password', regenerateErrors) && (
+                                    <p className="text-sm text-destructive">
+                                        {getErrorMessage('password', regenerateErrors)}
+                                    </p>
+                                )}
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <Label htmlFor="regenerate-2fa-code">2FA Code</Label>
+                                <Input
+                                    id="regenerate-2fa-code"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="\d{6}"
+                                    maxLength={6}
+                                    value={regenerateFormData.two_factor_code}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '');
+                                        setRegenerateData('two_factor_code', value);
+                                        validateTwoFactorCode(value);
+                                    }}
+                                    placeholder="Enter 6-digit code"
+                                    required
+                                    disabled={regenerating}
+                                    autoComplete="one-time-code"
+                                    className={codeError ? "border-destructive" : ""}
+                                />
+                                {codeError && (
+                                    <p className="text-sm text-destructive">{codeError}</p>
+                                )}
+                            </div>
+                            
+                            <div className="flex gap-2 justify-end pt-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setShowRegenerateModal(false);
+                                        resetRegenerateForm();
+                                        setTwoFactorCode('');
+                                        setCodeError('');
+                                    }}
+                                    disabled={regenerating}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={regenerating || !regenerateFormData.password || !validateTwoFactorCode(regenerateFormData.two_factor_code || '')}
+                                >
+                                    {regenerating ? 'Regenerating...' : 'Regenerate Codes'}
+                                </Button>
+                            </div>
+                        </form>,
+                        () => {
+                            setShowRegenerateModal(false);
+                            resetRegenerateForm();
+                            setTwoFactorCode('');
+                            setCodeError('');
                         }
                     )}
                 </div>

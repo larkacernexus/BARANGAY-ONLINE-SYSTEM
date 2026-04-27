@@ -1,4 +1,5 @@
-// pages/admin/settings.tsx (or wherever your admin settings page is)
+// pages/admin/settings.tsx
+
 import { type BreadcrumbItem, type SharedData } from '@/types/breadcrumbs';
 import { Transition } from '@headlessui/react';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
@@ -74,15 +75,6 @@ export default function Settings({
 } & TwoFactorProps) {
     const { auth, qrCodeSvg: propQrCodeSvg, manualSetupKey: propManualSetupKey, flash } = usePage<PageProps>().props;
     
-    // Debug: Log what's coming from the server
-    console.log('📦 [Admin Page] Server props:', {
-        flash,
-        propQrCodeSvg: propQrCodeSvg ? 'present' : 'missing',
-        propManualSetupKey: propManualSetupKey ? 'present' : 'missing',
-        requiresConfirmation,
-        twoFactorEnabled
-    });
-    
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
     
@@ -116,14 +108,6 @@ export default function Settings({
     const displayQrCodeSvg = hookQrCodeSvg || initialQrCodeSvg;
     const displayManualSetupKey = hookManualSetupKey || initialManualSetupKey;
     
-    // Debug: Log what we're displaying
-    console.log('🎯 [Admin Page] Display data:', {
-        displayQrCodeSvg: displayQrCodeSvg ? '✅ Present' : '❌ Missing',
-        displayManualSetupKey: displayManualSetupKey ? '✅ Present' : '❌ Missing',
-        hookQrCodeSvg: hookQrCodeSvg ? '✅ Present' : '❌ Missing',
-        initialQrCodeSvg: initialQrCodeSvg ? '✅ Present' : '❌ Missing'
-    });
-    
     // Show flash messages from backend
     useEffect(() => {
         if (flash?.success || flash?.error) {
@@ -148,7 +132,6 @@ export default function Settings({
     // Automatically fetch setup data if modal is open but no QR code
     useEffect(() => {
         if (showSetupModal && !displayQrCodeSvg && !hasSetupData) {
-            console.log('🔄 [Admin Page] No QR data, fetching...');
             fetchSetupData();
         }
     }, [showSetupModal, displayQrCodeSvg, hasSetupData, fetchSetupData]);
@@ -225,8 +208,7 @@ export default function Settings({
                 setIsEnabling(false);
                 // The hook will update with the new QR data from flash
             },
-            onError: (errors) => {
-                console.error('Enable error:', errors);
+            onError: () => {
                 setShowSetupModal(false);
                 setIsEnabling(false);
             },
@@ -256,9 +238,6 @@ export default function Settings({
                 disableForm.reset();
                 window.location.reload();
             },
-            onError: (errors) => {
-                console.error('Disable error:', errors);
-            },
         });
     };
 
@@ -284,9 +263,6 @@ export default function Settings({
                 setCancelPassword('');
                 cancelForm.reset();
                 clearSetupData();
-            },
-            onError: (errors) => {
-                console.error('Cancel error:', errors);
             },
         });
     };

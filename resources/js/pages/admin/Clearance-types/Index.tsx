@@ -79,8 +79,8 @@ export default function ClearanceTypesIndex() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(filters?.direction));
     
     // Additional filter states
-    const [feeRange, setFeeRange] = useState<string>('');
-    const [dateRangePreset, setDateRangePreset] = useState<string>('');
+    const [feeRange, setFeeRange] = useState<string>('all');
+    const [dateRangePreset, setDateRangePreset] = useState<string>('all');
     
     const [windowWidth, setWindowWidth] = useState<number>(
         typeof window !== 'undefined' ? window.innerWidth : 1024
@@ -738,8 +738,8 @@ export default function ClearanceTypesIndex() {
         setStatusFilter('all');
         setRequiresPaymentFilter('all');
         setDiscountableFilter('all');
-        setFeeRange('');
-        setDateRangePreset('');
+        setFeeRange('all');
+        setDateRangePreset('all');
         setSortBy('name');
         setSortOrder('asc');
         setCurrentPage(1);
@@ -766,8 +766,8 @@ export default function ClearanceTypesIndex() {
         (statusFilter && statusFilter !== 'all') || 
         (requiresPaymentFilter && requiresPaymentFilter !== 'all') ||
         (discountableFilter && discountableFilter !== 'all') ||
-        (feeRange && feeRange !== '') ||
-        (dateRangePreset && dateRangePreset !== '')
+        (feeRange && feeRange !== 'all') ||
+        (dateRangePreset && dateRangePreset !== 'all')
     );
 
     // Create filters object for the Filters component - FIXED with all required properties

@@ -52,8 +52,8 @@ export default function Roles() {
     // Filter states - client-side only (removed sortBy/sortOrder from filters, kept for table sorting)
     const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
     const [typeFilter, setTypeFilter] = useState<string>(getSafeString(safeFilters.type, 'all'));
-    const [usersRange, setUsersRange] = useState<string>('');
-    const [permissionsRange, setPermissionsRange] = useState<string>('');
+    const [usersRange, setUsersRange] = useState<string>('all');
+    const [permissionsRange, setPermissionsRange] = useState<string>('all');
     
     // Sorting is now handled by table header only
     const [sortBy, setSortBy] = useState<string>('name');
@@ -635,8 +635,8 @@ export default function Roles() {
     const handleClearFilters = useCallback(() => {
         setSearch('');
         setTypeFilter('all');
-        setUsersRange('');
-        setPermissionsRange('');
+        setUsersRange('all');
+        setPermissionsRange('all');
         setSortBy('name');
         setSortOrder('asc');
         setCurrentPage(1);

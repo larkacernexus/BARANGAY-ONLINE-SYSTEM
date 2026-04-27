@@ -115,12 +115,9 @@ export default function CreateAnnouncement() {
     const [isDragging, setIsDragging] = useState(false);
     const [previewImage, setPreviewImage] = useState<Attachment | null>(null);
 
-    // Memoized values
     const typeOptions = useMemo(() => Object.entries(types).map(([value, label]) => ({ value: value as AnnouncementType, label })), [types]);
     const priorityOptions = useMemo(() => Object.entries(priorities).map(([value, label]) => ({ value: parseInt(value) as PriorityLevel, label })), [priorities]);
     const audienceOptions = useMemo(() => Object.entries(audience_types).map(([value, label]) => ({ value: value as AudienceType, label })), [audience_types]);
-
-    const attachmentsCount = attachments.length;
 
     const {
         formData,
@@ -165,17 +162,17 @@ export default function CreateAnnouncement() {
             Object.entries(data).forEach(([key, value]) => {
                 if (value !== null && value !== undefined && value !== '') {
                     if (key === 'attachments' && Array.isArray(value)) {
-                        value.forEach((file, index) => {
+                        (value as File[]).forEach((file, index) => {
                             submitData.append(`attachments[${index}]`, file);
                         });
                     } else if (Array.isArray(value)) {
-                        value.forEach(id => {
+                        (value as number[]).forEach(id => {
                             submitData.append(`${key}[]`, id.toString());
                         });
                     } else if (typeof value === 'boolean') {
                         submitData.append(key, value ? '1' : '0');
                     } else {
-                        submitData.append(key, value.toString());
+                        submitData.append(key, String(value));
                     }
                 }
             });
@@ -185,19 +182,17 @@ export default function CreateAnnouncement() {
                     toast.success('Announcement created successfully');
                     router.visit(route('admin.announcements.index'));
                 },
-                onError: (errs) => {
+                onError: () => {
                     toast.error('Failed to create announcement');
                 }
             });
         }
     });
 
-    // Ensure active tab is 'content' when component mounts
     useEffect(() => {
         setActiveTab('content');
-    }, []); // Empty dependency array ensures this runs once on mount
+    }, []);
 
-    // Format file size
     const formatFileSize = useCallback((bytes: number): string => {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -206,11 +201,9 @@ export default function CreateAnnouncement() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }, []);
 
-    // Get file icon component
     const getFileIconComponent = useCallback((attachment: Attachment) => {
         const type = attachment.type;
         const name = attachment.name;
-        
         if (type.includes('image')) return FileImage;
         if (type.includes('pdf')) return FileText;
         if (name.endsWith('.doc') || name.endsWith('.docx')) return FileText;
@@ -219,7 +212,6 @@ export default function CreateAnnouncement() {
         return FileText;
     }, []);
 
-    // Get priority color
     const getPriorityColor = useCallback((priority: PriorityLevel): string => {
         switch (priority) {
             case 4: return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
@@ -230,7 +222,6 @@ export default function CreateAnnouncement() {
         }
     }, []);
 
-    // Get type color
     const getTypeColor = useCallback((type: AnnouncementType): string => {
         switch (type) {
             case 'important': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
@@ -241,7 +232,6 @@ export default function CreateAnnouncement() {
         }
     }, []);
 
-    // Get type icon
     const getTypeIcon = useCallback((type: AnnouncementType) => {
         switch (type) {
             case 'important': return AlertCircle;
@@ -252,7 +242,6 @@ export default function CreateAnnouncement() {
         }
     }, []);
 
-    // Get audience icon
     const getAudienceIcon = useCallback((type: AudienceType) => {
         switch (type) {
             case 'roles': return Users;
@@ -265,13 +254,11 @@ export default function CreateAnnouncement() {
         }
     }, []);
 
-    // Validate file before adding
     const validateFile = useCallback((file: File): string | null => {
         const maxSizeBytes = maxFileSize * 1024 * 1024;
         if (file.size > maxSizeBytes) {
             return `File size exceeds ${maxFileSize}MB limit`;
         }
-
         if (allowedFileTypes.length > 0) {
             const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
             const isAllowed = allowedFileTypes.some(type => {
@@ -281,30 +268,23 @@ export default function CreateAnnouncement() {
                 }
                 return type === fileExt || type === file.type;
             });
-            
             if (!isAllowed) {
                 return `File type not allowed. Allowed: ${allowedFileTypes.join(', ')}`;
             }
         }
-
         return null;
     }, [maxFileSize, allowedFileTypes]);
 
-    // Handle file selection
     const handleFileSelect = useCallback((files: FileList | null) => {
         if (!files) return;
-
         const newAttachments: Attachment[] = [];
         const newFiles: File[] = [];
-
         Array.from(files).forEach(file => {
             if (attachments.some(att => att.name === file.name && att.size === file.size)) {
                 toast.error(`${file.name} is already added`);
                 return;
             }
-
             const error = validateFile(file);
-            
             const attachment: Attachment = {
                 file,
                 name: file.name,
@@ -313,30 +293,24 @@ export default function CreateAnnouncement() {
                 isImage: file.type.startsWith('image/'),
                 error: error || undefined
             };
-
             if (file.type.startsWith('image/')) {
                 attachment.preview = URL.createObjectURL(file);
             }
-
             if (!error) {
                 newFiles.push(file);
             }
-
             newAttachments.push(attachment);
         });
-
         setAttachments(prev => [...prev, ...newAttachments]);
         updateFormData({ attachments: [...formData.attachments, ...newFiles] });
     }, [attachments, formData.attachments, updateFormData, validateFile]);
 
-    // Handle file drop
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
         handleFileSelect(e.dataTransfer.files);
     }, [handleFileSelect]);
 
-    // Handle drag events
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(true);
@@ -347,78 +321,62 @@ export default function CreateAnnouncement() {
         setIsDragging(false);
     }, []);
 
-    // Remove attachment
     const removeAttachment = useCallback((index: number) => {
         if (attachments[index]?.preview) {
             URL.revokeObjectURL(attachments[index].preview!);
         }
-        
         setAttachments(prev => prev.filter((_, i) => i !== index));
         const updatedAttachments = formData.attachments.filter((_, i) => i !== index);
         updateFormData({ attachments: updatedAttachments });
     }, [attachments, formData.attachments, updateFormData]);
 
-    // Clear all attachments
     const clearAttachments = useCallback(() => {
         attachments.forEach(att => {
-            if (att?.preview) {
-                URL.revokeObjectURL(att.preview);
-            }
+            if (att?.preview) URL.revokeObjectURL(att.preview);
         });
         setAttachments([]);
         updateFormData({ attachments: [] });
     }, [attachments, updateFormData]);
 
-    // Cleanup object URLs on unmount
     useEffect(() => {
         return () => {
             attachments.forEach(att => {
-                if (att?.preview) {
-                    URL.revokeObjectURL(att.preview);
-                }
+                if (att?.preview) URL.revokeObjectURL(att.preview);
             });
         };
     }, [attachments]);
 
-    // Handle multi-select changes for audience targets
     const handleMultiSelectChange = useCallback((name: string, value: number[]) => {
         updateFormData({ [name]: value });
     }, [updateFormData]);
 
-    // Handle switch changes
     const handleSwitchChange = useCallback((name: string, checked: boolean) => {
         updateFormData({ [name]: checked });
     }, [updateFormData]);
 
-    // Auto-set end date to 30 days from start date
     const handleAutoFillDates = useCallback(() => {
         const today = new Date().toISOString().split('T')[0];
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + 30);
         const formattedEndDate = endDate.toISOString().split('T')[0];
-        
         updateFormData({
             start_date: formData.start_date || today,
             end_date: formData.end_date || formattedEndDate,
         });
-        
         if (showStartTime && !formData.start_time) {
             const now = new Date();
             const hours = now.getHours().toString().padStart(2, '0');
             const minutes = now.getMinutes().toString().padStart(2, '0');
             updateFormData({ start_time: `${hours}:${minutes}` });
         }
-        
         toast.success('Dates auto-filled');
     }, [formData.start_date, formData.end_date, formData.start_time, showStartTime, updateFormData]);
 
-    // Handle toggle time
     const handleToggleTime = useCallback(() => {
         setShowStartTime(!showStartTime);
         setShowEndTime(!showEndTime);
     }, [showStartTime, showEndTime]);
 
-    // Apply template
     const applyTemplate = useCallback((template: { title: string; content: string; type: AnnouncementType; priority: PriorityLevel }) => {
         updateFormData({
             title: template.title,
@@ -430,41 +388,17 @@ export default function CreateAnnouncement() {
         toast.success('Template applied');
     }, [updateFormData, setActiveTab]);
 
-    // Format date and time for preview
-    const formatDateTimePreview = useCallback((date: string, time: string, showTime: boolean): string => {
-        if (!date) return 'Not set';
-        
-        const dateObj = new Date(date);
-        const formattedDate = dateObj.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        
-        if (showTime && time) {
-            const [hours, minutes] = time.split(':');
-            const hour = parseInt(hours);
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            const displayHour = hour % 12 || 12;
-            return `${formattedDate} at ${displayHour}:${minutes} ${ampm}`;
-        }
-        
-        return formattedDate;
-    }, []);
-
-    // Handle reset
     const handleReset = useCallback(() => {
         if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
             resetForm();
             clearAttachments();
             setShowStartTime(false);
             setShowEndTime(false);
-            setActiveTab('content'); // Reset to content tab
+            setActiveTab('content');
             toast.info('Form reset');
         }
     }, [resetForm, clearAttachments]);
 
-    // Handle cancel
     const handleCancel = useCallback(() => {
         if (hasUnsavedChanges) {
             if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
@@ -475,7 +409,6 @@ export default function CreateAnnouncement() {
         }
     }, [hasUnsavedChanges]);
 
-    // Default templates
     const defaultTemplates = [
         {
             title: 'Barangay Assembly',
@@ -487,7 +420,7 @@ export default function CreateAnnouncement() {
             title: 'Medical Mission',
             content: 'Free medical mission with dental check-up, blood pressure monitoring, and medicine distribution.',
             type: 'event' as AnnouncementType,
-            priority: 2 as PriorityLevel,
+            priority: 3 as PriorityLevel,
         },
         {
             title: 'Clean-Up Drive',
@@ -677,7 +610,14 @@ export default function CreateAnnouncement() {
                             <>
                                 <FormContainer title="Target Audience" description="Select who should see this announcement">
                                     <AudienceTab
-                                        formData={formData}
+                                        formData={{
+                                            audience_type: formData.audience_type,
+                                            target_roles: formData.target_roles,
+                                            target_puroks: formData.target_puroks,
+                                            target_households: formData.target_households,
+                                            target_businesses: formData.target_businesses,
+                                            target_users: formData.target_users,
+                                        }}
                                         errors={errors}
                                         audienceOptions={audienceOptions}
                                         roles={roles}
@@ -720,7 +660,6 @@ export default function CreateAnnouncement() {
                                     missingFields={missingFields}
                                 />
                                 
-                                {/* Announcement Summary Preview Card */}
                                 <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
                                     <div className="p-4 border-b">
                                         <h3 className="font-semibold text-gray-700 dark:text-gray-300">Announcement Preview</h3>
@@ -770,20 +709,20 @@ export default function CreateAnnouncement() {
                                             </div>
                                         </div>
 
-                        {formData.content && (
-                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3 whitespace-pre-wrap">
-                                    {formData.content}
-                                </p>
-                            </div>
-                        )}
+                                        {formData.content && (
+                                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3 whitespace-pre-wrap">
+                                                    {formData.content}
+                                                </p>
+                                            </div>
+                                        )}
 
-                        {attachments.length > 0 && (
-                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                <Paperclip className="h-3 w-3" />
-                                <span>{attachments.length} attachment(s)</span>
-                            </div>
-                        )}
+                                        {attachments.length > 0 && (
+                                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                                <Paperclip className="h-3 w-3" />
+                                                <span>{attachments.length} attachment(s)</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -792,7 +731,6 @@ export default function CreateAnnouncement() {
                 </div>
             </div>
 
-            {/* Image Preview Dialog */}
             <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
                 <DialogContent className="max-w-4xl dark:bg-gray-900">
                     <DialogHeader>

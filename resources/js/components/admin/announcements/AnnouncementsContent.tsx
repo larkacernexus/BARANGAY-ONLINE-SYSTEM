@@ -22,7 +22,8 @@ import {
     Bell,
     BellRing,
     Users,
-    ArrowUpDown
+    ArrowUpDown,
+    Rows3
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -60,6 +61,8 @@ interface AnnouncementsContentProps {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
+    perPage?: string;
+    onPerPageChange?: (value: string) => void;
     onPageChange: (page: number) => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
@@ -119,6 +122,8 @@ export default function AnnouncementsContent({
     totalPages,
     totalItems,
     itemsPerPage,
+    perPage = '15',
+    onPerPageChange = () => {},
     onPageChange,
     onSelectAllOnPage,
     onSelectAllFiltered,
@@ -148,6 +153,48 @@ export default function AnnouncementsContent({
     getCurrentSortValue,
     sortOptions = DEFAULT_SORT_OPTIONS,
 }: AnnouncementsContentProps) {
+    
+    // ✅ Dynamic per-page options based on total items
+    const getAllowedPerPageOptions = () => {
+        const options: { value: string; label: string }[] = [];
+        
+        // Always show 15
+        options.push({ value: '15', label: '15 per page' });
+        
+        // Show 30 if total > 15
+        if (totalItems > 15) {
+            options.push({ value: '30', label: '30 per page' });
+        }
+        
+        // Show 50 if total > 30
+        if (totalItems > 30) {
+            options.push({ value: '50', label: '50 per page' });
+        }
+        
+        // Show 100 if total > 50
+        if (totalItems > 50) {
+            options.push({ value: '100', label: '100 per page' });
+        }
+        
+        // Show 500 if total > 100
+        if (totalItems > 100) {
+            options.push({ value: '500', label: '500 per page' });
+        }
+        
+        // Show All only if total <= 550
+        if (totalItems > 0 && totalItems <= 550) {
+            options.push({ value: 'all', label: `Show All (${totalItems})` });
+        }
+        
+        return options;
+    };
+
+    const perPageOptions = getAllowedPerPageOptions();
+
+    // Handle per page change
+    const handlePerPageChange = (value: string) => {
+        onPerPageChange(value);
+    };
     
     const bulkActions = {
         primary: [
@@ -280,6 +327,28 @@ export default function AnnouncementsContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* ✅ Per Page Selector with Dynamic Options */}
+                        {!isMobile && perPageOptions.length > 1 && (
+                            <div className="flex items-center gap-2">
+                                <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={perPage}
+                                    onValueChange={handlePerPageChange}
+                                >
+                                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                                        <SelectValue placeholder="Per page..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {perPageOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Sort Dropdown */}
                         {!isMobile && (
                             <div className="flex items-center gap-2">
@@ -343,7 +412,9 @@ export default function AnnouncementsContent({
                         
                         {/* Page Info */}
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                            Page {currentPage} of {totalPages}
+                            {totalItems > 0 && (
+                                <>Showing {announcements.length > 0 ? '1' : '0'} - {announcements.length} of {totalItems}</>
+                            )}
                         </div>
                     </div>
                 </CardHeader>
@@ -420,19 +491,44 @@ export default function AnnouncementsContent({
                                 />
                             )}
 
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        totalItems={totalItems}
-                                        itemsPerPage={itemsPerPage}
-                                        onPageChange={onPageChange}
-                                        showCount={true}
-                                    />
+                            {/* ✅ Per Page & Pagination Footer */}
+                            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    {/* Mobile Per Page Selector */}
+                                    {isMobile && perPageOptions.length > 1 && (
+                                        <div className="flex items-center gap-2 w-full">
+                                            <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            <Select
+                                                value={perPage}
+                                                onValueChange={handlePerPageChange}
+                                            >
+                                                <SelectTrigger className="w-full h-8 text-xs">
+                                                    <SelectValue placeholder="Per page..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {perPageOptions.map((option) => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+
+                                    {/* Pagination */}
+                                    <div className="w-full">
+                                        <Pagination
+                                            currentPage={currentPage}
+                                            totalPages={totalPages}
+                                            totalItems={totalItems}
+                                            itemsPerPage={itemsPerPage}
+                                            onPageChange={onPageChange}
+                                            showCount={true}
+                                        />
+                                    </div>
                                 </div>
-                            )}
+                            </div>
                         </>
                     )}
                 </CardContent>

@@ -1,7 +1,7 @@
 // components/ui/form/form-tabs.tsx
 import React from 'react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle, AlertCircle, Circle } from 'lucide-react';
+import { Check, AlertCircle, Circle, MinusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface TabConfig {
@@ -9,82 +9,121 @@ export interface TabConfig {
     label: string;
     icon: React.ElementType;
     requiredFields?: string[];
+    disabled?: boolean;
+    description?: string;
 }
+
+export type TabStatus = 'complete' | 'incomplete' | 'error' | 'optional';
 
 interface FormTabsProps {
     tabs: TabConfig[];
     activeTab: string;
     onTabChange: (tabId: string) => void;
-    tabStatuses?: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'>;
+    tabStatuses?: Record<string, TabStatus>;
     className?: string;
 }
 
-function TabIcon({ tab, icon: Icon, status }: { tab: string; icon: React.ElementType; status?: string }) {
+const StatusBadge = ({ status }: { status?: TabStatus }) => {
     if (status === 'complete') {
-        return (
-            <div className="relative">
-                <Icon className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <CheckCircle className="absolute -top-1 -right-1 h-3 w-3 text-green-600 dark:text-green-400 fill-white dark:fill-gray-900" />
-            </div>
-        );
+        return <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />;
     }
     
     if (status === 'error') {
-        return (
-            <div className="relative">
-                <Icon className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertCircle className="absolute -top-1 -right-1 h-3 w-3 text-red-600 dark:text-red-400 fill-white dark:fill-gray-900" />
-            </div>
-        );
+        return <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />;
     }
     
     if (status === 'incomplete') {
-        return (
-            <div className="relative">
-                <Icon className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <Circle className="absolute -top-1 -right-1 h-3 w-3 text-amber-600 dark:text-amber-400 fill-white dark:fill-gray-900" />
-            </div>
-        );
+        return <Circle className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />;
     }
     
-    return <Icon className="h-4 w-4" />;
-}
-
-// Helper function to determine grid columns based on number of tabs
-const getGridCols = (tabCount: number) => {
-    if (tabCount === 1) return 'grid-cols-1';
-    if (tabCount === 2) return 'grid-cols-2';
-    if (tabCount === 3) return 'grid-cols-3';
-    if (tabCount === 4) return 'grid-cols-4';
-    if (tabCount === 5) return 'grid-cols-5';
-    if (tabCount === 6) return 'grid-cols-6';
-    return `grid-cols-${Math.min(tabCount, 6)}`;
+    if (status === 'optional') {
+        return <MinusCircle className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />;
+    }
+    
+    return null;
 };
 
-export function FormTabs({ tabs, activeTab, onTabChange, tabStatuses, className }: FormTabsProps) {
-    const tabCount = tabs.length;
-    const gridCols = getGridCols(tabCount);
+export function FormTabs({ 
+    tabs, 
+    activeTab, 
+    onTabChange, 
+    tabStatuses = {}, 
+    className,
+}: FormTabsProps) {
+    const missingCount = tabs.filter(
+        tab => tab.requiredFields?.length && tabStatuses[tab.id] === 'incomplete'
+    ).length;
     
     return (
-        <Tabs value={activeTab} onValueChange={onTabChange} className={cn("space-y-4", className)}>
-            <TabsList className={cn("grid w-full lg:w-auto", gridCols)}>
-                {tabs.map((tab) => (
-                    <TabsTrigger key={tab.id} value={tab.id} className="gap-2">
-                        <TabIcon 
-                            tab={tab.id} 
-                            icon={tab.icon} 
-                            status={tabStatuses?.[tab.id]} 
-                        />
-                        <span className="hidden sm:inline">{tab.label}</span>
-                        {/* Optional: Show required badge for tabs with required fields */}
-                        {tab.requiredFields && tab.requiredFields.length > 0 && tabStatuses?.[tab.id] === 'incomplete' && (
-                            <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">
-                                *
-                            </span>
-                        )}
-                    </TabsTrigger>
-                ))}
-            </TabsList>
-        </Tabs>
+        <div className={cn("w-full", className)}>
+            <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
+                <TabsList 
+                    className="flex w-full h-auto p-1 bg-gray-100/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-200 dark:border-gray-700"
+                >
+                    {tabs.map((tab) => {
+                        const status = tabStatuses[tab.id];
+                        const isDisabled = tab.disabled;
+                        const Icon = tab.icon;
+                        const hasMissingRequired = tab.requiredFields?.length && status === 'incomplete';
+                        const isActive = activeTab === tab.id;
+                        
+                        return (
+                            <TabsTrigger
+                                key={tab.id}
+                                value={tab.id}
+                                disabled={isDisabled}
+                                className={cn(
+                                    "flex-1 relative flex items-center justify-center gap-2",
+                                    "px-4 py-2.5 text-sm font-medium",
+                                    "rounded-md transition-all duration-200",
+                                    // Active tab styling
+                                    isActive && [
+                                        "bg-white dark:bg-gray-900",
+                                        "shadow-sm",
+                                        "border border-gray-200 dark:border-gray-600",
+                                        "text-gray-900 dark:text-gray-100",
+                                    ],
+                                    // Inactive tab styling
+                                    !isActive && [
+                                        "bg-transparent",
+                                        "text-gray-600 dark:text-gray-400",
+                                        "hover:bg-gray-100 dark:hover:bg-gray-800/50",
+                                        "hover:text-gray-900 dark:hover:text-gray-200",
+                                    ],
+                                    // Status-based text colors
+                                    hasMissingRequired && !isActive && "text-amber-600 dark:text-amber-400",
+                                    hasMissingRequired && isActive && "text-amber-700 dark:text-amber-300",
+                                    status === 'optional' && !isActive && "text-gray-500 dark:text-gray-500",
+                                    status === 'optional' && isActive && "text-gray-600 dark:text-gray-400",
+                                    // Disabled state
+                                    "disabled:opacity-40 disabled:pointer-events-none",
+                                    // Focus state
+                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+                                )}
+                                title={tab.description}
+                            >
+                                <Icon className={cn(
+                                    "w-4 h-4",
+                                    hasMissingRequired && isActive && "text-amber-600 dark:text-amber-400"
+                                )} />
+                                <span className="hidden sm:inline">{tab.label}</span>
+                                
+                                {status && (
+                                    <span className="ml-1">
+                                        <StatusBadge status={status} />
+                                    </span>
+                                )}
+                            </TabsTrigger>
+                        );
+                    })}
+                </TabsList>
+            </Tabs>
+            
+            {missingCount > 0 && (
+                <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
+                    ⚠️ {missingCount} required field{missingCount !== 1 ? 's' : ''} missing
+                </p>
+            )}
+        </div>
     );
 }

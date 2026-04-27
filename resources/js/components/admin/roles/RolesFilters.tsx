@@ -12,7 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Search, Filter, Download, X, FilterX, Users, Shield, Lock, Unlock, TrendingUp, Key, Briefcase } from 'lucide-react';
+import { Search, Filter, Download, X, FilterX, Users, Shield, Lock, TrendingUp, Key, Briefcase } from 'lucide-react';
 import { FilterState } from '@/types/admin/roles/roles';
 import { RefObject } from 'react';
 
@@ -32,7 +32,6 @@ interface RolesFiltersProps {
     searchInputRef: RefObject<HTMLInputElement | null>;
     handleExport: () => void;
     isLoading?: boolean;
-    // New filters
     usersRange?: string;
     setUsersRange?: (value: string) => void;
     permissionsRange?: string;
@@ -55,9 +54,9 @@ export default function RolesFilters({
     searchInputRef,
     handleExport,
     isLoading = false,
-    usersRange = '',
+    usersRange = 'all',
     setUsersRange,
-    permissionsRange = '',
+    permissionsRange = 'all',
     setPermissionsRange
 }: RolesFiltersProps) {
     
@@ -69,9 +68,9 @@ export default function RolesFilters({
         setSearch('');
     };
 
-    // Users count range options
+    // Users count range options - FIXED: No empty string values
     const usersRanges = [
-        { value: '', label: 'All Roles', color: 'gray' },
+        { value: 'all', label: 'All Roles', color: 'gray' },
         { value: '0', label: 'No Users Assigned (0)', color: 'red' },
         { value: '1-5', label: 'Few Users (1-5)', color: 'blue' },
         { value: '6-10', label: 'Moderate Users (6-10)', color: 'emerald' },
@@ -79,9 +78,9 @@ export default function RolesFilters({
         { value: '20+', label: 'Popular Role (20+)', color: 'purple' }
     ];
 
-    // Permissions count range options
+    // Permissions count range options - FIXED: No empty string values
     const permissionsRanges = [
-        { value: '', label: 'All Roles', color: 'gray' },
+        { value: 'all', label: 'All Roles', color: 'gray' },
         { value: '0', label: 'No Permissions (0)', color: 'red' },
         { value: '1-5', label: 'Limited Access (1-5)', color: 'blue' },
         { value: '6-10', label: 'Standard Access (6-10)', color: 'emerald' },
@@ -94,12 +93,12 @@ export default function RolesFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
-    // Helper to get active filter count
+    // Helper to get active filter count - FIXED: Check for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
         if (filtersState.type && filtersState.type !== 'all') count++;
-        if (usersRange && usersRange !== '') count++;
-        if (permissionsRange && permissionsRange !== '') count++;
+        if (usersRange && usersRange !== 'all') count++;
+        if (permissionsRange && permissionsRange !== 'all') count++;
         return count;
     };
 
@@ -208,7 +207,7 @@ export default function RolesFilters({
                             <span className="ml-1">roles</span>
                             {search && (
                                 <span className="ml-1">
-                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                 </span>
                             )}
                         </div>
@@ -226,7 +225,7 @@ export default function RolesFilters({
                                             {getTypeInfo(filtersState.type).label}
                                         </Badge>
                                     )}
-                                    {usersRange && usersRange !== '' && (
+                                    {usersRange && usersRange !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             getUsersRangeColor(usersRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
                                             getUsersRangeColor(usersRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
@@ -238,7 +237,7 @@ export default function RolesFilters({
                                             {getUsersRangeLabel(usersRange)}
                                         </Badge>
                                     )}
-                                    {permissionsRange && permissionsRange !== '' && (
+                                    {permissionsRange && permissionsRange !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             getPermissionsRangeColor(permissionsRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
                                             getPermissionsRangeColor(permissionsRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
@@ -520,8 +519,8 @@ export default function RolesFilters({
                                             size="sm"
                                             className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
-                                                setUsersRange?.('');
-                                                setPermissionsRange?.('');
+                                                setUsersRange?.('all');
+                                                setPermissionsRange?.('all');
                                                 setShowAdvancedFilters(false);
                                             }}
                                             disabled={isLoading}

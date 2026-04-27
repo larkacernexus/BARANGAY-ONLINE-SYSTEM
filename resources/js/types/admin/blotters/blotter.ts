@@ -107,10 +107,27 @@ export interface IncidentType {
 }
 
 export interface Resident {
+    photo_path: any;
     id: number;
     name: string;
     first_name: string;
     last_name: string;
+    middle_name?: string;
+    suffix?: string;
     address?: string;
     contact_number?: string;
+    email?: string;
+    purok?: string;
+    purok_id?: number;
+    photo_url?: string | null;
+    gender?: string;
+    civil_status?: string;
+}
+
+export interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    has_more: boolean;
 }

@@ -38,7 +38,6 @@ interface ClearanceTypesFiltersProps {
     endIndex: number;
     searchInputRef: React.RefObject<HTMLInputElement | null>;
     isLoading?: boolean;
-    // New filters
     feeRange?: string;
     setFeeRange?: (value: string) => void;
     dateRangePreset?: string;
@@ -58,16 +57,16 @@ export default function ClearanceTypesFilters({
     endIndex,
     searchInputRef,
     isLoading = false,
-    feeRange = '',
+    feeRange = 'all',
     setFeeRange,
-    dateRangePreset = '',
+    dateRangePreset = 'all',
     setDateRangePreset
 }: ClearanceTypesFiltersProps) {
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-    // Fee range options
+    // ✅ FIXED: Fee range options - use 'all' instead of empty string
     const feeRangeOptions = [
-        { value: '', label: 'All Fees', color: 'gray' },
+        { value: 'all', label: 'All Fees', color: 'gray' },
         { value: '0', label: 'Free (₱0)', color: 'emerald' },
         { value: '1-50', label: '₱1 - ₱50', color: 'blue' },
         { value: '51-100', label: '₱51 - ₱100', color: 'amber' },
@@ -75,9 +74,9 @@ export default function ClearanceTypesFilters({
         { value: '200+', label: '₱200+', color: 'red' }
     ];
 
-    // Date range presets
+    // ✅ FIXED: Date range presets - use 'all' instead of empty string
     const dateRangePresets = [
-        { value: '', label: 'All Time', color: 'gray' },
+        { value: 'all', label: 'All Time', color: 'gray' },
         { value: 'today', label: 'Today', color: 'blue' },
         { value: 'yesterday', label: 'Yesterday', color: 'blue' },
         { value: 'this_week', label: 'This Week', color: 'emerald' },
@@ -105,14 +104,14 @@ export default function ClearanceTypesFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
-    // Helper to get active filter count
+    // ✅ FIXED: Helper to get active filter count - check for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
         if (filtersState.status && filtersState.status !== 'all') count++;
         if (filtersState.requires_payment && filtersState.requires_payment !== 'all') count++;
         if (filtersState.discountable && filtersState.discountable !== 'all') count++;
-        if (feeRange && feeRange !== '') count++;
-        if (dateRangePreset && dateRangePreset !== '') count++;
+        if (feeRange && feeRange !== 'all') count++;
+        if (dateRangePreset && dateRangePreset !== 'all') count++;
         if (search) count++;
         return count;
     };
@@ -216,8 +215,8 @@ export default function ClearanceTypesFilters({
                                         status: filtersState.status !== 'all' ? filtersState.status : undefined,
                                         requires_payment: filtersState.requires_payment !== 'all' ? filtersState.requires_payment : undefined,
                                         discountable: filtersState.discountable !== 'all' ? filtersState.discountable : undefined,
-                                        fee_range: feeRange || undefined,
-                                        date_range: dateRangePreset || undefined,
+                                        fee_range: feeRange !== 'all' ? feeRange : undefined,
+                                        date_range: dateRangePreset !== 'all' ? dateRangePreset : undefined,
                                     });
                                     window.open(exportUrl, '_blank');
                                 }}
@@ -238,13 +237,13 @@ export default function ClearanceTypesFilters({
                             <span className="ml-1">clearance types</span>
                             {search && (
                                 <span className="ml-1">
-                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                 </span>
                             )}
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Active filter badges */}
+                            {/* ✅ FIXED: Active filter badges - check for 'all' instead of empty string */}
                             {activeFilters && (
                                 <>
                                     {filtersState.status && filtersState.status !== 'all' && (
@@ -274,7 +273,7 @@ export default function ClearanceTypesFilters({
                                             {getDiscountableInfo(filtersState.discountable).label}
                                         </Badge>
                                     )}
-                                    {feeRange && feeRange !== '' && (
+                                    {feeRange && feeRange !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             getFeeRangeInfo(feeRange).color === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
                                             getFeeRangeInfo(feeRange).color === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
@@ -286,7 +285,7 @@ export default function ClearanceTypesFilters({
                                             {getFeeRangeInfo(feeRange).label}
                                         </Badge>
                                     )}
-                                    {dateRangePreset && dateRangePreset !== '' && (
+                                    {dateRangePreset && dateRangePreset !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             dateRangePreset === 'today' || dateRangePreset === 'yesterday' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
                                             dateRangePreset === 'this_week' || dateRangePreset === 'last_week' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
@@ -324,7 +323,7 @@ export default function ClearanceTypesFilters({
                                 Status
                             </Label>
                             <Select
-                                value={filtersState.status}
+                                value={filtersState.status || 'all'}
                                 onValueChange={(value) => updateFilter('status', value)}
                                 disabled={isLoading}
                             >
@@ -346,7 +345,7 @@ export default function ClearanceTypesFilters({
                                 Payment Type
                             </Label>
                             <Select
-                                value={filtersState.requires_payment}
+                                value={filtersState.requires_payment || 'all'}
                                 onValueChange={(value) => updateFilter('requires_payment', value)}
                                 disabled={isLoading}
                             >
@@ -368,7 +367,7 @@ export default function ClearanceTypesFilters({
                                 Discountable
                             </Label>
                             <Select
-                                value={filtersState.discountable}
+                                value={filtersState.discountable || 'all'}
                                 onValueChange={(value) => updateFilter('discountable', value)}
                                 disabled={isLoading}
                             >

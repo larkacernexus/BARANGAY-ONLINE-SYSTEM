@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\RolePermission;
+use Illuminate\Support\Facades\Auth;
 
 class PermissionsSeeder extends Seeder
 {
@@ -39,6 +41,7 @@ class PermissionsSeeder extends Seeder
             // ====================
             ['name' => 'manage-roles', 'display_name' => 'Manage Roles', 'module' => 'Roles', 'description' => 'Create, edit, and delete roles'],
             ['name' => 'manage-permissions', 'display_name' => 'Manage Permissions', 'module' => 'Permissions', 'description' => 'Manage system permissions'],
+            ['name' => 'manage-role-permissions', 'display_name' => 'Manage Role Permissions', 'module' => 'Permissions', 'description' => 'Assign permissions to roles'],
 
             // ====================
             // RESIDENT MANAGEMENT
@@ -96,10 +99,21 @@ class PermissionsSeeder extends Seeder
             ['name' => 'review-reports', 'display_name' => 'Review Community Reports', 'module' => 'Community Reports', 'description' => 'Review and acknowledge reports'],
 
             // ====================
+            // INCIDENT MANAGEMENT
+            // ====================
+            ['name' => 'view-incidents', 'display_name' => 'View Incidents', 'module' => 'Incidents', 'description' => 'View incident reports'],
+            ['name' => 'manage-incidents', 'display_name' => 'Manage Incidents', 'module' => 'Incidents', 'description' => 'Full incident management'],
+            ['name' => 'manage-complaints', 'display_name' => 'Manage Complaints', 'module' => 'Incidents', 'description' => 'Manage complaints'],
+            ['name' => 'review-incidents', 'display_name' => 'Review Incidents', 'module' => 'Incidents', 'description' => 'Review incident status'],
+
+            // ====================
             // BLOTTER REPORTS MANAGEMENT
             // ====================
             ['name' => 'manage-blotters', 'display_name' => 'Manage Blotters', 'module' => 'Blotters', 'description' => 'Full blotter report management'],
             ['name' => 'view-blotters', 'display_name' => 'View Blotters', 'module' => 'Blotters', 'description' => 'View blotter reports only'],
+            ['name' => 'create-blotters', 'display_name' => 'Create Blotters', 'module' => 'Blotters', 'description' => 'Create new blotter records'],
+            ['name' => 'edit-blotters', 'display_name' => 'Edit Blotters', 'module' => 'Blotters', 'description' => 'Edit blotter records'],
+            ['name' => 'delete-blotters', 'display_name' => 'Delete Blotters', 'module' => 'Blotters', 'description' => 'Delete blotter records'],
 
             // ====================
             // REPORT TYPES MANAGEMENT
@@ -111,6 +125,13 @@ class PermissionsSeeder extends Seeder
             // FORMS MANAGEMENT
             // ====================
             ['name' => 'manage-forms', 'display_name' => 'Manage Forms', 'module' => 'Forms', 'description' => 'Manage downloadable forms'],
+
+            // ====================
+            // PRIVILEGES MANAGEMENT
+            // ====================
+            ['name' => 'manage-privileges', 'display_name' => 'Manage Privileges', 'module' => 'Privileges', 'description' => 'Manage resident privileges and discounts'],
+            ['name' => 'view-privileges', 'display_name' => 'View Privileges', 'module' => 'Privileges', 'description' => 'View privileges only'],
+            ['name' => 'assign-privileges', 'display_name' => 'Assign Privileges', 'module' => 'Privileges', 'description' => 'Assign privileges to residents'],
 
             // ====================
             // ANNOUNCEMENTS MANAGEMENT
@@ -142,6 +163,12 @@ class PermissionsSeeder extends Seeder
             ['name' => 'manage-backups', 'display_name' => 'Manage Backups', 'module' => 'System', 'description' => 'Create, download, and restore system backups'],
 
             // ====================
+            // PORTAL BANNER MANAGEMENT
+            // ====================
+            ['name' => 'manage-portal-banner', 'display_name' => 'Manage Portal Banner', 'module' => 'System', 'description' => 'Manage portal banner settings and images'],
+            ['name' => 'view-portal-banner', 'display_name' => 'View Portal Banner', 'module' => 'System', 'description' => 'View portal banner settings'],
+
+            // ====================
             // REPORTS (GENERAL REPORTS)
             // ====================
             ['name' => 'view-statistics', 'display_name' => 'View Statistics', 'module' => 'Reports', 'description' => 'Access statistics and analytics'],
@@ -152,22 +179,30 @@ class PermissionsSeeder extends Seeder
             ['name' => 'view-security-logs', 'display_name' => 'View Security Logs', 'module' => 'Security', 'description' => 'Access security and audit logs'],
 
             // ====================
-            // NEW: DOCUMENT TYPES MANAGEMENT (ADDED)
+            // DOCUMENT TYPES MANAGEMENT
             // ====================
             ['name' => 'manage-document-types', 'display_name' => 'Manage Document Types', 'module' => 'Documents', 'description' => 'Manage document categories and requirements'],
             ['name' => 'view-document-types', 'display_name' => 'View Document Types', 'module' => 'Documents', 'description' => 'View document types only'],
 
             // ====================
-            // NEW: CALENDAR MANAGEMENT (ADDED)
+            // CALENDAR MANAGEMENT
             // ====================
             ['name' => 'manage-calendar', 'display_name' => 'Manage Calendar', 'module' => 'Calendar', 'description' => 'Manage events and schedules'],
             ['name' => 'view-calendar', 'display_name' => 'View Calendar', 'module' => 'Calendar', 'description' => 'View calendar events only'],
+
+            // ====================
+            // BUSINESS MANAGEMENT
+            // ====================
+            ['name' => 'manage-businesses', 'display_name' => 'Manage Businesses', 'module' => 'Businesses', 'description' => 'Manage business registrations'],
         ];
 
         $createdCount = 0;
         $updatedCount = 0;
 
         foreach ($permissions as $permissionData) {
+            // Add is_active = true by default
+            $permissionData['is_active'] = true;
+            
             $permission = Permission::firstOrNew(
                 ['name' => $permissionData['name']]
             );
@@ -190,7 +225,7 @@ class PermissionsSeeder extends Seeder
     }
 
     /**
-     * Assign permissions to existing roles
+     * Assign permissions to existing roles using RolePermission pivot model
      */
     private function assignPermissionsToRoles(): void
     {
@@ -207,15 +242,15 @@ class PermissionsSeeder extends Seeder
         // Define permission assignments for each role
         $rolePermissions = [
             // 1. SYSTEM ADMINISTRATOR - ALL PERMISSIONS
-            'Administrator' => Permission::all()->pluck('name')->toArray(),
+            'Administrator' => Permission::all()->pluck('id')->toArray(),
 
             // 2. BARANGAY CAPTAIN - ALL EXCEPT BACKUPS
             'Barangay Captain' => Permission::whereNotIn('name', [
                 'manage-backups',
-            ])->pluck('name')->toArray(),
+            ])->pluck('id')->toArray(),
 
             // 3. BARANGAY SECRETARY
-            'Barangay Secretary' => [
+            'Barangay Secretary' => Permission::whereIn('name', [
                 // Dashboard
                 'view-dashboard',
                 'view-admin-dashboard',
@@ -232,25 +267,45 @@ class PermissionsSeeder extends Seeder
                 'manage-positions',
                 'manage-committees',
                 'manage-officials',
+                'manage-businesses',
 
                 // Document Types - FULL ACCESS (Secretary handles documents)
                 'manage-document-types',
                 'view-document-types',
+
+                // Portal Banner - FULL ACCESS
+                'manage-portal-banner',
+                'view-portal-banner',
 
                 // Community Reports - FULL ACCESS
                 'manage-reports',
                 'view-reports',
                 'create-reports',
                 'edit-reports',
+                'delete-reports',
                 'assign-reports',
                 'resolve-reports',
                 'review-reports',
                 'manage-report-types',
                 'view-report-types',
 
+                // Incidents
+                'view-incidents',
+                'manage-incidents',
+                'manage-complaints',
+                'review-incidents',
+
                 // Blotters - FULL ACCESS
                 'manage-blotters',
                 'view-blotters',
+                'create-blotters',
+                'edit-blotters',
+                'delete-blotters',
+
+                // Privileges
+                'manage-privileges',
+                'view-privileges',
+                'assign-privileges',
 
                 // Announcements - FULL ACCESS
                 'manage-announcements',
@@ -268,10 +323,10 @@ class PermissionsSeeder extends Seeder
                 // Reports/Statistics - VIEW ONLY
                 'view-statistics',
                 'view-security-logs',
-            ],
+            ])->pluck('id')->toArray(),
 
             // 4. BARANGAY TREASURER
-            'Barangay Treasurer' => [
+            'Barangay Treasurer' => Permission::whereIn('name', [
                 // Dashboard
                 'view-dashboard',
                 'view-admin-dashboard',
@@ -287,9 +342,13 @@ class PermissionsSeeder extends Seeder
                 'manage-residents',
                 'manage-households',
                 'manage-puroks',
+                'manage-businesses',
 
                 // View document types (for clearance requirements)
                 'view-document-types',
+
+                // Portal Banner - View only
+                'view-portal-banner',
 
                 // View other modules (NO EDIT ACCESS)
                 'view-clearances',
@@ -298,14 +357,15 @@ class PermissionsSeeder extends Seeder
                 'view-blotters',
                 'view-announcements',
                 'view-calendar',
+                'view-privileges',
 
                 // Reports/Statistics
                 'view-statistics',
                 'view-security-logs',
-            ],
+            ])->pluck('id')->toArray(),
 
             // 5. BARANGAY KAGAWAD
-            'Barangay Kagawad' => [
+            'Barangay Kagawad' => Permission::whereIn('name', [
                 // Dashboard
                 'view-dashboard',
                 'view-admin-dashboard',
@@ -321,6 +381,8 @@ class PermissionsSeeder extends Seeder
                 'view-fee-types',
                 'view-document-types',
                 'view-calendar',
+                'view-privileges',
+                'view-portal-banner',
 
                 // Can view residents and households
                 'manage-residents',
@@ -328,10 +390,10 @@ class PermissionsSeeder extends Seeder
 
                 // Reports/Statistics - VIEW ONLY
                 'view-statistics',
-            ],
+            ])->pluck('id')->toArray(),
 
             // 6. SK CHAIRMAN
-            'SK Chairman' => [
+            'SK Chairman' => Permission::whereIn('name', [
                 // Dashboard
                 'view-dashboard',
                 'view-admin-dashboard',
@@ -352,13 +414,15 @@ class PermissionsSeeder extends Seeder
                 'view-clearances',
                 'view-clearance-types',
                 'view-document-types',
+                'view-portal-banner',
+                'view-privileges',
 
                 // Reports/Statistics
                 'view-statistics',
-            ],
+            ])->pluck('id')->toArray(),
 
             // 7. SK KAGAWAD
-            'SK Kagawad' => [
+            'SK Kagawad' => Permission::whereIn('name', [
                 // Dashboard
                 'view-dashboard',
                 'view-admin-dashboard',
@@ -370,13 +434,14 @@ class PermissionsSeeder extends Seeder
                 'view-blotters',
                 'view-document-types',
                 'view-calendar',
+                'view-portal-banner',
 
                 // Reports/Statistics
                 'view-statistics',
-            ],
+            ])->pluck('id')->toArray(),
 
             // 8. RESIDENT
-            'Resident' => [
+            'Resident' => Permission::whereIn('name', [
                 // Community Reports
                 'create-reports',
                 'view-reports',
@@ -389,10 +454,13 @@ class PermissionsSeeder extends Seeder
 
                 // Calendar
                 'view-calendar',
-            ],
+
+                // Portal Banner
+                'view-portal-banner',
+            ])->pluck('id')->toArray(),
 
             // 9. STAFF
-            'Staff' => [
+            'Staff' => Permission::whereIn('name', [
                 // Dashboard
                 'view-dashboard',
                 'view-admin-dashboard',
@@ -410,29 +478,49 @@ class PermissionsSeeder extends Seeder
                 'view-announcements',
                 'view-calendar',
                 'view-document-types',
+                'view-portal-banner',
 
                 // Reports/Statistics
                 'view-statistics',
-            ],
+            ])->pluck('id')->toArray(),
         ];
 
-        // Assign permissions to each role
-        foreach ($rolePermissions as $roleName => $permissionNames) {
+        $assignedCount = 0;
+        
+        // Assign permissions to each role using RolePermission pivot model
+        foreach ($rolePermissions as $roleName => $permissionIds) {
             if (!isset($roles[$roleName])) {
                 $this->command->warn("⚠️  Role '$roleName' not found, skipping...");
                 continue;
             }
 
             $role = $roles[$roleName];
-            $permissions = Permission::whereIn('name', $permissionNames)->get();
-
-            if ($permissions->isEmpty()) {
-                $this->command->warn("⚠️  No permissions found for role '$roleName', skipping...");
+            
+            if (empty($permissionIds)) {
+                $this->command->warn("⚠️  No permissions defined for role '$roleName', skipping...");
                 continue;
             }
 
-            $role->permissions()->sync($permissions->pluck('id'));
-            $this->command->info("✅ Assigned " . $permissions->count() . " permissions to '$roleName'");
+            // Delete existing role permissions for this role
+            RolePermission::where('role_id', $role->id)->delete();
+            
+            // Create new role permission assignments
+            $rolePermissionsData = array_map(function($permissionId) use ($role) {
+                return [
+                    'role_id' => $role->id,
+                    'permission_id' => $permissionId,
+                    'granted_by' => null, // System granted
+                    'granted_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }, $permissionIds);
+            
+            RolePermission::insert($rolePermissionsData);
+            
+            $permissionCount = count($permissionIds);
+            $assignedCount += $permissionCount;
+            $this->command->info("✅ Assigned $permissionCount permissions to '$roleName'");
         }
 
         // Summary
@@ -440,30 +528,28 @@ class PermissionsSeeder extends Seeder
         $this->command->info('========================================');
         $this->command->info('PERMISSIONS ASSIGNED SUCCESSFULLY');
         $this->command->info('========================================');
+        $this->command->info("Total role-permission assignments: $assignedCount");
 
         foreach ($roles as $roleName => $role) {
-            $permissionCount = $role->permissions()->count();
+            $permissionCount = RolePermission::where('role_id', $role->id)->count();
             $this->command->info("- $roleName: $permissionCount permissions");
         }
 
         $this->command->info('========================================');
         $this->command->info('Key Additions:');
-        $this->command->info('1. manage-document-types - Added for Document Types');
-        $this->command->info('2. view-document-types - View only for Document Types');
-        $this->command->info('3. manage-calendar - Added for Calendar management');
-        $this->command->info('4. view-calendar - View only for Calendar');
+        $this->command->info('1. manage-portal-banner - Added for Portal Banner management');
+        $this->command->info('2. view-portal-banner - View only for Portal Banner');
+        $this->command->info('3. manage-document-types - Added for Document Types');
+        $this->command->info('4. view-document-types - View only for Document Types');
+        $this->command->info('5. manage-calendar - Added for Calendar management');
+        $this->command->info('6. view-calendar - View only for Calendar');
+        $this->command->info('7. manage-businesses - Added for Business management');
         $this->command->info('========================================');
 
         // Verify all permissions are assigned at least once
         $allPermissions = Permission::all();
-        $assignedPermissions = collect();
-
-        foreach ($roles as $role) {
-            $assignedPermissions = $assignedPermissions->merge($role->permissions->pluck('id'));
-        }
-
-        $assignedPermissions = $assignedPermissions->unique();
-        $unassignedPermissions = $allPermissions->whereNotIn('id', $assignedPermissions);
+        $assignedPermissionIds = RolePermission::distinct('permission_id')->pluck('permission_id');
+        $unassignedPermissions = $allPermissions->whereNotIn('id', $assignedPermissionIds);
 
         if ($unassignedPermissions->isNotEmpty()) {
             $this->command->warn('⚠️  Unassigned permissions:');

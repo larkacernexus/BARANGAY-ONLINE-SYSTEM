@@ -64,6 +64,7 @@ export default function Residents() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
         (initialFilters.sort_order as 'asc' | 'desc') || 'asc'
     );
+    const [perPage, setPerPage] = useState<string>(initialFilters.per_page || '15');
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     
@@ -122,7 +123,7 @@ export default function Residents() {
         total: initialResidents?.total || 0,
         from: initialResidents?.from || 0,
         to: initialResidents?.to || 0,
-        per_page: initialResidents?.per_page || 15,
+        per_page: initialResidents?.per_page || parseInt(perPage) || 15,
     };
 
     const getCurrentFilters = useCallback((): Record<string, any> => {
@@ -140,12 +141,13 @@ export default function Residents() {
         if (debouncedMaxAge) filters.max_age = debouncedMaxAge;
         if (sortBy) filters.sort_by = sortBy;
         if (sortOrder) filters.sort_order = sortOrder;
+        if (perPage) filters.per_page = perPage;
         
         return filters;
     }, [
         debouncedSearch, statusFilter, purokFilter, genderFilter, civilStatusFilter,
         voterFilter, headFilter, privilegeFilter, debouncedMinAge, debouncedMaxAge,
-        sortBy, sortOrder
+        sortBy, sortOrder, perPage
     ]);
 
     const reloadData = useCallback((page = 1) => {
@@ -179,7 +181,7 @@ export default function Residents() {
     }, [
         debouncedSearch, statusFilter, purokFilter, genderFilter, civilStatusFilter,
         voterFilter, headFilter, privilegeFilter, debouncedMinAge, debouncedMaxAge,
-        sortBy, sortOrder, reloadData
+        sortBy, sortOrder, perPage, reloadData
     ]);
 
     // Reset selection when exiting bulk mode
@@ -189,6 +191,13 @@ export default function Residents() {
             setIsSelectAll(false);
         }
     }, [isBulkMode]);
+
+    // Handle per page change
+    const handlePerPageChange = (value: string) => {
+        setPerPage(value);
+        // Reset to page 1 when changing per page
+        reloadData(1);
+    };
 
     // Selection handlers
     const handleSelectAllOnPage = () => {
@@ -512,6 +521,7 @@ export default function Residents() {
         setMaxAge('');
         setSortBy('last_name');
         setSortOrder('asc');
+        setPerPage('15');
     };
 
     const handleClearSelection = () => {
@@ -529,7 +539,8 @@ export default function Residents() {
         headFilter !== 'all' ||
         privilegeFilter !== 'all' ||
         minAge ||
-        maxAge
+        maxAge ||
+        perPage !== '15'
     );
 
     // Prepare filters object for the Filters component
@@ -546,7 +557,8 @@ export default function Residents() {
         max_age: maxAge,
         sort_by: sortBy,
         sort_order: sortOrder,
-        search: search
+        search: search,
+        per_page: perPage
     };
 
     const updateFilter = (key: string, value: string) => {
@@ -577,6 +589,9 @@ export default function Residents() {
                 break;
             case 'max_age':
                 setMaxAge(value);
+                break;
+            case 'per_page':
+                handlePerPageChange(value);
                 break;
         }
     };
@@ -678,6 +693,8 @@ export default function Residents() {
                         startIndex={paginationData.from}
                         endIndex={paginationData.to}
                         searchInputRef={searchInputRef}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                     />
 
                     <ResidentsContent
@@ -695,6 +712,8 @@ export default function Residents() {
                         totalPages={paginationData.last_page}
                         totalItems={paginationData.total}
                         itemsPerPage={paginationData.per_page}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onSelectAllFiltered={() => {}}

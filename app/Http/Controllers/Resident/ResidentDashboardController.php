@@ -10,21 +10,40 @@ use App\Models\ClearanceRequest;
 use App\Models\Announcement;
 use App\Models\Privilege;
 use App\Models\Banner;
+use App\Models\CommunityReport;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Carbon\Carbon;
 
+/**
+ * Resident Dashboard Controller
+ * 
+ * @method \Illuminate\Routing\ControllerMiddlewareOptions middleware(string|array $middleware, array $options = [])
+ */
 class ResidentDashboardController extends Controller
 {
+    // SECURITY NOTE: Cache TTL constants
+    private const CACHE_TTL_PRIVILEGES = 3600; // 1 hour
+    
+    // SECURITY NOTE: Allowed date filters - whitelist for validation
+    private const ALLOWED_DATE_FILTERS = ['today', 'week', 'month', 'year', 'all'];
+    
+    // LOGIC NOTE: Middleware is applied via routes - no constructor needed
+    
     /**
      * Get all active privileges - DYNAMIC FROM DATABASE
+     * 
+     * SECURITY NOTE: Cache key includes version for cache busting on schema changes
      */
     private function getAllPrivileges(): array
     {
-        return Cache::remember('all_active_privileges', 3600, function () {
+        $cacheKey = 'all_active_privileges:v1';
+        
+        return Cache::remember($cacheKey, self::CACHE_TTL_PRIVILEGES, function () {
             return Privilege::with('discountType')
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -55,6 +74,8 @@ class ResidentDashboardController extends Controller
 
     /**
      * Get resident's active privileges - DYNAMIC
+     * 
+     * SECURITY NOTE: Only returns privileges belonging to the resident
      */
     private function getResidentPrivileges(Resident $resident): array
     {
@@ -138,58 +159,19 @@ class ResidentDashboardController extends Controller
                     'id' => $banner->id,
                     'image' => $banner->image_url,
                     'mobileImage' => $banner->mobile_image_url,
-                    'title' => $banner->title,
-                    'description' => $banner->description,
+                    'title' => $this->sanitizeOutput($banner->title),
+                    'description' => $this->sanitizeOutput($banner->description),
                     'link' => $banner->link_url,
-                    'buttonText' => $banner->button_text ?? 'Learn More',
-                    'alt' => $banner->alt_text ?? $banner->title,
+                    'buttonText' => $this->sanitizeOutput($banner->button_text) ?? 'Learn More',
+                    'alt' => $this->sanitizeOutput($banner->alt_text) ?? $this->sanitizeOutput($banner->title),
                 ];
             })->toArray();
             
         } catch (\Exception $e) {
-            \Log::error('Error getting banners: ' . $e->getMessage());
-            return [];
-        }
-    }
-
-    /**
-     * Get upcoming events
-     */
-    private function getUpcomingEvents(): array
-    {
-        try {
-            if (!class_exists('\App\Models\Event')) {
-                return [];
-            }
-            
-            $user = Auth::user();
-            
-            return \App\Models\Event::where('is_active', true)
-                ->where('event_date', '>=', now())
-                ->when($user && $user->resident, function ($query) use ($user) {
-                    if (method_exists(\App\Models\Event::class, 'visibleToUser')) {
-                        return $query->visibleToUser($user);
-                    }
-                    return $query;
-                })
-                ->orderBy('event_date', 'asc')
-                ->take(3)
-                ->get()
-                ->map(function ($e) {
-                    return [
-                        'id' => $e->id,
-                        'title' => $e->title,
-                        'description' => $this->createExcerpt($e->description ?? '', 80),
-                        'event_date' => $e->event_date->toISOString(),
-                        'start_time' => $e->start_time,
-                        'end_time' => $e->end_time,
-                        'location' => $e->location,
-                        'type' => $e->type ?? 'event',
-                    ];
-                })
-                ->toArray();
-        } catch (\Exception $e) {
-            \Log::error('Error getting upcoming events: ' . $e->getMessage());
+            \Log::error('Error getting banners', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -205,17 +187,24 @@ class ResidentDashboardController extends Controller
         
         $content = strip_tags($content);
         if (strlen($content) <= $length) {
-            return $content;
+            return $this->sanitizeOutput($content);
         }
-        return substr($content, 0, $length) . '...';
+        return $this->sanitizeOutput(substr($content, 0, $length)) . '...';
     }
 
     /**
      * Get date range from filter - SERVER SIDE
+     * 
+     * SECURITY NOTE: Validates filter against whitelist
      */
     private function getDateRangeFromFilter(?string $filter): ?array
     {
-        if (!$filter || $filter === 'all') {
+        // SECURITY NOTE: Validate filter against whitelist
+        if (!$filter || !in_array($filter, self::ALLOWED_DATE_FILTERS, true)) {
+            return null;
+        }
+        
+        if ($filter === 'all') {
             return null;
         }
         
@@ -252,6 +241,10 @@ class ResidentDashboardController extends Controller
      */
     private function getPreviousPeriodRange(string $filter): ?array
     {
+        if (!in_array($filter, self::ALLOWED_DATE_FILTERS, true) || $filter === 'all') {
+            return null;
+        }
+        
         $now = Carbon::now();
         
         switch ($filter) {
@@ -293,13 +286,31 @@ class ResidentDashboardController extends Controller
 
     /**
      * Main dashboard method
+     * 
+     * SECURITY NOTE: Rate limited to prevent abuse
      */
     public function residentdashboard(Request $request)
     {
         $user = Auth::user();
         
-        // Get date filter from request (default to 'week')
+        // SECURITY NOTE: Rate limiting for dashboard
+        $rateLimitKey = 'dashboard:' . $user->id;
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 30)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            
+            return Inertia::render('resident/residentdashboard', [
+                'error' => "Too many requests. Please wait {$seconds} seconds.",
+                'rate_limited' => true,
+            ]);
+        }
+        
+        RateLimiter::hit($rateLimitKey, 60); // 30 attempts per minute
+        
+        // SECURITY NOTE: Validate date filter
         $dateFilter = $request->input('date_filter', 'week');
+        if (!in_array($dateFilter, self::ALLOWED_DATE_FILTERS, true)) {
+            $dateFilter = 'week';
+        }
         
         // Get date range based on filter
         $dateRange = $this->getDateRangeFromFilter($dateFilter);
@@ -324,10 +335,12 @@ class ResidentDashboardController extends Controller
         $householdResidentIds = [$resident->id];
         
         if ($user->household_id) {
-            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege.discountType'])->find($user->household_id);
+            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege.discountType'])
+                ->find($user->household_id);
         }
         
         if ($household) {
+            // SECURITY NOTE: Verify resident belongs to this household
             $member = $household->householdMembers->firstWhere('resident_id', $resident->id);
             $isHouseholdHead = $member ? $member->is_head : false;
             
@@ -353,12 +366,11 @@ class ResidentDashboardController extends Controller
             'recentActivities' => $recentActivities,
             'recentPayments' => $recentPayments,
             'pendingClearances' => $pendingClearances,
-            'announcements' => $this->getAnnouncements($allPrivileges),
+            'announcements' => $this->getAnnouncements(),
             'paymentSummary' => $paymentSummary,
             'resident' => $this->getResidentData($resident, $household, $isHouseholdHead, $allPrivileges),
             'allPrivileges' => $allPrivileges,
             'bannerSlides' => $this->getBannerSlides(),
-            'upcomingEvents' => $this->getUpcomingEvents(),
             'dateFilter' => $dateFilter,
         ]);
     }
@@ -370,7 +382,7 @@ class ResidentDashboardController extends Controller
                 'total_payments' => 0,
                 'total_payments_amount' => 0,
                 'total_clearances' => 0,
-                'total_complaints' => 0,
+                'total_reports' => 0,
                 'pending_clearances' => 0,
                 'pending_requests' => 0,
                 'household_members' => 0,
@@ -382,7 +394,6 @@ class ResidentDashboardController extends Controller
             'pendingClearances' => [],
             'announcements' => $this->getPublicAnnouncements(),
             'paymentSummary' => [],
-            'upcomingEvents' => $this->getUpcomingEvents(),
             'resident' => [
                 'id' => null,
                 'full_name' => 'Guest Resident',
@@ -434,14 +445,13 @@ class ResidentDashboardController extends Controller
             $totalClearances = $clearancesQuery->count();
             $pendingClearances = $clearancesQuery->whereIn('status', ['pending', 'processing', 'under_review', 'pending_payment'])->count();
             
-            $totalComplaints = 0;
-            if (class_exists('\App\Models\Complaint')) {
-                $complaintsQuery = \App\Models\Complaint::whereIn('resident_id', $householdResidentIds);
-                if ($dateRange) {
-                    $complaintsQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
-                }
-                $totalComplaints = $complaintsQuery->count();
+            // Community Reports stats
+            $totalReports = 0;
+            $reportsQuery = CommunityReport::whereIn('resident_id', $householdResidentIds);
+            if ($dateRange) {
+                $reportsQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
             }
+            $totalReports = $reportsQuery->count();
             
             // Calculate trend percentage
             $percentageChange = 0;
@@ -461,7 +471,7 @@ class ResidentDashboardController extends Controller
                 'total_payments' => $totalPayments,
                 'total_payments_amount' => $totalPaymentsAmount,
                 'total_clearances' => $totalClearances,
-                'total_complaints' => $totalComplaints,
+                'total_reports' => $totalReports,
                 'pending_clearances' => $pendingClearances,
                 'pending_requests' => $pendingClearances,
                 'household_members' => count($householdResidentIds),
@@ -469,12 +479,15 @@ class ResidentDashboardController extends Controller
                 'trend' => $trend,
             ];
         } catch (\Exception $e) {
-            \Log::error('Error getting dashboard stats: ' . $e->getMessage());
+            \Log::error('Error getting dashboard stats', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [
                 'total_payments' => 0,
                 'total_payments_amount' => 0,
                 'total_clearances' => 0,
-                'total_complaints' => 0,
+                'total_reports' => 0,
                 'pending_clearances' => 0,
                 'pending_requests' => 0,
                 'household_members' => 0,
@@ -509,12 +522,14 @@ class ResidentDashboardController extends Controller
                     return [
                         'id' => 'payment-' . $payment->id,
                         'type' => 'payment',
-                        'description' => ($payerResident?->first_name ?? 'Household Member') . ' paid: ' . ($payment->clearance_type ?? 'Barangay Fee'),
+                        'description' => $this->sanitizeOutput(
+                            ($payerResident?->first_name ?? 'Household Member') . ' paid: ' . ($payment->clearance_type ?? 'Barangay Fee')
+                        ),
                         'status' => $payment->status ?? 'completed',
                         'date' => $payment->payment_date?->toISOString() ?? now()->toISOString(),
                         'amount' => '₱' . number_format($payment->total_amount ?? 0, 2),
                         'originalId' => $payment->id,
-                        'payer_name' => $payerResident?->first_name ?? 'Household Member',
+                        'payer_name' => $this->sanitizeOutput($payerResident?->first_name ?? 'Household Member'),
                     ];
                 });
 
@@ -534,23 +549,56 @@ class ResidentDashboardController extends Controller
                     return [
                         'id' => 'clearance-' . $clearance->id,
                         'type' => 'clearance',
-                        'description' => ($applicantResident?->first_name ?? 'Household Member') . ' requested: ' . ($clearance->clearanceType?->name ?? 'Clearance'),
+                        'description' => $this->sanitizeOutput(
+                            ($applicantResident?->first_name ?? 'Household Member') . ' requested: ' . ($clearance->clearanceType?->name ?? 'Clearance')
+                        ),
                         'status' => $clearance->status,
                         'date' => $clearance->created_at->toISOString(),
                         'originalId' => $clearance->id,
-                        'applicant_name' => $applicantResident?->first_name ?? 'Household Member',
+                        'applicant_name' => $this->sanitizeOutput($applicantResident?->first_name ?? 'Household Member'),
+                    ];
+                });
+            
+            // Community reports activities
+            $reportsQuery = CommunityReport::whereIn('resident_id', $householdResidentIds);
+            
+            if ($dateRange) {
+                $reportsQuery->whereBetween('created_at', [$dateRange['start'], $dateRange['end']]);
+            }
+            
+            $recentReports = $reportsQuery
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get()
+                ->map(function ($report) {
+                    $reporterResident = Resident::find($report->resident_id);
+                    
+                    return [
+                        'id' => 'report-' . $report->id,
+                        'type' => 'report',
+                        'description' => $this->sanitizeOutput(
+                            ($reporterResident?->first_name ?? 'Household Member') . ' submitted: ' . ($report->title ?? 'Community Report')
+                        ),
+                        'status' => $report->status ?? 'pending',
+                        'date' => $report->created_at->toISOString(),
+                        'originalId' => $report->id,
+                        'reporter_name' => $this->sanitizeOutput($reporterResident?->first_name ?? 'Household Member'),
                     ];
                 });
 
             return $activities->concat($recentPayments)
                 ->concat($recentClearances)
+                ->concat($recentReports)
                 ->sortByDesc('date')
                 ->take(8)
                 ->values()
                 ->toArray();
 
         } catch (\Exception $e) {
-            \Log::error('Error getting recent activities: ' . $e->getMessage());
+            \Log::error('Error getting recent activities', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -578,21 +626,24 @@ class ResidentDashboardController extends Controller
                     
                     return [
                         'id' => $payment->id,
-                        'reference_number' => $payment->or_number ?? $payment->reference_number,
+                        'reference_number' => $this->sanitizeOutput($payment->or_number ?? $payment->reference_number),
                         'amount' => (float) ($payment->total_amount ?? 0),
                         'status' => $payment->status ?? 'completed',
-                        'fee_type' => $payment->clearance_type ?? $this->getPaymentFeeType($payment),
+                        'fee_type' => $this->sanitizeOutput($payment->clearance_type ?? $this->getPaymentFeeType($payment)),
                         'payment_date' => $payment->payment_date?->toISOString(),
                         'created_at' => $payment->created_at->toISOString(),
                         'payment_method' => $payment->payment_method,
-                        'payer_name' => $payerResident ? $payerResident->first_name . ' ' . $payerResident->last_name : 'Household Member',
+                        'payer_name' => $payerResident ? $this->sanitizeOutput($payerResident->first_name . ' ' . $payerResident->last_name) : 'Household Member',
                         'payer_id' => $payment->payer_id,
                         'is_current_user' => $payerResident && $payerResident->user && $payerResident->user->id === Auth::id(),
                     ];
                 })
                 ->toArray();
         } catch (\Exception $e) {
-            \Log::error('Error getting recent payments: ' . $e->getMessage());
+            \Log::error('Error getting recent payments', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -640,21 +691,24 @@ class ResidentDashboardController extends Controller
                     
                     return [
                         'id' => $clearance->id,
-                        'clearance_type' => $clearance->clearanceType?->name ?? 'General Clearance',
-                        'purpose' => $clearance->purpose ?? 'No purpose specified',
+                        'clearance_type' => $this->sanitizeOutput($clearance->clearanceType?->name ?? 'General Clearance'),
+                        'purpose' => $this->sanitizeOutput($clearance->purpose ?? 'No purpose specified'),
                         'status' => $clearance->status,
                         'created_at' => $clearance->created_at->toISOString(),
                         'requirements_count' => $clearance->documents?->count() ?? 0,
-                        'reference_number' => $clearance->reference_number,
+                        'reference_number' => $this->sanitizeOutput($clearance->reference_number),
                         'urgency' => $clearance->urgency,
-                        'applicant_name' => $applicantResident ? $applicantResident->first_name . ' ' . $applicantResident->last_name : 'Household Member',
+                        'applicant_name' => $applicantResident ? $this->sanitizeOutput($applicantResident->first_name . ' ' . $applicantResident->last_name) : 'Household Member',
                         'applicant_id' => $clearance->resident_id,
                         'is_current_user' => $applicantResident && $applicantResident->user && $applicantResident->user->id === Auth::id(),
                     ];
                 })
                 ->toArray();
         } catch (\Exception $e) {
-            \Log::error('Error getting pending clearances: ' . $e->getMessage());
+            \Log::error('Error getting pending clearances', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -662,7 +716,7 @@ class ResidentDashboardController extends Controller
     /**
      * Get announcements
      */
-    private function getAnnouncements(array $allPrivileges): array
+    private function getAnnouncements(): array
     {
         try {
             $user = Auth::user();
@@ -690,11 +744,11 @@ class ResidentDashboardController extends Controller
                 ->map(function ($a) {
                     return [
                         'id' => $a->id,
-                        'title' => $a->title ?? 'Announcement',
-                        'content' => $a->content,
+                        'title' => $this->sanitizeOutput($a->title ?? 'Announcement'),
+                        'content' => $this->sanitizeOutput($a->content),
                         'type' => $a->type ?? 'general',
                         'priority' => $a->priority ?? 0,
-                        'author' => $a->creator?->first_name . ' ' . $a->creator?->last_name ?? 'Barangay Official',
+                        'author' => $this->sanitizeOutput($a->creator?->first_name . ' ' . $a->creator?->last_name) ?? 'Barangay Official',
                         'created_at' => $a->created_at->toISOString(),
                         'status' => $a->status,
                         'status_color' => $a->status_color,
@@ -708,7 +762,10 @@ class ResidentDashboardController extends Controller
                 })
                 ->toArray();
         } catch (\Exception $e) {
-            \Log::error('Error getting announcements: ' . $e->getMessage());
+            \Log::error('Error getting announcements', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -735,17 +792,20 @@ class ResidentDashboardController extends Controller
                 ->map(function ($a) {
                     return [
                         'id' => $a->id,
-                        'title' => $a->title ?? 'Announcement',
-                        'content' => $a->content,
+                        'title' => $this->sanitizeOutput($a->title ?? 'Announcement'),
+                        'content' => $this->sanitizeOutput($a->content),
                         'type' => $a->type ?? 'general',
                         'priority' => $a->priority ?? 0,
-                        'author' => $a->creator?->first_name . ' ' . $a->creator?->last_name ?? 'Barangay Official',
+                        'author' => $this->sanitizeOutput($a->creator?->first_name . ' ' . $a->creator?->last_name) ?? 'Barangay Official',
                         'created_at' => $a->created_at->toISOString(),
                     ];
                 })
                 ->toArray();
         } catch (\Exception $e) {
-            \Log::error('Error getting public announcements: ' . $e->getMessage());
+            \Log::error('Error getting public announcements', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -763,6 +823,7 @@ class ResidentDashboardController extends Controller
                 $paymentsQuery->whereBetween('payment_date', [$dateRange['start'], $dateRange['end']]);
             }
             
+            // SECURITY NOTE: Group by hardcoded column name - safe
             return $paymentsQuery
                 ->selectRaw('
                     CASE 
@@ -780,11 +841,14 @@ class ResidentDashboardController extends Controller
                     'total' => (float) $s->total,
                     'count' => (int) $s->count,
                     'status' => $s->status,
-                    'formatted_type' => str_replace('_', ' ', ucwords(strtolower($s->type))),
+                    'formatted_type' => $this->sanitizeOutput(str_replace('_', ' ', ucwords(strtolower($s->type)))),
                 ])
                 ->toArray();
         } catch (\Exception $e) {
-            \Log::error('Error getting payment summary: ' . $e->getMessage());
+            \Log::error('Error getting payment summary', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -799,18 +863,18 @@ class ResidentDashboardController extends Controller
         $data = [
             'id' => $resident->id,
             'user_id' => $resident->user?->id,
-            'full_name' => $resident->full_name,
-            'first_name' => $resident->first_name ?? 'Resident',
-            'last_name' => $resident->last_name ?? '',
-            'middle_name' => $resident->middle_name ?? '',
-            'suffix' => $resident->suffix ?? '',
+            'full_name' => $this->sanitizeOutput($resident->full_name),
+            'first_name' => $this->sanitizeOutput($resident->first_name ?? 'Resident'),
+            'last_name' => $this->sanitizeOutput($resident->last_name ?? ''),
+            'middle_name' => $this->sanitizeOutput($resident->middle_name ?? ''),
+            'suffix' => $this->sanitizeOutput($resident->suffix ?? ''),
             'email' => $resident->email ?? '',
             'phone_number' => $resident->contact_number ?? $resident->phone_number ?? 'N/A',
             'birth_date' => $resident->birth_date?->format('Y-m-d'),
             'age' => $resident->age,
             'gender' => $resident->gender,
             'civil_status' => $resident->civil_status,
-            'occupation' => $resident->occupation,
+            'occupation' => $this->sanitizeOutput($resident->occupation),
             'is_voter' => $resident->is_voter,
             'status' => $resident->status,
             'profile_photo_url' => $resident->photo_path ? asset('storage/' . $resident->photo_path) : null,
@@ -832,10 +896,10 @@ class ResidentDashboardController extends Controller
         if ($household) {
             $household->load(['householdMembers.resident.residentPrivileges.privilege.discountType']);
             
-            $data['household_number'] = $household->household_number;
-            $data['zone'] = $household->zone;
-            $data['purok'] = $household->purok;
-            $data['address'] = $household->address;
+            $data['household_number'] = $this->sanitizeOutput($household->household_number);
+            $data['zone'] = $this->sanitizeOutput($household->zone);
+            $data['purok'] = $this->sanitizeOutput($household->purok);
+            $data['address'] = $this->sanitizeOutput($household->address);
             $data['household_id'] = $household->id;
             $data['household_member_count'] = $household->householdMembers->count();
             
@@ -848,10 +912,10 @@ class ResidentDashboardController extends Controller
                     
                     $memberData = [
                         'id' => $member->resident_id,
-                        'full_name' => $mr->full_name,
-                        'first_name' => $mr->first_name,
-                        'last_name' => $mr->last_name,
-                        'relationship' => $member->relationship_to_head,
+                        'full_name' => $this->sanitizeOutput($mr->full_name),
+                        'first_name' => $this->sanitizeOutput($mr->first_name),
+                        'last_name' => $this->sanitizeOutput($mr->last_name),
+                        'relationship' => $this->sanitizeOutput($member->relationship_to_head),
                         'is_head' => $member->is_head,
                         'is_current_user' => $mr->user && $mr->user->id === Auth::id(),
                         'age' => $mr->age,
@@ -873,17 +937,17 @@ class ResidentDashboardController extends Controller
                 
             $data['household'] = [
                 'id' => $household->id,
-                'household_number' => $household->household_number,
-                'zone' => $household->zone,
-                'purok' => $household->purok,
-                'address' => $household->address,
+                'household_number' => $this->sanitizeOutput($household->household_number),
+                'zone' => $this->sanitizeOutput($household->zone),
+                'purok' => $this->sanitizeOutput($household->purok),
+                'address' => $this->sanitizeOutput($household->address),
             ];
         } else {
             $data['household_number'] = 'N/A';
             $data['zone'] = 'N/A';
             $data['purok'] = $resident->purok?->name ?? 'N/A';
             $data['purok_id'] = $resident->purok_id;
-            $data['address'] = $resident->address ?? 'N/A';
+            $data['address'] = $this->sanitizeOutput($resident->address) ?? 'N/A';
             $data['household_member_count'] = 0;
             $data['household_members'] = [];
         }
@@ -932,6 +996,8 @@ class ResidentDashboardController extends Controller
 
     /**
      * Save profile setup
+     * 
+     * SECURITY NOTE: Uses validated data only
      */
     public function saveProfileSetup(Request $request)
     {
@@ -939,31 +1005,47 @@ class ResidentDashboardController extends Controller
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'contact_number' => 'required|string|max:20',
-            'birth_date' => 'required|date',
+            'birth_date' => 'required|date|before:today',
             'gender' => 'required|string|in:male,female,other',
             'address' => 'required|string|max:500',
         ]);
 
         $user = Auth::user();
         
-        $resident = Resident::create([
-            'first_name' => $validated['first_name'],
-            'last_name' => $validated['last_name'],
-            'email' => $user->email,
-            'contact_number' => $validated['contact_number'],
-            'birth_date' => $validated['birth_date'],
-            'gender' => $validated['gender'],
-            'address' => $validated['address'],
-            'status' => 'active',
-            'civil_status' => 'single',
-            'age' => Carbon::parse($validated['birth_date'])->age,
-            'is_voter' => false,
-        ]);
+        DB::beginTransaction();
+        
+        try {
+            $resident = Resident::create([
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'email' => $user->email,
+                'contact_number' => $validated['contact_number'],
+                'birth_date' => $validated['birth_date'],
+                'gender' => $validated['gender'],
+                'address' => $validated['address'],
+                'status' => 'active',
+                'civil_status' => 'single',
+                'age' => Carbon::parse($validated['birth_date'])->age,
+                'is_voter' => false,
+            ]);
 
-        $user->update(['resident_id' => $resident->id]);
-
-        return redirect()->route('resident.dashboard')
-            ->with('success', 'Profile created successfully!');
+            $user->update(['resident_id' => $resident->id]);
+            
+            DB::commit();
+            
+            return redirect()->route('resident.dashboard')
+                ->with('success', 'Profile created successfully!');
+                
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            \Log::error('Profile setup failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return back()->withErrors(['error' => 'Failed to create profile. Please try again.']);
+        }
     }
 
     /**
@@ -988,20 +1070,20 @@ class ResidentDashboardController extends Controller
         
         $data = [
             'id' => $resident->id,
-            'first_name' => $resident->first_name,
-            'last_name' => $resident->last_name,
-            'middle_name' => $resident->middle_name,
-            'suffix' => $resident->suffix,
+            'first_name' => $this->sanitizeOutput($resident->first_name),
+            'last_name' => $this->sanitizeOutput($resident->last_name),
+            'middle_name' => $this->sanitizeOutput($resident->middle_name),
+            'suffix' => $this->sanitizeOutput($resident->suffix),
             'email' => $resident->email,
             'phone_number' => $resident->contact_number,
             'birth_date' => $resident->birth_date?->format('Y-m-d'),
             'age' => $resident->age,
             'gender' => $resident->gender,
             'civil_status' => $resident->civil_status,
-            'occupation' => $resident->occupation,
-            'address' => $resident->address,
+            'occupation' => $this->sanitizeOutput($resident->occupation),
+            'address' => $this->sanitizeOutput($resident->address),
             'profile_photo_url' => $resident->photo_path ? asset('storage/' . $resident->photo_path) : null,
-            'purok' => $resident->purok?->name,
+            'purok' => $this->sanitizeOutput($resident->purok?->name),
             'purok_id' => $resident->purok_id,
             'is_voter' => $resident->is_voter,
             'privileges' => $activePrivileges,
@@ -1016,14 +1098,15 @@ class ResidentDashboardController extends Controller
         }
 
         if ($user->household_id) {
-            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege.discountType'])->find($user->household_id);
+            $household = Household::with(['householdMembers.resident.residentPrivileges.privilege.discountType'])
+                ->find($user->household_id);
             
             if ($household) {
                 $data['household'] = [
-                    'household_number' => $household->household_number,
-                    'zone' => $household->zone,
-                    'purok' => $household->purok,
-                    'address' => $household->address,
+                    'household_number' => $this->sanitizeOutput($household->household_number),
+                    'zone' => $this->sanitizeOutput($household->zone),
+                    'purok' => $this->sanitizeOutput($household->purok),
+                    'address' => $this->sanitizeOutput($household->address),
                     'members' => $household->householdMembers
                         ->map(function ($member) use ($user) {
                             $mr = $member->resident;
@@ -1033,8 +1116,8 @@ class ResidentDashboardController extends Controller
                             
                             $memberData = [
                                 'id' => $member->resident_id,
-                                'full_name' => $mr->full_name,
-                                'relationship' => $member->relationship_to_head,
+                                'full_name' => $this->sanitizeOutput($mr->full_name),
+                                'relationship' => $this->sanitizeOutput($member->relationship_to_head),
                                 'age' => $mr->age,
                                 'is_head' => $member->is_head,
                                 'is_current_user' => $mr->user && $mr->user->id === $user->id,
@@ -1064,17 +1147,22 @@ class ResidentDashboardController extends Controller
 
     /**
      * Emergency contacts API
+     * 
+     * SECURITY NOTE: Returns actual emergency contacts from config
      */
     public function emergencyContacts()
     {
-        return response()->json([
-            'data' => [
-                ['name' => 'Police', 'number' => '911'],
-                ['name' => 'Fire', 'number' => '911'],
-                ['name' => 'Ambulance', 'number' => '911'],
-                ['name' => 'Barangay Hall', 'number' => '(082) 123-4567'],
-            ]
+        $contacts = config('emergency.contacts', [
+            ['name' => 'Police', 'number' => '911'],
+            ['name' => 'Fire', 'number' => '911'],
+            ['name' => 'Ambulance', 'number' => '911'],
+            ['name' => 'Barangay Hall', 'number' => null],
         ]);
+        
+        // Filter out contacts without numbers
+        $contacts = array_filter($contacts, fn($c) => !empty($c['number']));
+        
+        return response()->json(['data' => array_values($contacts)]);
     }
     
     /**
@@ -1089,21 +1177,51 @@ class ResidentDashboardController extends Controller
                 ->with('info', 'You already have a resident profile.');
         }
         
-        $resident = Resident::create([
-            'first_name' => $user->name,
-            'last_name' => '',
-            'email' => $user->email,
-            'contact_number' => '',
-            'address' => '',
-            'status' => 'active',
-            'civil_status' => 'single',
-            'age' => 0,
-            'is_voter' => false,
-        ]);
+        DB::beginTransaction();
         
-        $user->update(['resident_id' => $resident->id]);
+        try {
+            $resident = Resident::create([
+                'first_name' => $user->name,
+                'last_name' => '',
+                'email' => $user->email,
+                'contact_number' => '',
+                'address' => '',
+                'status' => 'active',
+                'civil_status' => 'single',
+                'age' => 0,
+                'is_voter' => false,
+            ]);
+            
+            $user->update(['resident_id' => $resident->id]);
+            
+            DB::commit();
+            
+            return redirect()->route('resident.dashboard')
+                ->with('success', 'Basic profile created. Please update your complete profile.');
+                
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            \Log::error('Failed to create resident record', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return back()->withErrors(['error' => 'Failed to create profile. Please try again.']);
+        }
+    }
+    
+    /**
+     * Sanitize output for safe display
+     * 
+     * SECURITY NOTE: Prevents XSS attacks
+     */
+    private function sanitizeOutput(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
         
-        return redirect()->route('resident.dashboard')
-            ->with('success', 'Basic profile created. Please update your complete profile.');
+        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }

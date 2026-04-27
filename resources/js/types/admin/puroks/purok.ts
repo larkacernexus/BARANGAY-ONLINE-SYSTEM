@@ -67,6 +67,8 @@ export interface Household {
 }
 
 export interface Resident {
+    name: string | undefined;
+    purok: import("react/jsx-runtime").JSX.Element;
     photo_url: any;
     full_name: string;
     photo_path(photo_path: any): unknown;
@@ -234,5 +236,13 @@ export interface PaginationData {
     last_page: number;
     from: number;
     to: number;
+}
+
+export interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    has_more: boolean;
 }
 

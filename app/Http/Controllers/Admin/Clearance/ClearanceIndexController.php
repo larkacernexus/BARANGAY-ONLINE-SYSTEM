@@ -13,6 +13,16 @@ use Illuminate\Support\Facades\Log;
 
 class ClearanceIndexController extends Controller
 {
+    /**
+     * Allowed per page options (including 'all')
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500', 'all'];
+    
+    /**
+     * Default per page value
+     */
+    protected const DEFAULT_PER_PAGE = 15;
+
     public function index(Request $request)
     {
         // Build query with eager loading
@@ -25,8 +35,9 @@ class ClearanceIndexController extends Controller
         // Apply sorting
         $this->applySorting($query, $request);
         
-        // Get paginated results
-        $clearances = $query->paginate(20)
+        // Get paginated results with dynamic per page
+        $perPage = $this->getPerPage($request);
+        $clearances = $query->paginate($perPage)
             ->withQueryString()
             ->through(fn($clearance) => $this->formatClearance($clearance));
         
@@ -56,6 +67,7 @@ class ClearanceIndexController extends Controller
         Log::info('Clearances index (Server-Side)', [
             'total' => $clearances->total(),
             'current_page' => $clearances->currentPage(),
+            'per_page' => $perPage,
             'filters' => $request->only(['search', 'status', 'type', 'payment_status'])
         ]);
 
@@ -75,12 +87,37 @@ class ClearanceIndexController extends Controller
                 'applicant_type',
                 'amount_range',
                 'sort_by',
-                'sort_order'
+                'sort_order',
+                'per_page'
             ]),
             'statusOptions' => $statusOptions,
             'paymentStatusOptions' => $paymentStatusOptions,
             'urgencyOptions' => $urgencyOptions,
         ]);
+    }
+
+    /**
+     * Get the per page value from request
+     *
+     * @param Request $request
+     * @return int
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Handle 'all' option - return total count
+        if ($perPage === 'all') {
+            return ClearanceRequest::count() ?: self::DEFAULT_PER_PAGE;
+        }
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
     }
 
     /**

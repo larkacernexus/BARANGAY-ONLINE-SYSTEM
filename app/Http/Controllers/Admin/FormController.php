@@ -15,6 +15,16 @@ use Carbon\Carbon;
 
 class FormController extends Controller
 {
+    /**
+     * Allowed per page options (including 'all')
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500', 'all'];
+    
+    /**
+     * Default per page value - ✅ 15
+     */
+    protected const DEFAULT_PER_PAGE = 15;
+
     // List all forms (for admin)
     public function index(Request $request)
     {
@@ -55,7 +65,9 @@ class FormController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
 
-        $forms = $query->paginate(20);
+        // ✅ Dynamic per page - DEFAULT IS 15
+        $perPage = $this->getPerPage($request);
+        $forms = $query->paginate($perPage);
 
         // Get stats for dashboard
         $stats = [
@@ -74,9 +86,30 @@ class FormController extends Controller
             'forms' => $forms,
             'categories' => Form::CATEGORIES,
             'agencies' => Form::AGENCIES,
-            'filters' => $request->only(['search', 'category', 'agency', 'status', 'featured', 'from_date', 'to_date']),
+            'filters' => $request->only(['search', 'category', 'agency', 'status', 'featured', 'from_date', 'to_date', 'per_page']),
             'stats' => $stats,
         ]);
+    }
+
+    /**
+     * Get the per page value from request
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Handle 'all' option - return total count
+        if ($perPage === 'all') {
+            return Form::count() ?: self::DEFAULT_PER_PAGE;
+        }
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
     }
 
     // Show single form details

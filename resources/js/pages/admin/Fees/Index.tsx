@@ -65,6 +65,7 @@ export default function FeesIndex({
     
     const isMobile = useMediaQuery('(max-width: 768px)');
     
+    // ✅ per_page default is 15
     const safeFees = initialFees || { 
         data: [], current_page: 1, last_page: 1, total: 0, per_page: 15, from: 0, to: 0 
     };
@@ -93,6 +94,8 @@ export default function FeesIndex({
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
         (initialFilters.sort_order as 'asc' | 'desc') || 'desc'
     );
+    // ✅ DEFAULT IS '15'
+    const [perPage, setPerPage] = useState<string>('15');
     
     const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -128,8 +131,8 @@ export default function FeesIndex({
         total: safeFees.total || 0,
         from: safeFees.from || 0,
         to: safeFees.to || 0,
-        per_page: safeFees.per_page || 15,
-    }), [safeFees]);
+        per_page: safeFees.per_page || parseInt(perPage) || 15, // ✅ fallback 15
+    }), [safeFees, perPage]);
 
     const getCurrentFilters = useCallback(() => ({
         search: debouncedSearch,
@@ -145,10 +148,11 @@ export default function FeesIndex({
         due_date_range: dueDateRange,
         sort_by: sortBy,
         sort_order: sortOrder,
+        per_page: perPage,
     }), [
         debouncedSearch, statusFilter, categoryFilter, purokFilter, payerTypeFilter,
         debouncedMinAmount, debouncedMaxAmount, debouncedFromDate, debouncedToDate,
-        amountRange, dueDateRange, sortBy, sortOrder
+        amountRange, dueDateRange, sortBy, sortOrder, perPage
     ]);
 
     const reloadData = useCallback((page = 1) => {
@@ -181,8 +185,13 @@ export default function FeesIndex({
     }, [
         debouncedSearch, statusFilter, categoryFilter, purokFilter, payerTypeFilter,
         debouncedMinAmount, debouncedMaxAmount, debouncedFromDate, debouncedToDate,
-        amountRange, dueDateRange, sortBy, sortOrder, reloadData
+        amountRange, dueDateRange, sortBy, sortOrder, perPage, reloadData
     ]);
+
+    const handlePerPageChange = useCallback((value: string) => {
+        setPerPage(value);
+        reloadData(1);
+    }, [reloadData]);
 
     useEffect(() => {
         if (!isBulkMode) {
@@ -363,6 +372,7 @@ export default function FeesIndex({
         }
     }, [paginationData.current_page, reloadData]);
 
+    // ✅ Clear filters - reset to '15'
     const handleClearFilters = useCallback(() => {
         setSearch('');
         setStatusFilter('all');
@@ -378,6 +388,7 @@ export default function FeesIndex({
         setDateRangePreset('');
         setSortBy('created_at');
         setSortOrder('desc');
+        setPerPage('15');
     }, []);
 
     const handleClearSelection = useCallback(() => {
@@ -418,8 +429,9 @@ export default function FeesIndex({
             case 'max_amount': setMaxAmount(value); break;
             case 'from_date': setFromDate(value); break;
             case 'to_date': setToDate(value); break;
+            case 'per_page': handlePerPageChange(value); break;
         }
-    }, []);
+    }, [handlePerPageChange]);
 
     const hasActiveFilters = useMemo(() => Boolean(
         search || 
@@ -437,8 +449,9 @@ export default function FeesIndex({
         min_amount: minAmount,
         max_amount: maxAmount,
         from_date: fromDate,
-        to_date: toDate
-    }), [statusFilter, purokFilter, minAmount, maxAmount, fromDate, toDate]);
+        to_date: toDate,
+        per_page: perPage
+    }), [statusFilter, purokFilter, minAmount, maxAmount, fromDate, toDate, perPage]);
 
     const bulkModeRef = useRef(isBulkMode);
     const selectedFeesRef = useRef(selectedFees);
@@ -562,6 +575,8 @@ export default function FeesIndex({
                         setCategoryFilter={setCategoryFilter}
                         categories={categories}
                         searchInputRef={searchInputRef}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                     />
                     
                     <FeesContent
@@ -578,6 +593,8 @@ export default function FeesIndex({
                         totalPages={paginationData.last_page}
                         totalItems={paginationData.total}
                         itemsPerPage={paginationData.per_page}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onSelectAllFiltered={() => {}}

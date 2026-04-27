@@ -101,8 +101,8 @@ export default function PrivilegesIndex({
     const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
     const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
     const [discountTypeFilter, setDiscountTypeFilter] = useState<string>(getSafeString(safeFilters.discount_type, 'all'));
-    const [assignmentsRange, setAssignmentsRange] = useState<string>('');
-    const [discountPercentageRange, setDiscountPercentageRange] = useState<string>('');
+    const [assignmentsRange, setAssignmentsRange] = useState<string>('all');
+    const [discountPercentageRange, setDiscountPercentageRange] = useState<string>('all');
     const [requiresVerificationFilter, setRequiresVerificationFilter] = useState<string>('all');
     const [requiresIdNumberFilter, setRequiresIdNumberFilter] = useState<string>('all');
     
@@ -584,8 +584,8 @@ export default function PrivilegesIndex({
         setSearch('');
         setStatusFilter('all');
         setDiscountTypeFilter('all');
-        setAssignmentsRange('');
-        setDiscountPercentageRange('');
+        setAssignmentsRange('all');
+        setDiscountPercentageRange('all');
         setRequiresVerificationFilter('all');
         setRequiresIdNumberFilter('all');
         setSortBy('name');

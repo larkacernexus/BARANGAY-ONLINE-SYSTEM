@@ -1,5 +1,6 @@
 // resources/js/components/admin/community-reports/CommunityReportsTableView.tsx
 
+import React from 'react';  // ✅ Add this import
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -143,40 +144,34 @@ export default function CommunityReportsTableView({
                                     </TableHead>
                                 </TableRow>
                             </TableHeader>
-                            <TableBody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900">
+                           <TableBody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900">
                                 {reports.map((report) => {
                                     const isSelected = selectedReports.includes(report.id);
                                     const isExpanded = expandedReport === report.id;
                                     
-                                    return (
-                                        <>
-                                            <CommunityReportRow
-                                                key={report.id}
-                                                report={report}
-                                                isBulkMode={isBulkMode}
-                                                isSelected={isSelected}
-                                                isExpanded={isExpanded}
-                                                windowWidth={windowWidth}
-                                                safeStatuses={safeStatuses}
-                                                safePriorities={safePriorities}
-                                                safeUrgencies={safeUrgencies}
-                                                onItemSelect={onItemSelect}
-                                                onDelete={onDelete}
-                                                onCopyToClipboard={onCopyToClipboard}
-                                                onToggleExpand={toggleReportExpansion}
-                                                onMarkResolved={onMarkResolved}
-                                            />
-                                            
-                                            {isExpanded && (
-                                                <CommunityReportExpandedRow
-                                                    report={report}
-                                                    isBulkMode={isBulkMode}
-                                                />
-                                            )}
-                                        </>
-                                    );
+                                    return (<React.Fragment key={report.id}>
+                                        <CommunityReportRow
+                                            report={report}
+                                            isBulkMode={isBulkMode}
+                                            isSelected={isSelected}
+                                            isExpanded={isExpanded}
+                                            windowWidth={windowWidth}
+                                            safeStatuses={safeStatuses}
+                                            safePriorities={safePriorities}
+                                            safeUrgencies={safeUrgencies}
+                                            onItemSelect={onItemSelect}
+                                            onDelete={onDelete}
+                                            onCopyToClipboard={onCopyToClipboard}
+                                            onToggleExpand={toggleReportExpansion}
+                                            onMarkResolved={onMarkResolved}
+                                        />
+                                        {isExpanded && (<CommunityReportExpandedRow
+                                            report={report}
+                                            isBulkMode={isBulkMode}
+                                        />)}
+                                    </React.Fragment>);
                                 })}
-                            </TableBody>
+                                </TableBody>
                         </Table>
                     </div>
                 </div>

@@ -1,5 +1,4 @@
-// pages/admin/CommunityReports/Create.tsx (Complete corrected section for IncidentDetailsCard)
-
+// pages/admin/CommunityReports/Create.tsx
 import { useState, useRef, useEffect } from 'react';
 import { router, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
@@ -17,8 +16,9 @@ import { ReportTypeCard } from '@/components/admin/community-reports/create/comp
 import { IncidentDetailsCard } from '@/components/admin/community-reports/create/components/IncidentDetailsCard';
 import { ReviewCard } from '@/components/admin/community-reports/create/components/ReviewCard';
 import { ProgressSidebar } from '@/components/admin/community-reports/create/components/ProgressSidebar';
+import type { Resident } from '@/types/admin/reports/community-report';
 
-// Define ExistingFile interface for edit mode (if needed)
+// Define ExistingFile interface for edit mode
 interface ExistingFile {
     id: number;
     file_name: string;
@@ -37,15 +37,21 @@ const steps = [
 export default function Create({
     report_types,
     puroks,
-    users,
+    categories,
+    statuses,
+    urgencies,
+    priorities,
+    impact_levels,
+    affected_people_options,
+    noise_levels,
     ...props
 }: PageProps) {
     const [activeStep, setActiveStep] = useState(1);
     const [selectedType, setSelectedType] = useState<ReportType | null>(null);
-    const [selectedResident, setSelectedResident] = useState<PageProps['users'][0] | null>(null);
+    const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
     const [files, setFiles] = useState<FileWithPreview[]>([]);
-    const [existingFiles, setExistingFiles] = useState<ExistingFile[]>([]); // For edit mode
-    const [isEditMode] = useState(false); // Set to true for edit mode
+    const [existingFiles, setExistingFiles] = useState<ExistingFile[]>([]);
+    const [isEditMode] = useState(false);
     const [previewModal, setPreviewModal] = useState<{
         isOpen: boolean;
         url: string | null;
@@ -93,20 +99,27 @@ export default function Create({
     });
 
     // Handle resident selection
-    const handleResidentSelect = (resident: PageProps['users'][0]) => {
+    const handleResidentSelect = (resident: Resident) => {
+        if (!resident.id || !resident.name) {
+            toast.error('Invalid resident data');
+            return;
+        }
+        
         setSelectedResident(resident);
-        setFormData((prev: any) => ({
+        setFormData((prev) => ({
             ...prev,
             user_id: resident.id,
             reporter_name: resident.name,
             reporter_contact: resident.phone || resident.email || '',
             reporter_address: resident.address || '',
         }));
+        
+        toast.success(`Selected ${resident.name}`);
     };
 
     const handleClearResident = () => {
         setSelectedResident(null);
-        setFormData((prev: any) => ({
+        setFormData((prev) => ({
             ...prev,
             user_id: null,
             reporter_name: '',
@@ -117,15 +130,15 @@ export default function Create({
 
     // Handle type selection
     const handleTypeSelect = (typeId: number) => {
-        const type = report_types.find((t: { id: number; }) => t.id === typeId);
+        const type = report_types.find((t) => t.id === typeId);
         setSelectedType(type || null);
-        setFormData((prev: any) => ({ ...prev, report_type_id: typeId }));
+        setFormData((prev) => ({ ...prev, report_type_id: typeId }));
     };
 
     // Handle file selection
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFiles = Array.from(e.target.files || []);
-        const maxSize = 10 * 1024 * 1024;
+        const maxSize = 10 * 1024 * 1024; // 10MB
         
         const validFiles = selectedFiles.filter(file => file.size <= maxSize);
         const invalidFiles = selectedFiles.filter(file => file.size > maxSize);
@@ -146,7 +159,7 @@ export default function Create({
         setFiles(prev => [...prev, ...filesWithPreview]);
     };
 
-    // Remove a new file - matches onRemoveNewFile prop
+    // Remove a new file
     const removeNewFile = (id: string) => {
         setFiles(prev => {
             const file = prev.find(f => f.id === id);
@@ -162,7 +175,7 @@ export default function Create({
         setExistingFiles(prev => prev.filter(f => f.id !== fileId));
     };
 
-    // Clear all new files - matches onClearAllNewFiles prop
+    // Clear all new files
     const clearAllNewFiles = () => {
         files.forEach(file => {
             if (file.preview) {
@@ -178,7 +191,7 @@ export default function Create({
         setExistingFiles([]);
     };
 
-    // Update openPreview to handle both FileWithPreview and ExistingFile
+    // Open preview for a file
     const openPreview = (file: FileWithPreview | ExistingFile) => {
         let url: string | null = null;
         let type = '';
@@ -214,7 +227,7 @@ export default function Create({
     };
 
     const closePreview = () => {
-        if (previewModal.url && !previewModal.url.startsWith('blob:')) {
+        if (previewModal.url && previewModal.url.startsWith('blob:')) {
             URL.revokeObjectURL(previewModal.url);
         }
         setPreviewModal({
@@ -234,7 +247,7 @@ export default function Create({
                 }
             });
         };
-    }, []);
+    }, [files]);
 
     // Navigation
     const goToStep = (step: number) => {
@@ -258,7 +271,7 @@ export default function Create({
         
         if (activeStep === 2) {
             if (!formData.title.trim()) {
-                toast.error('Please enter a title');
+                toast.error('Please enter a report title');
                 return;
             }
             if (!formData.description.trim()) {
@@ -266,7 +279,7 @@ export default function Create({
                 return;
             }
             if (!formData.location.trim()) {
-                toast.error('Please enter the location');
+                toast.error('Please enter the incident location');
                 return;
             }
         }
@@ -292,14 +305,14 @@ export default function Create({
         
         if (type === 'checkbox') {
             const checked = (e.target as HTMLInputElement).checked;
-            setFormData((prev: any) => ({ ...prev, [name]: checked }));
+            setFormData((prev) => ({ ...prev, [name]: checked }));
         } else {
-            setFormData((prev: any) => ({ ...prev, [name]: value }));
+            setFormData((prev) => ({ ...prev, [name]: value }));
         }
     };
 
     const handleCheckboxChange = (name: string, checked: boolean) => {
-        setFormData((prev: any) => ({ ...prev, [name]: checked }));
+        setFormData((prev) => ({ ...prev, [name]: checked }));
     };
 
     // Form submission
@@ -374,7 +387,7 @@ export default function Create({
 
     const isStepValid = () => {
         if (activeStep === 1) {
-            return (formData.user_id !== null || formData.is_anonymous || formData.reporter_name) && 
+            return (formData.user_id !== null || formData.is_anonymous || formData.reporter_name !== '') && 
                    formData.report_type_id !== null;
         }
         if (activeStep === 2) {
@@ -389,7 +402,7 @@ export default function Create({
         <AdminLayout
             title="Create Community Report"
             breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Dashboard', href: '/admin/dashboard' },
                 { title: 'Community Reports', href: '/admin/community-reports' },
                 { title: 'Create Report', href: '/admin/community-reports/create' }
             ]}
@@ -400,13 +413,18 @@ export default function Create({
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <Link href={route('admin.community-reports.index')}>
-                                <Button type="button" variant="outline" size="sm">
+                                <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm"
+                                    className="dark:border-gray-600 dark:text-gray-300 hover:dark:bg-gray-800"
+                                >
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Back
                                 </Button>
                             </Link>
                             <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
                                     <FileText className="h-6 w-6 text-white" />
                                 </div>
                                 <div>
@@ -423,7 +441,7 @@ export default function Create({
                             type="submit" 
                             disabled={isSubmitting || !isStepValid()} 
                             size="lg"
-                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700 dark:hover:from-blue-800 dark:hover:to-indigo-800 shadow-lg hover:shadow-xl transition-all"
                         >
                             <Save className="h-4 w-4 mr-2" />
                             {isSubmitting ? 'Saving...' : 'Save Report'}
@@ -440,7 +458,6 @@ export default function Create({
                             {activeStep === 1 && (
                                 <>
                                     <ComplainantInfoCard
-                                        residents={users}
                                         selectedResident={selectedResident}
                                         formData={{
                                             user_id: formData.user_id,
@@ -506,20 +523,25 @@ export default function Create({
                             )}
 
                             {/* Navigation Buttons */}
-                            <div className="flex items-center justify-between pt-4">
+                            <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                                 <div>
                                     {activeStep > 1 ? (
                                         <Button
                                             type="button"
                                             variant="outline"
                                             onClick={prevStep}
+                                            className="dark:border-gray-600 dark:text-gray-300 hover:dark:bg-gray-800"
                                         >
                                             <ArrowLeft className="h-4 w-4 mr-2" />
                                             Previous
                                         </Button>
                                     ) : (
                                         <Link href={route('admin.community-reports.index')}>
-                                            <Button type="button" variant="outline">
+                                            <Button 
+                                                type="button" 
+                                                variant="outline"
+                                                className="dark:border-gray-600 dark:text-gray-300 hover:dark:bg-gray-800"
+                                            >
                                                 Cancel
                                             </Button>
                                         </Link>
@@ -531,7 +553,7 @@ export default function Create({
                                             type="button"
                                             onClick={nextStep}
                                             disabled={!isStepValid()}
-                                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white dark:from-blue-700 dark:to-indigo-700"
                                         >
                                             Next
                                             <ArrowRight className="h-4 w-4 ml-2" />
@@ -540,7 +562,7 @@ export default function Create({
                                         <Button 
                                             type="submit"
                                             disabled={isSubmitting}
-                                            className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+                                            className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white dark:from-green-700 dark:to-teal-700 shadow-lg hover:shadow-xl transition-all"
                                         >
                                             <Send className="h-4 w-4 mr-2" />
                                             {isSubmitting ? 'Submitting...' : 'Submit Report'}

@@ -19,7 +19,8 @@ import {
     Grid3X3, 
     Plus,
     Smartphone,
-    ArrowUpDown
+    ArrowUpDown,
+    Rows3
 } from 'lucide-react';
 import CommunityReportsTableView from './CommunityReportsTableView';
 import CommunityReportsGridView from './CommunityReportsGridView';
@@ -42,6 +43,8 @@ interface CommunityReportsContentProps {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
+    perPage?: string;
+    onPerPageChange?: (value: string) => void;
     onPageChange: (page: number) => void;
     onSelectAllOnPage: () => void;
     onItemSelect: (id: number) => void;
@@ -89,6 +92,8 @@ export default function CommunityReportsContent({
     totalPages,
     totalItems,
     itemsPerPage,
+    perPage = '15',
+    onPerPageChange = () => {},
     onPageChange,
     onSelectAllOnPage,
     onItemSelect,
@@ -128,6 +133,20 @@ export default function CommunityReportsContent({
     const [localBulkMode, setLocalBulkMode] = useState(isBulkMode);
     const [showBulkActions, setShowBulkActions] = useState(false);
     const bulkActionRef = useRef<HTMLDivElement>(null);
+    
+    // Per page options
+    const perPageOptions = [
+        { value: '15', label: '15 per page' },
+        { value: '30', label: '30 per page' },
+        { value: '50', label: '50 per page' },
+        { value: '100', label: '100 per page' },
+        { value: '500', label: '500 per page' },
+    ];
+
+    // Handle per page change
+    const handlePerPageChange = (value: string) => {
+        onPerPageChange(value);
+    };
     
     // Convert hasActiveFilters to boolean
     const activeFilters = typeof hasActiveFilters === 'string' 
@@ -357,6 +376,28 @@ export default function CommunityReportsContent({
                     </div>
                     
                     <div className="flex items-center gap-3">
+                        {/* Per Page Selector */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={perPage}
+                                    onValueChange={handlePerPageChange}
+                                >
+                                    <SelectTrigger className="w-[130px] h-8 text-xs">
+                                        <SelectValue placeholder="Per page..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {perPageOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Sort By Dropdown */}
                         {!isMobile && (
                             <div className="flex items-center gap-2">
@@ -451,7 +492,7 @@ export default function CommunityReportsContent({
                         {/* Page info */}
                         {!isMobile && totalPages > 1 && (
                             <div className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                                Page {currentPage} of {totalPages}
+                                Showing {reports.length > 0 ? '1' : '0'} - {reports.length} of {totalItems}
                             </div>
                         )}
                         
@@ -521,65 +562,92 @@ export default function CommunityReportsContent({
                                 />
                             )}
                             
-                            {/* Simplified pagination for grid view */}
-                            {totalPages > 1 && (
-                                <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-3 items-center justify-between ${isMobile ? 'p-3' : 'mt-4 pt-4 px-4 border-t dark:border-gray-800'}`}>
-                                    <div className={`text-gray-500 dark:text-gray-400 ${isMobile ? 'text-xs mb-2' : 'text-sm'}`}>
-                                        Page {currentPage} of {totalPages}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size={isMobile ? "sm" : "default"}
-                                            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                                            disabled={currentPage === 1}
-                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
-                                        >
-                                            {isMobile ? "←" : "Previous"}
-                                        </Button>
-                                        
-                                        <div className="flex items-center gap-1">
-                                            {Array.from({ length: Math.min(isMobile ? 3 : 5, totalPages) }, (_, i) => {
-                                                let pageNum;
-                                                if (totalPages <= (isMobile ? 3 : 5)) {
-                                                    pageNum = i + 1;
-                                                } else if (currentPage <= 2) {
-                                                    pageNum = i + 1;
-                                                } else if (currentPage >= totalPages - 1) {
-                                                    pageNum = totalPages - (isMobile ? 2 : 4) + i;
-                                                } else {
-                                                    pageNum = currentPage - 1 + i;
-                                                }
-                                                return (
-                                                    <Button
-                                                        key={pageNum}
-                                                        variant={currentPage === pageNum ? "default" : "outline"}
-                                                        size={isMobile ? "sm" : "default"}
-                                                        onClick={() => onPageChange(pageNum)}
-                                                        className={`${isMobile ? "h-8 w-8 p-0 text-xs" : "h-8 w-8 p-0"} ${
-                                                            currentPage === pageNum 
-                                                                ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
-                                                                : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
-                                                        }`}
-                                                    >
-                                                        {pageNum}
-                                                    </Button>
-                                                );
-                                            })}
+                            {/* Mobile Per Page & Pagination Footer */}
+                            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    {/* Mobile Per Page Selector */}
+                                    {isMobile && (
+                                        <div className="flex items-center gap-2 w-full">
+                                            <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            <Select
+                                                value={perPage}
+                                                onValueChange={handlePerPageChange}
+                                            >
+                                                <SelectTrigger className="w-full h-8 text-xs">
+                                                    <SelectValue placeholder="Per page..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {perPageOptions.map((option) => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                        
-                                        <Button
-                                            variant="outline"
-                                            size={isMobile ? "sm" : "default"}
-                                            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                                            disabled={currentPage === totalPages}
-                                            className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
-                                        >
-                                            {isMobile ? "→" : "Next"}
-                                        </Button>
-                                    </div>
+                                    )}
+
+                                    {/* Simplified pagination for grid/mobile */}
+                                    {totalPages > 1 && (
+                                        <div className={`flex ${isMobile ? 'flex-col w-full' : 'flex-row w-full'} gap-3 items-center justify-between`}>
+                                            <div className={`text-gray-500 dark:text-gray-400 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                                                Page {currentPage} of {totalPages}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size={isMobile ? "sm" : "default"}
+                                                    onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                                                    disabled={currentPage === 1}
+                                                    className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
+                                                >
+                                                    {isMobile ? "←" : "Previous"}
+                                                </Button>
+                                                
+                                                <div className="flex items-center gap-1">
+                                                    {Array.from({ length: Math.min(isMobile ? 3 : 5, totalPages) }, (_, i) => {
+                                                        let pageNum;
+                                                        if (totalPages <= (isMobile ? 3 : 5)) {
+                                                            pageNum = i + 1;
+                                                        } else if (currentPage <= 2) {
+                                                            pageNum = i + 1;
+                                                        } else if (currentPage >= totalPages - 1) {
+                                                            pageNum = totalPages - (isMobile ? 2 : 4) + i;
+                                                        } else {
+                                                            pageNum = currentPage - 1 + i;
+                                                        }
+                                                        return (
+                                                            <Button
+                                                                key={pageNum}
+                                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                                size={isMobile ? "sm" : "default"}
+                                                                onClick={() => onPageChange(pageNum)}
+                                                                className={`${isMobile ? "h-8 w-8 p-0 text-xs" : "h-8 w-8 p-0"} ${
+                                                                    currentPage === pageNum 
+                                                                        ? 'dark:bg-blue-600 dark:hover:bg-blue-700' 
+                                                                        : 'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
+                                                                }`}
+                                                            >
+                                                                {pageNum}
+                                                            </Button>
+                                                        );
+                                                    })}
+                                                </div>
+                                                
+                                                <Button
+                                                    variant="outline"
+                                                    size={isMobile ? "sm" : "default"}
+                                                    onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+                                                    disabled={currentPage === totalPages}
+                                                    className={`${isMobile ? "h-8 px-3 text-xs" : ""} dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
+                                                >
+                                                    {isMobile ? "→" : "Next"}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </>
                     )}
                 </CardContent>

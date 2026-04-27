@@ -20,7 +20,6 @@ import {
     X,
     Users,
     BadgeCheck,
-    Clock,
     Shield,
     TrendingUp,
     UserPlus
@@ -90,7 +89,7 @@ export default function PositionsFilters({
         if (filtersState.requires_account && filtersState.requires_account !== 'all') {
             queryParams.append('requires_account', filtersState.requires_account);
         }
-        if (filtersState.officials_range) {
+        if (filtersState.officials_range && filtersState.officials_range !== 'all') {
             queryParams.append('officials_range', filtersState.officials_range);
         }
         window.location.href = `/admin/positions/export?${queryParams.toString()}`;
@@ -99,27 +98,27 @@ export default function PositionsFilters({
     // Safe access to filter values with fallbacks
     const currentStatus = filtersState.status ?? 'all';
     const currentRequiresAccount = filtersState.requires_account ?? 'all';
-    const currentOfficialsRange = filtersState.officials_range ?? '';
+    const currentOfficialsRange = filtersState.officials_range ?? 'all';
 
     // Convert hasActiveFilters to boolean
     const activeFilters = typeof hasActiveFilters === 'string' 
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
-    // Helper to get active filter count
+    // Helper to get active filter count - FIXED: Check for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
         if (currentStatus !== 'all') count++;
         if (currentRequiresAccount !== 'all') count++;
-        if (currentOfficialsRange && currentOfficialsRange !== '') count++;
+        if (currentOfficialsRange && currentOfficialsRange !== 'all') count++;
         return count;
     };
 
     const activeFilterCount = getActiveFilterCount();
 
-    // Officials count range options
+    // Officials count range options - FIXED: Use 'all' instead of empty string
     const officialsRanges = [
-        { value: '', label: 'All Positions', color: 'gray' },
+        { value: 'all', label: 'All Positions', color: 'gray' },
         { value: '0', label: 'Vacant (0 officials)', color: 'red' },
         { value: '1', label: '1 official', color: 'blue' },
         { value: '2-3', label: '2-3 officials', color: 'emerald' },
@@ -169,7 +168,7 @@ export default function PositionsFilters({
                             </div>
                             <Input
                                 ref={searchInputRef}
-                                placeholder="Search positions by name, code, committee, or description..."
+                                placeholder="Search positions by name, code, committee, or description... (Ctrl+F)"
                                 className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 value={search}
                                 onChange={(e) => handleSearch(e.target.value)}
@@ -227,13 +226,13 @@ export default function PositionsFilters({
                             <span className="ml-1">positions</span>
                             {search && (
                                 <span className="ml-1">
-                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                 </span>
                             )}
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Active filter badges */}
+                            {/* Active filter badges - FIXED: Check for 'all' instead of empty string */}
                             {activeFilters && (
                                 <>
                                     {currentStatus !== 'all' && (
@@ -254,7 +253,7 @@ export default function PositionsFilters({
                                             {getAccountRequirementLabel(currentRequiresAccount)}
                                         </Badge>
                                     )}
-                                    {currentOfficialsRange && currentOfficialsRange !== '' && (
+                                    {currentOfficialsRange && currentOfficialsRange !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             getOfficialsRangeColor(currentOfficialsRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
                                             getOfficialsRangeColor(currentOfficialsRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
@@ -543,7 +542,7 @@ export default function PositionsFilters({
                                         size="sm"
                                         className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                         onClick={() => {
-                                            handleOfficialsRange('');
+                                            handleOfficialsRange('all');
                                             setShowAdvancedFilters(false);
                                         }}
                                         disabled={isLoading}

@@ -1,17 +1,15 @@
-// components/community-report/ComplainantInfoCard.tsx
+// components/admin/community-reports/create/components/ComplainantInfoCard.tsx
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { UserPlus, X, CheckCircle } from 'lucide-react';
+import { UserPlus, CheckCircle } from 'lucide-react';
 import { SearchableResidentDropdown } from './SearchableResidentDropdown';
 import { Resident } from '@/types/admin/reports/community-report';
 
 interface ComplainantInfoCardProps {
-    residents: Resident[];
     selectedResident: Resident | null;
     formData: {
         user_id: number | null;
@@ -27,7 +25,6 @@ interface ComplainantInfoCardProps {
 }
 
 export const ComplainantInfoCard = ({
-    residents,
     selectedResident,
     formData,
     onResidentSelect,
@@ -43,49 +40,22 @@ export const ComplainantInfoCard = ({
                     Complainant Information
                 </CardTitle>
                 <CardDescription className="text-gray-500 dark:text-gray-400">
-                    Select an existing resident or enter complainant details manually
+                    Select an existing resident or enter complainant details manually. 
+                    Search by name, email, phone, or address.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* Searchable Resident Dropdown */}
                 <div className="space-y-2">
-                    <Label className="text-gray-700 dark:text-gray-300">Search Resident</Label>
+                    <Label className="text-gray-700 dark:text-gray-300">
+                        Search Resident
+                    </Label>
                     <SearchableResidentDropdown
-                        residents={residents}
                         onSelect={onResidentSelect}
                         selectedResident={selectedResident}
                         onClear={onClearResident}
-                        placeholder="Search by name, email, or phone number..."
+                        placeholder="Search by name, email, phone, or address..."
                     />
-                    {selectedResident && (
-                        <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
-                            <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                    <p className="font-medium text-gray-900 dark:text-gray-100">{selectedResident.name}</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1 mt-1 text-sm">
-                                        {selectedResident.email && (
-                                            <p className="text-gray-600 dark:text-gray-400">📧 {selectedResident.email}</p>
-                                        )}
-                                        {selectedResident.phone && (
-                                            <p className="text-gray-600 dark:text-gray-400">📞 {selectedResident.phone}</p>
-                                        )}
-                                        {selectedResident.address && (
-                                            <p className="text-gray-600 dark:text-gray-400 col-span-2">📍 {selectedResident.address}</p>
-                                        )}
-                                    </div>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                                    onClick={onClearResident}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <Separator className="bg-gray-200 dark:bg-gray-700" />
@@ -99,16 +69,24 @@ export const ComplainantInfoCard = ({
                             onCheckedChange={(checked) => 
                                 onCheckboxChange('is_anonymous', checked as boolean)
                             }
+                            disabled={!!selectedResident}
                             className="border-gray-300 dark:border-gray-600"
                         />
-                        <Label htmlFor="is_anonymous" className="text-gray-700 dark:text-gray-300">Report anonymously</Label>
+                        <Label 
+                            htmlFor="is_anonymous" 
+                            className={`text-gray-700 dark:text-gray-300 ${selectedResident ? 'opacity-50' : ''}`}
+                        >
+                            Report anonymously
+                        </Label>
                     </div>
 
                     {!formData.is_anonymous && !selectedResident && (
                         <>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="reporter_name" className="text-gray-700 dark:text-gray-300">Full Name *</Label>
+                                    <Label htmlFor="reporter_name" className="text-gray-700 dark:text-gray-300">
+                                        Full Name <span className="text-red-500">*</span>
+                                    </Label>
                                     <Input
                                         id="reporter_name"
                                         name="reporter_name"
@@ -119,7 +97,9 @@ export const ComplainantInfoCard = ({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="reporter_contact" className="text-gray-700 dark:text-gray-300">Contact Number *</Label>
+                                    <Label htmlFor="reporter_contact" className="text-gray-700 dark:text-gray-300">
+                                        Contact Number <span className="text-red-500">*</span>
+                                    </Label>
                                     <Input
                                         id="reporter_contact"
                                         name="reporter_contact"
@@ -131,7 +111,9 @@ export const ComplainantInfoCard = ({
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="reporter_address" className="text-gray-700 dark:text-gray-300">Address</Label>
+                                <Label htmlFor="reporter_address" className="text-gray-700 dark:text-gray-300">
+                                    Address
+                                </Label>
                                 <Textarea
                                     id="reporter_address"
                                     name="reporter_address"
@@ -149,9 +131,23 @@ export const ComplainantInfoCard = ({
                     {selectedResident && !formData.is_anonymous && (
                         <div className="p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg">
                             <div className="flex items-center gap-2">
-                                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                                 <p className="text-sm text-green-700 dark:text-green-300">
-                                    Resident information will be used for this report
+                                    Resident information will be used for this report. 
+                                    Clear the selection to enter details manually.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Show message when anonymous */}
+                    {formData.is_anonymous && (
+                        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                            <div className="flex items-center gap-2">
+                                <CheckCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                    This report will be submitted anonymously. 
+                                    No complainant information will be recorded.
                                 </p>
                             </div>
                         </div>

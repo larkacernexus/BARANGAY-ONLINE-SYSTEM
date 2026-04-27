@@ -45,18 +45,26 @@ class Banner extends Model
     ];
 
     // COPY THE EXACT SAME PATTERN AS RESIDENT MODEL
-    public function getImageUrlAttribute(): ?string
-    {
-        if (!$this->image_path) {
-            return null;
-        }
-        
-        if (str_starts_with($this->image_path, 'http')) {
-            return $this->image_path;
-        }
-        
-        return Storage::url($this->image_path);  // 👈 USE Storage::url() LIKE RESIDENT!
+   public function getImageUrlAttribute(): ?string
+{
+    if (!$this->image_path) {
+        return null;
     }
+    
+    if (str_starts_with($this->image_path, 'http')) {
+        return $this->image_path;
+    }
+    
+    // Try Storage::url first
+    $url = Storage::url($this->image_path);
+    
+    // Fallback: use asset helper
+    if (!file_exists(public_path($url))) {
+        return asset('storage/' . $this->image_path);
+    }
+    
+    return $url;
+}
 
     public function getMobileImageUrlAttribute(): ?string
     {

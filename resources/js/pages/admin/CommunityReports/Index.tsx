@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/admin-app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react'; // ✅ Added useState
 
 // Custom hooks
 import { useCommunityReportsManagement } from '@/hooks/useCommunityReportsManagement';
@@ -65,6 +65,9 @@ export default function CommunityReportsIndex({
 }: CommunityReportsIndexProps) {
     
     const { flash } = usePage().props as any;
+    
+    // ✅ ADDED: Manage perPage state locally since the hook may not expose it
+    const [perPage, setPerPage] = useState<string>(filters?.per_page || '15');
     
     // Use the custom hook for state management
     const {
@@ -157,15 +160,23 @@ export default function CommunityReportsIndex({
         stats: rawStats
     });
 
+    // ✅ Handle per page change
+    const handlePerPageChange = (value: string) => {
+        setPerPage(value);
+        // Optionally reload data with new per_page value
+        // router.get('/admin/community-reports', { ...filters, per_page: value, page: 1 }, {
+        //     preserveState: true,
+        //     preserveScroll: true,
+        // });
+    };
+
     // Add mark as resolved handler
     const handleMarkResolved = (report: CommunityReport) => {
-        // Implement mark as resolved logic here
         console.log('Mark as resolved:', report.id);
     };
 
     // Wrapper for onBulkOperation to convert BulkOperation to string for the component
     const handleBulkOperationWrapper = async (operation: string, customData?: any) => {
-        // Cast string to BulkOperation
         await handleBulkOperation(operation as BulkOperation, customData);
     };
 
@@ -270,8 +281,8 @@ export default function CommunityReportsIndex({
                         searchInputRef={searchInputRef}
                         selectionRef={selectionRef}
                         windowWidth={windowWidth}
-                        // onSortChange={handleSortChange}
-                        // getCurrentSortValue={getCurrentSortValue}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                     />
 
                     {/* Quick Filters */}
@@ -311,6 +322,8 @@ export default function CommunityReportsIndex({
                         totalPages={totalPages}
                         totalItems={totalItems}
                         itemsPerPage={itemsPerPage}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                         onPageChange={setCurrentPage}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onItemSelect={handleItemSelect}
@@ -345,11 +358,9 @@ export default function CommunityReportsIndex({
                         onSelectAllFiltered={handleSelectAllFiltered}
                         onSelectAll={handleSelectAll}
                         onClearSelection={() => {
-                            // Clear selection logic
                             selectedReports.forEach(id => handleItemSelect(id));
                         }}
                         sortBy={sortBy}
-                        // sortOrder={sortOrder}
                         onSortChange={handleSortChange}
                         getCurrentSortValue={getCurrentSortValue}
                     />

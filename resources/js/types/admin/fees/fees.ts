@@ -6,51 +6,79 @@ import React from 'react';
 
 // Base Fee interface
 export interface Fee {
-    name: any;
-    description: any;
-    surcharge_amount: number;
-    discount_amount: number;
-    cancelled_at: any;
+    // Required fields
     id: number;
     fee_type_id: number;
     resident_id: number;
     amount: number;
     status: 'pending' | 'paid' | 'overdue' | 'cancelled' | 'refunded' | 'issued' | 'partial' | 'partially_paid';
     due_date: string;
+    created_at: string;
+    updated_at: string;
+    
+    // Required fields (formerly optional)
+    fee_code: string;
+    balance: number;
+    amount_paid: number;
+    payer_type: 'resident' | 'household' | 'business' | string;
+    
+    // Optional fields
+    name?: any;
+    description?: any;
+    surcharge_amount?: number;
+    discount_amount?: number;
+    cancelled_at?: any;
     paid_date?: string | null;
     payment_method?: string | null;
     payment_reference?: string | null;
     notes?: string | null;
-    created_at: string;
-    updated_at: string;
-    
-    // Additional fields from the grid view
-    fee_code?: string;
     code?: string;
-    payer_type?: 'resident' | 'household' | 'business' | string;
     type?: 'resident' | 'household' | 'business' | string;
     payer_name?: string;
     contact_number?: string;
     purok?: string;
     issue_date?: string;
-    amount_paid?: number;
     paid_amount?: number;
-    balance?: number;
     household_id?: number;
     address?: string;
     total_amount?: number;
     certificate_number?: string;
     or_number?: string;
+    penalty_amount?: number;
+    base_amount?: number;
+    computation_details?: string;
+    requirements_submitted?: string;
+    zone?: string;
+    business_id?: number;
     
     // Relations
     fee_type?: FeeType;
     resident?: Resident;
+    household?: Household;
+    business?: Business;
     payments?: Payment[];
     
     // Computed fields
     is_overdue?: boolean;
     days_overdue?: number;
-    penalty_amount?: number;
+    penalty_amount_calculated?: number;
+}
+
+// Business interface
+export interface Business {
+    id: number;
+    business_name: string;
+    contact_number?: string;
+    email?: string;
+    address?: string;
+    purok?: string;
+    zone?: string;
+    business_type?: string;
+    owner_name?: string;
+    registration_number?: string;
+    is_active?: boolean;
+    created_at?: string;
+    updated_at?: string;
 }
 
 // Fee Type interface
@@ -72,6 +100,7 @@ export interface FeeType {
     is_discountable?: boolean;
     surcharge_description?: string;
     penalty_description?: string;
+    requirements?: string[] | string;
     
     // Discount fields
     has_senior_discount: boolean;
@@ -109,7 +138,20 @@ export interface Resident {
     is_solo_parent?: boolean;
     is_indigent?: boolean;
     full_name?: string;
+    name?: string;
     privileges?: PrivilegeData[];
+    profile_photo?: string | null;
+    birth_date?: string;
+    gender?: 'male' | 'female' | 'other';
+    occupation?: string;
+    zone?: string;
+    civil_status?: string;
+    nationality?: string;
+    religion?: string;
+    tin?: string;
+    sss?: string;
+    philhealth?: string;
+    voter_id?: string;
 }
 
 // Household interface
@@ -127,6 +169,12 @@ export interface Household {
     privileges?: PrivilegeData[];
     created_at?: string;
     updated_at?: string;
+    zone?: string;
+    household_number?: string;
+    street?: string;
+    barangay?: string;
+    city?: string;
+    province?: string;
 }
 
 // Privilege Data interface
@@ -194,6 +242,44 @@ export interface Payment {
     created_at: string;
 }
 
+// Payment History interface
+export interface PaymentHistory {
+    id: number;
+    fee_id: number;
+    amount: number;
+    payment_date: string;
+    payment_method: string;
+    reference_number?: string;
+    or_number?: string;
+    description?: string;
+    notes?: string;
+    received_by?: string;
+    created_at: string;
+    updated_at?: string;
+    formatted_amount?: string;
+    formatted_subtotal?: string;
+    formatted_total_discount?: string;
+    subtotal?: number;
+    total_discount?: number;
+    fee?: Fee;
+}
+
+// Related Fee interface
+export interface RelatedFee {
+    id: number;
+    fee_code: string;
+    fee_type_id: number;
+    status: string;
+    amount: number;
+    due_date: string;
+    created_at: string;
+    fee_type?: {
+        id: number;
+        name: string;
+        code: string;
+    };
+}
+
 // ========== PAGINATION ==========
 
 export interface PaginationData {
@@ -213,7 +299,7 @@ export interface PaginationLink {
     active: boolean;
 }
 
-// ========== FILTERS (FIXED) ==========
+// ========== FILTERS ==========
 
 export interface Filters {
     search?: string;
@@ -233,8 +319,6 @@ export interface Filters {
     sort_by?: string;
     sort_order?: 'asc' | 'desc';
     due_date_range?: string;
-    
-    // ✅ ADDED: Missing properties for cross-module compatibility
     payer_type?: string;
     amount_range?: string;
     type?: string;
@@ -257,10 +341,9 @@ export interface FilterState {
     amount_max: string;
 }
 
-// ========== STATS (FIXED) ==========
+// ========== STATS ==========
 
 export interface Stats {
-    // Required fields
     total: number;
     total_amount: number;
     collected: number;
@@ -275,13 +358,9 @@ export interface Stats {
     this_month_collected: number;
     status_counts: Record<string, number>;
     category_totals: Record<string, number>;
-    
-    // Optional fields
     issued_count?: number;
     partially_paid_count?: number;
     waived_count?: number;
-    
-    // ✅ ADDED: Missing properties for cross-module compatibility
     active?: number;
     inactive?: number;
     averageAmount?: number;
@@ -306,8 +385,6 @@ export interface Stats {
     totalRevenue?: number;
     expressRequests?: number;
     rushRequests?: number;
-    
-    // Legacy fields for compatibility
     total_fees?: number;
     paid_amount?: number;
     pending_amount?: number;
@@ -340,8 +417,6 @@ export interface SelectionStats {
     residents: number;
     households: number;
     businesses: number;
-    
-    // ✅ ADDED: For compatibility
     paid?: number;
     pending?: number;
     overdue?: number;
@@ -358,7 +433,7 @@ export interface SelectionStats {
     byStatus?: Record<string, number>;
 }
 
-// ========== BULK OPERATIONS (FIXED) ==========
+// ========== BULK OPERATIONS ==========
 
 export type BulkOperation = 
     | 'delete' 
@@ -373,7 +448,6 @@ export type BulkOperation =
     | 'waive_penalties'
     | 'print'          
     | 'copy_data'
-    // ✅ ADDED: Missing operations for clearances compatibility
     | 'issue'
     | 'cancel'
     | 'process'
@@ -440,6 +514,10 @@ export interface FeesShowProps {
         total_penalties: number;
         payment_history: Payment[];
     };
+    related_fees?: RelatedFee[];
+    payment_history?: PaymentHistory[];
+    permissions?: Permissions;
+    allPrivileges?: PrivilegeData[];
 }
 
 export interface FeesCreateProps {
@@ -614,3 +692,63 @@ export const safeString = (value: any): string => {
     if (value === undefined || value === null) return '';
     return String(value);
 };
+
+export interface DiscountItem {
+    rule_name?: string;
+    rule_id?: number;
+    discount_type?: string;
+    amount?: number;
+    formatted_amount?: string;
+    percentage?: number;
+}
+
+
+export interface ComputationDetails {
+    base_amount?: number;
+    surcharge_rate?: number;
+    surcharge_amount?: number;
+    penalty_rate?: number;
+    penalty_amount?: number;
+    discount_rate?: number;
+    discount_amount?: number;
+    total_amount?: number;
+    calculation_method?: string;
+    breakdown?: Array<{
+        description: string;
+        amount: number;
+        type: 'base' | 'surcharge' | 'penalty' | 'discount';
+    }>;
+    [key: string]: any;
+}
+
+export interface FeeDetailsTabProps {
+    fee: Fee;
+    payerInfo: PayerInfo;
+    formatDate: (date: string | null | undefined) => string;
+    formatCurrency: (amount: number | string | undefined) => string;
+}
+
+// ========== TYPES ==========
+interface PayerInfo {
+    name: string;
+    contact?: string;
+    email?: string;
+    address?: string;
+    purok?: string;
+    zone?: string;
+    classification?: string;
+    link?: string | null;
+    icon: 'User' | 'Home' | 'Building' | string;
+    typeLabel: string;
+    profile_photo?: string | null;
+    birth_date?: string;
+    gender?: string;
+    occupation?: string;
+    privileges?: PrivilegeData[];
+    has_privileges?: boolean;
+    head_privileges?: PrivilegeData[];
+    resident_id?: number;
+    household_id?: number;
+    business_id?: number;
+    id?: number;
+}

@@ -11,7 +11,7 @@ import { FormHeader } from '@/components/adminui/form/form-header';
 import { FormErrors } from '@/components/adminui/form/form-errors';
 import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
 import { useFormManager } from '@/hooks/admin/use-form-manager';
-import { User, FileText, FileCheck, CreditCard, Info, Sparkles, Copy, RefreshCw, Home, Building, AlertCircle } from 'lucide-react';
+import { User, FileText, FileCheck, CreditCard, Info, Sparkles, Copy, RefreshCw, Home, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ApplicantTab } from '@/components/admin/clearances/create/applicant-tab';
 import { RequestTab } from '@/components/admin/clearances/create/request-tab';
@@ -55,18 +55,12 @@ interface FormData {
 
 export default function CreateClearanceRequest() {
     const { props } = usePage<{
-        residents: Resident[];
-        households: Household[];
-        businesses: Business[];
         clearanceTypes: ClearanceType[];
         activeClearanceTypes: ClearanceType[];
         purposeOptions: string[];
     }>();
     
     const {
-        residents = [],
-        households = [],
-        businesses = [],
         clearanceTypes = [],
         activeClearanceTypes = [],
         purposeOptions = []
@@ -79,9 +73,6 @@ export default function CreateClearanceRequest() {
     const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
     const [selectedClearanceType, setSelectedClearanceType] = useState<ClearanceType | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filteredResidents, setFilteredResidents] = useState<Resident[]>([]);
-    const [filteredHouseholds, setFilteredHouseholds] = useState<Household[]>([]);
-    const [filteredBusinesses, setFilteredBusinesses] = useState<Business[]>([]);
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
 
     const {
@@ -92,8 +83,6 @@ export default function CreateClearanceRequest() {
         formProgress,
         allRequiredFieldsFilled,
         handleInputChange,
-        handleSelectChange,
-        handleSubmit,
         setActiveTab,
         getTabStatus,
         getMissingFields,
@@ -119,25 +108,68 @@ export default function CreateClearanceRequest() {
             remarks: '',
         },
         requiredFields: requiredFieldsMap,
-        onSubmit: (data) => {
-            router.post(route('admin.clearances.store'), data as any, {
-                onSuccess: () => {
-                    toast.success('Clearance request created successfully');
-                    router.visit(route('admin.clearances.index'));
-                },
-                onError: (errs) => {
-                    setLocalErrors(errs);
-                    toast.error('Failed to create clearance request');
-                }
-            });
+        onSubmit: () => {
+            // Handled in custom submit handlers
         }
     });
 
-    // Ensure active tab is 'applicant' when component mounts
     useEffect(() => {
-        // Set active tab to 'applicant' on initial load
         setActiveTab('applicant');
-    }, []); // Empty dependency array ensures this runs once on mount
+    }, [setActiveTab]);
+
+    // Calculate fee based on clearance type and urgency
+    const calculateFee = useCallback((clearanceType: ClearanceType | null, urgency: UrgencyLevel): number => {
+        if (!clearanceType) return 0;
+        
+        let fee = clearanceType.fee;
+        if (urgency === 'rush') {
+            fee *= 1.5;
+        } else if (urgency === 'express') {
+            fee *= 2.0;
+        }
+        return fee;
+    }, []);
+
+    // Custom select change handler
+    const handleClearanceTypeChange = useCallback((value: string) => {
+        const selected = activeClearanceTypes.find(ct => ct.id.toString() === value);
+        
+        if (selected) {
+            setSelectedClearanceType(selected);
+            const fee = calculateFee(selected, formData.urgency);
+            
+            updateFormData({
+                clearance_type_id: value,
+                fee_amount: fee
+            });
+        } else {
+            setSelectedClearanceType(null);
+            updateFormData({
+                clearance_type_id: '',
+                fee_amount: 0
+            });
+        }
+    }, [activeClearanceTypes, formData.urgency, calculateFee, updateFormData]);
+
+    const handleUrgencyChange = useCallback((value: string) => {
+        const urgency = value as UrgencyLevel;
+        const fee = calculateFee(selectedClearanceType, urgency);
+        
+        updateFormData({
+            urgency,
+            fee_amount: fee
+        });
+    }, [selectedClearanceType, calculateFee, updateFormData]);
+
+    const handleSelectChangeWrapper = useCallback((name: string, value: string) => {
+        if (name === 'clearance_type_id') {
+            handleClearanceTypeChange(value);
+        } else if (name === 'urgency') {
+            handleUrgencyChange(value);
+        } else {
+            updateFormData({ [name]: value } as Partial<FormData>);
+        }
+    }, [handleClearanceTypeChange, handleUrgencyChange, updateFormData]);
 
     // Memoized values
     const safePurposeOptions = useMemo(() => {
@@ -150,8 +182,8 @@ export default function CreateClearanceRequest() {
         if (payerType === 'resident' && selectedResident) {
             return {
                 name: selectedResident.full_name,
-                details: `${(selectedResident as any).address || 'No address'} • ${selectedResident.contact_number || 'No contact'}`,
-                extra: (selectedResident as any).purok ? `Purok ${(selectedResident as any).purok}` : null
+                details: `${selectedResident.address || 'No address'} • ${selectedResident.contact_number || 'No contact'}`,
+                extra: selectedResident.purok ? `Purok ${selectedResident.purok}` : null
             };
         } else if (payerType === 'household' && selectedHousehold) {
             return {
@@ -171,7 +203,9 @@ export default function CreateClearanceRequest() {
 
     const requirements = useMemo(() => {
         if (selectedClearanceType?.document_requirements && selectedClearanceType.document_requirements.length > 0) {
-            return selectedClearanceType.document_requirements.map(req => req.name);
+            return selectedClearanceType.document_requirements.map(req => 
+                typeof req === 'string' ? req : (req as any).name || 'Unknown requirement'
+            );
         }
         return [
             'Valid ID presented',
@@ -192,68 +226,8 @@ export default function CreateClearanceRequest() {
         return days;
     }, [selectedClearanceType, formData.urgency]);
 
-    // Update fee amount based on urgency and clearance type
-    useEffect(() => {
-        if (selectedClearanceType) {
-            let fee = selectedClearanceType.fee;
-            if (formData.urgency === 'rush') {
-                fee *= 1.5;
-            } else if (formData.urgency === 'express') {
-                fee *= 2.0;
-            }
-            updateFormData({ fee_amount: fee });
-        }
-    }, [selectedClearanceType, formData.urgency, updateFormData]);
-
-    // Filter search results
-    useEffect(() => {
-        if (payerType === 'resident') {
-            const residentsArray = Array.isArray(residents) ? residents : [];
-            if (searchTerm.trim()) {
-                const term = searchTerm.toLowerCase();
-                const results = residentsArray.filter(resident =>
-                    (resident.full_name?.toLowerCase() || '').includes(term) ||
-                    (resident.first_name?.toLowerCase() || '').includes(term) ||
-                    (resident.last_name?.toLowerCase() || '').includes(term) ||
-                    ((resident as any).address?.toLowerCase() || '').includes(term) ||
-                    (resident.contact_number || '').includes(term)
-                );
-                setFilteredResidents(results);
-            } else {
-                setFilteredResidents(residentsArray.slice(0, 10));
-            }
-        } else if (payerType === 'household') {
-            const householdsArray = Array.isArray(households) ? households : [];
-            if (searchTerm.trim()) {
-                const term = searchTerm.toLowerCase();
-                const results = householdsArray.filter(household =>
-                    (household.head_of_family?.toLowerCase() || '').includes(term) ||
-                    (household.household_number?.toLowerCase() || '').includes(term) ||
-                    (household.address?.toLowerCase() || '').includes(term)
-                );
-                setFilteredHouseholds(results);
-            } else {
-                setFilteredHouseholds(householdsArray.slice(0, 10));
-            }
-        } else if (payerType === 'business') {
-            const businessesArray = Array.isArray(businesses) ? businesses : [];
-            if (searchTerm.trim()) {
-                const term = searchTerm.toLowerCase();
-                const results = businessesArray.filter(business =>
-                    (business.business_name?.toLowerCase() || '').includes(term) ||
-                    (business.owner_name?.toLowerCase() || '').includes(term) ||
-                    (business.address?.toLowerCase() || '').includes(term) ||
-                    (business.contact_number || '').includes(term)
-                );
-                setFilteredBusinesses(results);
-            } else {
-                setFilteredBusinesses(businessesArray.slice(0, 10));
-            }
-        }
-    }, [payerType, searchTerm, residents, households, businesses]);
-
     // Handle payer type change
-    const handlePayerTypeChange = (type: 'resident' | 'household' | 'business') => {
+    const handlePayerTypeChange = useCallback((type: 'resident' | 'household' | 'business') => {
         setPayerType(type);
         setSelectedResident(null);
         setSelectedHousehold(null);
@@ -266,43 +240,79 @@ export default function CreateClearanceRequest() {
             business_id: ''
         });
         setSearchTerm('');
-    };
+    }, [updateFormData]);
 
     // Selection handlers
-    const handleSelectResident = (resident: Resident) => {
+    const handleSelectResident = useCallback((resident: Resident) => {
+        if (!resident.id || !resident.full_name) {
+            toast.error('Invalid resident data');
+            return;
+        }
+        
         setSelectedResident(resident);
+        setSelectedHousehold(null);
+        setSelectedBusiness(null);
+        setPayerType('resident');
+        
         updateFormData({
             resident_id: resident.id.toString(),
+            household_id: '',
+            business_id: '',
             payer_id: resident.id.toString(),
             payer_type: 'resident'
         });
+        
         setSearchTerm('');
         toast.success(`Selected ${resident.full_name}`);
-    };
+    }, [updateFormData]);
 
-    const handleSelectHousehold = (household: Household) => {
+    const handleSelectHousehold = useCallback((household: Household) => {
+        if (!household.id || !household.head_of_family) {
+            toast.error('Invalid household data');
+            return;
+        }
+        
         setSelectedHousehold(household);
+        setSelectedResident(null);
+        setSelectedBusiness(null);
+        setPayerType('household');
+        
         updateFormData({
+            resident_id: '',
             household_id: household.id.toString(),
+            business_id: '',
             payer_id: household.id.toString(),
             payer_type: 'household'
         });
+        
         setSearchTerm('');
         toast.success(`Selected ${household.head_of_family}'s household`);
-    };
+    }, [updateFormData]);
 
-    const handleSelectBusiness = (business: Business) => {
+    const handleSelectBusiness = useCallback((business: Business) => {
+        if (!business.id || !business.business_name) {
+            toast.error('Invalid business data');
+            return;
+        }
+        
         setSelectedBusiness(business);
+        setSelectedResident(null);
+        setSelectedHousehold(null);
+        setPayerType('business');
+        
         updateFormData({
+            resident_id: '',
+            household_id: '',
             business_id: business.id.toString(),
             payer_id: business.id.toString(),
             payer_type: 'business'
         });
+        
         setSearchTerm('');
         toast.success(`Selected ${business.business_name}`);
-    };
+    }, [updateFormData]);
 
-    const handleChangePayer = () => {
+    const handleChangePayer = useCallback(() => {
         setSelectedResident(null);
         setSelectedHousehold(null);
         setSelectedBusiness(null);
@@ -313,38 +323,38 @@ export default function CreateClearanceRequest() {
             payer_id: ''
         });
         setSearchTerm('');
-    };
+    }, [updateFormData]);
 
     // Get payer icon
-    const getPayerIcon = (type: string) => {
+    const getPayerIcon = useCallback((type: string) => {
         switch (type) {
             case 'resident': return <User className="h-4 w-4" />;
             case 'household': return <Home className="h-4 w-4" />;
             case 'business': return <Building className="h-4 w-4" />;
             default: return <User className="h-4 w-4" />;
         }
-    };
+    }, []);
 
     // Get urgency color
-    const getUrgencyColor = (urgency: UrgencyLevel): string => {
+    const getUrgencyColor = useCallback((urgency: UrgencyLevel): string => {
         switch (urgency) {
             case 'express': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
             case 'rush': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
             default: return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
         }
-    };
+    }, []);
 
     // Format currency
-    const formatCurrency = (amount: number) => {
+    const formatCurrency = useCallback((amount: number) => {
         return new Intl.NumberFormat('en-PH', {
             style: 'currency',
             currency: 'PHP',
             minimumFractionDigits: 2
         }).format(amount);
-    };
+    }, []);
 
     // Format date
-    const formatDate = (dateString?: string) => {
+    const formatDate = useCallback((dateString?: string) => {
         if (!dateString) return 'Not specified';
         try {
             const date = new Date(dateString);
@@ -356,10 +366,10 @@ export default function CreateClearanceRequest() {
         } catch {
             return dateString;
         }
-    };
+    }, []);
 
     // Validate form
-    const validateForm = (): boolean => {
+    const validateForm = useCallback((): boolean => {
         const newErrors: Record<string, string> = {};
 
         if (payerType === 'resident' && !selectedResident) {
@@ -383,10 +393,44 @@ export default function CreateClearanceRequest() {
 
         setLocalErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    };
+    }, [payerType, selectedResident, selectedHousehold, selectedBusiness, selectedClearanceType, formData.purpose, formData.needed_date]);
 
-    // Handle custom submit with payment
-    const handleSubmitWithPayment = async (e: React.MouseEvent) => {
+    // Handle standard submit
+    const handleSubmit = useCallback(async (e?: React.MouseEvent | React.FormEvent) => {
+        if (e) {
+            e.preventDefault();
+        }
+        
+        if (!validateForm()) {
+            setActiveTab('applicant');
+            toast.error('Please fix the errors in the form');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        const submitData = {
+            ...formData,
+            proceed_to_payment: false
+        };
+
+        router.post(route('admin.clearances.store'), submitData as any, {
+            onSuccess: () => {
+                toast.success('Clearance request created successfully');
+            },
+            onError: (errs) => {
+                setLocalErrors(errs);
+                toast.error('Failed to create clearance request');
+                setIsSubmitting(false);
+            },
+            onFinish: () => {
+                setIsSubmitting(false);
+            }
+        });
+    }, [validateForm, formData, setActiveTab, setIsSubmitting]);
+
+    // Handle submit with payment
+    const handleSubmitWithPayment = useCallback(async (e: React.MouseEvent) => {
         e.preventDefault();
         
         if (!validateForm()) {
@@ -406,9 +450,9 @@ export default function CreateClearanceRequest() {
             onSuccess: (page) => {
                 toast.success('Clearance request created successfully');
                 
-                if (formData.fee_amount > 0 && (page.props as any)?.clearance?.id) {
-                    const clearance = (page.props as any).clearance;
-                    
+                const serverClearance = (page.props as any)?.clearance;
+                
+                if (formData.fee_amount > 0 && serverClearance?.id) {
                     let payerId = '';
                     let payerName = '';
                     let contactNumber = '';
@@ -419,8 +463,8 @@ export default function CreateClearanceRequest() {
                         payerId = selectedResident.id.toString();
                         payerName = selectedResident.full_name;
                         contactNumber = selectedResident.contact_number || '';
-                        address = (selectedResident as any).address || '';
-                        purok = (selectedResident as any).purok || '';
+                        address = selectedResident.address || '';
+                        purok = selectedResident.purok || '';
                     } else if (payerType === 'household' && selectedHousehold) {
                         payerId = selectedHousehold.id.toString();
                         payerName = selectedHousehold.head_of_family;
@@ -441,9 +485,9 @@ export default function CreateClearanceRequest() {
                         contact_number: contactNumber,
                         address: address,
                         purok: purok,
-                        fee_id: clearance.id.toString(),
-                        fee_code: clearance.fee_code || `CLR-${clearance.id}`,
-                        fee_amount: clearance.amount?.toString() || formData.fee_amount.toString(),
+                        fee_id: serverClearance.id.toString(),
+                        fee_code: serverClearance.fee_code || `CLR-${serverClearance.id}`,
+                        fee_amount: serverClearance.amount?.toString() || formData.fee_amount.toString(),
                         fee_description: `${selectedClearanceType?.name} Clearance`,
                         from_clearance: 'true',
                         clearance_created: 'true',
@@ -452,11 +496,7 @@ export default function CreateClearanceRequest() {
                     });
                     
                     router.visit(route('payments.create') + '?' + params.toString());
-                } else {
-                    router.visit(route('admin.clearances.index'));
                 }
-                
-                setIsSubmitting(false);
             },
             onError: (errs) => {
                 setLocalErrors(errs);
@@ -467,10 +507,10 @@ export default function CreateClearanceRequest() {
                 setIsSubmitting(false);
             }
         });
-    };
+    }, [validateForm, formData, payerType, selectedResident, selectedHousehold, selectedBusiness, selectedClearanceType, setActiveTab, setIsSubmitting]);
 
     // Handle reset
-    const handleReset = () => {
+    const handleReset = useCallback(() => {
         if (confirm('Are you sure you want to reset the form? All data will be lost.')) {
             resetForm();
             setSelectedResident(null);
@@ -479,13 +519,13 @@ export default function CreateClearanceRequest() {
             setSelectedClearanceType(null);
             setSearchTerm('');
             setLocalErrors({});
-            setActiveTab('applicant'); // Reset to applicant tab
+            setActiveTab('applicant');
             toast.info('Form reset');
         }
-    };
+    }, [resetForm, setActiveTab]);
 
     // Handle cancel
-    const handleCancel = () => {
+    const handleCancel = useCallback(() => {
         if (formData.clearance_type_id || selectedPayerDisplay) {
             if (confirm('You have unsaved changes. Are you sure you want to cancel?')) {
                 router.visit(route('admin.clearances.index'));
@@ -493,7 +533,29 @@ export default function CreateClearanceRequest() {
         } else {
             router.visit(route('admin.clearances.index'));
         }
-    };
+    }, [formData.clearance_type_id, selectedPayerDisplay]);
+
+    // Compute submit button disabled state
+    const isSubmitDisabled = useMemo(() => {
+        if (isSubmitting) return true;
+        
+        const hasValidPayer = (() => {
+            switch (payerType) {
+                case 'resident':
+                    return selectedResident !== null && selectedResident.id !== undefined;
+                case 'household':
+                    return selectedHousehold !== null && selectedHousehold.id !== undefined;
+                case 'business':
+                    return selectedBusiness !== null && selectedBusiness.id !== undefined;
+                default:
+                    return false;
+            }
+        })();
+        
+        const hasValidClearanceType = selectedClearanceType !== null && selectedClearanceType.id !== undefined;
+        
+        return !hasValidPayer || !hasValidClearanceType;
+    }, [isSubmitting, payerType, selectedResident, selectedHousehold, selectedBusiness, selectedClearanceType]);
 
     const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
         applicant: getTabStatus('applicant'),
@@ -559,7 +621,10 @@ export default function CreateClearanceRequest() {
                                         type="button"
                                         onClick={() => {
                                             setSelectedClearanceType(type);
-                                            updateFormData({ clearance_type_id: type.id.toString(), fee_amount: type.fee });
+                                            updateFormData({ 
+                                                clearance_type_id: type.id.toString(), 
+                                                fee_amount: type.fee 
+                                            });
                                             setActiveTab('request');
                                             toast.success(`${type.name} selected`);
                                         }}
@@ -623,9 +688,9 @@ export default function CreateClearanceRequest() {
                                         payerType={payerType}
                                         searchTerm={searchTerm}
                                         selectedPayerDisplay={selectedPayerDisplay}
-                                        filteredResidents={filteredResidents}
-                                        filteredHouseholds={filteredHouseholds}
-                                        filteredBusinesses={filteredBusinesses}
+                                        filteredResidents={[]}
+                                        filteredHouseholds={[]}
+                                        filteredBusinesses={[]}
                                         errors={allErrors}
                                         isLocked={false}
                                         isSubmitting={isSubmitting}
@@ -663,7 +728,7 @@ export default function CreateClearanceRequest() {
                                         safePurposeOptions={safePurposeOptions}
                                         selectedClearanceType={selectedClearanceType}
                                         isSubmitting={isSubmitting}
-                                        onSelectChange={handleSelectChange}
+                                        onSelectChange={handleSelectChangeWrapper}
                                         onInputChange={handleInputChange}
                                         formatCurrency={formatCurrency}
                                     />
@@ -705,7 +770,7 @@ export default function CreateClearanceRequest() {
                                         type="button"
                                         variant="default"
                                         onClick={handleSubmit}
-                                        disabled={isSubmitting || !selectedPayerDisplay || !selectedClearanceType}
+                                        disabled={isSubmitDisabled}
                                         className="dark:bg-blue-600 dark:hover:bg-blue-700"
                                     >
                                         {isSubmitting ? 'Creating...' : 'Create Request'}
@@ -714,7 +779,7 @@ export default function CreateClearanceRequest() {
                                         <Button
                                             type="button"
                                             onClick={handleSubmitWithPayment}
-                                            disabled={isSubmitting || !selectedPayerDisplay || !selectedClearanceType}
+                                            disabled={isSubmitDisabled}
                                             className="gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
                                         >
                                             <CreditCard className="h-4 w-4" />

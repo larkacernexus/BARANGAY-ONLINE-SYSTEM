@@ -1,3 +1,4 @@
+// pages/admin/households/edit.tsx
 import AppLayout from '@/layouts/admin-app-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,10 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { Link, useForm } from '@inertiajs/react';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import axios from 'axios';
+import debounce from 'lodash/debounce';
+import { Badge } from '@/components/ui/badge';
 import { 
     PageProps, 
     Resident, 
@@ -119,6 +123,14 @@ interface HouseholdFormData {
     longitude?: number | null;
 }
 
+interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    has_more: boolean;
+}
+
 interface EditHouseholdProps extends PageProps {
     household: {
         id: number;
@@ -141,9 +153,7 @@ interface EditHouseholdProps extends PageProps {
         latitude?: number | null;
         longitude?: number | null;
     };
-    heads: Resident[];
     puroks: Purok[];
-    available_residents?: Resident[];
     current_members: HouseholdMember[];
 }
 
@@ -205,26 +215,10 @@ const MemberCard = ({
                                     Head of Family
                                 </span>
                             )}
-                            {hasPhoto(member) && (
-                                <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                    <Camera className="h-3 w-3" />
-                                    Photo
-                                </span>
-                            )}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                             {member.relationship}
                             {member.age && member.age > 0 && ` • ${member.age} years old`}
-                            {member.resident_id && !isHead && (
-                                <span className="ml-2 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded">
-                                    Existing Resident
-                                </span>
-                            )}
-                            {member.purok_name && (
-                                <span className="ml-2 text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-2 py-0.5 rounded">
-                                    Purok: {member.purok_name}
-                                </span>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -262,22 +256,6 @@ const MemberCard = ({
                             }
                         </SelectContent>
                     </Select>
-                </div>
-            )}
-            
-            {!member.resident_id && member.name && !isHead && (
-                <div className="mt-3 pt-3 border-t border-dashed dark:border-gray-700">
-                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        This member is not in the residents database yet.
-                    </div>
-                    <Link 
-                        href={`/admin/residents/create?return_to=/households/${householdId}/edit&name=${encodeURIComponent(member.name)}&age=${member.age}&relationship=${encodeURIComponent(member.relationship)}&household_id=${householdId}&purok_id=${purokId || ''}`}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400 dark:hover:text-blue-300"
-                    >
-                        <Plus className="h-3 w-3" />
-                        Add to Residents Database
-                    </Link>
                 </div>
             )}
         </div>
@@ -331,9 +309,7 @@ const ChecklistItem = ({ completed, label, subLabel, warning = false }: Checklis
 
 export default function EditHousehold({ 
     household, 
-    heads, 
     puroks, 
-    available_residents = [],
     current_members 
 }: EditHouseholdProps) {
     // State
@@ -347,6 +323,21 @@ export default function EditHousehold({
     
     const [showMemberSearch, setShowMemberSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Resident[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [memberPagination, setMemberPagination] = useState<PaginationMeta | null>(null);
+    const [isLoadingMoreMembers, setIsLoadingMoreMembers] = useState(false);
+    
+    // Head search state
+    const [heads, setHeads] = useState<Resident[]>([]);
+    const [headSearchQuery, setHeadSearchQuery] = useState('');
+    const [isSearchingHeads, setIsSearchingHeads] = useState(false);
+    const [headPagination, setHeadPagination] = useState<PaginationMeta | null>(null);
+    
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const debouncedSearchRef = useRef(
+        debounce((query: string) => fetchResidents(query, 1, false), 300)
+    );
     
     // Form
     const { data, setData, put, processing, errors, reset } = useForm<HouseholdFormData>({
@@ -370,6 +361,89 @@ export default function EditHousehold({
         longitude: household.longitude || null,
     });
 
+    // Fetch heads from server
+    const fetchHeads = useCallback(async (query: string = '', page: number = 1) => {
+        setIsSearchingHeads(true);
+        
+        try {
+            const params = new URLSearchParams({
+                search: query,
+                page: String(page),
+                per_page: '50',
+            });
+            
+            const response = await axios.get(`/admin/households/search-heads?${params}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                }
+            });
+            
+            if (response.data) {
+                if (page > 1) {
+                    setHeads(prev => {
+                        const existingIds = new Set(prev.map(h => h.id));
+                        const newHeads = (response.data.data || []).filter((h: Resident) => !existingIds.has(h.id));
+                        return [...prev, ...newHeads];
+                    });
+                } else {
+                    setHeads(response.data.data || []);
+                }
+                setHeadPagination(response.data.pagination || null);
+            }
+        } catch (error) {
+            // Handle silently
+        } finally {
+            setIsSearchingHeads(false);
+        }
+    }, []);
+
+    // Fetch residents for member search
+    const fetchResidents = useCallback(async (query: string = '', page: number = 1, append: boolean = false) => {
+        setIsSearching(true);
+        
+        try {
+            const params = new URLSearchParams({
+                search: query,
+                page: String(page),
+                per_page: '50',
+            });
+            
+            const response = await axios.get(`/admin/households/search-residents?${params}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                }
+            });
+            
+            if (response.data) {
+                if (append && page > 1) {
+                    setSearchResults(prev => {
+                        const existingIds = new Set(prev.map(r => r.id));
+                        const newResidents = (response.data.data || []).filter((r: Resident) => !existingIds.has(r.id));
+                        return [...prev, ...newResidents];
+                    });
+                } else {
+                    setSearchResults(response.data.data || []);
+                }
+                setMemberPagination(response.data.pagination || null);
+            }
+        } catch (error) {
+            if (!append) setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+            setIsLoadingMoreMembers(false);
+        }
+    }, []);
+
+    // Initial loads
+    useEffect(() => {
+        fetchHeads('', 1);
+        return () => debouncedSearchRef.current.cancel();
+    }, []);
+
     // Computed values
     const headMember = useMemo(() => members.find(m => m.relationship === 'Head' || m.is_head), [members]);
     const currentHeadResident = useMemo(() => 
@@ -378,17 +452,18 @@ export default function EditHousehold({
             : null,
         [headMember, heads]
     );
-    
-    const searchResults = useMemo(() => {
-        if (!searchQuery.trim()) return available_residents;
-        const searchLower = searchQuery.toLowerCase();
-        return available_residents.filter(resident => {
-            const fullName = getFullName(resident.first_name, resident.last_name, resident.middle_name).toLowerCase();
-            return fullName.includes(searchLower) ||
-                resident.first_name.toLowerCase().includes(searchLower) ||
-                resident.last_name.toLowerCase().includes(searchLower);
-        });
-    }, [searchQuery, available_residents]);
+
+    // Handle member search
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        debouncedSearchRef.current(value);
+    };
+
+    const loadMoreMembers = async () => {
+        if (!memberPagination?.has_more || isLoadingMoreMembers) return;
+        setIsLoadingMoreMembers(true);
+        await fetchResidents(searchQuery, (memberPagination.current_page || 1) + 1, true);
+    };
 
     // Update form data when members change
     useEffect(() => {
@@ -422,7 +497,7 @@ export default function EditHousehold({
             return;
         }
 
-        const newId = members.length > 0 ? Math.max(...members.map(m => m.id)) + 1 : 1;
+        const newId = Date.now();
         const fullName = getFullName(resident.first_name, resident.last_name, resident.middle_name);
         
         setMembers(prev => [...prev, { 
@@ -565,7 +640,7 @@ export default function EditHousehold({
                         <div>
                             <h1 className="text-3xl font-bold tracking-tight dark:text-white">Edit Household</h1>
                             <p className="text-gray-500 dark:text-gray-400">
-                                Household #{household.household_number} • Last updated {new Date().toLocaleDateString()}
+                                Household #{household.household_number}
                             </p>
                         </div>
                     </div>
@@ -626,9 +701,6 @@ export default function EditHousehold({
                                     <Home className="h-5 w-5" />
                                     Basic Household Information
                                 </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Edit the household's basic details
-                                </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid gap-4 md:grid-cols-2">
@@ -641,9 +713,6 @@ export default function EditHousehold({
                                             required
                                             className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                         />
-                                        {errors.household_number && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.household_number}</p>
-                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="registrationDate" className="dark:text-gray-300">Registration Date</Label>
@@ -662,68 +731,43 @@ export default function EditHousehold({
                                     <Select 
                                         value={currentHeadResident?.id?.toString() || ''}
                                         onValueChange={handleHeadChange}
+                                        onOpenChange={(open) => {
+                                            if (open) fetchHeads('', 1);
+                                        }}
                                     >
                                         <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-white">
                                             <SelectValue placeholder="Select or search for head of family">
                                                 {currentHeadResident ? (
                                                     <div className="flex items-center gap-2">
-                                                        <div className="h-6 w-6 rounded-full overflow-hidden">
-                                                            {hasPhoto(currentHeadResident) ? (
-                                                                <img 
-                                                                    src={getPhotoUrl(currentHeadResident.photo_path, currentHeadResident.photo_url)!}
-                                                                    alt={getFullName(currentHeadResident.first_name, currentHeadResident.last_name, currentHeadResident.middle_name)}
-                                                                    className="h-full w-full object-cover"
-                                                                />
-                                                            ) : (
-                                                                <div className="h-full w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                                                    <User className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <span>{currentHeadResident.first_name} {currentHeadResident.last_name}</span>
-                                                        {currentHeadResident.age && (
-                                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                ({currentHeadResident.age} years)
-                                                            </span>
-                                                        )}
+                                                        {getFullName(currentHeadResident.first_name, currentHeadResident.last_name, currentHeadResident.middle_name)}
                                                     </div>
                                                 ) : 'Select head of family'}
                                             </SelectValue>
                                         </SelectTrigger>
-                                        <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                                            {heads.map((head) => {
-                                                const fullName = getFullName(head.first_name, head.last_name, head.middle_name);
-                                                return (
-                                                    <SelectItem key={head.id} value={head.id.toString()} className="dark:text-white">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-6 w-6 rounded-full overflow-hidden">
-                                                                {hasPhoto(head) ? (
-                                                                    <img 
-                                                                        src={getPhotoUrl(head.photo_path, head.photo_url)!}
-                                                                        alt={fullName}
-                                                                        className="h-full w-full object-cover"
-                                                                    />
-                                                                ) : (
-                                                                    <div className="h-full w-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                                                        <User className="h-3 w-3 text-gray-500 dark:text-gray-400" />
-                                                                    </div>
+                                        <SelectContent className="dark:bg-gray-900 dark:border-gray-700 max-h-60">
+                                            {heads.length === 0 ? (
+                                                <div className="px-2 py-4 text-center text-gray-500 text-sm">
+                                                    No available residents found
+                                                </div>
+                                            ) : (
+                                                heads.map((head) => {
+                                                    const fullName = getFullName(head.first_name, head.last_name, head.middle_name);
+                                                    return (
+                                                        <SelectItem key={head.id} value={head.id.toString()} className="dark:text-white">
+                                                            <div className="flex items-center justify-between w-full">
+                                                                <span>{fullName}</span>
+                                                                {head.household_status === 'member' && (
+                                                                    <Badge variant="outline" className="ml-2 text-xs bg-purple-100 text-purple-800">
+                                                                        HH #{head.current_household?.number}
+                                                                    </Badge>
                                                                 )}
                                                             </div>
-                                                            <span>{fullName}</span>
-                                                            {head.age && (
-                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                    ({head.age} years)
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </SelectItem>
-                                                );
-                                            })}
+                                                        </SelectItem>
+                                                    );
+                                                })
+                                            )}
                                         </SelectContent>
                                     </Select>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        Select the head of family from available residents. The head will be added as the first household member.
-                                    </p>
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
@@ -740,9 +784,6 @@ export default function EditHousehold({
                                                 onChange={(e) => setData('contact_number', e.target.value)}
                                             />
                                         </div>
-                                        {errors.contact_number && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.contact_number}</p>
-                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="email" className="dark:text-gray-300">Email Address</Label>
@@ -757,9 +798,6 @@ export default function EditHousehold({
                                                 onChange={(e) => setData('email', e.target.value)}
                                             />
                                         </div>
-                                        {errors.email && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-                                        )}
                                     </div>
                                 </div>
                             </CardContent>
@@ -772,25 +810,17 @@ export default function EditHousehold({
                                     <MapPin className="h-5 w-5" />
                                     Address Information
                                 </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    Edit the household's address
-                                </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="completeAddress" className="dark:text-gray-300">Complete Address *</Label>
                                     <Textarea 
                                         id="completeAddress" 
-                                        placeholder="House No., Street, Barangay Kibawe" 
-                                        required 
                                         rows={3}
                                         value={data.address}
                                         onChange={(e) => setData('address', e.target.value)}
                                         className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                     />
-                                    {errors.address && (
-                                        <p className="text-sm text-red-600 dark:text-red-400">{errors.address}</p>
-                                    )}
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
@@ -811,22 +841,10 @@ export default function EditHousehold({
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                        {errors.purok_id && (
-                                            <p className="text-sm text-red-600 dark:text-red-400">{errors.purok_id}</p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="nearestLandmark" className="dark:text-gray-300">Nearest Landmark</Label>
-                                        <Input 
-                                            id="nearestLandmark" 
-                                            placeholder="e.g., Near barangay hall, beside school" 
-                                            className="dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                                        />
                                     </div>
                                 </div>
 
-                                {/* Google Maps URL Field */}
-                                <div className="space-y-2 pt-2">
+                                <div className="space-y-2">
                                     <Label htmlFor="google_maps_url" className="flex items-center gap-2 dark:text-gray-300">
                                         <Globe className="h-4 w-4" />
                                         Google Maps Link
@@ -838,12 +856,8 @@ export default function EditHousehold({
                                         onChange={(e) => setData('google_maps_url', e.target.value)}
                                         className="dark:bg-gray-900 dark:border-gray-700 dark:text-white font-mono text-sm"
                                     />
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        Paste any Google Maps share link. Coordinates will be extracted automatically when you save.
-                                    </p>
                                 </div>
 
-                                {/* Coordinates Display */}
                                 {(data.latitude || data.longitude) && (
                                     <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                                         <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">📍 Current Coordinates</p>
@@ -874,23 +888,23 @@ export default function EditHousehold({
                                         <Users className="h-5 w-5" />
                                         Household Members
                                         <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                                            ({members.length} member{members.length !== 1 ? 's' : ''})
+                                            ({members.length})
                                         </span>
                                     </div>
                                     <Button 
                                         type="button" 
                                         variant="outline" 
                                         size="sm"
-                                        onClick={() => setShowMemberSearch(true)}
+                                        onClick={() => {
+                                            setShowMemberSearch(true);
+                                            if (searchResults.length === 0) fetchResidents('', 1, false);
+                                        }}
                                         className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
                                     >
                                         <Search className="h-4 w-4 mr-2" />
-                                        Add Other Members
+                                        Add Members
                                     </Button>
                                 </CardTitle>
-                                <CardDescription className="dark:text-gray-400">
-                                    The head of family will appear here automatically when selected above. Add other family members below.
-                                </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {/* Member Search Modal */}
@@ -899,12 +913,7 @@ export default function EditHousehold({
                                         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col dark:border dark:border-gray-700">
                                             <div className="p-6 border-b dark:border-gray-700">
                                                 <div className="flex items-center justify-between mb-4">
-                                                    <div>
-                                                        <h3 className="text-lg font-semibold dark:text-white">Add Other Family Members</h3>
-                                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                                            Search and select residents to add to this household
-                                                        </p>
-                                                    </div>
+                                                    <h3 className="text-lg font-semibold dark:text-white">Add Family Members</h3>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
@@ -912,7 +921,6 @@ export default function EditHousehold({
                                                             setShowMemberSearch(false);
                                                             setSearchQuery('');
                                                         }}
-                                                        className="h-8 w-8 p-0 dark:text-gray-400 dark:hover:text-white"
                                                         type="button"
                                                     >
                                                         <X className="h-4 w-4" />
@@ -921,212 +929,93 @@ export default function EditHousehold({
                                                 <div className="relative">
                                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
                                                     <Input
-                                                        placeholder="Search by name, purok, or address..." 
+                                                        placeholder="Search residents..." 
                                                         className="pl-10 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                                                         value={searchQuery}
-                                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                                        onChange={(e) => handleSearchChange(e.target.value)}
                                                         autoFocus
                                                     />
+                                                    {isSearching && (
+                                                        <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />
+                                                    )}
                                                 </div>
                                             </div>
                                             
-                                            <div className="flex-1 overflow-hidden">
-                                                {available_residents.length === 0 ? (
+                                            <div className="flex-1 overflow-y-auto">
+                                                {searchResults.length === 0 && !isSearching ? (
                                                     <div className="p-8 text-center">
                                                         <Users className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                                                        <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-2">No Available Residents</h4>
-                                                        <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                                                            All residents already belong to households. You can create new residents or check if existing residents can be transferred.
-                                                        </p>
-                                                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                                                            <Link 
-                                                                href={`/admin/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
-                                                                className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                                                onClick={() => setShowMemberSearch(false)}
-                                                            >
-                                                                <Plus className="h-4 w-4 mr-2" />
-                                                                Create New Resident
-                                                            </Link>
-                                                            <Button
-                                                                variant="outline"
-                                                                onClick={() => setShowMemberSearch(false)}
-                                                                type="button"
-                                                                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
-                                                            >
-                                                                Cancel
-                                                            </Button>
-                                                        </div>
+                                                        <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-2">No Residents Found</h4>
+                                                        <Link 
+                                                            href={`/admin/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
+                                                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                                                            onClick={() => setShowMemberSearch(false)}
+                                                        >
+                                                            Create New Resident
+                                                        </Link>
                                                     </div>
                                                 ) : (
-                                                    <div className="h-full overflow-y-auto">
-                                                        {searchQuery && searchResults.length === 0 ? (
-                                                            <div className="p-8 text-center">
-                                                                <Search className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                                                                <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-2">No Results Found</h4>
-                                                                <p className="text-gray-500 dark:text-gray-400 mb-4">
-                                                                    No residents found for "<span className="font-medium">{searchQuery}</span>"
-                                                                </p>
-                                                                <Link 
-                                                                    href={`/admin/residents/create?return_to=/households/${household.id}/edit&name=${encodeURIComponent(searchQuery)}&household_id=${household.id}&purok_id=${data.purok_id || ''}`}
-                                                                    className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                                                    onClick={() => setShowMemberSearch(false)}
-                                                                >
-                                                                    <Plus className="h-4 w-4 mr-2" />
-                                                                    Create New Resident
-                                                                </Link>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="divide-y dark:divide-gray-700">
-                                                                <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-b dark:border-gray-700">
-                                                                    <div className="flex items-center justify-between text-sm">
-                                                                        <span className="text-gray-600 dark:text-gray-400">
-                                                                            {searchQuery ? `${searchResults.length} results found` : `${available_residents.length} available residents`}
-                                                                        </span>
-                                                                        <span className="text-gray-500 dark:text-gray-400">
-                                                                            {members.length} member{members.length !== 1 ? 's' : ''} in household
-                                                                        </span>
+                                                    <div className="divide-y dark:divide-gray-700">
+                                                        {searchResults.map((resident) => {
+                                                            const fullName = getFullName(resident.first_name, resident.last_name, resident.middle_name);
+                                                            const isAlreadyAdded = members.some(m => m.resident_id === resident.id);
+                                                            const isHead = currentHeadResident?.id === resident.id;
+                                                            
+                                                            return (
+                                                                <div key={resident.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div>
+                                                                            <div className="font-medium dark:text-white">{fullName}</div>
+                                                                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                                                {resident.age && `${resident.age} yrs • `}
+                                                                                {resident.purok_name || 'No purok'}
+                                                                            </div>
+                                                                        </div>
+                                                                        {isHead ? (
+                                                                            <Badge className="bg-blue-100 text-blue-800">Current Head</Badge>
+                                                                        ) : isAlreadyAdded ? (
+                                                                            <Badge className="bg-green-100 text-green-800">Already Added</Badge>
+                                                                        ) : (
+                                                                            <Button 
+                                                                                size="sm" 
+                                                                                onClick={() => handleAddExistingResident(resident)}
+                                                                                type="button"
+                                                                            >
+                                                                                <Plus className="h-4 w-4 mr-1" />
+                                                                                Add
+                                                                            </Button>
+                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                                
-                                                                {searchResults.map((resident) => {
-                                                                    const fullName = getFullName(resident.first_name, resident.last_name, resident.middle_name);
-                                                                    const isAlreadyAdded = members.some(m => m.resident_id === resident.id);
-                                                                    const isHead = currentHeadResident?.id === resident.id;
-                                                                    const currentPurok = resident.purok_name || 'No purok';
-                                                                    const photoUrl = getPhotoUrl(resident.photo_path, resident.photo_url);
-                                                                    
-                                                                    return (
-                                                                        <div 
-                                                                            key={resident.id} 
-                                                                            className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                                                                                isAlreadyAdded || isHead ? 'opacity-75' : ''
-                                                                            }`}
-                                                                        >
-                                                                            <div className="flex items-center justify-between">
-                                                                                <div className="flex items-start gap-3">
-                                                                                    <div className={`h-12 w-12 rounded-full flex items-center justify-center overflow-hidden ${
-                                                                                        isHead 
-                                                                                            ? 'border-2 border-blue-500 dark:border-blue-400' 
-                                                                                            : isAlreadyAdded
-                                                                                            ? 'border-2 border-green-500 dark:border-green-400'
-                                                                                            : 'border border-gray-300 dark:border-gray-600'
-                                                                                    }`}>
-                                                                                        {photoUrl ? (
-                                                                                            <img 
-                                                                                                src={photoUrl}
-                                                                                                alt={fullName}
-                                                                                                className="h-full w-full object-cover"
-                                                                                            />
-                                                                                        ) : (
-                                                                                            <div className={`h-full w-full flex items-center justify-center ${
-                                                                                                isHead 
-                                                                                                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
-                                                                                                    : isAlreadyAdded
-                                                                                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                                                                                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                                                                                            }`}>
-                                                                                                <User className="h-6 w-6" />
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div>
-                                                                                        <div className="font-medium flex items-center gap-2 dark:text-white">
-                                                                                            {fullName}
-                                                                                            {isHead && (
-                                                                                                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
-                                                                                                    Current Head
-                                                                                                </span>
-                                                                                            )}
-                                                                                            {isAlreadyAdded && !isHead && (
-                                                                                                <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-0.5 rounded">
-                                                                                                    Already in Household
-                                                                                                </span>
-                                                                                            )}
-                                                                                            {hasPhoto(resident) && (
-                                                                                                <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded flex items-center gap-1">
-                                                                                                    <Camera className="h-3 w-3" />
-                                                                                                    Photo
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 space-y-1">
-                                                                                            {resident.age ? `${resident.age} years old` : 'Age not specified'}
-                                                                                            {currentPurok && ` • Purok: ${currentPurok}`}
-                                                                                            {resident.address && (
-                                                                                                <div className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-md">
-                                                                                                    {resident.address}
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                
-                                                                                <div className="flex items-center gap-2">
-                                                                                    {isHead ? (
-                                                                                        <div className="text-sm text-blue-600 dark:text-blue-400 px-3 py-1 border border-blue-200 dark:border-blue-800 rounded bg-blue-50 dark:bg-blue-900/30">
-                                                                                            Current Head
-                                                                                        </div>
-                                                                                    ) : isAlreadyAdded ? (
-                                                                                        <div className="text-sm text-gray-500 dark:text-gray-400 px-3 py-1 border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-900">
-                                                                                            Already Added
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        <Button 
-                                                                                            size="sm" 
-                                                                                            onClick={() => handleAddExistingResident(resident)}
-                                                                                            type="button"
-                                                                                            className="whitespace-nowrap dark:bg-blue-600 dark:hover:bg-blue-700"
-                                                                                        >
-                                                                                            <Plus className="h-4 w-4 mr-2" />
-                                                                                            Add to Household
-                                                                                        </Button>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                            
-                                                                            {!isHead && !isAlreadyAdded && resident.purok_id && resident.purok_id !== data.purok_id && (
-                                                                                <div className="mt-3 pt-3 border-t border-dashed border-amber-200 dark:border-amber-800">
-                                                                                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm">
-                                                                                        <div className="h-2 w-2 rounded-full bg-amber-500"></div>
-                                                                                        <span>
-                                                                                            Note: This resident is from Purok {currentPurok}. Adding them will transfer them to this household's purok.
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
+                                                            );
+                                                        })}
+                                                        
+                                                        {memberPagination?.has_more && (
+                                                            <div className="p-4 text-center">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={loadMoreMembers}
+                                                                    disabled={isLoadingMoreMembers}
+                                                                    type="button"
+                                                                >
+                                                                    {isLoadingMoreMembers ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                                                                    Load More ({searchResults.length} of {memberPagination.total})
+                                                                </Button>
                                                             </div>
                                                         )}
                                                     </div>
                                                 )}
                                             </div>
                                             
-                                            <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                                                <div className="flex items-center justify-between">
-                                                    <Button
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            setShowMemberSearch(false);
-                                                            setSearchQuery('');
-                                                        }}
-                                                        type="button"
-                                                        className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
-                                                    >
-                                                        Close
-                                                    </Button>
-                                                    {available_residents.length > 0 && (
-                                                        <Link 
-                                                            href={`/admin/residents/create?return_to=/households/${household.id}/edit&purok_id=${data.purok_id || ''}`}
-                                                            className="inline-flex items-center justify-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                                                            onClick={() => setShowMemberSearch(false)}
-                                                        >
-                                                            <Plus className="h-4 w-4 mr-2" />
-                                                            Create New Resident
-                                                        </Link>
-                                                    )}
-                                                </div>
+                                            <div className="p-4 border-t dark:border-gray-700">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => { setShowMemberSearch(false); setSearchQuery(''); }}
+                                                    type="button"
+                                                >
+                                                    Close
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
@@ -1136,26 +1025,20 @@ export default function EditHousehold({
                                     {members.length === 0 ? (
                                         <div className="text-center py-8 border-2 border-dashed rounded-lg dark:border-gray-700">
                                             <User className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-                                            <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No head of family selected</h3>
-                                            <p className="text-gray-500 dark:text-gray-500 mb-4">
-                                                Select a head of family from the dropdown above to start
-                                            </p>
-                                            <div className="text-sm text-gray-400 dark:text-gray-600">
-                                                Once selected, they will appear here automatically
-                                            </div>
+                                            <p className="text-gray-500 dark:text-gray-400">No head of family selected</p>
                                         </div>
                                     ) : (
                                         members.map((member) => (
-                                          <MemberCard
-                                            key={member.id}
-                                            member={member}
-                                            isHead={member.relationship === 'Head' || member.is_head === true}
-                                            onRemove={handleRemoveMember}
-                                            onUpdateRelationship={handleUpdateMemberRelationship}
-                                            householdId={household.id}
-                                            purokId={data.purok_id}
-                                            relationshipTypes={RELATIONSHIP_TYPES}
-                                        />
+                                            <MemberCard
+                                                key={member.id}
+                                                member={member}
+                                                isHead={member.relationship === 'Head' || member.is_head === true}
+                                                onRemove={handleRemoveMember}
+                                                onUpdateRelationship={handleUpdateMemberRelationship}
+                                                householdId={household.id}
+                                                purokId={data.purok_id}
+                                                relationshipTypes={RELATIONSHIP_TYPES}
+                                            />
                                         ))
                                     )}
                                 </div>
@@ -1183,9 +1066,7 @@ export default function EditHousehold({
                                             </SelectTrigger>
                                             <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 {HOUSING_TYPES.map((type) => (
-                                                    <SelectItem key={type} value={type} className="dark:text-white">
-                                                        {type}
-                                                    </SelectItem>
+                                                    <SelectItem key={type} value={type} className="dark:text-white">{type}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -1201,9 +1082,7 @@ export default function EditHousehold({
                                             </SelectTrigger>
                                             <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 {OWNERSHIP_STATUSES.map((status) => (
-                                                    <SelectItem key={status} value={status} className="dark:text-white">
-                                                        {status}
-                                                    </SelectItem>
+                                                    <SelectItem key={status} value={status} className="dark:text-white">{status}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -1222,9 +1101,7 @@ export default function EditHousehold({
                                             </SelectTrigger>
                                             <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 {WATER_SOURCES.map((source) => (
-                                                    <SelectItem key={source} value={source} className="dark:text-white">
-                                                        {source}
-                                                    </SelectItem>
+                                                    <SelectItem key={source} value={source} className="dark:text-white">{source}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -1240,9 +1117,7 @@ export default function EditHousehold({
                                             </SelectTrigger>
                                             <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
                                                 {INCOME_RANGES.map((range) => (
-                                                    <SelectItem key={range} value={range} className="dark:text-white">
-                                                        {range}
-                                                    </SelectItem>
+                                                    <SelectItem key={range} value={range} className="dark:text-white">{range}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -1255,52 +1130,39 @@ export default function EditHousehold({
                                             id="electricity" 
                                             checked={data.electricity}
                                             onCheckedChange={(checked) => setData('electricity', checked as boolean)}
-                                            className="dark:border-gray-600"
                                         />
-                                        <Label htmlFor="electricity" className="text-sm dark:text-gray-300">
-                                            <div className="flex items-center gap-2">
-                                                <Zap className="h-4 w-4" />
-                                                Has electricity connection
-                                            </div>
-                                        </Label>
+                                        <Label htmlFor="electricity" className="flex items-center gap-2"><Zap className="h-4 w-4" />Has electricity</Label>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <Checkbox 
                                             id="internet" 
                                             checked={data.internet}
                                             onCheckedChange={(checked) => setData('internet', checked as boolean)}
-                                            className="dark:border-gray-600"
                                         />
-                                        <Label htmlFor="internet" className="text-sm dark:text-gray-300">
-                                            Has internet connection
-                                        </Label>
+                                        <Label htmlFor="internet">Has internet</Label>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <Checkbox 
                                             id="vehicle" 
                                             checked={data.vehicle}
                                             onCheckedChange={(checked) => setData('vehicle', checked as boolean)}
-                                            className="dark:border-gray-600"
                                         />
-                                        <Label htmlFor="vehicle" className="text-sm dark:text-gray-300">
-                                            Owns a vehicle
-                                        </Label>
+                                        <Label htmlFor="vehicle">Owns a vehicle</Label>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        {/* Additional Information */}
+                        {/* Remarks */}
                         <Card className="dark:bg-gray-900 dark:border-gray-700">
                             <CardHeader>
                                 <CardTitle className="dark:text-white">Additional Information</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardContent>
                                 <div className="space-y-2">
                                     <Label htmlFor="remarks" className="dark:text-gray-300">Remarks/Notes</Label>
                                     <Textarea 
                                         id="remarks" 
-                                        placeholder="Any additional information about this household..."
                                         rows={3}
                                         value={data.remarks}
                                         onChange={(e) => setData('remarks', e.target.value)}
@@ -1311,139 +1173,37 @@ export default function EditHousehold({
                         </Card>
                     </div>
 
-                    {/* Right Column - Summary & Actions */}
+                    {/* Right Column */}
                     <div className="space-y-6">
-                        {/* Household Summary */}
                         <Card className="dark:bg-gray-900 dark:border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="dark:text-white">Household Summary</CardTitle>
-                            </CardHeader>
+                            <CardHeader><CardTitle className="dark:text-white">Household Summary</CardTitle></CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-gray-500 dark:text-gray-400">Household #:</span>
-                                        <span className="font-mono font-bold dark:text-white">{household.household_number}</span>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Household #:</span>
+                                        <span className="font-mono font-bold">{household.household_number}</span>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-gray-500 dark:text-gray-400">Total Members:</span>
-                                        <span className="font-bold text-lg dark:text-white">{members.length}</span>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Total Members:</span>
+                                        <span className="font-bold text-lg">{members.length}</span>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-gray-500 dark:text-gray-400">Purok:</span>
-                                        <span className="font-medium dark:text-white">
-                                            {data.purok_id ? (
-                                                puroks.find(p => p.id === data.purok_id)?.name || 'Not set'
-                                            ) : 'Not set'}
-                                        </span>
-                                    </div>
-                                    {(data.latitude || data.longitude) && (
-                                        <div className="border-t dark:border-gray-700 pt-3">
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">📍 Coordinates</p>
-                                            <p className="text-xs font-mono dark:text-gray-300">{data.latitude?.toFixed(6)}, {data.longitude?.toFixed(6)}</p>
-                                        </div>
-                                    )}
-                                    <div className="border-t dark:border-gray-700 pt-4">
-                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Members with Photos:</div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                {members.filter(m => hasPhoto(m)).length} of {members.length} members
-                                            </span>
-                                            <span className="text-sm font-medium dark:text-white">
-                                                {Math.round((members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100)}%
-                                            </span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-                                            <div 
-                                                className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full transition-all duration-300" 
-                                                style={{ width: `${(members.filter(m => hasPhoto(m)).length / Math.max(members.length, 1)) * 100}%` }}
-                                            />
-                                        </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Purok:</span>
+                                        <span>{data.purok_id ? puroks.find(p => p.id === data.purok_id)?.name || 'Not set' : 'Not set'}</span>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        {/* Edit Checklist */}
                         <Card className="dark:bg-gray-900 dark:border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="dark:text-white">Edit Checklist</CardTitle>
-                            </CardHeader>
+                            <CardHeader><CardTitle className="dark:text-white">Edit Checklist</CardTitle></CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    <ChecklistItem 
-                                        completed={!!headMember}
-                                        label="Head of family information"
-                                    />
-                                    <ChecklistItem 
-                                        completed={!!data.address}
-                                        label="Complete address"
-                                    />
-                                    <ChecklistItem 
-                                        completed={!!data.contact_number}
-                                        label="Contact information"
-                                    />
-                                    <ChecklistItem 
-                                        completed={!!data.purok_id}
-                                        label="Purok selection"
-                                        warning={!data.purok_id}
-                                    />
-                                    <ChecklistItem 
-                                        completed={members.length > 1}
-                                        label={`Household members (${members.length})`}
-                                        warning={members.length <= 1}
-                                    />
-                                    <ChecklistItem 
-                                        completed={!!data.google_maps_url}
-                                        label="Google Maps location"
-                                        subLabel={data.google_maps_url ? '(coordinates will extract)' : ''}
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* Quick Actions */}
-                        <Card className="dark:bg-gray-900 dark:border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="dark:text-white">Quick Actions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                    Print Household Profile
-                                </Button>
-                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                    View History
-                                </Button>
-                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                    Generate Report
-                                </Button>
-                                <Button variant="outline" className="w-full justify-start dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600" type="button">
-                                    Check Duplicates
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        {/* Water Source Guide */}
-                        <Card className="dark:bg-gray-900 dark:border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 dark:text-white">
-                                    <Droplets className="h-5 w-5" />
-                                    Water Source Guide
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                                        <span className="dark:text-gray-300">Level I: Point Source (Well, Spring)</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                        <span className="dark:text-gray-300">Level II: Communal Faucet</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-2 w-2 rounded-full bg-purple-500"></div>
-                                        <span className="dark:text-gray-300">Level III: Waterworks System</span>
-                                    </div>
+                                    <ChecklistItem completed={!!headMember} label="Head of family" />
+                                    <ChecklistItem completed={!!data.address} label="Complete address" />
+                                    <ChecklistItem completed={!!data.contact_number} label="Contact information" />
+                                    <ChecklistItem completed={!!data.purok_id} label="Purok selection" warning={!data.purok_id} />
+                                    <ChecklistItem completed={members.length > 1} label={`Household members (${members.length})`} />
                                 </div>
                             </CardContent>
                         </Card>
@@ -1452,22 +1212,13 @@ export default function EditHousehold({
 
                 {/* Form Actions */}
                 <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-6 border-t dark:border-gray-700">
-                    <div className="flex flex-col-reverse sm:flex-row items-center gap-2 w-full sm:w-auto">
-                        <Link href={`/admin/households/${household.id}`} className="w-full sm:w-auto">
-                            <Button variant="ghost" type="button" className="dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700 w-full">
-                                Cancel
-                            </Button>
+                    <div className="flex gap-2">
+                        <Link href={`/admin/households/${household.id}`}>
+                            <Button variant="ghost" type="button">Cancel</Button>
                         </Link>
-                        <Button 
-                            variant="outline" 
-                            type="button"
-                            onClick={handleReset}
-                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600 w-full sm:w-auto"
-                        >
-                            Reset Changes
-                        </Button>
+                        <Button variant="outline" type="button" onClick={handleReset}>Reset Changes</Button>
                     </div>
-                    <Button type="submit" disabled={processing} className="dark:bg-blue-600 dark:hover:bg-blue-700 w-full sm:w-auto">
+                    <Button type="submit" disabled={processing}>
                         <Save className="h-4 w-4 mr-2" />
                         {processing ? 'Updating...' : 'Update Household'}
                     </Button>

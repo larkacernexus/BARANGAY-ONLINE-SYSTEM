@@ -133,9 +133,10 @@ export default function PermissionsIndex({
         initialFilters.status === 'inactive' ? 'inactive' : 'all'
     );
     const [rolesCountFilter, setRolesCountFilter] = useState<RolesCountFilterType>('all');
-    const [dateRange, setDateRange] = useState<string>('');
+    // ✅ FIXED: Use 'all' instead of empty string
+    const [dateRange, setDateRange] = useState<string>('all');
     
-    // ✅ Separate sort states for table header
+    // Separate sort states for table header
     const [sortBy, setSortBy] = useState<string>('name');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     
@@ -169,7 +170,7 @@ export default function PermissionsIndex({
     // Get all permissions data
     const allPermissions = permissions.data || [];
 
-    // ✅ Helper function to check roles count range
+    // Helper function to check roles count range
     const checkRolesCountRange = (count: number, range: string): boolean => {
         switch (range) {
             case '0': return count === 0;
@@ -180,8 +181,9 @@ export default function PermissionsIndex({
         }
     };
 
-    // ✅ Helper function to check date range
+    // ✅ FIXED: Helper function to check date range
     const checkDateRange = (dateString: string, range: string): boolean => {
+        if (range === 'all') return true;  // ✅ Added this check
         if (!dateString) return false;
         const date = new Date(dateString);
         const now = new Date();
@@ -196,7 +198,7 @@ export default function PermissionsIndex({
         }
     };
 
-    // Filter and sort permissions (client-side) - removed sort dropdown logic
+    // Filter and sort permissions (client-side)
     const filteredAndSortedPermissions = useMemo(() => {
         let filtered = [...allPermissions];
         
@@ -224,21 +226,21 @@ export default function PermissionsIndex({
             });
         }
         
-        // ✅ Apply roles count filter
+        // Apply roles count filter
         if (rolesCountFilter !== 'all') {
             filtered = filtered.filter(permission => 
                 checkRolesCountRange(permission.roles_count || 0, rolesCountFilter)
             );
         }
         
-        // ✅ Apply date range filter
-        if (dateRange) {
+        // ✅ FIXED: Apply date range filter (now properly handles 'all')
+        if (dateRange !== 'all') {
             filtered = filtered.filter(permission => 
                 checkDateRange(permission.created_at, dateRange)
             );
         }
         
-        // ✅ Apply sorting (for table header)
+        // Apply sorting (for table header)
         filtered.sort((a, b) => {
             let valueA: any;
             let valueB: any;
@@ -330,9 +332,9 @@ export default function PermissionsIndex({
         { value: '10+', label: 'High Usage (10+ roles)', color: 'purple' }
     ];
 
-    // Date range options
+    // ✅ FIXED: Date range options - no empty string!
     const dateRangeOptions = [
-        { value: '', label: 'All Time', color: 'gray' },
+        { value: 'all', label: 'All Time', color: 'gray' },
         { value: 'last_7_days', label: 'Last 7 Days', color: 'blue' },
         { value: 'last_30_days', label: 'Last 30 Days', color: 'emerald' },
         { value: 'last_90_days', label: 'Last 90 Days', color: 'amber' },
@@ -363,7 +365,7 @@ export default function PermissionsIndex({
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // ✅ Handle sort from table header
+    // Handle sort from table header
     const handleSort = (column: string): void => {
         const newSortOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
         setSortBy(column);
@@ -395,12 +397,13 @@ export default function PermissionsIndex({
         }
     };
 
+    // ✅ FIXED: Reset filters uses 'all' instead of empty string
     const resetFilters = (): void => {
         setSearch('');
         setModuleFilter('all');
         setStatusFilter('all');
         setRolesCountFilter('all');
-        setDateRange('');
+        setDateRange('all');  // ✅ Changed from '' to 'all'
         setSortBy('name');
         setSortOrder('asc');
         setCurrentPage(1);
@@ -469,17 +472,17 @@ export default function PermissionsIndex({
 
     // Computed values for UI
     const hasActiveFilters = Boolean(
-        search || moduleFilter !== 'all' || statusFilter !== 'all' || rolesCountFilter !== 'all' || dateRange
+        search || moduleFilter !== 'all' || statusFilter !== 'all' || rolesCountFilter !== 'all' || dateRange !== 'all'
     );
     
-    // Get active filter count
+    // ✅ FIXED: Get active filter count - checks for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
         if (search) count++;
         if (moduleFilter !== 'all') count++;
         if (statusFilter !== 'all') count++;
         if (rolesCountFilter !== 'all') count++;
-        if (dateRange) count++;
+        if (dateRange && dateRange !== 'all') count++;  // ✅ Changed from dateRange !== ''
         return count;
     };
 
@@ -661,7 +664,7 @@ export default function PermissionsIndex({
                                     <span className="ml-1">permissions</span>
                                     {search && (
                                         <span className="ml-1">
-                                            matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                            matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                         </span>
                                     )}
                                 </div>
@@ -696,7 +699,8 @@ export default function PermissionsIndex({
                                                     {rolesCountOptions.find(o => o.value === rolesCountFilter)?.label}
                                                 </Badge>
                                             )}
-                                            {dateRange && dateRange !== '' && (
+                                            {/* ✅ FIXED: Check for 'all' instead of empty string */}
+                                            {dateRange && dateRange !== 'all' && (
                                                 <Badge variant="secondary" className={`${
                                                     getDateRangeColor(dateRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
                                                     getDateRangeColor(dateRange) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
@@ -803,7 +807,7 @@ export default function PermissionsIndex({
                                     </Select>
                                 </div>
 
-                                {/* Created Date Filter */}
+                                {/* ✅ FIXED: Created Date Filter - using 'all' as default */}
                                 <div className="space-y-1.5">
                                     <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                         <Calendar className="h-3 w-3" />

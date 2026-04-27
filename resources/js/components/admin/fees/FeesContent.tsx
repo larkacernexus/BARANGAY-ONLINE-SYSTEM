@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
 import {
     Select,
     SelectContent,
@@ -13,7 +12,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { FileText, ArrowUpDown } from 'lucide-react';
+import { FileText, ArrowUpDown, Rows3 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
 import { Pagination } from '@/components/adminui/pagination';
@@ -39,6 +38,8 @@ interface FeesContentProps {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
+    perPage?: string;
+    onPerPageChange?: (value: string) => void;
     onPageChange: (page: number) => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
@@ -74,6 +75,35 @@ interface FeesContentProps {
     isLoading?: boolean;
 }
 
+// ✅ Dynamic per-page options - 15 is default, no 20
+const getDynamicPerPageOptions = (totalItems: number) => {
+    const options: { value: string; label: string }[] = [];
+    
+    options.push({ value: '15', label: '15 per page' });
+    
+    if (totalItems > 15) {
+        options.push({ value: '30', label: '30 per page' });
+    }
+    
+    if (totalItems > 30) {
+        options.push({ value: '50', label: '50 per page' });
+    }
+    
+    if (totalItems > 50) {
+        options.push({ value: '100', label: '100 per page' });
+    }
+    
+    if (totalItems > 100) {
+        options.push({ value: '500', label: '500 per page' });
+    }
+    
+    if (totalItems > 0 && totalItems <= 550) {
+        options.push({ value: 'all', label: `Show All (${totalItems})` });
+    }
+    
+    return options;
+};
+
 export default function FeesContent({
     fees,
     isBulkMode,
@@ -88,6 +118,8 @@ export default function FeesContent({
     totalPages,
     totalItems,
     itemsPerPage,
+    perPage = '15',
+    onPerPageChange = () => {},
     onPageChange,
     onSelectAllOnPage,
     onSelectAllFiltered,
@@ -123,6 +155,13 @@ export default function FeesContent({
     isLoading = false
 }: FeesContentProps) {
     
+    const perPageOptions = getDynamicPerPageOptions(totalItems);
+
+    const handlePerPageChange = (value: string) => {
+        if (isLoading) return;
+        onPerPageChange(value);
+    };
+    
     const handleBulkModeToggle = () => {
         setIsBulkMode(!isBulkMode);
         if (isBulkMode) {
@@ -130,7 +169,7 @@ export default function FeesContent({
         }
     };
 
-    // Helper functions
+    // ✅ PROPERLY DEFINED FUNCTIONS - NOT inline throw statements
     const formatCurrency = (amount: number | string | undefined) => {
         if (amount === undefined || amount === null) return '₱0.00';
         const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -159,11 +198,12 @@ export default function FeesContent({
         return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     };
 
-    const getStatusIcon = (status: string) => {
-        return null;
+    // ✅ Properly defined helper functions
+    const getStatusIcon = (status: string): React.ReactNode => {
+        return null; // or return proper icons if needed
     };
 
-    const getCategoryColor = (category: string) => {
+    const getCategoryColor = (category: string): string => {
         const colors: Record<string, string> = {
             tax: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
             clearance: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
@@ -171,10 +211,10 @@ export default function FeesContent({
             fee: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
             donation: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
         };
-        return colors[category] || colors.fee;
+        return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400';
     };
 
-    const getCategoryLabel = (category: string) => {
+    const getCategoryLabel = (category: string): string => {
         const labels: Record<string, string> = {
             tax: 'Tax',
             clearance: 'Clearance',
@@ -189,7 +229,6 @@ export default function FeesContent({
 
     return (
         <>
-            {/* Enhanced Bulk Actions Bar */}
             {isBulkMode && selectedFees.length > 0 && (
                 <FeesBulkActions
                     selectedFees={selectedFees}
@@ -215,7 +254,6 @@ export default function FeesContent({
                 />
             )}
 
-            {/* Floating Select All for Grid View */}
             {viewMode === 'grid' && hasFees && selectedFees.length < fees.length && isBulkMode && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
@@ -226,7 +264,6 @@ export default function FeesContent({
                 />
             )}
 
-            {/* Fees List/Grid View with dark mode */}
             <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-3">
@@ -242,23 +279,32 @@ export default function FeesContent({
                             </CardTitle>
                         </div>
                         {!isMobile && (
-                            <ViewToggle
-                                viewMode={viewMode}
-                                onViewModeChange={setViewMode}
-                                isMobile={isMobile}
-                            />
+                            <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} isMobile={isMobile} />
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Per Page Selector */}
+                        {!isMobile && totalItems > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select value={perPage} onValueChange={handlePerPageChange} disabled={isLoading}>
+                                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                                        <SelectValue placeholder="15 per page" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {perPageOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Sort By Dropdown */}
                         {!isMobile && (
                             <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                                <Select
-                                    value={getCurrentSortValue()}
-                                    onValueChange={onSortChange}
-                                    disabled={isLoading}
-                                >
+                                <Select value={getCurrentSortValue()} onValueChange={onSortChange} disabled={isLoading}>
                                     <SelectTrigger className="w-[180px] h-8 text-xs">
                                         <SelectValue placeholder="Sort by..." />
                                     </SelectTrigger>
@@ -282,16 +328,10 @@ export default function FeesContent({
                             </div>
                         )}
 
-                        {/* Grid view select all checkbox */}
+                        {/* Grid view select all */}
                         {viewMode === 'grid' && isBulkMode && hasFees && (
                             <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="select-all-grid"
-                                    checked={isSelectAll}
-                                    onCheckedChange={onSelectAllOnPage}
-                                    disabled={isLoading}
-                                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600 dark:data-[state=checked]:bg-blue-600"
-                                />
+                                <Checkbox id="select-all-grid" checked={isSelectAll} onCheckedChange={onSelectAllOnPage} disabled={isLoading} className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-gray-600" />
                                 <Label htmlFor="select-all-grid" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
                                     {isSelectAll ? 'Deselect Page' : 'Select Page'}
                                 </Label>
@@ -304,133 +344,109 @@ export default function FeesContent({
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <div className="flex items-center gap-2">
-                                            <Switch
-                                                id="bulk-mode"
-                                                checked={isBulkMode}
-                                                onCheckedChange={handleBulkModeToggle}
-                                                disabled={isLoading}
-                                                className="data-[state=checked]:bg-blue-600 h-5 w-9 dark:data-[state=checked]:bg-blue-600"
-                                            />
-                                            <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">
-                                                Bulk Mode
-                                            </Label>
+                                            <Switch id="bulk-mode" checked={isBulkMode} onCheckedChange={handleBulkModeToggle} disabled={isLoading} className="data-[state=checked]:bg-blue-600 h-5 w-9" />
+                                            <Label htmlFor="bulk-mode" className="text-xs sm:text-sm font-medium cursor-pointer whitespace-nowrap dark:text-gray-300">Bulk Mode</Label>
                                         </div>
                                     </TooltipTrigger>
-                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700">
-                                        <p>Toggle bulk selection mode</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Ctrl+Shift+B • Ctrl+A to select</p>
-                                    </TooltipContent>
+                                    <TooltipContent className="dark:bg-gray-900 dark:text-gray-200"><p>Toggle bulk selection mode</p></TooltipContent>
                                 </Tooltip>
                             </div>
                         )}
                         
                         {/* Page Info */}
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                            Page {currentPage} of {totalPages}
+                            {totalItems > 0 && <>Showing {fees.length > 0 ? '1' : '0'} - {fees.length} of {totalItems}</>}
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 dark:bg-gray-900">
-                    {/* Empty State */}
                     {!hasFees ? (
                         <EmptyState
                             icon={<FileText className="h-12 w-12 text-gray-400 dark:text-gray-600" />}
                             title="No fees found"
-                            description={hasActiveFilters 
-                                ? "No fees match your current filters. Try adjusting your search or filters."
-                                : "No fees have been created yet."}
-                            action={hasActiveFilters ? {
-                                label: "Clear Filters",
-                                onClick: onClearFilters
-                            } : undefined}
+                            description={hasActiveFilters ? "No fees match your current filters." : "No fees have been created yet."}
+                            action={hasActiveFilters ? { label: "Clear Filters", onClick: onClearFilters } : undefined}
                             className="py-12 sm:py-16 dark:bg-gray-900"
                         />
                     ) : (
                         <>
-                            {/* Table View */}
                             {viewMode === 'table' ? (
-                                <FeesTableView
-                                    fees={fees}
-                                    isBulkMode={isBulkMode}
-                                    selectedFees={selectedFees}
-                                    filtersState={filtersState}
-                                    onItemSelect={onItemSelect}
-                                    onSort={onSort}
-                                    hasActiveFilters={hasActiveFilters}
-                                    onClearFilters={onClearFilters}
-                                    onDelete={onDelete}
-                                    onEdit={onEdit}
-                                    onViewDetails={onViewDetails}
-                                    onCopyToClipboard={onCopyToClipboard}
-                                    onSelectAllOnPage={onSelectAllOnPage}
-                                    isSelectAll={isSelectAll}
-                                    statuses={statuses}
-                                    categories={categories}
-                                    formatCurrency={formatCurrency}
+                                <FeesTableView 
+                                    fees={fees} 
+                                    isBulkMode={isBulkMode} 
+                                    selectedFees={selectedFees} 
+                                    filtersState={filtersState} 
+                                    onItemSelect={onItemSelect} 
+                                    onSort={onSort} 
+                                    hasActiveFilters={hasActiveFilters} 
+                                    onClearFilters={onClearFilters} 
+                                    onDelete={onDelete} 
+                                    onEdit={onEdit} 
+                                    onViewDetails={onViewDetails} 
+                                    onCopyToClipboard={onCopyToClipboard} 
+                                    onSelectAllOnPage={onSelectAllOnPage} 
+                                    isSelectAll={isSelectAll} 
+                                    statuses={statuses} 
+                                    categories={categories} 
+                                    formatCurrency={formatCurrency} 
                                     getStatusColor={getStatusColor}
                                     getStatusIcon={getStatusIcon}
                                     getCategoryColor={getCategoryColor}
                                     getCategoryLabel={getCategoryLabel}
-                                    sortBy={sortBy}
-                                    sortOrder={sortOrder}
-                                    isLoading={isLoading}
+                                    sortBy={sortBy} 
+                                    sortOrder={sortOrder} 
+                                    isLoading={isLoading} 
                                 />
                             ) : (
-                                // Grid View
-                                <FeesGridView
-                                    fees={fees}
-                                    isBulkMode={isBulkMode}
-                                    selectedFees={selectedFees}
-                                    onItemSelect={onItemSelect}
-                                    hasActiveFilters={hasActiveFilters}
-                                    onClearFilters={onClearFilters}
-                                    onDelete={onDelete}
-                                    onEdit={onEdit}
-                                    onViewDetails={onViewDetails}
-                                    onCopyToClipboard={onCopyToClipboard}
-                                    formatCurrency={formatCurrency}
+                                <FeesGridView 
+                                    fees={fees} 
+                                    isBulkMode={isBulkMode} 
+                                    selectedFees={selectedFees} 
+                                    onItemSelect={onItemSelect} 
+                                    hasActiveFilters={hasActiveFilters} 
+                                    onClearFilters={onClearFilters} 
+                                    onDelete={onDelete} 
+                                    onEdit={onEdit} 
+                                    onViewDetails={onViewDetails} 
+                                    onCopyToClipboard={onCopyToClipboard} 
+                                    formatCurrency={formatCurrency} 
                                     getStatusColor={getStatusColor}
                                     getStatusIcon={getStatusIcon}
                                     getCategoryColor={getCategoryColor}
                                     getCategoryLabel={getCategoryLabel}
-                                    statuses={statuses}
-                                    categories={categories}
-                                    isLoading={isLoading}
+                                    statuses={statuses} 
+                                    categories={categories} 
+                                    isLoading={isLoading} 
                                 />
                             )}
 
-                            {/* Grid Selection Summary */}
                             {viewMode === 'grid' && isBulkMode && selectedFees.length > 0 && (
-                                <GridSelectionSummary
-                                    selectedCount={selectedFees.length}
-                                    totalCount={fees.length}
-                                    isSelectAll={isSelectAll}
-                                    onSelectAll={onSelectAllOnPage}
-                                    onClearSelection={onClearSelection}
-                                    className="mt-4 mx-4 dark:text-gray-300"
-                                    extraInfo={
-                                        selectionStats && (
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                Total amount: {formatCurrency(selectionStats.totalAmount || 0)}
-                                            </div>
-                                        )
-                                    }
-                                />
+                                <GridSelectionSummary selectedCount={selectedFees.length} totalCount={fees.length} isSelectAll={isSelectAll} onSelectAll={onSelectAllOnPage} onClearSelection={onClearSelection} className="mt-4 mx-4" extraInfo={selectionStats && <div className="text-xs text-gray-500 mt-1">Total: {formatCurrency(selectionStats.totalAmount || 0)}</div>} />
                             )}
 
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        totalItems={totalItems}
-                                        itemsPerPage={itemsPerPage}
-                                        onPageChange={onPageChange}
-                                        showCount={true}
-                                    />
+                            {/* Footer with mobile per-page selector */}
+                            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    {isMobile && totalItems > 0 && (
+                                        <div className="flex items-center gap-2 w-full">
+                                            <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            <Select value={perPage} onValueChange={handlePerPageChange} disabled={isLoading}>
+                                                <SelectTrigger className="w-full h-8 text-xs">
+                                                    <SelectValue placeholder="15 per page" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {perPageOptions.map((option) => (
+                                                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+                                    <div className="w-full">
+                                        <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={totalItems} itemsPerPage={itemsPerPage} onPageChange={onPageChange} showCount={true} />
+                                    </div>
                                 </div>
-                            )}
+                            </div>
                         </>
                     )}
                 </CardContent>

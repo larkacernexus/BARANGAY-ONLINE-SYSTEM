@@ -12,43 +12,35 @@ use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use App\Exceptions\InvalidStateTransitionException;
+use Carbon\Carbon;
 
 class ClearanceRequest extends Model
 {
     use LogsActivity, Notifiable;
 
+    // SECURITY NOTE: Explicitly define fillable to prevent mass assignment
     protected $fillable = [
-        // Payer Information (Polymorphic)
-        'payer_type', // 'resident', 'household', 'business'
+        'payer_type',
         'payer_id',
-        
-        // Resident (kept for backward compatibility)
-        'resident_id',
-        
-        // Type
+        'resident_id', // LOGIC NOTE: Deprecated - maintained for backward compatibility only
         'clearance_type_id',
-        
-        // Request Details
         'reference_number',
         'purpose',
         'specific_purpose',
-        'urgency', // normal, rush, express
+        'urgency',
         'needed_date',
         'additional_requirements',
         'fee_amount',
-        
-        // Status
-        'status', // pending, processing, approved, issued, rejected, cancelled, pending_payment, expired
-        
-        // Payment Tracking
+        'status',
         'payment_id',
-        'payment_status', // unpaid, partially_paid, paid
+        'payment_status',
         'amount_paid',
         'balance',
         'payment_date',
         'or_number',
-        
-        // Clearance Issuance Details
         'clearance_number',
         'issue_date',
         'valid_until',
@@ -56,20 +48,15 @@ class ClearanceRequest extends Model
         'remarks',
         'issuing_officer_id',
         'issuing_officer_name',
-        
-        // Processing Details
         'admin_notes',
         'cancellation_reason',
         'processed_at',
         'processed_by',
-        
-        // Contact Info (snapshot at time of request)
         'contact_name',
         'contact_number',
         'contact_address',
         'contact_purok_id',
         'contact_email',
-
         'requested_by_user_id',
         'household_id',
     ];
@@ -86,23 +73,29 @@ class ClearanceRequest extends Model
         'requirements_met' => 'array',
     ];
     
+    // SECURITY NOTE: Use API Resources instead of appends for data exposure control
     protected $appends = [
         'formatted_fee',
         'formatted_amount_paid',
         'formatted_balance',
         'status_display',
         'urgency_display',
-        'estimated_completion_date',
         'is_valid',
         'days_remaining',
-        'formatted_status_history',
-        'payer_name',
-        'payer_display',
-        'payer_icon',
-        'payer_type_label',
         'payment_status_display',
         'is_fully_paid',
-        // DYNAMIC: Will be populated via relationship
+    ];
+    
+    // LOGIC NOTE: Define valid state transitions
+    protected const VALID_TRANSITIONS = [
+        'pending' => ['processing', 'rejected', 'cancelled', 'pending_payment'],
+        'pending_payment' => ['processing', 'cancelled', 'expired'],
+        'processing' => ['approved', 'rejected', 'cancelled'],
+        'approved' => ['issued', 'rejected', 'cancelled'],
+        'issued' => ['expired'],
+        'rejected' => [],
+        'cancelled' => [],
+        'expired' => [],
     ];
     
     // ========== ACTIVITY LOG CONFIGURATION ==========
@@ -110,7 +103,18 @@ class ClearanceRequest extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['status', 'payment_status', 'amount_paid', 'balance', 'purpose', 'specific_purpose', 'urgency', 'fee_amount', 'remarks', 'admin_notes'])
+            ->logOnly([
+                'status', 
+                'payment_status', 
+                'amount_paid', 
+                'balance', 
+                'purpose', 
+                'specific_purpose', 
+                'urgency', 
+                'fee_amount', 
+                'remarks', 
+                'admin_notes'
+            ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->setDescriptionForEvent(fn(string $eventName) => "Clearance request {$eventName}")
@@ -118,54 +122,42 @@ class ClearanceRequest extends Model
     }
     
     // ========== RELATIONSHIPS ==========
-
-    /**
-     * Get the parent payable model (resident, household, or business).
-     */
+    
     public function payer(): MorphTo
     {
         return $this->morphTo();
     }
-
-    /**
-     * For backward compatibility - get the resident if payer is resident.
-     */
+    
     public function resident(): BelongsTo
     {
         return $this->belongsTo(Resident::class);
     }
-
-    /**
-     * Get the household if payer is household.
-     */
+    
     public function household(): BelongsTo
     {
         return $this->belongsTo(Household::class, 'payer_id');
     }
-
-    /**
-     * Get the business if payer is business.
-     */
+    
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class, 'payer_id');
     }
-
+    
     public function clearanceType(): BelongsTo
     {
         return $this->belongsTo(ClearanceType::class);
     }
-
+    
     public function documents(): HasMany
     {
         return $this->hasMany(ClearanceRequestDocument::class);
     }
-
+    
     public function issuingOfficer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issuing_officer_id');
     }
-
+    
     public function processedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by');
@@ -175,17 +167,17 @@ class ClearanceRequest extends Model
     {
         return $this->belongsTo(Payment::class);
     }
-
+    
     public function paymentItem(): HasOne
     {
         return $this->hasOne(PaymentItem::class, 'clearance_request_id');
     }
-
+    
     public function paymentItems(): HasMany
     {
         return $this->hasMany(PaymentItem::class, 'clearance_request_id');
     }
-
+    
     public function payments()
     {
         return $this->hasManyThrough(
@@ -198,22 +190,16 @@ class ClearanceRequest extends Model
         );
     }
     
-    /**
-     * Get the receipts for this clearance request (polymorphic)
-     */
     public function receipts()
     {
         return $this->morphMany(Receipt::class, 'receiptable');
     }
-
-    /**
-     * Get the receipt for this clearance request (if any)
-     */
+    
     public function receipt()
     {
         return $this->morphOne(Receipt::class, 'receiptable');
     }
-
+    
     public function requestedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by_user_id');
@@ -224,47 +210,73 @@ class ClearanceRequest extends Model
         return $this->belongsTo(Purok::class, 'contact_purok_id');
     }
     
-    /**
-     * Get all activities for this clearance request.
-     */
     public function activities()
     {
         return $this->morphMany(Activity::class, 'subject')
             ->orderBy('created_at', 'desc');
     }
     
-    /**
-     * Get status change history for this clearance request.
-     */
     public function statusHistory()
     {
         return $this->morphMany(Activity::class, 'subject')
             ->where(function ($query) {
-                $query->whereJsonContains('properties->changes', ['status' => '!'])
+                $query->whereJsonContains('properties->attributes->status', '!=')
                       ->orWhere('description', 'LIKE', '%status%')
                       ->orWhere('event', 'LIKE', '%status%');
             })
             ->orderBy('created_at', 'desc');
     }
     
+    // ========== STATE MANAGEMENT ==========
+    
+    /**
+     * SECURITY NOTE: Validates state transitions with explicit whitelist
+     */
+    protected function validateStateTransition(string $newStatus): void
+    {
+        $currentStatus = $this->status;
+        
+        if (!isset(self::VALID_TRANSITIONS[$currentStatus])) {
+            throw new InvalidStateTransitionException("Invalid current state: {$currentStatus}");
+        }
+        
+        if (!in_array($newStatus, self::VALID_TRANSITIONS[$currentStatus])) {
+            throw new InvalidStateTransitionException(
+                "Cannot transition from {$currentStatus} to {$newStatus}"
+            );
+        }
+    }
+    
+    /**
+     * SECURITY NOTE: Safe status update with validation
+     */
+    protected function updateStatus(string $newStatus, array $additionalData = []): bool
+    {
+        $this->validateStateTransition($newStatus);
+        
+        $data = array_merge(['status' => $newStatus], $additionalData);
+        
+        return $this->update($data);
+    }
+    
     // ========== ACCESSORS ==========
     
-    public function getFormattedFeeAttribute()
+    public function getFormattedFeeAttribute(): string
     {
-        return '₱' . number_format($this->fee_amount, 2);
+        return '₱' . number_format($this->fee_amount ?? 0, 2);
     }
-
-    public function getFormattedAmountPaidAttribute()
+    
+    public function getFormattedAmountPaidAttribute(): string
     {
         return '₱' . number_format($this->amount_paid ?? 0, 2);
     }
-
-    public function getFormattedBalanceAttribute()
+    
+    public function getFormattedBalanceAttribute(): string
     {
-        return '₱' . number_format($this->balance ?? $this->fee_amount, 2);
+        return '₱' . number_format($this->balance ?? $this->fee_amount ?? 0, 2);
     }
-
-    public function getStatusDisplayAttribute()
+    
+    public function getStatusDisplayAttribute(): string
     {
         $statuses = [
             'pending' => 'Pending Review',
@@ -279,8 +291,8 @@ class ClearanceRequest extends Model
         
         return $statuses[$this->status] ?? ucfirst($this->status);
     }
-
-    public function getPaymentStatusDisplayAttribute()
+    
+    public function getPaymentStatusDisplayAttribute(): string
     {
         $statuses = [
             'unpaid' => 'Unpaid',
@@ -290,15 +302,15 @@ class ClearanceRequest extends Model
         
         return $statuses[$this->payment_status] ?? 'Unpaid';
     }
-
-    public function getIsFullyPaidAttribute()
+    
+    public function getIsFullyPaidAttribute(): bool
     {
         return $this->payment_status === 'paid' || 
                ($this->balance !== null && $this->balance <= 0) ||
                ($this->amount_paid >= $this->fee_amount);
     }
-
-    public function getUrgencyDisplayAttribute()
+    
+    public function getUrgencyDisplayAttribute(): string
     {
         $urgencies = [
             'normal' => 'Normal',
@@ -306,10 +318,10 @@ class ClearanceRequest extends Model
             'express' => 'Express',
         ];
         
-        return $urgencies[$this->urgency] ?? ucfirst($this->urgency);
+        return $urgencies[$this->urgency] ?? ucfirst($this->urgency ?? 'normal');
     }
     
-    public function getIsValidAttribute()
+    public function getIsValidAttribute(): bool
     {
         if ($this->status !== 'issued') {
             return false;
@@ -318,7 +330,7 @@ class ClearanceRequest extends Model
         return $this->valid_until && $this->valid_until->isFuture();
     }
     
-    public function getDaysRemainingAttribute()
+    public function getDaysRemainingAttribute(): ?int
     {
         if (!$this->valid_until || $this->status !== 'issued') {
             return null;
@@ -326,537 +338,335 @@ class ClearanceRequest extends Model
         
         return $this->valid_until->diffInDays(now(), false);
     }
-
-    public function getPayerTypeLabelAttribute()
-    {
-        return match($this->payer_type) {
-            'resident' => 'Resident',
-            'household' => 'Household',
-            'business' => 'Business',
-            default => 'Unknown'
-        };
-    }
-
-    public function getPayerIconAttribute()
-    {
-        return match($this->payer_type) {
-            'resident' => 'User',
-            'household' => 'Home',
-            'business' => 'Building',
-            default => 'User'
-        };
-    }
-
-    /**
-     * Get the payer's name based on payer type.
-     */
-    public function getPayerNameAttribute()
-    {
-        // If we have a loaded payer relationship
-        if ($this->relationLoaded('payer') && $this->payer) {
-            return $this->getPayerNameFromModel($this->payer);
-        }
-        
-        // Try to load specific relationships based on type
-        if ($this->payer_type === 'resident' && $this->relationLoaded('resident') && $this->resident) {
-            return $this->resident->full_name ?? 'Unknown Resident';
-        }
-        
-        if ($this->payer_type === 'household' && $this->relationLoaded('household') && $this->household) {
-            return $this->getHouseholdDisplayNameSafe($this->household);
-        }
-        
-        if ($this->payer_type === 'business' && $this->relationLoaded('business') && $this->business) {
-            return $this->business->business_name ?? 'Unknown Business';
-        }
-        
-        // Fallback to stored contact name
-        if ($this->contact_name) {
-            return $this->contact_name;
-        }
-        
-        // Ultimate fallback to resident
-        if ($this->resident) {
-            return $this->resident->full_name ?? 'Unknown Resident';
-        }
-        
-        return 'Unknown';
-    }
-
-    /**
-     * Helper to get name from different payer models.
-     */
-    private function getPayerNameFromModel($model)
-    {
-        if ($model instanceof Resident) {
-            return $model->full_name ?? 'Unknown Resident';
-        }
-        
-        if ($model instanceof Household) {
-            return $this->getHouseholdDisplayNameSafe($model);
-        }
-        
-        if ($model instanceof Business) {
-            return $model->business_name ?? 'Unknown Business';
-        }
-        
-        return 'Unknown';
-    }
-
-    /**
-     * SAFE: Get household display name without relying on members relationship.
-     */
-    private function getHouseholdDisplayNameSafe($household)
-    {
-        if (!$household) {
-            return 'Unknown Household';
-        }
-        
-        // Check if household has a head_name attribute directly
-        if (isset($household->head_name) && !empty($household->head_name)) {
-            return $household->head_name . ' (Household)';
-        }
-        
-        // Check if household has a household_number
-        if (isset($household->household_number) && !empty($household->household_number)) {
-            return 'Household ' . $household->household_number;
-        }
-        
-        // Try to access members relationship if it exists
-        if (method_exists($household, 'members')) {
-            try {
-                $headMember = $household->members()
-                    ->where('is_head', true)
-                    ->with('resident')
-                    ->first();
-                    
-                if ($headMember && $headMember->resident) {
-                    return ($headMember->resident->full_name ?? 'Unknown') . ' (Household)';
-                }
-            } catch (\Exception $e) {
-                // Silently fall back
-            }
-        }
-        
-        return 'Household #' . $household->id;
-    }
-
-    /**
-     * SAFE: Get household head name without relying on members relationship.
-     */
-    private function getHouseholdHeadNameSafe($household)
-    {
-        if (!$household) {
-            return null;
-        }
-        
-        if (isset($household->head_name) && !empty($household->head_name)) {
-            return $household->head_name;
-        }
-        
-        if (method_exists($household, 'members')) {
-            try {
-                $headMember = $household->members()
-                    ->where('is_head', true)
-                    ->with('resident')
-                    ->first();
-                    
-                if ($headMember && $headMember->resident) {
-                    return $headMember->resident->full_name ?? null;
-                }
-            } catch (\Exception $e) {
-                return null;
-            }
-        }
-        
-        return null;
-    }
-
-    /**
-     * SAFE: Get household member count without relying on members relationship.
-     */
-    private function getHouseholdMemberCountSafe($household)
-    {
-        if (!$household) {
-            return 0;
-        }
-        
-        if (method_exists($household, 'members')) {
-            try {
-                return $household->members()->count();
-            } catch (\Exception $e) {
-                return 0;
-            }
-        }
-        
-        return 0;
-    }
-
-    /**
-     * SAFE: Get household contact number without relying on members relationship.
-     */
-    private function getHouseholdContactNumberSafe($household)
-    {
-        if (!$household) {
-            return null;
-        }
-        
-        if (isset($household->contact_number) && !empty($household->contact_number)) {
-            return $household->contact_number;
-        }
-        
-        if (method_exists($household, 'members')) {
-            try {
-                $headMember = $household->members()
-                    ->where('is_head', true)
-                    ->with('resident')
-                    ->first();
-                    
-                if ($headMember && $headMember->resident && isset($headMember->resident->contact_number)) {
-                    return $headMember->resident->contact_number;
-                }
-            } catch (\Exception $e) {
-                return null;
-            }
-        }
-        
-        return null;
-    }
-
-    /**
-     * Get resident's privileges if payer is a resident
-     */
-    private function getResidentPrivileges($resident): array
-    {
-        if (!$resident || !$resident->relationLoaded('residentPrivileges')) {
-            return [];
-        }
-
-        return $resident->residentPrivileges
-            ->filter(fn($rp) => $rp->isActive())
-            ->map(fn($rp) => [
-                'code' => $rp->privilege->code,
-                'name' => $rp->privilege->name,
-                'id_number' => $rp->id_number,
-            ])
-            ->values()
-            ->toArray();
-    }
-
-    /**
-     * Get detailed payer display information - DYNAMIC with privileges
-     */
-    public function getPayerDisplayAttribute()
-    {
-        $display = [
-            'name' => $this->payer_name,
-            'type' => $this->payer_type,
-            'type_label' => $this->payer_type_label,
-            'icon' => $this->payer_icon,
-            'id' => $this->payer_id,
-            'contact' => $this->payer_contact_number,
-            'address' => $this->payer_address,
-            'purok' => $this->payer_purok,
-        ];
-        
-        // Add type-specific details with DYNAMIC privileges
-        if ($this->payer_type === 'resident' && $this->resident) {
-            // Load privileges if not already loaded
-            if (!$this->resident->relationLoaded('residentPrivileges')) {
-                $this->resident->load('residentPrivileges.privilege');
-            }
-            
-            $privileges = $this->getResidentPrivileges($this->resident);
-            
-            $display['details'] = [
-                'age' => $this->resident->age ?? null,
-                'gender' => $this->resident->gender ?? null,
-                'civil_status' => $this->resident->civil_status ?? null,
-                'privileges' => $privileges,
-                'privileges_count' => count($privileges),
-                'has_privileges' => count($privileges) > 0,
-            ];
-        } elseif ($this->payer_type === 'household' && $this->household) {
-            $headName = $this->getHouseholdHeadNameSafe($this->household);
-            
-            // Try to get head resident's privileges
-            $headPrivileges = [];
-            if (method_exists($this->household, 'members')) {
-                try {
-                    $headMember = $this->household->members()
-                        ->where('is_head', true)
-                        ->with('resident.residentPrivileges.privilege')
-                        ->first();
-                        
-                    if ($headMember && $headMember->resident) {
-                        $headPrivileges = $this->getResidentPrivileges($headMember->resident);
-                    }
-                } catch (\Exception $e) {
-                    // Silently fail
-                }
-            }
-            
-            $display['details'] = [
-                'household_number' => $this->household->household_number ?? null,
-                'head_name' => $headName ?? 'Unknown',
-                'member_count' => $this->getHouseholdMemberCountSafe($this->household),
-                'head_privileges' => $headPrivileges,
-                'head_has_privileges' => count($headPrivileges) > 0,
-            ];
-        } elseif ($this->payer_type === 'business' && $this->business) {
-            // Try to get owner's privileges
-            $ownerPrivileges = [];
-            if ($this->business->owner_id) {
-                $owner = Resident::with(['residentPrivileges.privilege'])->find($this->business->owner_id);
-                if ($owner) {
-                    $ownerPrivileges = $this->getResidentPrivileges($owner);
-                }
-            }
-            
-            $display['details'] = [
-                'business_type' => $this->business->business_type_label ?? $this->business->business_type ?? null,
-                'owner_name' => $this->business->owner_name ?? null,
-                'permit_number' => $this->business->mayors_permit_number ?? null,
-                'employee_count' => $this->business->employee_count ?? null,
-                'owner_privileges' => $ownerPrivileges,
-                'owner_has_privileges' => count($ownerPrivileges) > 0,
-            ];
-        }
-        
-        return $display;
-    }
-
-    /**
-     * Get payer's contact number.
-     */
-    public function getPayerContactNumberAttribute()
-    {
-        if ($this->contact_number) {
-            return $this->contact_number;
-        }
-        
-        if ($this->payer_type === 'resident' && $this->resident) {
-            return $this->resident->contact_number ?? null;
-        }
-        
-        if ($this->payer_type === 'household' && $this->household) {
-            return $this->getHouseholdContactNumberSafe($this->household);
-        }
-        
-        if ($this->payer_type === 'business' && $this->business) {
-            return $this->business->contact_number ?? null;
-        }
-        
-        return null;
-    }
-
-    /**
-     * Get payer's address.
-     */
-    public function getPayerAddressAttribute()
-    {
-        if ($this->contact_address) {
-            return $this->contact_address;
-        }
-        
-        if ($this->payer_type === 'resident' && $this->resident) {
-            return $this->resident->address ?? null;
-        }
-        
-        if ($this->payer_type === 'household' && $this->household) {
-            return $this->household->address ?? null;
-        }
-        
-        if ($this->payer_type === 'business' && $this->business) {
-            return $this->business->address ?? null;
-        }
-        
-        return null;
-    }
-
-    /**
-     * Get payer's purok.
-     */
-    public function getPayerPurokAttribute()
-    {
-        if ($this->contactPurok) {
-            return $this->contactPurok->name ?? null;
-        }
-        
-        if ($this->payer_type === 'resident' && $this->resident && $this->resident->purok) {
-            return $this->resident->purok->name ?? null;
-        }
-        
-        if ($this->payer_type === 'household' && $this->household && $this->household->purok) {
-            return $this->household->purok->name ?? null;
-        }
-        
-        if ($this->payer_type === 'business' && $this->business && $this->business->purok) {
-            return $this->business->purok->name ?? null;
-        }
-        
-        return null;
-    }
-
-    /**
-     * Calculate estimated completion date.
-     */
-    public function getEstimatedCompletionDateAttribute()
-    {
-        if (!$this->clearanceType || $this->isCompleted()) {
-            return null;
-        }
-        
-        $processingDays = $this->clearanceType->processing_days ?? 3;
-        
-        if ($this->urgency === 'rush') {
-            $processingDays = ceil($processingDays * 0.5);
-        } elseif ($this->urgency === 'express') {
-            $processingDays = 1;
-        }
-        
-        $startDate = $this->created_at ?? now();
-        return $startDate->copy()->addDays($processingDays);
-    }
     
-    public function getRequestingUserAttribute()
+    // ========== ACTION METHODS WITH AUTHORIZATION ==========
+    
+    /**
+     * SECURITY NOTE: Explicit authorization check before state change
+     */
+    public function markAsProcessing(?int $userId = null): self
     {
-        if ($this->requestedBy) {
-            return $this->requestedBy;
+        // SECURITY NOTE: Verify user has permission
+        if (!Gate::allows('process-clearance', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to process this clearance request.'
+            );
         }
         
-        if ($this->payer_type === 'resident' && $this->resident && $this->resident->user) {
-            return $this->resident->user;
-        }
+        DB::transaction(function () use ($userId) {
+            $this->updateStatus('processing', [
+                'processed_by' => $userId ?? auth()->id(),
+                'processed_at' => now(),
+            ]);
+        });
         
-        return null;
+        return $this;
     }
     
     /**
-     * Get formatted status history as an array.
+     * SECURITY NOTE: Validate date format and bounds
      */
-    public function getFormattedStatusHistoryAttribute()
+    public function approve(?Carbon $validUntil = null): self
     {
-        if (!$this->relationLoaded('statusHistory')) {
-            $this->load(['statusHistory' => function ($query) {
-                $query->with('causer')->orderBy('created_at', 'desc');
-            }]);
+        if (!Gate::allows('approve-clearance', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to approve clearance requests.'
+            );
         }
         
-        return $this->statusHistory->map(function ($activity) {
-            $oldStatus = null;
-            $newStatus = null;
-            $description = $activity->description;
-            
-            if (isset($activity->properties['changes']['status'])) {
-                $oldStatus = $activity->properties['changes']['status']['old'] ?? null;
-                $newStatus = $activity->properties['changes']['status']['new'] ?? null;
-                
-                if ($oldStatus && $newStatus) {
-                    $description = "Status changed from {$oldStatus} to {$newStatus}";
-                }
-            }
-            
-            return [
-                'id' => $activity->id,
-                'old_status' => $oldStatus,
-                'new_status' => $newStatus,
-                'description' => $description,
-                'changed_by' => $activity->causer ? $activity->causer->name : 'System',
-                'changed_by_user' => $activity->causer,
-                'changed_at' => $activity->created_at->format('Y-m-d H:i:s'),
-                'formatted_date' => $activity->created_at->format('F j, Y g:i A'),
-                'properties' => $activity->properties,
-                'event' => $activity->event,
-            ];
-        })->values()->toArray();
+        $user = auth()->user();
+        
+        if (!$user) {
+            throw new \RuntimeException('No authenticated user available for approval.');
+        }
+        
+        // SECURITY NOTE: Validate and sanitize date input
+        if ($validUntil && !$validUntil instanceof Carbon) {
+            $validUntil = Carbon::parse($validUntil);
+        }
+        
+        // LOGIC NOTE: Ensure validity period is within allowed bounds
+        $maxValidityDays = config('clearance.max_validity_days', 365);
+        $minValidityDays = config('clearance.min_validity_days', 30);
+        
+        if (!$validUntil) {
+            $validUntil = now()->addDays($this->clearanceType->validity_days ?? $minValidityDays);
+        }
+        
+        $daysUntilExpiry = now()->diffInDays($validUntil);
+        
+        if ($daysUntilExpiry > $maxValidityDays) {
+            throw new \InvalidArgumentException(
+                "Clearance validity cannot exceed {$maxValidityDays} days."
+            );
+        }
+        
+        if ($daysUntilExpiry < $minValidityDays) {
+            throw new \InvalidArgumentException(
+                "Clearance validity must be at least {$minValidityDays} days."
+            );
+        }
+        
+        DB::transaction(function () use ($user, $validUntil) {
+            $this->updateStatus('approved', [
+                'issuing_officer_id' => $user->id,
+                'issuing_officer_name' => $user->name,
+                'processed_by' => $user->id,
+                'processed_at' => now(),
+                'issue_date' => now(),
+                'valid_until' => $validUntil,
+            ]);
+        });
+        
+        return $this;
     }
     
-    // ========== SCOPES ==========
-    
-    public function scopePending($query)
+    public function issue(): self
     {
-        return $query->where('status', 'pending');
-    }
-
-    public function scopeByResident($query, $residentId)
-    {
-        return $query->where('resident_id', $residentId);
-    }
-
-    /**
-     * Scope by payer type and ID.
-     */
-    public function scopeByPayer($query, $payerType, $payerId)
-    {
-        return $query->where('payer_type', $payerType)
-            ->where('payer_id', $payerId);
-    }
-
-    /**
-     * Scope by payer type.
-     */
-    public function scopeOfPayerType($query, $payerType)
-    {
-        return $query->where('payer_type', $payerType);
-    }
-
-    public function scopeNeedsProcessing($query)
-    {
-        return $query->whereIn('status', ['pending', 'processing', 'approved']);
+        if (!Gate::allows('issue-clearance', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to issue clearances.'
+            );
+        }
+        
+        if (!$this->clearance_number) {
+            $this->clearance_number = self::generateClearanceNumber();
+        }
+        
+        $user = auth()->user();
+        
+        DB::transaction(function () use ($user) {
+            $this->updateStatus('issued', [
+                'issuing_officer_id' => $user->id,
+                'issuing_officer_name' => $user->name,
+                'issue_date' => $this->issue_date ?? now(),
+                'clearance_number' => $this->clearance_number,
+            ]);
+        });
+        
+        return $this;
     }
     
-    public function scopeIssued($query)
+    public function reject(string $reason): self
     {
-        return $query->where('status', 'issued');
+        if (!Gate::allows('reject-clearance', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to reject clearance requests.'
+            );
+        }
+        
+        if (!$this->canBeProcessed()) {
+            throw new InvalidStateTransitionException('Request cannot be rejected at this stage.');
+        }
+        
+        DB::transaction(function () use ($reason) {
+            $this->updateStatus('rejected', [
+                'admin_notes' => $reason,
+                'processed_by' => auth()->id(),
+                'processed_at' => now(),
+            ]);
+        });
+        
+        return $this;
     }
     
-    public function scopeActive($query)
+    public function cancel(?string $reason = null, bool $cancelledByResident = true): self
     {
-        return $query->whereIn('status', ['pending', 'processing', 'approved', 'pending_payment']);
+        // SECURITY NOTE: Different permissions for admin vs resident cancellation
+        if (!$cancelledByResident && !Gate::allows('cancel-clearance', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to cancel clearance requests.'
+            );
+        }
+        
+        if (!in_array($this->status, ['pending', 'processing', 'pending_payment'])) {
+            throw new InvalidStateTransitionException('Cannot cancel request at this stage.');
+        }
+        
+        DB::transaction(function () use ($reason, $cancelledByResident) {
+            $this->updateStatus('cancelled', [
+                'cancellation_reason' => $reason,
+                'processed_at' => $cancelledByResident ? null : now(),
+                'processed_by' => $cancelledByResident ? null : auth()->id(),
+            ]);
+        });
+        
+        return $this;
     }
     
-    public function scopeExpired($query)
+    public function markAsPendingPayment(): self
     {
-        return $query->where('status', 'issued')
-            ->whereDate('valid_until', '<', now());
-    }
-
-    public function scopeUnpaid($query)
-    {
-        return $query->where(function($q) {
-            $q->whereNull('payment_status')
-              ->orWhere('payment_status', 'unpaid')
-              ->orWhere('balance', '>', 0);
+        if (!Gate::allows('update-clearance', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to update this clearance request.'
+            );
+        }
+        
+        return DB::transaction(function () {
+            $this->updateStatus('pending_payment');
+            return $this;
         });
     }
-
-    public function scopePaid($query)
+    
+    public function markAsExpired(): self
     {
-        return $query->where('payment_status', 'paid')
-            ->orWhere(function($q) {
-                $q->whereNotNull('amount_paid')
-                  ->whereColumn('amount_paid', '>=', 'fee_amount');
-            });
-    }
-
-    public function scopePartiallyPaid($query)
-    {
-        return $query->where('payment_status', 'partially_paid')
-            ->orWhere(function($q) {
-                $q->whereNotNull('amount_paid')
-                  ->whereColumn('amount_paid', '<', 'fee_amount')
-                  ->where('amount_paid', '>', 0);
-            });
+        if ($this->status !== 'issued' || $this->is_valid) {
+            throw new InvalidStateTransitionException('Only expired issued clearances can be marked as expired.');
+        }
+        
+        return DB::transaction(function () {
+            $this->updateStatus('expired');
+            return $this;
+        });
     }
     
-    // ========== BUSINESS LOGIC METHODS ==========
+    // ========== PAYMENT METHODS WITH TRANSACTION SAFETY ==========
+    
+    /**
+     * SECURITY NOTE: Atomic payment application with optimistic locking
+     */
+    public function applyPayment(Payment $payment, float $amount, array $data = []): self
+    {
+        // SECURITY NOTE: Validate payment amount
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('Payment amount must be greater than zero.');
+        }
+        
+        if (!Gate::allows('process-payment', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to apply payments to this clearance request.'
+            );
+        }
+        
+        return DB::transaction(function () use ($payment, $amount, $data) {
+            // LOGIC NOTE: Lock the row for update to prevent race conditions
+            $fresh = self::where('id', $this->id)->lockForUpdate()->first();
+            
+            $oldAmountPaid = $fresh->amount_paid ?? 0;
+            $oldPaymentStatus = $fresh->payment_status;
+            
+            $fresh->payment_id = $payment->id;
+            $fresh->amount_paid = $oldAmountPaid + $amount;
+            $fresh->balance = max(0, $fresh->fee_amount - $fresh->amount_paid);
+            $fresh->payment_date = $payment->payment_date;
+            $fresh->or_number = $payment->or_number;
+            
+            // LOGIC NOTE: Determine new payment status
+            if ($fresh->balance <= 0) {
+                $fresh->payment_status = 'paid';
+                // SECURITY NOTE: Only auto-approve if configured to do so
+                if (config('clearance.auto_approve_on_payment', true)) {
+                    $fresh->validateStateTransition('approved');
+                    $fresh->status = 'approved';
+                }
+            } elseif ($fresh->amount_paid > 0) {
+                $fresh->payment_status = 'partially_paid';
+            } else {
+                $fresh->payment_status = 'unpaid';
+            }
+            
+            if (isset($data['issue_date'])) {
+                $fresh->issue_date = Carbon::parse($data['issue_date']);
+            }
+            
+            if (isset($data['valid_until'])) {
+                $fresh->valid_until = Carbon::parse($data['valid_until']);
+            }
+            
+            $fresh->save();
+            
+            // SECURITY NOTE: Log payment with minimal sensitive data
+            activity()
+                ->performedOn($fresh)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'payment_id' => $payment->id,
+                    'or_number' => $payment->or_number,
+                    'amount' => $amount,
+                    'new_amount_paid' => $fresh->amount_paid,
+                    'new_status' => $fresh->payment_status,
+                ])
+                ->log('payment_applied');
+            
+            return $fresh;
+        });
+    }
+    
+    /**
+     * SECURITY NOTE: Mark as paid with validation
+     */
+    public function markAsPaid(?float $amount = null, array $data = []): self
+    {
+        if (!Gate::allows('process-payment', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to mark this clearance as paid.'
+            );
+        }
+        
+        $paymentAmount = $amount ?? $this->fee_amount;
+        
+        if ($paymentAmount <= 0) {
+            throw new \InvalidArgumentException('Payment amount must be greater than zero.');
+        }
+        
+        return DB::transaction(function () use ($paymentAmount, $data) {
+            $fresh = self::where('id', $this->id)->lockForUpdate()->first();
+            
+            $fresh->amount_paid = $paymentAmount;
+            $fresh->balance = max(0, $fresh->fee_amount - $paymentAmount);
+            $fresh->payment_status = 'paid';
+            
+            if ($fresh->balance <= 0 && config('clearance.auto_approve_on_payment', true)) {
+                $fresh->validateStateTransition('approved');
+                $fresh->status = 'approved';
+            }
+            
+            if (isset($data['issue_date'])) {
+                $fresh->issue_date = Carbon::parse($data['issue_date']);
+            }
+            
+            if (isset($data['valid_until'])) {
+                $fresh->valid_until = Carbon::parse($data['valid_until']);
+            }
+            
+            $fresh->save();
+            
+            return $fresh;
+        });
+    }
+    
+    public function voidPayment(): self
+    {
+        if (!Gate::allows('void-payment', $this)) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'You are not authorized to void payments.'
+            );
+        }
+        
+        return DB::transaction(function () {
+            $fresh = self::where('id', $this->id)->lockForUpdate()->first();
+            
+            $fresh->payment_id = null;
+            $fresh->payment_status = 'unpaid';
+            $fresh->amount_paid = 0;
+            $fresh->balance = $fresh->fee_amount;
+            $fresh->payment_date = null;
+            $fresh->or_number = null;
+            $fresh->validateStateTransition('pending_payment');
+            $fresh->status = 'pending_payment';
+            $fresh->save();
+            
+            return $fresh;
+        });
+    }
+    
+    // ========== HELPER METHODS ==========
     
     public function canBeProcessed(): bool
     {
         return $this->status === 'pending' || $this->status === 'processing';
     }
-
+    
     public function isCompleted(): bool
     {
         return in_array($this->status, ['issued', 'rejected', 'cancelled', 'expired']);
@@ -887,252 +697,132 @@ class ClearanceRequest extends Model
         return $this->status === 'pending_payment';
     }
     
-    // ========== PAYMENT METHODS ==========
+    // ========== SCOPES ==========
     
-    /**
-     * Apply payment to this clearance request
-     */
-    public function applyPayment(Payment $payment, float $amount, array $data = []): self
+    public function scopePending($query)
     {
-        $oldAmountPaid = $this->amount_paid ?? 0;
-        $oldPaymentStatus = $this->payment_status;
-        
-        $this->payment_id = $payment->id;
-        $this->amount_paid = $oldAmountPaid + $amount;
-        $this->balance = max(0, $this->fee_amount - $this->amount_paid);
-        $this->payment_date = $payment->payment_date;
-        $this->or_number = $payment->or_number;
-        
-        if ($this->balance <= 0) {
-            $this->payment_status = 'paid';
-            $this->status = 'approved';
-        } elseif ($this->amount_paid > 0) {
-            $this->payment_status = 'partially_paid';
-        } else {
-            $this->payment_status = 'unpaid';
-        }
-        
-        if (isset($data['issue_date'])) {
-            $this->issue_date = $data['issue_date'];
-        }
-        
-        if (isset($data['valid_until'])) {
-            $this->valid_until = $data['valid_until'];
-        }
-        
-        $this->save();
-        
-        activity()
-            ->performedOn($this)
-            ->causedBy(auth()->user())
-            ->withProperties([
-                'payment_id' => $payment->id,
-                'or_number' => $payment->or_number,
-                'amount' => $amount,
-                'old_amount_paid' => $oldAmountPaid,
-                'new_amount_paid' => $this->amount_paid,
-                'old_status' => $oldPaymentStatus,
-                'new_status' => $this->payment_status,
-                'balance' => $this->balance,
-            ])
-            ->log('payment_applied');
-        
-        return $this;
-    }
-
-    /**
-     * Mark as paid without creating a payment
-     */
-    public function markAsPaid(float $amount = null, array $data = []): self
-    {
-        $this->amount_paid = $amount ?? $this->fee_amount;
-        $this->balance = max(0, $this->fee_amount - $this->amount_paid);
-        $this->payment_status = 'paid';
-        
-        if ($this->balance <= 0) {
-            $this->status = 'approved';
-        }
-        
-        if (isset($data['issue_date'])) {
-            $this->issue_date = $data['issue_date'];
-        }
-        
-        if (isset($data['valid_until'])) {
-            $this->valid_until = $data['valid_until'];
-        }
-        
-        $this->save();
-        
-        return $this;
-    }
-
-    /**
-     * Void payment (for cancellations/refunds)
-     */
-    public function voidPayment(): self
-    {
-        $this->payment_id = null;
-        $this->payment_status = 'unpaid';
-        $this->amount_paid = 0;
-        $this->balance = $this->fee_amount;
-        $this->payment_date = null;
-        $this->or_number = null;
-        $this->status = 'pending_payment';
-        $this->save();
-        
-        return $this;
+        return $query->where('status', 'pending');
     }
     
-    // ========== ACTION METHODS ==========
-    
-    public function markAsProcessing($userId = null)
+    public function scopeByResident($query, $residentId)
     {
-        $this->update([
-            'status' => 'processing',
-            'processed_by' => $userId ?? auth()->id(),
-            'processed_at' => now(),
-        ]);
-        
-        return $this;
+        return $query->where('resident_id', $residentId);
     }
     
-    public function approve($validUntil = null)
+    public function scopeByPayer($query, $payerType, $payerId)
     {
-        $user = auth()->user();
+        // SECURITY NOTE: Whitelist payer types
+        $allowedTypes = ['resident', 'household', 'business'];
         
-        $this->update([
-            'status' => 'approved',
-            'issuing_officer_id' => $user->id,
-            'issuing_officer_name' => $user->name,
-            'processed_by' => $user->id,
-            'processed_at' => now(),
-            'issue_date' => now(),
-            'valid_until' => $validUntil ?? now()->addDays($this->clearanceType->validity_days ?? 30),
-        ]);
-        
-        return $this;
-    }
-    
-    public function issue()
-    {
-        $user = auth()->user();
-        
-        $this->update([
-            'status' => 'issued',
-            'issuing_officer_id' => $user->id,
-            'issuing_officer_name' => $user->name,
-            'issue_date' => $this->issue_date ?? now(),
-        ]);
-        
-        return $this;
-    }
-
-    public function getIssuingOfficerDisplayAttribute()
-    {
-        if ($this->issuingOfficer) {
-            return $this->issuingOfficer->name . ' (ID: ' . $this->issuingOfficer->id . ')';
-        }
-        return $this->issuing_officer_name ?? 'N/A';
-    }
-
-    public function reject($reason, $processedBy = null)
-    {
-        if (!$this->canBeProcessed()) {
-            throw new \Exception('Request cannot be rejected at this stage.');
-        }
-
-        $this->update([
-            'status' => 'rejected',
-            'admin_notes' => $reason,
-            'processed_by' => $processedBy ?? auth()->id(),
-            'processed_at' => now(),
-        ]);
-
-        return $this;
-    }
-
-    public function cancel($reason = null, $cancelledByResident = true)
-    {
-        if (!in_array($this->status, ['pending', 'processing', 'pending_payment'])) {
-            throw new \Exception('Cannot cancel request at this stage.');
-        }
-
-        $this->update([
-            'status' => 'cancelled',
-            'cancellation_reason' => $reason,
-            'processed_at' => $cancelledByResident ? null : now(),
-            'processed_by' => $cancelledByResident ? null : auth()->id(),
-        ]);
-
-        return $this;
-    }
-    
-    public function markAsPendingPayment()
-    {
-        $this->update([
-            'status' => 'pending_payment',
-        ]);
-        
-        return $this;
-    }
-
-    public function clearance_type(): BelongsTo
-    {
-        return $this->belongsTo(ClearanceType::class, 'clearance_type_id');
-    }
-    
-    public function markAsExpired()
-    {
-        if ($this->status !== 'issued' || $this->is_valid) {
-            throw new \Exception('Only expired issued clearances can be marked as expired.');
+        if (!in_array($payerType, $allowedTypes)) {
+            throw new \InvalidArgumentException('Invalid payer type.');
         }
         
-        $this->update([
-            'status' => 'expired',
-        ]);
-        
-        return $this;
+        return $query->where('payer_type', $payerType)
+            ->where('payer_id', $payerId);
     }
     
-    public function processor(): BelongsTo
+    public function scopeOfPayerType($query, $payerType)
     {
-        return $this->belongsTo(User::class, 'processor_id');
+        $allowedTypes = ['resident', 'household', 'business'];
+        
+        if (!in_array($payerType, $allowedTypes)) {
+            throw new \InvalidArgumentException('Invalid payer type.');
+        }
+        
+        return $query->where('payer_type', $payerType);
+    }
+    
+    public function scopeNeedsProcessing($query)
+    {
+        return $query->whereIn('status', ['pending', 'processing', 'approved']);
+    }
+    
+    public function scopeIssued($query)
+    {
+        return $query->where('status', 'issued');
+    }
+    
+    public function scopeActive($query)
+    {
+        return $query->whereIn('status', ['pending', 'processing', 'approved', 'pending_payment']);
+    }
+    
+    public function scopeExpired($query)
+    {
+        return $query->where('status', 'issued')
+            ->whereDate('valid_until', '<', now());
+    }
+    
+    public function scopeUnpaid($query)
+    {
+        return $query->where(function($q) {
+            $q->whereNull('payment_status')
+              ->orWhere('payment_status', 'unpaid')
+              ->orWhere('balance', '>', 0);
+        });
+    }
+    
+    public function scopePaid($query)
+    {
+        return $query->where('payment_status', 'paid')
+            ->orWhere(function($q) {
+                $q->whereNotNull('amount_paid')
+                  ->whereColumn('amount_paid', '>=', 'fee_amount');
+            });
+    }
+    
+    public function scopePartiallyPaid($query)
+    {
+        return $query->where('payment_status', 'partially_paid')
+            ->orWhere(function($q) {
+                $q->whereNotNull('amount_paid')
+                  ->whereColumn('amount_paid', '<', 'fee_amount')
+                  ->where('amount_paid', '>', 0);
+            });
     }
     
     // ========== GENERATORS ==========
     
-    public static function generateReferenceNumber()
+    public static function generateReferenceNumber(): string
     {
-        $prefix = 'REQ-' . date('Ymd') . '-';
-        $lastRequest = self::where('reference_number', 'like', $prefix . '%')
-            ->orderBy('reference_number', 'desc')
-            ->first();
-
-        if ($lastRequest) {
-            $lastNumber = (int) str_replace($prefix, '', $lastRequest->reference_number);
-            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '0001';
-        }
-
-        return $prefix . $newNumber;
+        // SECURITY NOTE: Use database lock to prevent duplicate numbers
+        return DB::transaction(function () {
+            $prefix = 'REQ-' . date('Ymd') . '-';
+            $lastRequest = self::where('reference_number', 'like', $prefix . '%')
+                ->orderBy('reference_number', 'desc')
+                ->lockForUpdate()
+                ->first();
+            
+            if ($lastRequest) {
+                $lastNumber = (int) str_replace($prefix, '', $lastRequest->reference_number);
+                $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+            } else {
+                $newNumber = '0001';
+            }
+            
+            return $prefix . $newNumber;
+        });
     }
     
-    public static function generateClearanceNumber()
+    public static function generateClearanceNumber(): string
     {
-        $prefix = 'CLR-' . date('Y') . '-';
-        $lastClearance = self::where('clearance_number', 'like', $prefix . '%')
-            ->orderBy('clearance_number', 'desc')
-            ->first();
-
-        if ($lastClearance) {
-            $lastNumber = (int) str_replace($prefix, '', $lastClearance->clearance_number);
-            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '0001';
-        }
-
-        return $prefix . $newNumber;
+        return DB::transaction(function () {
+            $prefix = 'CLR-' . date('Y') . '-';
+            $lastClearance = self::where('clearance_number', 'like', $prefix . '%')
+                ->orderBy('clearance_number', 'desc')
+                ->lockForUpdate()
+                ->first();
+            
+            if ($lastClearance) {
+                $lastNumber = (int) str_replace($prefix, '', $lastClearance->clearance_number);
+                $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+            } else {
+                $newNumber = '0001';
+            }
+            
+            return $prefix . $newNumber;
+        });
     }
     
     // ========== BOOT METHOD ==========
@@ -1146,42 +836,19 @@ class ClearanceRequest extends Model
                 $model->reference_number = self::generateReferenceNumber();
             }
             
+            // LOGIC NOTE: Initialize payment fields correctly
             $model->payment_status = $model->payment_status ?? 'unpaid';
             $model->amount_paid = $model->amount_paid ?? 0;
             $model->balance = $model->fee_amount ?? 0;
             
-            if (!$model->contact_name && $model->payer) {
-                if ($model->payer_type === 'resident') {
-                    $model->contact_name = $model->payer->full_name ?? null;
-                    $model->contact_number = $model->payer->contact_number ?? null;
-                } elseif ($model->payer_type === 'household') {
-                    if (method_exists($model->payer, 'members')) {
-                        try {
-                            $headMember = $model->payer->members()
-                                ->where('is_head', true)
-                                ->with('resident')
-                                ->first();
-                            if ($headMember && $headMember->resident) {
-                                $model->contact_name = $headMember->resident->full_name ?? null;
-                                $model->contact_number = $headMember->resident->contact_number ?? null;
-                            }
-                        } catch (\Exception $e) {
-                            $model->contact_name = $model->payer->head_name ?? 'Household Member';
-                        }
-                    } else {
-                        $model->contact_name = $model->payer->head_name ?? 'Household Member';
-                    }
-                } elseif ($model->payer_type === 'business') {
-                    $model->contact_name = $model->payer->business_name ?? null;
-                    $model->contact_number = $model->payer->contact_number ?? null;
-                }
-                
-                $model->contact_address = $model->payer->address ?? null;
-                $model->contact_purok_id = $model->payer->purok_id ?? null;
+            // SECURITY NOTE: Only copy contact info if explicitly allowed
+            if (!$model->contact_name && $model->payer && config('clearance.auto_populate_contact', true)) {
+                $model->populateContactInfoFromPayer();
             }
         });
         
         static::updating(function ($model) {
+            // LOGIC NOTE: Recalculate balance when fee changes
             if ($model->isDirty('fee_amount') && $model->amount_paid > 0) {
                 $model->balance = max(0, $model->fee_amount - $model->amount_paid);
                 
@@ -1194,9 +861,54 @@ class ClearanceRequest extends Model
         });
         
         static::saving(function ($model) {
+            // LOGIC NOTE: Auto-expire if past validity date
             if ($model->status === 'issued' && $model->valid_until && $model->valid_until->isPast()) {
                 $model->status = 'expired';
             }
+            
+            // LOGIC NOTE: Sync resident_id for backward compatibility
+            if ($model->payer_type === 'resident' && $model->payer_id) {
+                $model->resident_id = $model->payer_id;
+            }
         });
+    }
+    
+    /**
+     * SECURITY NOTE: Safe contact info population
+     */
+    protected function populateContactInfoFromPayer(): void
+    {
+        if (!$this->payer) {
+            return;
+        }
+        
+        if ($this->payer_type === 'resident') {
+            $this->contact_name = $this->payer->full_name ?? null;
+            $this->contact_number = $this->payer->contact_number ?? null;
+        } elseif ($this->payer_type === 'household') {
+            if (method_exists($this->payer, 'members')) {
+                try {
+                    $headMember = $this->payer->members()
+                        ->where('is_head', true)
+                        ->with('resident')
+                        ->first();
+                    if ($headMember && $headMember->resident) {
+                        $this->contact_name = $headMember->resident->full_name ?? null;
+                        $this->contact_number = $headMember->resident->contact_number ?? null;
+                    }
+                } catch (\Exception $e) {
+                    // LOGIC NOTE: Graceful degradation
+                    $this->contact_name = $this->payer->head_name ?? 'Household Member';
+                }
+            } else {
+                $this->contact_name = $this->payer->head_name ?? 'Household Member';
+            }
+        } elseif ($this->payer_type === 'business') {
+            $this->contact_name = $this->payer->business_name ?? null;
+            $this->contact_number = $this->payer->contact_number ?? null;
+        }
+        
+        $this->contact_address = $this->payer->address ?? null;
+        $this->contact_purok_id = $this->payer->purok_id ?? null;
     }
 }

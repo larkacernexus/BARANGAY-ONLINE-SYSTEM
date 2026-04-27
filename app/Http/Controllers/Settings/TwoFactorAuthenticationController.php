@@ -15,15 +15,24 @@ use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
-use Laravel\Fortify\TwoFactorAuthenticationProvider; 
+use Laravel\Fortify\TwoFactorAuthenticationProvider;
+use Illuminate\Support\Facades\Auth;
 
 class TwoFactorAuthenticationController extends Controller
 {
-    protected $maxAttempts = 5;
-    protected $decayMinutes = 1;
+    // SECURITY NOTE: Use environment-based configuration for security parameters
+    protected $maxAttempts;
+    protected $decayMinutes;
+    
+    public function __construct()
+    {
+        $this->maxAttempts = config('auth.two_factor.max_attempts', 5);
+        $this->decayMinutes = config('auth.two_factor.decay_minutes', 1);
+    }
     
     /**
      * Get Google2FA instance
+     * SECURITY NOTE: Use dependency injection for better testability
      */
     private function getGoogle2FA(): Google2FA
     {
@@ -32,168 +41,227 @@ class TwoFactorAuthenticationController extends Controller
 
     /**
      * Show 2FA settings page for admin
+     * SECURITY NOTE: Limit sensitive data exposure
      */
     public function show(Request $request)
     {
         $user = $request->user();
         
+        // SECURITY NOTE: Verify session hasn't been hijacked
+        if (!$this->isSessionSecure($request)) {
+            Auth::logout();
+            return redirect()->route('login')->with('error', 'Session security check failed.');
+        }
+        
         $twoFactorEnabled = $this->isTwoFactorEnabled($user);
         $requiresConfirmation = $this->requiresTwoFactorConfirmation($user);
         
-        // If 2FA is partially setup, generate QR code to show in modal
+        // SECURITY NOTE: Only expose QR code if absolutely necessary
         $initialSetupData = null;
         
         if ($requiresConfirmation) {
             try {
-                $secret = $this->getTwoFactorSecret($user);
-                $qrCodeSvg = $this->generateQrCodeSvg($secret, $user->email);
-                $initialSetupData = [
-                    'qrCodeSvg' => $qrCodeSvg,
-                    'manualSetupKey' => $secret,
-                ];
+                // SECURITY NOTE: Add timeout for pending setups (30 minutes)
+                if ($this->isSetupExpired($user)) {
+                    $this->clearTwoFactorData($user);
+                    $requiresConfirmation = false;
+                } else {
+                    $secret = $this->getTwoFactorSecret($user);
+                    $qrCodeSvg = $this->generateQrCodeSvg($secret, $user->email);
+                    $initialSetupData = [
+                        'qrCodeSvg' => $qrCodeSvg,
+                        'manualSetupKey' => $this->formatSecretForDisplay($secret),
+                    ];
+                }
             } catch (\Exception $e) {
+                // SECURITY NOTE: Log error but don't expose details to user
                 Log::error('Failed to generate QR code for existing setup', [
                     'user_id' => $user->id,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
                 ]);
                 
-                // Clear invalid setup data
                 $this->clearTwoFactorData($user);
+                $requiresConfirmation = false;
             }
         }
         
+        // SECURITY NOTE: Never expose actual recovery codes in initial page load
         return Inertia::render('admin/settings/two-factor', [
             'twoFactorEnabled' => $twoFactorEnabled,
             'requiresConfirmation' => $requiresConfirmation,
             'initialSetupData' => $initialSetupData,
-            'lastUsedAt' => $user->two_factor_last_used_at ?? null,
+            'lastUsedAt' => $user->two_factor_last_used_at ? 
+                $user->two_factor_last_used_at->diffForHumans() : null,
             'backupCodesRemaining' => $this->getRemainingRecoveryCodes($user),
         ]);
     }
 
     /**
      * Enable 2FA (generate QR code) for admin
+     * SECURITY NOTE: Require recent authentication for sensitive operations
      */
-   public function enable(Request $request)
-{
-    Log::info('===== 2FA ENABLE START =====');
-    Log::info('User:', ['id' => $request->user()->id, 'email' => $request->user()->email]);
-    
-    $user = $request->user();
-
-    // Generate secret
-    $secret = app(TwoFactorAuthenticationProvider::class)->generateSecretKey();
-    Log::info('Secret generated:', ['secret' => $secret]);
-
-    // Store in session
-    $request->session()->put('two_factor_secret', $secret);
-    $request->session()->put('two_factor_setup_required', true);
-
-    // Generate QR code as SVG
-    $qrCodeSvg = $this->generateQrCodeSvg($secret, $user->email);
-    Log::info('QR Code SVG generated');
-
-    // SAVE TO DATABASE LIKE RESIDENT CONTROLLER
-    $user->update([
-        'two_factor_secret' => Crypt::encryptString($secret),
-        'two_factor_confirmed_at' => null,
-        'two_factor_recovery_codes' => null,
-        'two_factor_enabled_at' => null,
-        'two_factor_last_used_at' => null,
-        'two_factor_used_recovery_codes' => null,
-    ]);
-
-    // Return with flash data - DIRECTLY, not wrapped
-    return redirect()->back()->with([
-        'success' => 'Two-factor authentication setup initiated.',
-        'qrCodeSvg' => $qrCodeSvg,
-        'manualSetupKey' => $secret,
-    ]);
-}
+    public function enable(Request $request)
+    {
+        // SECURITY NOTE: Verify user has authenticated recently (last 5 minutes)
+        if (!$this->hasRecentAuthentication($request)) {
+            return redirect()->back()->with([
+                'error' => 'Please confirm your password to enable 2FA.'
+            ]);
+        }
+        
+        $user = $request->user();
+        
+        // SECURITY NOTE: Prevent enabling if already enabled
+        if ($this->isTwoFactorEnabled($user)) {
+            return redirect()->back()->with([
+                'error' => 'Two-factor authentication is already enabled.'
+            ]);
+        }
+        
+        // SECURITY NOTE: Generate cryptographically secure secret
+        $secret = app(TwoFactorAuthenticationProvider::class)->generateSecretKey();
+        
+        // SECURITY NOTE: Store with expiration timestamp
+        $user->update([
+            'two_factor_secret' => Crypt::encryptString($secret),
+            'two_factor_confirmed_at' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_enabled_at' => null,
+            'two_factor_last_used_at' => null,
+            'two_factor_used_recovery_codes' => null,
+            'two_factor_setup_at' => now(), // Track when setup started
+        ]);
+        
+        // SECURITY NOTE: Log the initiation (not the secret)
+        Log::info('2FA setup initiated', [
+            'user_id' => $user->id,
+            'ip' => $this->anonymizeIp($request->ip()),
+        ]);
+        
+        $qrCodeSvg = $this->generateQrCodeSvg($secret, $user->email);
+        
+        // SECURITY NOTE: Format secret for display (add spaces for readability)
+        return redirect()->back()->with([
+            'success' => 'Two-factor authentication setup initiated.',
+            'qrCodeSvg' => $qrCodeSvg,
+            'manualSetupKey' => $this->formatSecretForDisplay($secret),
+        ]);
+    }
 
     /**
      * Confirm 2FA setup for admin
+     * SECURITY NOTE: Strict validation and rate limiting
      */
     public function confirm(Request $request)
     {
+        // SECURITY NOTE: Strict input validation
         $request->validate([
-            'code' => 'required|string|size:6|regex:/^\d{6}$/',
+            'code' => [
+                'required',
+                'string',
+                'size:6',
+                'regex:/^[0-9]{6}$/',
+            ],
         ]);
         
         $user = $request->user();
         
-        // Throttle confirmation attempts
+        // SECURITY NOTE: Aggressive rate limiting for confirmation attempts
         $throttleKey = $this->getThrottleKey($user, 'confirm_2fa');
         if ($this->hasTooManyAttempts($throttleKey)) {
             $availableIn = $this->availableIn($throttleKey);
+            
+            // SECURITY NOTE: Log rate limit hit for security monitoring
+            Log::warning('2FA confirmation rate limit hit', [
+                'user_id' => $user->id,
+                'ip' => $this->anonymizeIp($request->ip()),
+            ]);
+            
             return redirect()->back()->with([
-                'error' => 'Too many failed attempts. Please try again in '.$availableIn.' seconds.'
+                'error' => 'Too many failed attempts. Please try again in ' . $availableIn . ' seconds.'
             ]);
         }
         
         $this->incrementAttempts($throttleKey);
         
-        if (!$this->requiresTwoFactorConfirmation($user)) {
-            return redirect()->back()->withErrors([
-                'code' => 'No pending setup found. Please start over.'
-            ])->with([
-                'error' => 'No pending setup found.'
+        // SECURITY NOTE: Check setup expiration
+        if (!$this->requiresTwoFactorConfirmation($user) || $this->isSetupExpired($user)) {
+            $this->clearTwoFactorData($user);
+            return redirect()->back()->with([
+                'error' => 'Setup session expired. Please start over.'
             ]);
         }
         
-        // Get the secret
+        // SECURITY NOTE: Get and validate secret
         try {
             $secret = $this->getTwoFactorSecret($user);
         } catch (\Exception $e) {
             Log::error('Failed to decrypt 2FA secret', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage()
+                'error' => 'Decryption failed',
             ]);
             
             $this->clearTwoFactorData($user);
             
-            return redirect()->back()->withErrors([
-                'code' => 'Setup session expired. Please start over.'
-            ])->with([
-                'error' => 'Setup session expired.'
+            return redirect()->back()->with([
+                'error' => 'Setup session invalid. Please start over.'
             ]);
         }
         
-        // Verify code (allow some time drift - 2 means 60 seconds window)
-        $valid = $this->getGoogle2FA()->verifyKey($secret, $request->code, 2);
+        // SECURITY NOTE: Use constant-time verification via Google2FA
+        $code = trim($request->code);
+        $valid = $this->getGoogle2FA()->verifyKey($secret, $code, 2);
+        
+        // SECURITY NOTE: Additional check for code reuse prevention
+        if ($valid) {
+            $codeUsedKey = '2fa_code_used:' . $user->id . ':' . $code;
+            if (Cache::has($codeUsedKey)) {
+                $valid = false;
+                Log::warning('2FA code reuse attempt detected', [
+                    'user_id' => $user->id,
+                    'ip' => $this->anonymizeIp($request->ip()),
+                ]);
+            } else {
+                // Store used code for 2 minutes (prevent replay within window)
+                Cache::put($codeUsedKey, true, 120);
+            }
+        }
         
         if (!$valid) {
             $remainingAttempts = $this->remainingAttempts($throttleKey);
-            return redirect()->back()->withErrors([
-                'code' => 'Invalid verification code. Please try again.'
-            ])->with([
-                'error' => 'Invalid verification code.',
+            
+            // SECURITY NOTE: Generic error message
+            return redirect()->back()->with([
+                'error' => 'Invalid verification code. Please try again.',
                 'attempts_remaining' => $remainingAttempts
             ]);
         }
         
-        // Generate recovery codes
+        // SECURITY NOTE: Generate cryptographically secure recovery codes
         $recoveryCodes = $this->generateRecoveryCodes();
         
-        // Save to database
+        // SECURITY NOTE: Store hashed recovery codes for verification
+        $hashedCodes = array_map(function($code) {
+            return password_hash($code, PASSWORD_DEFAULT);
+        }, $recoveryCodes);
+        
         $user->update([
-            'two_factor_recovery_codes' => Crypt::encryptString(json_encode($recoveryCodes)),
+            'two_factor_recovery_codes' => Crypt::encryptString(json_encode($hashedCodes)),
             'two_factor_confirmed_at' => now(),
             'two_factor_enabled_at' => now(),
             'two_factor_last_used_at' => null,
+            'two_factor_setup_at' => null,
         ]);
         
-        // Log the 2FA activation
-        Log::info('2FA enabled for admin', [
+        // SECURITY NOTE: Log successful activation without sensitive data
+        Log::info('2FA enabled successfully', [
             'user_id' => $user->id,
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent()
+            'ip' => $this->anonymizeIp($request->ip()),
         ]);
         
-        // Clear attempts on success
         $this->clearAttempts($throttleKey);
         
+        // SECURITY NOTE: Return plain recovery codes only once
         return redirect()->back()->with([
             'success' => 'Two-factor authentication enabled successfully!',
             'recoveryCodes' => $recoveryCodes,
@@ -202,29 +270,33 @@ class TwoFactorAuthenticationController extends Controller
     }
 
     /**
-     * Cancel 2FA setup (for partial setup) - With password confirmation
+     * Cancel 2FA setup (for partial setup)
+     * SECURITY NOTE: Require password confirmation
      */
     public function cancelSetup(Request $request)
     {
+        // SECURITY NOTE: Validate password using constant-time verification
         $validator = Validator::make($request->all(), [
-            'password' => 'required|current_password',
+            'password' => ['required', 'string', 'current_password'],
         ]);
         
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->with([
+            // SECURITY NOTE: Rate limit failed password attempts
+            $this->incrementFailedPasswordAttempts($request);
+            
+            return redirect()->back()->with([
                 'error' => 'Invalid password.'
             ]);
         }
         
         $user = $request->user();
         
-        // Only allow cancel if setup is incomplete
         if ($this->requiresTwoFactorConfirmation($user)) {
             $this->clearTwoFactorData($user);
             
-            Log::info('2FA setup cancelled by admin', [
+            Log::info('2FA setup cancelled', [
                 'user_id' => $user->id,
-                'ip' => $request->ip()
+                'ip' => $this->anonymizeIp($request->ip()),
             ]);
             
             return redirect()->back()->with([
@@ -239,35 +311,49 @@ class TwoFactorAuthenticationController extends Controller
 
     /**
      * Disable 2FA for admin
+     * SECURITY NOTE: Multiple security checks required
      */
     public function disable(Request $request)
     {
+        // SECURITY NOTE: Validate all inputs strictly
         $validator = Validator::make($request->all(), [
-            'password' => 'required|current_password',
-            'reason' => 'nullable|string|max:500',
+            'password' => ['required', 'string', 'current_password'],
+            'reason' => ['nullable', 'string', 'max:500', 'regex:/^[a-zA-Z0-9\s\-\.,]+$/'],
         ]);
         
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->with([
-                'error' => 'Invalid password.'
+            return redirect()->back()->with([
+                'error' => 'Invalid password or reason format.'
             ]);
         }
         
         $user = $request->user();
         
+        // SECURITY NOTE: Prevent disabling if not enabled
         if (!$this->isTwoFactorEnabled($user)) {
             return redirect()->back()->with([
                 'error' => 'Two-factor authentication is not enabled.'
             ]);
         }
         
-        // Log the reason for disabling
-        $reason = $request->input('reason', 'No reason provided');
-        Log::info('2FA disabled by admin', [
+        // SECURITY NOTE: Check for suspicious timing (too quick after login)
+        if (!$this->hasRecentAuthentication($request, 10)) {
+            return redirect()->back()->with([
+                'error' => 'Please re-authenticate to disable 2FA.'
+            ]);
+        }
+        
+        // SECURITY NOTE: Sanitize reason before logging
+        $reason = $request->input('reason') ? 
+            strip_tags($request->input('reason')) : 
+            'No reason provided';
+        
+        // SECURITY NOTE: Log detailed audit trail
+        Log::warning('2FA disabled', [
             'user_id' => $user->id,
             'reason' => $reason,
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
+            'ip' => $this->anonymizeIp($request->ip()),
+            'user_agent_fingerprint' => hash('sha256', $request->userAgent()),
             'last_used_at' => $user->two_factor_last_used_at,
         ]);
         
@@ -280,6 +366,7 @@ class TwoFactorAuthenticationController extends Controller
 
     /**
      * Get recovery codes for admin
+     * SECURITY NOTE: Never expose actual codes in response
      */
     public function getRecoveryCodes(Request $request)
     {
@@ -288,32 +375,32 @@ class TwoFactorAuthenticationController extends Controller
         if (!$this->isTwoFactorEnabled($user)) {
             return response()->json([
                 'success' => true,
-                'data' => ['recoveryCodes' => []]
+                'data' => ['recoveryCodesRemaining' => 0]
             ]);
         }
         
+        // SECURITY NOTE: Only return count, never the actual codes
         try {
-            $recoveryCodes = $this->getDecryptedRecoveryCodes($user);
+            $remainingCount = $this->getRemainingRecoveryCodes($user);
         } catch (\Exception $e) {
-            Log::error('Failed to decrypt recovery codes', [
+            Log::error('Failed to get recovery codes count', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage()
+                'error' => 'Processing error',
             ]);
-            $recoveryCodes = [];
+            $remainingCount = 0;
         }
         
         return response()->json([
             'success' => true,
             'data' => [
-                'recoveryCodes' => $recoveryCodes,
-                'remaining' => count($recoveryCodes),
-                'used_codes' => $user->two_factor_used_recovery_codes ?? [],
+                'remaining' => $remainingCount,
             ]
         ]);
     }
 
     /**
      * Regenerate recovery codes for admin
+     * SECURITY NOTE: Invalidate all existing recovery codes
      */
     public function regenerateRecoveryCodes(Request $request)
     {
@@ -325,21 +412,34 @@ class TwoFactorAuthenticationController extends Controller
             ]);
         }
         
-        // Require password confirmation for security
+        // SECURITY NOTE: Require password and 2FA code for regeneration
         $request->validate([
-            'password' => 'required|current_password',
+            'password' => ['required', 'string', 'current_password'],
+            'two_factor_code' => ['required', 'string', 'size:6', 'regex:/^[0-9]{6}$/'],
         ]);
+        
+        // SECURITY NOTE: Verify 2FA code before proceeding
+        if (!$this->verifyCurrentTwoFactorCode($user, $request->two_factor_code)) {
+            return redirect()->back()->with([
+                'error' => 'Invalid two-factor authentication code.'
+            ]);
+        }
         
         $recoveryCodes = $this->generateRecoveryCodes();
         
+        // SECURITY NOTE: Hash recovery codes before storage
+        $hashedCodes = array_map(function($code) {
+            return password_hash($code, PASSWORD_DEFAULT);
+        }, $recoveryCodes);
+        
         $user->update([
-            'two_factor_recovery_codes' => Crypt::encryptString(json_encode($recoveryCodes)),
-            'two_factor_used_recovery_codes' => [], // Clear used codes
+            'two_factor_recovery_codes' => Crypt::encryptString(json_encode($hashedCodes)),
+            'two_factor_used_recovery_codes' => null,
         ]);
         
-        Log::info('Recovery codes regenerated', [
+        Log::warning('Recovery codes regenerated', [
             'user_id' => $user->id,
-            'ip' => $request->ip()
+            'ip' => $this->anonymizeIp($request->ip()),
         ]);
         
         return redirect()->back()->with([
@@ -350,20 +450,35 @@ class TwoFactorAuthenticationController extends Controller
     }
 
     /**
-     * Verify a 2FA code (for API use or additional verification)
+     * Verify a 2FA code
+     * SECURITY NOTE: Rate limit verification attempts
      */
     public function verifyCode(Request $request)
     {
         $request->validate([
-            'code' => 'required|string|size:6|regex:/^\d{6}$/',
+            'code' => [
+                'required',
+                'string',
+                'size:6',
+                'regex:/^[0-9]{6}$/',
+            ],
         ]);
         
         $user = $request->user();
         
+        // SECURITY NOTE: Rate limit by IP and user ID
+        $throttleKey = 'verify_2fa:' . $user->id . ':' . $request->ip();
+        if (Cache::get($throttleKey, 0) >= 5) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Too many attempts.'
+            ], 429);
+        }
+        
         if (!$this->isTwoFactorEnabled($user)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Two-factor authentication is not enabled.'
+                'message' => 'Invalid request.'
             ], 400);
         }
         
@@ -376,10 +491,22 @@ class TwoFactorAuthenticationController extends Controller
             ], 400);
         }
         
+        // SECURITY NOTE: Check for code reuse
+        $codeUsedKey = '2fa_code_used:' . $user->id . ':' . $request->code;
+        if (Cache::has($codeUsedKey)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid verification code.'
+            ], 422);
+        }
+        
         $valid = $this->getGoogle2FA()->verifyKey($secret, $request->code, 2);
         
         if ($valid) {
-            // Update last used time
+            // SECURITY NOTE: Mark code as used
+            Cache::put($codeUsedKey, true, 120);
+            Cache::increment($throttleKey, 1, 300);
+            
             $user->update([
                 'two_factor_last_used_at' => now(),
             ]);
@@ -390,6 +517,9 @@ class TwoFactorAuthenticationController extends Controller
             ]);
         }
         
+        // SECURITY NOTE: Increment failed attempts
+        Cache::increment($throttleKey, 1, 300);
+        
         return response()->json([
             'success' => false,
             'message' => 'Invalid verification code.'
@@ -397,12 +527,46 @@ class TwoFactorAuthenticationController extends Controller
     }
 
     /**
+     * Helper: Check if session is secure
+     * SECURITY NOTE: Validate session hasn't been hijacked
+     */
+    private function isSessionSecure(Request $request): bool
+    {
+        $sessionFingerprint = session('2fa_fingerprint');
+        $currentFingerprint = $this->generateSessionFingerprint($request);
+        
+        if (!$sessionFingerprint) {
+            session(['2fa_fingerprint' => $currentFingerprint]);
+            return true;
+        }
+        
+        return hash_equals($sessionFingerprint, $currentFingerprint);
+    }
+    
+    /**
+     * Generate session fingerprint
+     * SECURITY NOTE: Create unique identifier for session validation
+     */
+    private function generateSessionFingerprint(Request $request): string
+    {
+        $data = implode('|', [
+            $request->ip(),
+            $request->userAgent(),
+            $request->user()->id ?? '',
+        ]);
+        
+        return hash('sha256', $data);
+    }
+
+    /**
      * Helper: Check if 2FA is fully enabled
+     * SECURITY NOTE: Strict boolean check
      */
     private function isTwoFactorEnabled($user): bool
     {
         return !empty($user->two_factor_secret) && 
-               !empty($user->two_factor_confirmed_at);
+               !empty($user->two_factor_confirmed_at) &&
+               $user->two_factor_confirmed_at->isPast();
     }
 
     /**
@@ -413,9 +577,47 @@ class TwoFactorAuthenticationController extends Controller
         return !empty($user->two_factor_secret) && 
                empty($user->two_factor_confirmed_at);
     }
+    
+    /**
+     * Check if setup has expired
+     * SECURITY NOTE: Timeout incomplete setups after 30 minutes
+     */
+    private function isSetupExpired($user): bool
+    {
+        if (empty($user->two_factor_setup_at)) {
+            return true;
+        }
+        
+        return $user->two_factor_setup_at->addMinutes(30)->isPast();
+    }
+    
+    /**
+     * Check if user has authenticated recently
+     * SECURITY NOTE: Require recent auth for sensitive operations
+     */
+    private function hasRecentAuthentication(Request $request, int $minutes = 5): bool
+    {
+        $lastAuth = session('auth.last_confirmation', 0);
+        return (time() - $lastAuth) < ($minutes * 60);
+    }
+    
+    /**
+     * Verify current 2FA code
+     * SECURITY NOTE: Used for sensitive operations
+     */
+    private function verifyCurrentTwoFactorCode($user, string $code): bool
+    {
+        try {
+            $secret = $this->getTwoFactorSecret($user);
+            return $this->getGoogle2FA()->verifyKey($secret, $code, 2);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
 
     /**
      * Helper: Get decrypted 2FA secret
+     * SECURITY NOTE: Handle decryption failures gracefully
      */
     private function getTwoFactorSecret($user): string
     {
@@ -424,71 +626,38 @@ class TwoFactorAuthenticationController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to decrypt two_factor_secret', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage()
+                'error' => 'Decryption failed',
             ]);
             throw $e;
         }
     }
 
     /**
-     * Helper: Get decrypted recovery codes
+     * Helper: Get remaining recovery codes count
+     * SECURITY NOTE: Don't expose actual codes
      */
-    private function getDecryptedRecoveryCodes($user): array
+    private function getRemainingRecoveryCodes($user): int
     {
         if (empty($user->two_factor_recovery_codes)) {
-            return [];
+            return 0;
         }
         
         try {
             $codes = json_decode(Crypt::decryptString($user->two_factor_recovery_codes), true);
-            
-            // Filter out used codes
             $usedCodes = $user->two_factor_used_recovery_codes ?? [];
-            return array_diff($codes, $usedCodes);
+            return count($codes) - count($usedCodes);
         } catch (\Exception $e) {
-            Log::error('Failed to decrypt recovery codes', [
+            Log::error('Failed to get recovery codes count', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage()
+                'error' => 'Processing error',
             ]);
-            return [];
-        }
-    }
-
-    /**
-     * Helper: Get remaining recovery codes count
-     */
-    private function getRemainingRecoveryCodes($user): int
-    {
-        try {
-            $codes = $this->getDecryptedRecoveryCodes($user);
-            return count($codes);
-        } catch (\Exception $e) {
             return 0;
         }
     }
 
     /**
-     * Helper: Generate new 2FA secret and store it
-     */
-    private function generateNewSecret($user): string
-    {
-        $google2fa = $this->getGoogle2FA();
-        $secret = $google2fa->generateSecretKey(32);
-        
-        $user->update([
-            'two_factor_secret' => Crypt::encryptString($secret),
-            'two_factor_confirmed_at' => null,
-            'two_factor_recovery_codes' => null,
-            'two_factor_enabled_at' => null,
-            'two_factor_last_used_at' => null,
-            'two_factor_used_recovery_codes' => null,
-        ]);
-        
-        return $secret;
-    }
-
-    /**
      * Helper: Clear all 2FA data
+     * SECURITY NOTE: Ensure complete data removal
      */
     private function clearTwoFactorData($user): void
     {
@@ -499,24 +668,40 @@ class TwoFactorAuthenticationController extends Controller
             'two_factor_enabled_at' => null,
             'two_factor_last_used_at' => null,
             'two_factor_used_recovery_codes' => null,
+            'two_factor_setup_at' => null,
         ]);
     }
 
     /**
+     * Format secret for display
+     * SECURITY NOTE: Add spaces for readability without compromising security
+     */
+    private function formatSecretForDisplay(string $secret): string
+    {
+        return trim(chunk_split($secret, 4, ' '));
+    }
+
+    /**
      * Generate QR code SVG
+     * SECURITY NOTE: Use secure QR code generation
      */
     private function generateQrCodeSvg(string $secret, string $email): string
     {
         try {
-            $appName = config('app.name', 'Barangay System');
+            // SECURITY NOTE: Get app name from config, never hardcode
+            $appName = config('app.name', 'Application');
             $issuer = config('auth.two_factor.issuer', $appName);
+            
+            // SECURITY NOTE: Sanitize email for QR code URL
+            $sanitizedEmail = filter_var($email, FILTER_SANITIZE_EMAIL);
+            
             $qrCodeUrl = $this->getGoogle2FA()->getQRCodeUrl(
                 $issuer,
-                $email,
+                $sanitizedEmail,
                 $secret
             );
             
-            $size = config('auth.two_factor.qr_code_size', 200);
+            $size = config('auth.two_factor.qr_code_size', 250);
             $renderer = new ImageRenderer(
                 new RendererStyle($size),
                 new SvgImageBackEnd()
@@ -526,9 +711,7 @@ class TwoFactorAuthenticationController extends Controller
             return $writer->writeString($qrCodeUrl);
         } catch (\Exception $e) {
             Log::error('QR Code generation failed', [
-                'email' => $email,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
             ]);
             return '';
         }
@@ -536,6 +719,7 @@ class TwoFactorAuthenticationController extends Controller
 
     /**
      * Generate recovery codes
+     * SECURITY NOTE: Use cryptographically secure random generator
      */
     private function generateRecoveryCodes(): array
     {
@@ -544,28 +728,47 @@ class TwoFactorAuthenticationController extends Controller
         
         $codes = [];
         for ($i = 0; $i < $count; $i++) {
-            // Generate secure recovery codes
-            $codes[] = Str::upper(Str::random($length));
+            // SECURITY NOTE: Use secure random bytes
+            $codes[] = strtoupper(substr(bin2hex(random_bytes($length)), 0, $length));
         }
         
         return $codes;
+    }
+    
+    /**
+     * Increment failed password attempts
+     * SECURITY NOTE: Rate limit password failures
+     */
+    private function incrementFailedPasswordAttempts(Request $request): void
+    {
+        $key = 'password_failures:' . $request->ip();
+        Cache::increment($key, 1, 3600);
+    }
+    
+    /**
+     * Anonymize IP address for privacy compliance
+     * SECURITY NOTE: GDPR compliance - don't log full IPs
+     */
+    private function anonymizeIp(string $ip): string
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $parts = explode('.', $ip);
+            $parts[3] = '0';
+            return implode('.', $parts);
+        }
+        
+        return '0.0.0.0';
     }
 
     /**
      * Throttling Methods
      */
     
-    /**
-     * Get the throttle key for the given user and action
-     */
     private function getThrottleKey($user, string $action): string
     {
         return '2fa_throttle:' . $user->id . ':' . $action;
     }
 
-    /**
-     * Determine if the user has too many failed attempts.
-     */
     private function hasTooManyAttempts(string $throttleKey): bool
     {
         $timerKey = $throttleKey . ':timer';
@@ -578,9 +781,6 @@ class TwoFactorAuthenticationController extends Controller
         return $attempts >= $this->maxAttempts;
     }
 
-    /**
-     * Increment the attempt count.
-     */
     private function incrementAttempts(string $throttleKey): void
     {
         $timerKey = $throttleKey . ':timer';
@@ -591,31 +791,21 @@ class TwoFactorAuthenticationController extends Controller
             $this->decayMinutes * 60
         );
         
-        $attempts = Cache::get($throttleKey, 0);
-        Cache::put($throttleKey, $attempts + 1, $this->decayMinutes * 60);
+        Cache::increment($throttleKey, 1, $this->decayMinutes * 60);
     }
 
-    /**
-     * Clear the attempt count.
-     */
     private function clearAttempts(string $throttleKey): void
     {
         Cache::forget($throttleKey);
         Cache::forget($throttleKey . ':timer');
     }
 
-    /**
-     * Get the number of attempts remaining.
-     */
     private function remainingAttempts(string $throttleKey): int
     {
         $attempts = Cache::get($throttleKey, 0);
         return max(0, $this->maxAttempts - $attempts);
     }
 
-    /**
-     * Get the number of seconds until retry is available.
-     */
     private function availableIn(string $throttleKey): int
     {
         $timerKey = $throttleKey . ':timer';

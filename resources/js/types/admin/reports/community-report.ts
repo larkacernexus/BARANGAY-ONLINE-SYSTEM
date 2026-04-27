@@ -16,6 +16,7 @@ export interface ReportType {
 }
 
 export interface Resident {
+    photo_path: any;
     id: number;
     name: string;
     email: string;

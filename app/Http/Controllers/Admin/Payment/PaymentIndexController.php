@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/Admin/Payment/PaymentIndexController.php
 
 namespace App\Http\Controllers\Admin\Payment;
 
@@ -14,6 +13,16 @@ use Illuminate\Support\Facades\Log;
 
 class PaymentIndexController extends BasePaymentController
 {
+    /**
+     * Allowed per page options
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500'];
+    
+    /**
+     * Default per page value
+     */
+    protected const DEFAULT_PER_PAGE = 20;
+
     /**
      * Display a listing of payments.
      */
@@ -30,7 +39,8 @@ class PaymentIndexController extends BasePaymentController
         // Apply filters
         $this->applyFilters($query, $request);
 
-        $payments = $query->paginate(20)->withQueryString();
+        $perPage = $this->getPerPage($request);
+        $payments = $query->paginate($perPage)->withQueryString();
 
         // Get clearance types for filter
         $clearanceTypes = $this->getClearanceTypesForFilter();
@@ -43,6 +53,7 @@ class PaymentIndexController extends BasePaymentController
         Log::info('Payments index (Server-Side)', [
             'total_payments' => $payments->total(),
             'current_page' => $payments->currentPage(),
+            'per_page' => $request->input('per_page', self::DEFAULT_PER_PAGE),
             'filters_applied' => $request->only(['search', 'status', 'payment_method', 'payer_type'])
         ]);
 
@@ -50,12 +61,31 @@ class PaymentIndexController extends BasePaymentController
             'payments' => $payments,
             'filters' => $request->only([
                 'search', 'status', 'payment_method', 'date_from', 'date_to', 
-                'payer_type', 'clearance_type_id', 'clearance_request_id'
+                'payer_type', 'clearance_type_id', 'clearance_request_id', 'per_page'
             ]),
             'clearanceTypes' => $clearanceTypes,
             'stats' => $stats,
             'hasClearanceTypes' => $clearanceTypes->count() > 0,
         ]);
+    }
+
+    /**
+     * Get the per page value from request
+     *
+     * @param Request $request
+     * @return int
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
     }
 
     /**

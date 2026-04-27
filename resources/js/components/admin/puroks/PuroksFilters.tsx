@@ -86,35 +86,35 @@ export default function PuroksFilters({
         const queryParams = new URLSearchParams();
         if (search) queryParams.append('search', search);
         if (filtersState.status && filtersState.status !== 'all') queryParams.append('status', filtersState.status);
-        if (filtersState.population_range) queryParams.append('population_range', filtersState.population_range);
-        if (filtersState.household_range) queryParams.append('household_range', filtersState.household_range);
+        if (filtersState.population_range && filtersState.population_range !== 'all') queryParams.append('population_range', filtersState.population_range);
+        if (filtersState.household_range && filtersState.household_range !== 'all') queryParams.append('household_range', filtersState.household_range);
         window.location.href = `/admin/puroks/export?${queryParams.toString()}`;
     };
 
     // Safe access to filter values with fallbacks
     const currentStatus = filtersState.status ?? 'all';
-    const currentPopulationRange = filtersState.population_range ?? '';
-    const currentHouseholdRange = filtersState.household_range ?? '';
+    const currentPopulationRange = filtersState.population_range ?? 'all';
+    const currentHouseholdRange = filtersState.household_range ?? 'all';
 
     // Convert hasActiveFilters to boolean
     const activeFilters = typeof hasActiveFilters === 'string' 
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
-    // Helper to get active filter count
+    // Helper to get active filter count - FIXED: Check for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
         if (currentStatus !== 'all') count++;
-        if (currentPopulationRange && currentPopulationRange !== '') count++;
-        if (currentHouseholdRange && currentHouseholdRange !== '') count++;
+        if (currentPopulationRange && currentPopulationRange !== 'all') count++;
+        if (currentHouseholdRange && currentHouseholdRange !== 'all') count++;
         return count;
     };
 
     const activeFilterCount = getActiveFilterCount();
 
-    // Range options
+    // Range options - FIXED: Use 'all' instead of empty string for default
     const populationRanges = [
-        { value: '', label: 'All Populations' },
+        { value: 'all', label: 'All Populations', color: 'gray' },
         { value: '0-50', label: '0 - 50 residents', color: 'emerald' },
         { value: '51-100', label: '51 - 100 residents', color: 'blue' },
         { value: '101-200', label: '101 - 200 residents', color: 'amber' },
@@ -122,8 +122,9 @@ export default function PuroksFilters({
         { value: '500+', label: '500+ residents', color: 'red' }
     ];
 
+    // FIXED: Use 'all' instead of empty string for default
     const householdRanges = [
-        { value: '', label: 'All Households' },
+        { value: 'all', label: 'All Households', color: 'gray' },
         { value: '0-10', label: '0 - 10 households', color: 'emerald' },
         { value: '11-20', label: '11 - 20 households', color: 'blue' },
         { value: '21-50', label: '21 - 50 households', color: 'amber' },
@@ -146,10 +147,22 @@ export default function PuroksFilters({
         return range?.label || value;
     };
 
+    // Get population range color
+    const getPopulationRangeColor = (value: string) => {
+        const range = populationRanges.find(r => r.value === value);
+        return range?.color || 'gray';
+    };
+
     // Get household range label
     const getHouseholdRangeLabel = (value: string) => {
         const range = householdRanges.find(r => r.value === value);
         return range?.label || value;
+    };
+
+    // Get household range color
+    const getHouseholdRangeColor = (value: string) => {
+        const range = householdRanges.find(r => r.value === value);
+        return range?.color || 'gray';
     };
 
     return (
@@ -164,7 +177,7 @@ export default function PuroksFilters({
                             </div>
                             <Input
                                 ref={searchInputRef}
-                                placeholder="Search puroks by name, leader, code, or description..."
+                                placeholder="Search puroks by name, leader, code, or description... (Ctrl+F)"
                                 className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 value={search}
                                 onChange={(e) => handleSearch(e.target.value)}
@@ -222,13 +235,13 @@ export default function PuroksFilters({
                             <span className="ml-1">puroks</span>
                             {search && (
                                 <span className="ml-1">
-                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                 </span>
                             )}
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Active filter badges */}
+                            {/* Active filter badges - FIXED: Check for 'all' instead of empty string */}
                             {activeFilters && (
                                 <>
                                     {currentStatus !== 'all' && (
@@ -240,14 +253,28 @@ export default function PuroksFilters({
                                             Status: {currentStatus === 'active' ? 'Active' : 'Inactive'}
                                         </Badge>
                                     )}
-                                    {currentPopulationRange && currentPopulationRange !== '' && (
-                                        <Badge variant="secondary" className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                    {currentPopulationRange && currentPopulationRange !== 'all' && (
+                                        <Badge variant="secondary" className={`${
+                                            getPopulationRangeColor(currentPopulationRange) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                            getPopulationRangeColor(currentPopulationRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                            getPopulationRangeColor(currentPopulationRange) === 'amber' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                            getPopulationRangeColor(currentPopulationRange) === 'orange' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
+                                            getPopulationRangeColor(currentPopulationRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                            'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                        } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
                                             <Users className="h-3 w-3 mr-1 inline" />
                                             {getPopulationRangeLabel(currentPopulationRange)}
                                         </Badge>
                                     )}
-                                    {currentHouseholdRange && currentHouseholdRange !== '' && (
-                                        <Badge variant="secondary" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                    {currentHouseholdRange && currentHouseholdRange !== 'all' && (
+                                        <Badge variant="secondary" className={`${
+                                            getHouseholdRangeColor(currentHouseholdRange) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                            getHouseholdRangeColor(currentHouseholdRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                            getHouseholdRangeColor(currentHouseholdRange) === 'amber' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                            getHouseholdRangeColor(currentHouseholdRange) === 'orange' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
+                                            getHouseholdRangeColor(currentHouseholdRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                            'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                        } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
                                             <Home className="h-3 w-3 mr-1 inline" />
                                             {getHouseholdRangeLabel(currentHouseholdRange)}
                                         </Badge>
@@ -507,8 +534,8 @@ export default function PuroksFilters({
                                         size="sm"
                                         className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                         onClick={() => {
-                                            handlePopulationRange('');
-                                            handleHouseholdRange('');
+                                            handlePopulationRange('all');
+                                            handleHouseholdRange('all');
                                             setShowAdvancedFilters(false);
                                         }}
                                         disabled={isLoading}

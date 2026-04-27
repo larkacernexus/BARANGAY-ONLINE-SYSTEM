@@ -440,13 +440,13 @@ export default function ReceiptsIndex({
     // Clear filters
     const clearFilters = useCallback(() => {
         setSearch('');
-        setStatusFilter('');
-        setMethodFilter('');
-        setTypeFilter('');
+        setStatusFilter('all');
+        setMethodFilter('all');
+        setTypeFilter('all');
         setDateFrom('');
         setDateTo('');
-        setAmountRange('');
-        setPrintedStatusFilter('');
+        setAmountRange('all');
+        setPrintedStatusFilter('all');
         setSortBy('issued_date');
         setSortOrder('desc');
         setCurrentPage(1);

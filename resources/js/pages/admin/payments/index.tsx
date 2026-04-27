@@ -56,7 +56,7 @@ interface PaymentsIndexProps {
 
 export default function PaymentsIndex({
     payments: initialPayments,
-    filters: initialFilters = {},  // ✅ FIXED: Default to empty object, not a function
+    filters: initialFilters = {},
     stats: initialStats,
     clearanceTypes = []
 }: PaymentsIndexProps) {
@@ -94,6 +94,9 @@ export default function PaymentsIndex({
     // Sorting states
     const [sortBy, setSortBy] = useState<string>('payment_date');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
+    // Per page state
+    const [perPage, setPerPage] = useState<string>(getSafeString(initialFilters.per_page, '20'));
     
     // UI states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
@@ -148,10 +151,10 @@ export default function PaymentsIndex({
         total: safePayments.total || 0,
         from: safePayments.from || 0,
         to: safePayments.to || 0,
-        per_page: safePayments.per_page || 20,
+        per_page: safePayments.per_page || parseInt(perPage) || 20,
         path: typeof window !== 'undefined' ? window.location.pathname : '/admin/payments',
         links: safePayments.links || []
-    }), [safePayments]);
+    }), [safePayments, perPage]);
 
     const getCurrentFilters = useCallback(() => ({
         search: debouncedSearch,
@@ -161,9 +164,10 @@ export default function PaymentsIndex({
         clearance_type_id: clearanceTypeFilter,
         date_from: debouncedDateFrom,
         date_to: debouncedDateTo,
+        per_page: perPage,
     }), [
         debouncedSearch, statusFilter, methodFilter, payerTypeFilter, 
-        clearanceTypeFilter, debouncedDateFrom, debouncedDateTo
+        clearanceTypeFilter, debouncedDateFrom, debouncedDateTo, perPage
     ]);
 
     const reloadData = useCallback((page = 1) => {
@@ -171,7 +175,6 @@ export default function PaymentsIndex({
         
         const filters = { ...getCurrentFilters(), page };
         
-        // ✅ FIXED: Use a properly typed object with index signature
         const cleanedFilters: Record<string, any> = {};
         
         Object.entries(filters).forEach(([key, value]) => {
@@ -205,8 +208,14 @@ export default function PaymentsIndex({
         reloadData();
     }, [
         debouncedSearch, statusFilter, methodFilter, payerTypeFilter,
-        clearanceTypeFilter, debouncedDateFrom, debouncedDateTo
+        clearanceTypeFilter, debouncedDateFrom, debouncedDateTo, perPage
     ]);
+
+    // Handle per page change
+    const handlePerPageChange = useCallback((value: string) => {
+        setPerPage(value);
+        reloadData(1);
+    }, [reloadData]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -380,6 +389,7 @@ export default function PaymentsIndex({
         setClearanceTypeFilter('all');
         setDateFrom('');
         setDateTo('');
+        setPerPage('20');
     }, []);
 
     const handleClearSelection = useCallback(() => {
@@ -527,13 +537,11 @@ export default function PaymentsIndex({
         if (isMobile) return;
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ctrl+Shift+B - Toggle bulk mode
             if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
                 e.preventDefault();
                 setIsBulkMode(prev => !prev);
             }
             
-            // Ctrl+A - Select all on page (only in bulk mode)
             if (e.ctrlKey && e.key.toLowerCase() === 'a' && bulkModeRef.current) {
                 e.preventDefault();
                 const pageIds = currentPayments.map(payment => payment.id);
@@ -549,7 +557,6 @@ export default function PaymentsIndex({
                 setSelectionMode('page');
             }
             
-            // Escape - Exit bulk mode or clear selection
             if (e.key === 'Escape' && bulkModeRef.current) {
                 e.preventDefault();
                 if (selectedPaymentsRef.current.length > 0) {
@@ -560,13 +567,11 @@ export default function PaymentsIndex({
                 }
             }
             
-            // Ctrl+F - Focus search
             if (e.ctrlKey && e.key.toLowerCase() === 'f') {
                 e.preventDefault();
                 searchInputRef.current?.focus();
             }
             
-            // Delete - Bulk delete (only in bulk mode)
             if (e.key === 'Delete' && bulkModeRef.current && selectedPaymentsRef.current.length > 0) {
                 e.preventDefault();
                 setShowBulkDeleteDialog(true);
@@ -585,8 +590,9 @@ export default function PaymentsIndex({
         payer_type: payerTypeFilter,
         clearance_type_id: clearanceTypeFilter,
         date_from: dateFrom,
-        date_to: dateTo
-    }), [search, statusFilter, methodFilter, payerTypeFilter, clearanceTypeFilter, dateFrom, dateTo]);
+        date_to: dateTo,
+        per_page: perPage
+    }), [search, statusFilter, methodFilter, payerTypeFilter, clearanceTypeFilter, dateFrom, dateTo, perPage]);
 
     return (
         <AppLayout
@@ -662,6 +668,8 @@ export default function PaymentsIndex({
                         handleSelectAllFiltered={() => {}}
                         handleSelectAll={() => {}}
                         setSelectedPayments={setSelectedPayments}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                     />
                     
                     {/* Main Content */}
@@ -679,6 +687,8 @@ export default function PaymentsIndex({
                         totalPages={paginationData.last_page}
                         totalItems={paginationData.total}
                         itemsPerPage={paginationData.per_page}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onSelectAllFiltered={() => {}}

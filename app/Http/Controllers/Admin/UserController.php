@@ -22,111 +22,147 @@ class UserController extends Controller
     /**
      * Display a listing of users.
      */
-    public function index(Request $request)
-    {
-        // Use caching for statistics
-        $stats = Cache::remember('users.statistics', 300, function () {
-            return [
-                ['label' => 'Total Users', 'value' => User::count()],
-                ['label' => 'Active Users', 'value' => User::where('status', 'active')->count()],
-                ['label' => 'Household Accounts', 'value' => User::whereNotNull('household_id')->count()],
-                ['label' => 'Official Accounts', 'value' => User::whereNotNull('position')
-                    ->whereNull('household_id')
-                    ->count()],
-                ['label' => 'With 2FA', 'value' => User::whereNotNull('two_factor_confirmed_at')->count()],
-                ['label' => 'Inactive Users', 'value' => User::where('status', 'inactive')->count()],
-            ];
-        });
-        
-        // Build query with eager loading
-        $query = User::query()
-            ->with(['role', 'currentResident', 'household.currentHeadResident'])
-            ->select([
-                'id',
-                'username',
-                'email',
-                'contact_number',
-                'position',
-                'role_id',
-                'status',
-                'email_verified_at',
-                'last_login_at',
-                'last_login_ip',
-                'login_count',
-                'created_at',
-                'updated_at',
-                'two_factor_confirmed_at',
-                'require_password_change',
-                'resident_id',
-                'household_id',
-                'current_resident_id'
-            ]);
-        
-        // Apply filters (your existing filter logic is great!)
-        $this->applyFilters($query, $request);
-        
-        // Apply sorting
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortOrder = $request->input('sort_order', 'desc');
-        
-        $allowedSortColumns = [
-            'username', 'email', 'created_at', 'last_login_at', 
-            'login_count', 'status', 'role_id', 'position'
+ public function index(Request $request)
+{
+    // Use caching for statistics
+    $stats = Cache::remember('users.statistics', 300, function () {
+        return [
+            ['label' => 'Total Users', 'value' => User::count()],
+            ['label' => 'Active Users', 'value' => User::where('status', 'active')->count()],
+            ['label' => 'Household Accounts', 'value' => User::whereNotNull('household_id')->count()],
+            ['label' => 'Official Accounts', 'value' => User::whereNotNull('position')
+                ->whereNull('household_id')
+                ->count()],
+            ['label' => 'With 2FA', 'value' => User::whereNotNull('two_factor_confirmed_at')->count()],
+            ['label' => 'Inactive Users', 'value' => User::where('status', 'inactive')->count()],
         ];
+    });
+    
+    // Build query with eager loading
+    $query = User::query()
+        ->with(['role', 'currentResident', 'household.currentHeadResident'])
+        ->select([
+            'id',
+            'username',
+            'email',
+            'contact_number',
+            'position',
+            'role_id',
+            'status',
+            'email_verified_at',
+            'last_login_at',
+            'last_login_ip',
+            'login_count',
+            'created_at',
+            'updated_at',
+            'two_factor_confirmed_at',
+            'require_password_change',
+            'resident_id',
+            'household_id',
+            'current_resident_id'
+        ]);
+    
+    // Apply filters (your existing filter logic is great!)
+    $this->applyFilters($query, $request);
+    
+    // Apply sorting
+    $sortBy = $request->input('sort_by', 'created_at');
+    $sortOrder = $request->input('sort_order', 'desc');
+    
+    $allowedSortColumns = [
+        'username', 'email', 'created_at', 'last_login_at', 
+        'login_count', 'status', 'role_id', 'position'
+    ];
+    
+    if (in_array($sortBy, $allowedSortColumns)) {
+        $query->orderBy($sortBy, $sortOrder);
+    } else {
+        $query->orderBy('created_at', 'desc');
+    }
+    
+    // ✅ Pagination - DEFAULT IS 15, max 500
+    $perPage = $this->getPerPage($request);
+    $users = $query->paginate($perPage)->withQueryString();
+    
+    // Format users efficiently
+    $formattedUsers = $users->through(fn($user) => $this->formatUser($user));
+    
+    // Get roles for filter dropdown (cached)
+    $roles = Cache::remember('users.roles', 3600, function () {
+        return Role::select(['id', 'name', 'description'])
+            ->withCount(['users' => fn($q) => $q->where('status', 'active')])
+            ->get()
+            ->map(fn($role) => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'description' => $role->description,
+                'count' => $role->users_count,
+                'color' => $this->getRoleColor($role->name),
+            ]);
+    });
+    
+    // Account type options
+    $accountTypeOptions = [
+        ['value' => 'all', 'label' => 'All Types'],
+        ['value' => 'household', 'label' => 'Household Accounts'],
+        ['value' => 'official', 'label' => 'Official Accounts'],
+        ['value' => 'administrative', 'label' => 'Administrative'],
+    ];
+    
+    // Log for monitoring
+    Log::info('Users index (Server-Side)', [
+        'total_users' => $users->total(),
+        'current_page' => $users->currentPage(),
+        'per_page' => $perPage,
+        'filters' => $request->only(['search', 'role_id', 'status'])
+    ]);
+    
+    return Inertia::render('admin/Users/Index', [
+        'users' => $formattedUsers,
+        'stats' => $stats,
+        'roles' => $roles,
+        'accountTypeOptions' => $accountTypeOptions,
+        'filters' => $request->only([
+            'search', 'role_id', 'status', 'account_type', 'two_factor', 
+            'email_verified', 'date_from', 'date_to', 'last_login', 
+            'sort_by', 'sort_order', 'per_page'
+        ]),
+        'can' => [
+            'create_users' => auth()->user()->can('create-users'),
+            'edit_users' => auth()->user()->can('edit-users'),
+            'delete_users' => auth()->user()->can('delete-users'),
+            'bulk_actions' => auth()->user()->can('bulk-actions'),
+            'export_users' => auth()->user()->can('export-users'),
+        ],
+    ]);
+}
+
+    /**
+     * Get the per page value from request
+     *
+     * @param Request $request
+     * @return int
+     */
+    private function getPerPage(Request $request): int
+    {
+        $allowedPerPage = ['15', '30', '50', '100', '500', 'all'];
+        $defaultPerPage = 15;
+        $maxPerPage = 500;
         
-        if (in_array($sortBy, $allowedSortColumns)) {
-            $query->orderBy($sortBy, $sortOrder);
-        } else {
-            $query->orderBy('created_at', 'desc');
+        $perPage = $request->input('per_page', $defaultPerPage);
+        
+        // Handle 'all' option - return total count (capped at max)
+        if ($perPage === 'all') {
+            return min(User::count() ?: $defaultPerPage, $maxPerPage);
         }
         
-        // Pagination
-        $perPage = min($request->input('per_page', 20), 100);
-        $users = $query->paginate($perPage)->withQueryString();
+        // Validate that per_page is in allowed values
+        if (in_array((string)$perPage, $allowedPerPage)) {
+            return (int) $perPage;
+        }
         
-        // Format users efficiently
-        $formattedUsers = $users->through(fn($user) => $this->formatUser($user));
-        
-        // Get roles for filter dropdown (cached)
-        $roles = Cache::remember('users.roles', 3600, function () {
-            return Role::select(['id', 'name', 'description'])
-                ->withCount(['users' => fn($q) => $q->where('status', 'active')])
-                ->get()
-                ->map(fn($role) => [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'description' => $role->description,
-                    'count' => $role->users_count,
-                    'color' => $this->getRoleColor($role->name),
-                ]);
-        });
-        
-        // Account type options
-        $accountTypeOptions = [
-            ['value' => 'all', 'label' => 'All Types'],
-            ['value' => 'household', 'label' => 'Household Accounts'],
-            ['value' => 'official', 'label' => 'Official Accounts'],
-            ['value' => 'administrative', 'label' => 'Administrative'],
-        ];
-        
-        // Log for monitoring
-        Log::info('Users index (Server-Side)', [
-            'total_users' => $users->total(),
-            'current_page' => $users->currentPage(),
-            'filters' => $request->only(['search', 'role_id', 'status'])
-        ]);
-        
-        return Inertia::render('admin/Users/Index', [
-            'users' => $formattedUsers,
-            'stats' => $stats,
-            'roles' => $roles,
-            'accountTypeOptions' => $accountTypeOptions,
-            'filters' => $request->only([
-                'search', 'role_id', 'status', 'account_type', 'two_factor', 
-                'email_verified', 'date_from', 'date_to', 'last_login', 
-                'sort_by', 'sort_order', 'per_page'
-            ]),
-        ]);
+        // Return default if invalid value
+        return $defaultPerPage;
     }
     
     /**

@@ -69,8 +69,7 @@ export default function PositionsIndex({
     const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
     const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
     const [requiresAccountFilter, setRequiresAccountFilter] = useState<string>(getSafeString(safeFilters.requires_account, 'all'));
-    const [officialsRange, setOfficialsRange] = useState<string>(getSafeString(safeFilters.officials_range, ''));
-    
+    const [officialsRange, setOfficialsRange] = useState<string>(getSafeString(safeFilters.officials_range, 'all'));    
     // Sorting is now handled by table header, not in filters
     const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'order'));
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
@@ -553,7 +552,7 @@ export default function PositionsIndex({
         setSearch('');
         setStatusFilter('all');
         setRequiresAccountFilter('all');
-        setOfficialsRange('');
+        setOfficialsRange('all');  
         setSortBy('order');
         setSortOrder('asc');
         setCurrentPage(1);

@@ -4,73 +4,168 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Home, Phone, Mail, Key, AlertCircle, Users, ArrowRight, Ban, Info } from 'lucide-react';
+import { Home, Phone, Mail, Key, AlertCircle, Users, ArrowRight, Info, Search, Loader2, X } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import axios from 'axios';
+import debounce from 'lodash/debounce';
 
 interface Resident {
+    age: import("react/jsx-runtime").JSX.Element;
+    address: import("react/jsx-runtime").JSX.Element;
     id: number;
     first_name: string;
     last_name: string;
     middle_name?: string;
+    full_name?: string;
     household_status?: 'none' | 'member' | 'head';
+    status_label?: string;
+    status_color?: string;
     current_household?: {
         id: number;
         number: string;
-        is_head: boolean;
         relationship: string;
     } | null;
+}
+
+interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    has_more: boolean;
 }
 
 interface Props {
     data: any;
     setData: (key: string, value: any) => void;
     errors: Record<string, string>;
-    heads: Resident[];
 }
 
-export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
+export default function BasicInfoCard({ data, setData, errors }: Props) {
+    const [heads, setHeads] = useState<Resident[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [pagination, setPagination] = useState<PaginationMeta | null>(null);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [selectedHeadDetails, setSelectedHeadDetails] = useState<Resident | null>(null);
+    
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Update selected head details when head_resident_id changes
+    // Fetch heads from server
+    const fetchHeads = useCallback(async (query: string = '', page: number = 1, append: boolean = false) => {
+        setIsSearching(true);
+        
+        try {
+            const params = new URLSearchParams({
+                search: query,
+                page: String(page),
+                per_page: '50',
+            });
+            
+            const response = await axios.get(`/admin/households/search-heads?${params}`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                }
+            });
+            
+            if (response.data) {
+                if (append && page > 1) {
+                    setHeads(prev => {
+                        const existingIds = new Set(prev.map(h => h.id));
+                        const newHeads = (response.data.data || []).filter((h: Resident) => !existingIds.has(h.id));
+                        return [...prev, ...newHeads];
+                    });
+                } else {
+                    setHeads(response.data.data || []);
+                }
+                setPagination(response.data.pagination || null);
+            }
+        } catch (error: any) {
+            if (axios.isCancel(error)) return;
+            if (!append) setHeads([]);
+        } finally {
+            setIsSearching(false);
+            setIsLoadingMore(false);
+        }
+    }, []);
+
+    // Debounced search using useRef to persist the debounced function
+    const debouncedSearchRef = useRef(
+        debounce((query: string) => {
+            fetchHeads(query, 1, false);
+        }, 300)
+    );
+
+    // Initial load
     useEffect(() => {
-        if (data.head_resident_id) {
-            const head = heads.find(h => h.id === data.head_resident_id);
-            setSelectedHeadDetails(head || null);
-        } else {
-            setSelectedHeadDetails(null);
-        }
-    }, [data.head_resident_id, heads]);
+        fetchHeads('', 1, false);
+        
+        return () => {
+            debouncedSearchRef.current.cancel();
+        };
+    }, []);
 
-    const handleHeadChange = (value: string) => {
-        if (!value) {
-            setData('head_of_family', '');
-            setData('head_resident_id', null);
-            setSelectedHeadDetails(null);
-            return;
-        }
+    // Handle search input change
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        debouncedSearchRef.current(value);
+    };
 
-        const selectedHead = heads.find(head => head.id.toString() === value);
-        if (selectedHead) {
-            const fullName = `${selectedHead.first_name} ${selectedHead.last_name}`.trim();
-            setData('head_of_family', fullName);
-            setData('head_resident_id', parseInt(value));
-            setSelectedHeadDetails(selectedHead);
-        }
+    // Load more
+    const loadMore = async () => {
+        if (!pagination?.has_more || isLoadingMore) return;
+        setIsLoadingMore(true);
+        await fetchHeads(searchQuery, (pagination.current_page || 1) + 1, true);
+    };
+
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Handle head selection
+    const handleHeadChange = (head: Resident) => {
+        const fullName = head.full_name || `${head.first_name} ${head.last_name}`.trim();
+        setData('head_of_family', fullName);
+        setData('head_resident_id', head.id);
+        setSelectedHeadDetails(head);
+        setShowDropdown(false);
+        setSearchQuery(fullName);
+    };
+
+    // Clear selection
+    const clearSelection = () => {
+        setData('head_of_family', '');
+        setData('head_resident_id', null);
+        setSelectedHeadDetails(null);
+        setSearchQuery('');
+        fetchHeads('', 1, false);
     };
 
     // Get head status indicator
     const getHeadStatusIndicator = () => {
         if (!selectedHeadDetails) return null;
 
-        // Check if this head is currently a member of another household
         if (selectedHeadDetails.household_status === 'member') {
             return {
                 type: 'info',
@@ -84,7 +179,6 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
             };
         }
 
-        // Not in any household
         return {
             type: 'none',
             icon: <Users className="h-4 w-4 text-gray-500" />,
@@ -146,57 +240,117 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                 </div>
 
                 <div className="space-y-3">
-                    <Label htmlFor="head_resident_id" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         Head of Family <span className="text-red-500">*</span>
                     </Label>
                     
-                    {/* Head Selection Dropdown */}
-                    <Select 
-                        value={data.head_resident_id?.toString() || ''}
-                        onValueChange={handleHeadChange}
-                    >
-                        <SelectTrigger className="dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
-                            <SelectValue placeholder="Select or search for head of family" />
-                        </SelectTrigger>
-                        <SelectContent className="dark:bg-gray-900 dark:border-gray-700">
-                            {heads.length === 0 ? (
-                                <div className="px-2 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-                                    <AlertCircle className="h-4 w-4 inline-block mr-1" />
-                                    No available residents to select as head
-                                </div>
-                            ) : (
-                                heads.map((head) => {
-                                    const fullName = `${head.first_name} ${head.last_name}`.trim();
-                                    const isMemberOfOther = head.household_status === 'member';
-                                    
-                                    return (
-                                        <SelectItem 
-                                            key={head.id} 
-                                            value={head.id.toString()} 
-                                            className={`dark:text-gray-300 dark:focus:bg-gray-700 ${
-                                                isMemberOfOther ? 'text-purple-600 dark:text-purple-400' : ''
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between w-full">
-                                                <span>{fullName}</span>
-                                                {isMemberOfOther && head.current_household && (
-                                                    <Badge variant="outline" className="ml-2 bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 text-xs">
-                                                        <Users className="h-3 w-3 mr-1" />
-                                                        HH #{head.current_household.number}
-                                                    </Badge>
-                                                )}
-                                                {!isMemberOfOther && (
-                                                    <Badge variant="outline" className="ml-2 bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 text-xs">
-                                                        No Household
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </SelectItem>
-                                    );
-                                })
+                    {/* Searchable Dropdown */}
+                    <div ref={dropdownRef} className="relative">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                                ref={searchInputRef}
+                                placeholder="Search for head of family..."
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    handleSearchChange(e.target.value);
+                                    setShowDropdown(true);
+                                }}
+                                onFocus={() => setShowDropdown(true)}
+                                className="pl-10 pr-10 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300"
+                            />
+                            {isSearching && (
+                                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
                             )}
-                        </SelectContent>
-                    </Select>
+                            {!isSearching && (searchQuery || selectedHeadDetails) && (
+                                <button
+                                    type="button"
+                                    onClick={clearSelection}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                        
+                        {/* Dropdown */}
+                        {showDropdown && (
+                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                {heads.length === 0 && !isSearching ? (
+                                    <div className="px-4 py-6 text-center text-gray-500 dark:text-gray-400 text-sm">
+                                        <AlertCircle className="h-4 w-4 mx-auto mb-2" />
+                                        No available residents found
+                                    </div>
+                                ) : (
+                                    <>
+                                        {heads.map((head) => {
+                                            const fullName = head.full_name || `${head.first_name} ${head.last_name}`.trim();
+                                            const isMemberOfOther = head.household_status === 'member';
+                                            
+                                            return (
+                                                <button
+                                                    key={head.id}
+                                                    type="button"
+                                                    onClick={() => handleHeadChange(head)}
+                                                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                                                        selectedHeadDetails?.id === head.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <span className="font-medium text-gray-900 dark:text-gray-200">
+                                                                {fullName}
+                                                            </span>
+                                                            {head.age && (
+                                                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                                                    ({head.age} yrs)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {isMemberOfOther && head.current_household && (
+                                                            <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 text-xs">
+                                                                <Users className="h-3 w-3 mr-1" />
+                                                                HH #{head.current_household.number}
+                                                            </Badge>
+                                                        )}
+                                                        {!isMemberOfOther && (
+                                                            <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 text-xs">
+                                                                Available
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {head.address && (
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                            {head.address}
+                                                        </p>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                        
+                                        {/* Load More */}
+                                        {pagination?.has_more && (
+                                            <div className="p-2 text-center">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={loadMore}
+                                                    disabled={isLoadingMore}
+                                                    className="text-xs text-blue-600 dark:text-blue-400"
+                                                >
+                                                    {isLoadingMore ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                                    ) : null}
+                                                    Load More ({heads.length} of {pagination.total})
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
                     
                     {errors.head_resident_id && (
                         <p className="text-sm text-red-600 dark:text-red-400">{errors.head_resident_id}</p>
@@ -212,9 +366,7 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2">
-                                            <h4 className="text-sm font-medium">
-                                                {statusIndicator.title}
-                                            </h4>
+                                            <h4 className="text-sm font-medium">{statusIndicator.title}</h4>
                                             {selectedHeadDetails?.current_household && (
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
@@ -228,17 +380,7 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                                                 </Tooltip>
                                             )}
                                         </div>
-                                        <p className="text-xs mt-1 opacity-90">
-                                            {statusIndicator.message}
-                                        </p>
-                                        
-                                        {/* Show current household details if member */}
-                                        {selectedHeadDetails?.household_status === 'member' && selectedHeadDetails.current_household && (
-                                            <div className="mt-2 text-xs border-t border-purple-200 dark:border-purple-800 pt-2">
-                                                <span className="font-medium">Current Household:</span>{' '}
-                                                #{selectedHeadDetails.current_household.number} as {selectedHeadDetails.current_household.relationship}
-                                            </div>
-                                        )}
+                                        <p className="text-xs mt-1 opacity-90">{statusIndicator.message}</p>
                                     </div>
                                 </div>
                             </div>
@@ -246,12 +388,9 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                     )}
                     
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {heads.length === 0 && (
-                            <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                                <AlertCircle className="h-3 w-3" />
-                                All residents already belong to households. <Link href="/residents/create" className="text-blue-600 dark:text-blue-400 hover:underline">Create a new resident</Link>
-                            </div>
-                        )}
+                        <Link href="/admin/residents/create" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            Create a new resident
+                        </Link>
                     </div>
                     
                     {/* Manual Entry Option */}
@@ -270,10 +409,10 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                         value={data.head_of_family}
                         onChange={(e) => {
                             setData('head_of_family', e.target.value);
-                            // Clear selected head if manually entering
                             if (data.head_resident_id) {
                                 setData('head_resident_id', null);
                                 setSelectedHeadDetails(null);
+                                setSearchQuery('');
                             }
                         }}
                         placeholder="Enter head of family name manually"
@@ -282,8 +421,6 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                     {errors.head_of_family && (
                         <p className="text-sm text-red-600 dark:text-red-400">{errors.head_of_family}</p>
                     )}
-                    
-                    {/* Helper text for manual entry */}
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                         Manual entry is useful if the resident is not yet registered in the system.
                     </p>
@@ -353,10 +490,9 @@ export default function BasicInfoCard({ data, setData, errors, heads }: Props) {
                                 User Account Details:
                             </p>
                             <ul className="text-xs text-blue-700 dark:text-blue-400 space-y-1 list-disc list-inside">
-                                <li>Username: Generated from name (e.g., juan.delacruz)</li>
+                                <li>Username: Generated from name</li>
                                 <li>Initial password: Full contact number</li>
                                 <li>Will be required to change password on first login</li>
-                                <li>Email notifications will be sent if email is provided</li>
                             </ul>
                         </div>
                     )}

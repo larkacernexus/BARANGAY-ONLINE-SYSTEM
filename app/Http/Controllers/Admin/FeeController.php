@@ -24,6 +24,16 @@ use Illuminate\Database\Eloquent\Builder;
 class FeeController extends Controller
 {
     /**
+     * Allowed per page options
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500'];
+    
+    /**
+     * Default per page value
+     */
+    protected const DEFAULT_PER_PAGE = 20;
+
+    /**
      * Display list of fees
      */
     public function index(Request $request)
@@ -47,8 +57,8 @@ class FeeController extends Controller
             // Apply filters
             $this->applyFilters($query, $request);
 
-            // Get paginated results
-            $perPage = $request->get('per_page', 20);
+            // Get paginated results with dynamic per page
+            $perPage = $this->getPerPage($request);
             $fees = $query->paginate($perPage)
                 ->withQueryString()
                 ->through(fn($fee) => $this->formatFeeForDisplay($fee));
@@ -57,14 +67,16 @@ class FeeController extends Controller
             $filterOptions = $this->getFilterOptions();
 
             Log::info('FeeController@index completed', [
-                'fee_count' => $fees->total()
+                'fee_count' => $fees->total(),
+                'per_page' => $perPage
             ]);
 
             return Inertia::render('admin/Fees/Index', [
                 'fees' => $fees,
                 'filters' => $request->only([
                     'search', 'status', 'category', 'purok', 
-                    'payer_type', 'from_date', 'to_date', 'min_amount', 'max_amount'
+                    'payer_type', 'from_date', 'to_date', 'min_amount', 
+                    'max_amount', 'per_page'
                 ]),
                 ...$filterOptions,
                 'quickStats' => $this->getQuickStats(),
@@ -78,6 +90,25 @@ class FeeController extends Controller
 
             return back()->with('error', 'Failed to load fees. Please try again.');
         }
+    }
+
+    /**
+     * Get the per page value from request
+     *
+     * @param Request $request
+     * @return int
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
     }
 
     /**
@@ -333,7 +364,8 @@ class FeeController extends Controller
 
             $this->applyOutstandingFilters($query, $filters);
 
-            $fees = $query->paginate(20)->withQueryString();
+            $perPage = $this->getPerPage($request);
+            $fees = $query->paginate($perPage)->withQueryString();
             $stats = $this->getOutstandingStats();
             $puroks = $this->getDistinctPuroks();
 
@@ -431,7 +463,7 @@ class FeeController extends Controller
             $query->where('purok', $request->purok);
         }
 
-        // ✅ FIXED: Payer Type filter - convert frontend value to database value
+        // Payer Type filter - convert frontend value to database value
         if ($request->filled('payer_type') && $request->payer_type !== 'all') {
             $payerTypeValue = $this->normalizePayerTypeForDatabase($request->payer_type);
             $query->where('payer_type', $payerTypeValue);

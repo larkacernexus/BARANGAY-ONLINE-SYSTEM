@@ -74,8 +74,8 @@ export default function PuroksIndex({
     // Filter states - all client-side
     const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
     const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
-    const [populationRange, setPopulationRange] = useState<string>(getSafeString(safeFilters.population_range, ''));
-    const [householdRange, setHouseholdRange] = useState<string>(getSafeString(safeFilters.household_range, ''));
+   const [populationRange, setPopulationRange] = useState<string>(getSafeString(safeFilters.population_range, 'all'));
+const [householdRange, setHouseholdRange] = useState<string>(getSafeString(safeFilters.household_range, 'all'));
     const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'name'));
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
     
@@ -559,8 +559,8 @@ export default function PuroksIndex({
     const handleClearFilters = useCallback(() => {
         setSearch('');
         setStatusFilter('all');
-        setPopulationRange('');
-        setHouseholdRange('');
+        setPopulationRange('all');
+        setHouseholdRange('all');
         setSortBy('name');
         setSortOrder('asc');
         setCurrentPage(1);

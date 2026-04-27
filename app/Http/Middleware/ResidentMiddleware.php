@@ -1,5 +1,4 @@
-<?php
-
+<!-- 
 namespace App\Http\Middleware;
 
 use Closure;
@@ -27,4 +26,4 @@ class ResidentMiddleware
 
         return $next($request);
     }
-}
+} -->

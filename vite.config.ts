@@ -16,9 +16,12 @@ export default defineConfig({
             },
         }),
         tailwindcss(),
-        // No wayfinder here!
     ],
     esbuild: {
         jsx: 'automatic',
+    },
+    server: {
+        host: '127.0.0.1',  // 👈 Add this to force IPv4
+        port: 5173,
     },
 });

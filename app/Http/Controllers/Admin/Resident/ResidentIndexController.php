@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\Log;
 
 class ResidentIndexController extends BaseResidentController
 {
+    /**
+     * Allowed per page options
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500', '1000'];
+    
+    /**
+     * Default per page value
+     */
+    protected const DEFAULT_PER_PAGE = 15;
+
     public function index(Request $request)
     {
         // Get paginated and filtered residents from server
@@ -32,6 +42,7 @@ class ResidentIndexController extends BaseResidentController
         Log::info('Residents index response (Server-Side)', [
             'total_residents' => $residents->total(),
             'current_page' => $residents->currentPage(),
+            'per_page' => $request->input('per_page', self::DEFAULT_PER_PAGE),
             'filters_applied' => $request->only(['search', 'status', 'purok_id', 'gender']),
         ]);
 
@@ -40,7 +51,7 @@ class ResidentIndexController extends BaseResidentController
             'filters' => $request->only([
                 'search', 'status', 'purok_id', 'gender', 'min_age', 'max_age',
                 'civil_status', 'is_voter', 'is_head', 'privilege_id', 'privilege', 
-                'sort_by', 'sort_order'
+                'sort_by', 'sort_order', 'per_page'
             ]),
             'stats' => $stats,
             'puroks' => $puroks,
@@ -48,6 +59,25 @@ class ResidentIndexController extends BaseResidentController
             'civilStatusOptions' => $civilStatusOptions,
             'ageRanges' => $ageRanges,
         ]);
+    }
+
+    /**
+     * Get the per page value from request
+     *
+     * @param Request $request
+     * @return int
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
     }
 
     private function getPaginatedResidents(Request $request)
@@ -64,8 +94,11 @@ class ResidentIndexController extends BaseResidentController
         // Apply sorting
         $this->applySorting($query, $request);
 
+        // Determine per page value
+        $perPage = $this->getPerPage($request);
+
         // Paginate and format each resident
-        return $query->paginate(15)
+        return $query->paginate($perPage)
             ->withQueryString()
             ->through(fn($resident) => $this->formatResident($resident));
     }

@@ -42,7 +42,7 @@ class BlotterController extends Controller
             $query->where('priority', $request->priority);
         }
 
-        // Incident type filter (using the hardcoded types from frontend)
+        // Incident type filter
         if ($request->filled('incident_type') && $request->incident_type !== 'all') {
             $query->where('incident_type', $request->incident_type);
         }
@@ -128,21 +128,82 @@ class BlotterController extends Controller
      */
     public function create()
     {
-        // Get residents for selection
-        $residents = Resident::select('id', 'first_name', 'last_name', 'middle_name', 'suffix')
-            ->orderBy('last_name')
-            ->get()
-            ->map(function ($resident) {
-                return [
-                    'id' => $resident->id,
-                    'name' => $resident->full_name,
-                    'first_name' => $resident->first_name,
-                    'last_name' => $resident->last_name,
-                ];
-            });
-
         return Inertia::render('admin/Blotters/Create', [
-            'residents' => $residents,
+            'barangayName' => config('app.barangay_name', 'Kibawe'),
+        ]);
+    }
+
+    /**
+     * Search residents via AJAX for blotter party selection
+     */
+    public function searchResidents(Request $request)
+    {
+        $search = $request->get('search', '');
+        $page = $request->get('page', 1);
+        $perPage = 50;
+        
+        $query = Resident::with('purok')
+            ->select([
+                'id',
+                'first_name',
+                'last_name',
+                'middle_name',
+                'suffix',
+                'address',
+                'contact_number',
+                'email',
+                'purok_id',
+                'photo_path',
+                'gender',
+                'civil_status',
+            ])
+            ->orderBy('last_name')
+            ->orderBy('first_name');
+        
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('middle_name', 'like', "%{$search}%")
+                  ->orWhere('address', 'like', "%{$search}%")
+                  ->orWhere('contact_number', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhereHas('purok', function($pq) use ($search) {
+                      $pq->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+        
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        
+        $data = $paginator->map(function($resident) {
+            return [
+                'id' => $resident->id,
+                'name' => $resident->full_name,
+                'first_name' => $resident->first_name,
+                'last_name' => $resident->last_name,
+                'middle_name' => $resident->middle_name,
+                'suffix' => $resident->suffix,
+                'address' => $resident->address,
+                'contact_number' => $resident->contact_number,
+                'email' => $resident->email,
+                'purok' => $resident->purok?->name,
+                'purok_id' => $resident->purok_id,
+                'photo_url' => $resident->photo_path ? Storage::url($resident->photo_path) : null,
+                'gender' => $resident->gender,
+                'civil_status' => $resident->civil_status,
+            ];
+        });
+        
+        return response()->json([
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
         ]);
     }
 
@@ -160,8 +221,12 @@ class BlotterController extends Controller
             'reporter_name' => 'required|string|max:255',
             'reporter_contact' => 'nullable|string|max:20',
             'reporter_address' => 'nullable|string|max:255',
+            'reporter_is_resident' => 'boolean',
+            'reporter_resident_id' => 'nullable|exists:residents,id',
             'respondent_name' => 'nullable|string|max:255',
             'respondent_address' => 'nullable|string|max:255',
+            'respondent_is_resident' => 'boolean',
+            'respondent_resident_id' => 'nullable|exists:residents,id',
             'witnesses' => 'nullable|string',
             'evidence' => 'nullable|string',
             'priority' => 'required|in:low,medium,high,urgent',
@@ -259,16 +324,6 @@ class BlotterController extends Controller
      */
     public function edit(Blotter $blotter)
     {
-        $residents = Resident::select('id', 'first_name', 'last_name', 'middle_name', 'suffix')
-            ->orderBy('last_name')
-            ->get()
-            ->map(function ($resident) {
-                return [
-                    'id' => $resident->id,
-                    'name' => $resident->full_name,
-                ];
-            });
-
         return Inertia::render('admin/Blotters/Edit', [
             'blotter' => [
                 'id' => $blotter->id,
@@ -281,8 +336,12 @@ class BlotterController extends Controller
                 'reporter_name' => $blotter->reporter_name,
                 'reporter_contact' => $blotter->reporter_contact,
                 'reporter_address' => $blotter->reporter_address,
+                'reporter_is_resident' => (bool) $blotter->reporter_is_resident,
+                'reporter_resident_id' => $blotter->reporter_resident_id,
                 'respondent_name' => $blotter->respondent_name,
                 'respondent_address' => $blotter->respondent_address,
+                'respondent_is_resident' => (bool) $blotter->respondent_is_resident,
+                'respondent_resident_id' => $blotter->respondent_resident_id,
                 'witnesses' => $blotter->witnesses,
                 'evidence' => $blotter->evidence,
                 'status' => $blotter->status,
@@ -292,7 +351,6 @@ class BlotterController extends Controller
                 'resolved_datetime' => $blotter->resolved_datetime?->format('Y-m-d H:i:s'),
                 'involved_residents' => $blotter->involved_residents ?? [],
             ],
-            'residents' => $residents,
         ]);
     }
 
@@ -310,8 +368,12 @@ class BlotterController extends Controller
             'reporter_name' => 'required|string|max:255',
             'reporter_contact' => 'nullable|string|max:20',
             'reporter_address' => 'nullable|string|max:255',
+            'reporter_is_resident' => 'boolean',
+            'reporter_resident_id' => 'nullable|exists:residents,id',
             'respondent_name' => 'nullable|string|max:255',
             'respondent_address' => 'nullable|string|max:255',
+            'respondent_is_resident' => 'boolean',
+            'respondent_resident_id' => 'nullable|exists:residents,id',
             'witnesses' => 'nullable|string',
             'evidence' => 'nullable|string',
             'status' => 'required|in:pending,investigating,resolved,archived',
@@ -404,17 +466,5 @@ class BlotterController extends Controller
         }
 
         return Storage::disk('public')->download($attachment['path'], $attachment['name']);
-    }
-
-    /**
-     * Get incident types for frontend (optional - if you want to sync with hardcoded types)
-     */
-    public function getIncidentTypes()
-    {
-        // This is optional - you can return the list from a config file
-        // or just rely on the frontend hardcoded types
-        return response()->json([
-            'types' => [] // You can populate this from a config if needed
-        ]);
     }
 }

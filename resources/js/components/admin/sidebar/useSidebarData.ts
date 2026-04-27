@@ -6,7 +6,7 @@ import {
     BarChart3, Building2, Shield, Key, Link as LinkIcon, ShieldCheck, History,
     Activity, LogIn, Monitor, Server, Database, FileType, Tag, FileBox, UserCog,
     User, Lock, Palette, Users2, PlusCircle, FolderOpen, Zap,
-    Eye, Heart
+    Eye, Heart, Image
 } from 'lucide-react';
 import { SidebarCategory, QuickAction } from './types';
 
@@ -62,7 +62,7 @@ export function useSidebarData() {
         total_users: 0, total_roles: 0, total_permissions: 0, total_puroks: 0,
         total_positions: 0, total_committees: 0, total_officials: 0,
         total_clearance_types: 0, total_fee_types: 0, total_report_types: 0,
-        total_document_types: 0, active_sessions: 0
+        total_document_types: 0, active_sessions: 0, portal_banner_active: false
     };
     
     const securityStats = props?.securityStats || {
@@ -487,6 +487,17 @@ export function useSidebarData() {
                 icon: Server,
                 items: [
                     { 
+                        title: 'Portal Banner', href: '/admin/banners', icon: Image,
+                        description: 'Manage portal banner', 
+                        color: 'bg-pink-100 dark:bg-pink-800 text-pink-600 dark:text-pink-400',
+                        isActive: (url: string) => url.startsWith('/admin/banners'),
+                        requiredPermission: 'manage-portal-banner',
+                        // ✅ KEEP BADGE - shows if banner is active
+                        badge: systemStats.portal_banner_active ? 'Active' : 'Inactive',
+                        badgeColor: systemStats.portal_banner_active ? 'success' : 'default',
+                        isNew: true
+                    },
+                    { 
                         title: 'Backup', href: '/admin/backup', icon: Database,
                         description: 'Backup & restore', 
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
@@ -549,10 +560,10 @@ export function useSidebarData() {
                 { title: 'Add Business', href: '/admin/businesses/create', icon: Briefcase, color: 'purple' as const, requiredPermission: 'manage-businesses', description: 'Register new business' },
             ],
             services: [
-                { title: 'Issue Clearance', href: '/admin/clearances/clearances/create', icon: CheckCircle, color: 'emerald' as const, requiredPermission: 'issue-clearances', description: 'Issue barangay clearance' },
-                { title: 'Approval Requests', href: '/admin/clearances/approval/requests', icon: CheckCircle, color: 'violet' as const, requiredPermission: 'issue-clearances', description: 'Review clearance requests', badge: formatNumber(reportStats.pending_clearances), isNew: true },
-                { title: 'Record Payment', href: '/admin/payments/payments/create', icon: CreditCard, color: 'cyan' as const, requiredPermission: 'manage-payments', description: 'Record new payment' },
-                { title: 'Create Fee', href: '/admin/fees/fees/create', icon: DollarSign, color: 'yellow' as const, requiredPermission: 'manage-fees', description: 'Add new fee type' },
+                { title: 'Issue Clearance', href: '/admin/clearances/create', icon: CheckCircle, color: 'emerald' as const, requiredPermission: 'issue-clearances', description: 'Issue barangay clearance' },
+                // { title: 'Approval Requests', href: '/admin/clearances/approval/requests', icon: CheckCircle, color: 'violet' as const, requiredPermission: 'issue-clearances', description: 'Review clearance requests', badge: formatNumber(reportStats.pending_clearances), isNew: true },
+                { title: 'Record Payment', href: '/admin/payments/create', icon: CreditCard, color: 'cyan' as const, requiredPermission: 'manage-payments', description: 'Record new payment' },
+                { title: 'Create Fee', href: '/admin/fees/create', icon: DollarSign, color: 'yellow' as const, requiredPermission: 'manage-fees', description: 'Add new fee type' },
                 { title: 'Upload Form', href: '/admin/forms/create', icon: FileText, color: 'indigo' as const, requiredPermission: 'manage-forms', description: 'Upload new form' },
                 { title: 'New Announcement', href: '/admin/announcements/create', icon: Megaphone, color: 'pink' as const, requiredPermission: 'manage-announcements', description: 'Create announcement' },
                 { title: 'Add Privilege', href: '/admin/privileges/create', icon: Award, color: 'amber' as const, requiredPermission: 'manage-privileges', description: 'Create new privilege' },
@@ -586,6 +597,7 @@ export function useSidebarData() {
                 { title: 'Add Permission', href: '/admin/permissions/create', icon: Key, color: 'red' as const, requiredPermission: 'manage-permissions', description: 'Create new permission' },
             ],
             system: [
+                { title: 'Manage Portal Banner', href: '/admin/banners', icon: Image, color: 'pink' as const, requiredPermission: 'manage-portal-banner', description: 'Update portal banner', isNew: true },
                 { title: 'Run Backup', href: '/admin/backup', icon: Database, color: 'blue' as const, requiredPermission: 'manage-backups', description: 'Create system backup' },
                 { title: 'Add Clearance Type', href: '/admin/clearance-types/create', icon: FileType, color: 'emerald' as const, requiredPermission: 'manage-clearance-types', description: 'Create clearance type' },
                 { title: 'Add Fee Type', href: '/admin/fee-types/create', icon: Tag, color: 'yellow' as const, requiredPermission: 'manage-fee-types', description: 'Create fee type' },

@@ -1,9 +1,9 @@
 // resources/js/Pages/Admin/Fees/Show.tsx
+
 import { useState, useRef, useEffect } from 'react';
 import { router } from '@inertiajs/react';
 import AppLayout from '@/layouts/admin-app-layout';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
     TooltipProvider,
 } from '@/components/ui/tooltip';
@@ -15,14 +15,10 @@ import {
     DialogDescription,
 } from '@/components/ui/dialog';
 import {
-    ArrowLeft,
-    Tag,
     Loader2,
     Printer,
     FileDown,
-    Eye,
 } from 'lucide-react';
-import { Link } from '@inertiajs/react';
 import PrintableReceipt from '@/components/admin/receipts/PrintableReceipt';
 
 // Import components
@@ -36,10 +32,14 @@ import { FeePaymentHistoryTab } from '@/components/admin/fees/show/components/fe
 import { FeeStatusSidebar } from '@/components/admin/fees/show/components/fee-status-sidebar';
 
 // Import types
-import { Fee, PaymentHistory, Permissions, RelatedFee, PrivilegeData } from '@/components/admin/fees/show/types';
+import { Fee, PaymentHistory, Permissions, RelatedFee, PrivilegeData } from '@/types/admin/fees/fees';
 
 // Import helpers
-import { formatDate, formatDateTime, formatCurrency, getStatusVariant, getStatusIcon } from '@/components/admin/fees/show/utils/formatters';
+import { 
+    formatDate as importedFormatDate, 
+    formatDateTime as importedFormatDateTime, 
+    formatCurrency as importedFormatCurrency 
+} from '@/components/admin/fees/show/utils/formatters';
 import { getResidentPrivileges } from '@/components/admin/fees/show/utils/privileges';
 
 // ========== PROPS ==========
@@ -81,6 +81,46 @@ export default function FeesShow({
         }
     }, [showReceiptPreview, selectedPayment]);
 
+    // ========== HELPER FUNCTIONS (Fixed Type Signatures with null handling) ==========
+    
+    // Format date - accepts string | null | undefined, handles null properly
+    const formatDate = (date: string | null | undefined): string => {
+        if (date === null) return 'N/A';
+        return importedFormatDate(date);
+    };
+
+    // Format date time - accepts string | null | undefined, handles null properly
+    const formatDateTime = (date: string | null | undefined): string => {
+        if (date === null) return 'N/A';
+        return importedFormatDateTime(date);
+    };
+
+    // Format currency - accepts number | string | undefined
+    const formatCurrency = (amount: number | string | undefined): string => {
+        return importedFormatCurrency(amount);
+    };
+
+    // Get status variant - returns ONLY valid badge variants (no "success")
+    const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+        const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+            paid: "default",
+            pending: "secondary",
+            overdue: "destructive",
+            issued: "default",
+            partial: "secondary",
+            partially_paid: "secondary",
+            cancelled: "outline",
+            refunded: "secondary"
+        };
+        return variants[status] || "secondary";
+    };
+
+    // Get status icon
+    const getStatusIcon = (status: string): React.ReactNode => {
+        // Return null or an icon component based on status
+        return null;
+    };
+
     // Check if fee is overdue
     const isOverdue = (): boolean => {
         try {
@@ -113,7 +153,8 @@ export default function FeesShow({
         return Math.min(100, Math.max(0, Math.round(progress * 100) / 100));
     };
 
-    // Handle actions
+    // ========== ACTION HANDLERS ==========
+
     const handleDownloadCertificate = () => {
         if (fee.certificate_number) {
             window.open(`/admin/fees/${fee.id}/certificate/download`, '_blank');
@@ -212,18 +253,15 @@ export default function FeesShow({
         setIsPrinting(true);
         
         try {
-            // Get the receipt content
             const receiptContent = receiptRef.current.innerHTML;
-            
-            // Create a new window for printing
             const printWindow = window.open('', '_blank');
+            
             if (!printWindow) {
                 alert('Please allow pop-ups to print the receipt');
                 setIsPrinting(false);
                 return;
             }
 
-            // Get all styles from the document
             const styles = Array.from(document.styleSheets)
                 .map(sheet => {
                     try {
@@ -295,63 +333,62 @@ export default function FeesShow({
     };
 
     // Generate receipt data for PrintableReceipt
-    const generateReceiptData = (payment: PaymentHistory) => {
-        const payerInfo = getPayerInfo();
-        
-        return {
-            id: payment.id,
-            receipt_number: `RCP-${payment.or_number || payment.id}-${new Date().getFullYear()}`,
-            or_number: payment.or_number,
-            receipt_type: 'payment',
-            receipt_type_label: 'OFFICIAL RECEIPT',
-            payer_name: payerInfo.name,
-            payer_address: payerInfo.address || 'N/A',
-            subtotal: payment.subtotal || payment.amount,
-            surcharge: fee.surcharge_amount || 0,
-            penalty: fee.penalty_amount || 0,
-            discount: payment.total_discount || 0,
-            total_amount: payment.amount,
-            amount_paid: payment.amount,
-            change_due: 0,
-            formatted_subtotal: payment.formatted_subtotal || formatCurrency(payment.subtotal || payment.amount),
-            formatted_surcharge: formatCurrency(fee.surcharge_amount || 0),
-            formatted_penalty: formatCurrency(fee.penalty_amount || 0),
-            formatted_discount: payment.formatted_total_discount || formatCurrency(payment.total_discount || 0),
-            formatted_total: payment.formatted_amount || formatCurrency(payment.amount),
-            formatted_amount_paid: payment.formatted_amount || formatCurrency(payment.amount),
-            formatted_change: '₱0.00',
-            payment_method: payment.payment_method || 'cash',
-            payment_method_label: (payment.payment_method || 'cash').toUpperCase(),
-            reference_number: payment.reference_number,
-            formatted_payment_date: payment.payment_date || formatDate(new Date().toISOString()),
-            formatted_issued_date: formatDate(new Date().toISOString()),
-            issued_by: payment.received_by || 'System',
-            fee_breakdown: [
-                {
-                    fee_name: fee.fee_type?.name || 'Fee',
-                    fee_code: fee.fee_code,
-                    base_amount: fee.base_amount,
-                    total_amount: payment.subtotal || payment.amount
-                }
-            ],
-            notes: payment.description || '',
-            payment_id: payment.id,
-            clearance_request_id: null
-        };
+  const generateReceiptData = (payment: PaymentHistory) => {
+    const payerInfo = getPayerInfo();
+    
+    return {
+        id: payment.id,
+        receipt_number: `RCP-${payment.or_number || payment.id}-${new Date().getFullYear()}`,
+        or_number: payment.or_number || null, // ✅ Convert undefined to null
+        receipt_type: 'payment',
+        receipt_type_label: 'OFFICIAL RECEIPT',
+        payer_name: payerInfo.name,
+        payer_address: payerInfo.address || null, // ✅ Convert to null
+        subtotal: payment.subtotal || payment.amount,
+        surcharge: fee.surcharge_amount || 0,
+        penalty: fee.penalty_amount || 0,
+        discount: payment.total_discount || 0,
+        total_amount: payment.amount,
+        amount_paid: payment.amount,
+        change_due: 0,
+        formatted_subtotal: payment.formatted_subtotal || formatCurrency(payment.subtotal || payment.amount),
+        formatted_surcharge: formatCurrency(fee.surcharge_amount || 0),
+        formatted_penalty: formatCurrency(fee.penalty_amount || 0),
+        formatted_discount: payment.formatted_total_discount || formatCurrency(payment.total_discount || 0),
+        formatted_total: payment.formatted_amount || formatCurrency(payment.amount),
+        formatted_amount_paid: payment.formatted_amount || formatCurrency(payment.amount),
+        formatted_change: '₱0.00',
+        payment_method: payment.payment_method || 'cash',
+        payment_method_label: (payment.payment_method || 'cash').toUpperCase(),
+        reference_number: payment.reference_number || null, // ✅ Convert to null
+        formatted_payment_date: payment.payment_date ? formatDate(payment.payment_date) : formatDate(new Date().toISOString()),
+        formatted_issued_date: formatDate(new Date().toISOString()),
+        issued_by: payment.received_by || 'System',
+        fee_breakdown: [
+            {
+                fee_name: fee.fee_type?.name || 'Fee',
+                fee_code: fee.fee_code,
+                base_amount: fee.base_amount || 0,
+                total_amount: payment.subtotal || payment.amount
+            }
+        ],
+        notes: payment.description || null, // ✅ Convert to null
+        payment_id: payment.id,
+        clearance_request_id: null
     };
-
+};
     // Get payer information with privileges
     const getPayerInfo = () => {
         if (fee.payer_type === 'resident' && fee.resident) {
             const privileges = getResidentPrivileges(fee.resident);
             
             return {
-                name: fee.resident.name || fee.resident.full_name,
-                contact: fee.resident.contact_number || fee.contact_number,
-                email: fee.resident.email,
-                address: fee.resident.address || fee.address,
-                purok: fee.resident.purok || fee.purok,
-                zone: fee.resident.zone || fee.zone,
+                name: fee.resident.name || fee.resident.full_name || 'Unknown',
+                contact: fee.resident.contact_number || fee.contact_number || '',
+                email: fee.resident.email || '',
+                address: fee.resident.address || fee.address || '',
+                purok: fee.resident.purok || fee.purok || '',
+                zone: fee.resident.zone || fee.zone || '',
                 classification: '',
                 link: `/residents/${fee.resident.id}`,
                 icon: 'User',
@@ -367,11 +404,11 @@ export default function FeesShow({
         if (fee.payer_type === 'household' && fee.household) {
             return {
                 name: fee.household.name,
-                contact: fee.household.contact_number || fee.contact_number,
+                contact: fee.household.contact_number || fee.contact_number || '',
                 email: '',
-                address: fee.household.address || fee.address,
-                purok: fee.household.purok || fee.purok,
-                zone: fee.household.zone || fee.zone,
+                address: fee.household.address || fee.address || '',
+                purok: fee.household.purok || fee.purok || '',
+                zone: fee.household.zone || fee.zone || '',
                 classification: 'Household',
                 link: `/households/${fee.household.id}`,
                 icon: 'Home',
@@ -382,12 +419,12 @@ export default function FeesShow({
         if (fee.payer_type === 'business' && fee.business) {
             return {
                 name: fee.business.business_name,
-                contact: fee.business.contact_number || fee.contact_number,
-                email: fee.business.email,
-                address: fee.business.address || fee.address,
-                purok: fee.business.purok || fee.purok,
-                zone: fee.business.zone || fee.zone,
-                classification: fee.business.business_type,
+                contact: fee.business.contact_number || fee.contact_number || '',
+                email: fee.business.email || '',
+                address: fee.business.address || fee.address || '',
+                purok: fee.business.purok || fee.purok || '',
+                zone: fee.business.zone || fee.zone || '',
+                classification: fee.business.business_type || '',
                 link: `/businesses/${fee.business.id}`,
                 icon: 'Building',
                 typeLabel: 'Business',
@@ -395,7 +432,7 @@ export default function FeesShow({
         }
         return {
             name: fee.payer_name || 'Unknown',
-            contact: fee.contact_number,
+            contact: fee.contact_number || '',
             email: '',
             address: fee.address || '',
             purok: fee.purok || '',
@@ -403,7 +440,7 @@ export default function FeesShow({
             classification: '',
             link: null,
             icon: fee.payer_type === 'resident' ? 'User' : fee.payer_type === 'household' ? 'Home' : 'Building',
-            typeLabel: fee.payer_type.charAt(0).toUpperCase() + fee.payer_type.slice(1),
+            typeLabel: fee.payer_type ? fee.payer_type.charAt(0).toUpperCase() + fee.payer_type.slice(1) : 'Unknown',
         };
     };
 
@@ -476,7 +513,11 @@ export default function FeesShow({
                         {/* Left Column - Fee Details with Tabs */}
                         <div className="md:col-span-2 space-y-6">
                             {/* Tab Navigation */}
-                            <FeeTabs activeTab={activeTab} setActiveTab={setActiveTab} paymentCount={payment_history.length} />
+                            <FeeTabs 
+                                activeTab={activeTab} 
+                                setActiveTab={setActiveTab} 
+                                paymentCount={payment_history.length} 
+                            />
 
                             {/* Tab Content */}
                             <div className="pt-2">
@@ -538,7 +579,7 @@ export default function FeesShow({
                     </div>
                 </div>
 
-                {/* Receipt Preview Dialog - Only for Payments */}
+                {/* Receipt Preview Dialog */}
                 <Dialog open={showReceiptPreview} onOpenChange={setShowReceiptPreview}>
                     <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto dark:bg-gray-900">
                         <DialogHeader>

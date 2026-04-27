@@ -101,9 +101,9 @@ export default function ReceiptsFilters({
         }
     };
 
-    // Amount range options
+    // Amount range options - FIXED: Use 'all' instead of empty string
     const amountRangeOptions = [
-        { value: '', label: 'All Amounts' },
+        { value: 'all', label: 'All Amounts' },
         { value: '0-100', label: '₱0 - ₱100' },
         { value: '101-500', label: '₱101 - ₱500' },
         { value: '501-1000', label: '₱501 - ₱1,000' },
@@ -111,9 +111,9 @@ export default function ReceiptsFilters({
         { value: '5000+', label: '₱5,000+' }
     ];
 
-    // Printed status options
+    // Printed status options - FIXED: Use 'all' instead of empty string
     const printedStatusOptions = [
-        { value: '', label: 'All Receipts' },
+        { value: 'all', label: 'All Receipts', color: 'gray' },
         { value: 'printed', label: 'Printed', color: 'emerald' },
         { value: 'unprinted', label: 'Not Printed', color: 'amber' }
     ];
@@ -199,16 +199,16 @@ export default function ReceiptsFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
-    // Helper to get active filter count
+    // Helper to get active filter count - FIXED: Check for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
-        if (statusFilter && statusFilter !== '') count++;
-        if (methodFilter && methodFilter !== '') count++;
-        if (typeFilter && typeFilter !== '') count++;
-        if (printedStatusFilter && printedStatusFilter !== '') count++;
+        if (statusFilter && statusFilter !== 'all') count++;
+        if (methodFilter && methodFilter !== 'all') count++;
+        if (typeFilter && typeFilter !== 'all') count++;
+        if (printedStatusFilter && printedStatusFilter !== 'all') count++;
         if (dateFrom) count++;
         if (dateTo) count++;
-        if (amountRange && amountRange !== '') count++;
+        if (amountRange && amountRange !== 'all') count++;
         return count;
     };
 
@@ -267,7 +267,7 @@ export default function ReceiptsFilters({
                             </div>
                             <Input
                                 ref={searchInputRef}
-                                placeholder="Search receipts by receipt number, OR number, payer name, or transaction ID..."
+                                placeholder="Search receipts by receipt number, OR number, payer name, or transaction ID... (Ctrl+F)"
                                 className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 value={search}
                                 onChange={(e) => handleSearch(e.target.value)}
@@ -310,13 +310,13 @@ export default function ReceiptsFilters({
                                 onClick={() => {
                                     const exportUrl = new URL('/admin/receipts/export', window.location.origin);
                                     if (search) exportUrl.searchParams.append('search', search);
-                                    if (statusFilter) exportUrl.searchParams.append('status', statusFilter);
-                                    if (methodFilter) exportUrl.searchParams.append('payment_method', methodFilter);
-                                    if (typeFilter) exportUrl.searchParams.append('receipt_type', typeFilter);
+                                    if (statusFilter && statusFilter !== 'all') exportUrl.searchParams.append('status', statusFilter);
+                                    if (methodFilter && methodFilter !== 'all') exportUrl.searchParams.append('payment_method', methodFilter);
+                                    if (typeFilter && typeFilter !== 'all') exportUrl.searchParams.append('receipt_type', typeFilter);
                                     if (dateFrom) exportUrl.searchParams.append('date_from', dateFrom);
                                     if (dateTo) exportUrl.searchParams.append('date_to', dateTo);
-                                    if (amountRange) exportUrl.searchParams.append('amount_range', amountRange);
-                                    if (printedStatusFilter) exportUrl.searchParams.append('printed_status', printedStatusFilter);
+                                    if (amountRange && amountRange !== 'all') exportUrl.searchParams.append('amount_range', amountRange);
+                                    if (printedStatusFilter && printedStatusFilter !== 'all') exportUrl.searchParams.append('printed_status', printedStatusFilter);
                                     window.open(exportUrl.toString(), '_blank');
                                 }}
                                 disabled={isLoading}
@@ -336,16 +336,16 @@ export default function ReceiptsFilters({
                             <span className="ml-1">receipts</span>
                             {search && (
                                 <span className="ml-1">
-                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                 </span>
                             )}
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Active filter badges */}
+                            {/* Active filter badges - FIXED: Check for 'all' instead of empty string */}
                             {activeFilters && (
                                 <>
-                                    {statusFilter && statusFilter !== '' && (
+                                    {statusFilter && statusFilter !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             getStatusColor(statusFilter) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
                                             getStatusColor(statusFilter) === 'amber' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
@@ -356,19 +356,19 @@ export default function ReceiptsFilters({
                                             {getStatusLabel(statusFilter)}
                                         </Badge>
                                     )}
-                                    {methodFilter && methodFilter !== '' && (
+                                    {methodFilter && methodFilter !== 'all' && (
                                         <Badge variant="secondary" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
                                             <CreditCard className="h-3 w-3 mr-1 inline" />
                                             {getMethodLabel(methodFilter)}
                                         </Badge>
                                     )}
-                                    {typeFilter && typeFilter !== '' && (
+                                    {typeFilter && typeFilter !== 'all' && (
                                         <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
                                             <Receipt className="h-3 w-3 mr-1 inline" />
                                             {getReceiptTypeLabel(typeFilter)}
                                         </Badge>
                                     )}
-                                    {printedStatusFilter && printedStatusFilter !== '' && (
+                                    {printedStatusFilter && printedStatusFilter !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             getPrintedStatusInfo(printedStatusFilter).color === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
                                             'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
@@ -377,7 +377,7 @@ export default function ReceiptsFilters({
                                             {getPrintedStatusInfo(printedStatusFilter).label}
                                         </Badge>
                                     )}
-                                    {amountRange && amountRange !== '' && (
+                                    {amountRange && amountRange !== 'all' && (
                                         <Badge variant="secondary" className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
                                             <DollarSign className="h-3 w-3 mr-1 inline" />
                                             {getAmountRangeLabel(amountRange)}
@@ -422,14 +422,14 @@ export default function ReceiptsFilters({
 
                     {/* Basic Filters - Modern Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
-                        {/* Status Filter */}
+                        {/* Status Filter - FIXED: Use 'all' instead of empty string */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <AlertCircle className="h-3 w-3" />
                                 Status
                             </Label>
                             <Select
-                                value={statusFilter}
+                                value={statusFilter || 'all'}
                                 onValueChange={setStatusFilter}
                                 disabled={isLoading}
                             >
@@ -437,7 +437,7 @@ export default function ReceiptsFilters({
                                     <SelectValue placeholder="All Status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Status</SelectItem>
+                                    <SelectItem value="all">All Status</SelectItem>
                                     {filterOptions.status_options.map(option => (
                                         <SelectItem key={option.value} value={option.value}>
                                             {option.label}
@@ -447,14 +447,14 @@ export default function ReceiptsFilters({
                             </Select>
                         </div>
 
-                        {/* Payment Method Filter */}
+                        {/* Payment Method Filter - FIXED: Use 'all' instead of empty string */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <CreditCard className="h-3 w-3" />
                                 Payment Method
                             </Label>
                             <Select
-                                value={methodFilter}
+                                value={methodFilter || 'all'}
                                 onValueChange={setMethodFilter}
                                 disabled={isLoading}
                             >
@@ -462,7 +462,7 @@ export default function ReceiptsFilters({
                                     <SelectValue placeholder="All Methods" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Methods</SelectItem>
+                                    <SelectItem value="all">All Methods</SelectItem>
                                     {filterOptions.payment_methods.map(option => (
                                         <SelectItem key={option.value} value={option.value}>
                                             {option.label}
@@ -472,14 +472,14 @@ export default function ReceiptsFilters({
                             </Select>
                         </div>
 
-                        {/* Receipt Type Filter */}
+                        {/* Receipt Type Filter - FIXED: Use 'all' instead of empty string */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <Receipt className="h-3 w-3" />
                                 Receipt Type
                             </Label>
                             <Select
-                                value={typeFilter}
+                                value={typeFilter || 'all'}
                                 onValueChange={setTypeFilter}
                                 disabled={isLoading}
                             >
@@ -487,7 +487,7 @@ export default function ReceiptsFilters({
                                     <SelectValue placeholder="All Types" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Types</SelectItem>
+                                    <SelectItem value="all">All Types</SelectItem>
                                     {filterOptions.receipt_types.map(option => (
                                         <SelectItem key={option.value} value={option.value}>
                                             {option.label}
@@ -497,14 +497,14 @@ export default function ReceiptsFilters({
                             </Select>
                         </div>
 
-                        {/* Printed Status Filter */}
+                        {/* Printed Status Filter - FIXED: Use 'all' instead of empty string */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <Printer className="h-3 w-3" />
                                 Printed Status
                             </Label>
                             <Select
-                                value={printedStatusFilter}
+                                value={printedStatusFilter || 'all'}
                                 onValueChange={setPrintedStatusFilter}
                                 disabled={isLoading}
                             >
@@ -577,14 +577,14 @@ export default function ReceiptsFilters({
                                     </div>
                                 </div>
 
-                                {/* Amount Range */}
+                                {/* Amount Range - FIXED: Use 'all' instead of empty string */}
                                 <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
                                     <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                         <DollarSign className="h-4 w-4 text-emerald-500" />
                                         Amount Range
                                     </Label>
                                     <Select
-                                        value={amountRange}
+                                        value={amountRange || 'all'}
                                         onValueChange={setAmountRange}
                                         disabled={isLoading}
                                     >
@@ -599,14 +599,14 @@ export default function ReceiptsFilters({
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {amountRange && (
+                                    {amountRange && amountRange !== 'all' && (
                                         <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
                                             Filtering by amount range
                                         </p>
                                     )}
                                 </div>
 
-                                {/* Quick Actions */}
+                                {/* Quick Actions - FIXED: Use 'all' for clearing filters */}
                                 <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
                                     <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                         <TrendingUp className="h-4 w-4 text-amber-500" />
@@ -619,12 +619,12 @@ export default function ReceiptsFilters({
                                             className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 setStatusFilter('paid');
-                                                setMethodFilter('');
-                                                setTypeFilter('');
+                                                setMethodFilter('all');
+                                                setTypeFilter('all');
                                                 setDateFrom('');
                                                 setDateTo('');
-                                                setAmountRange('');
-                                                setPrintedStatusFilter('');
+                                                setAmountRange('all');
+                                                setPrintedStatusFilter('all');
                                             }}
                                             disabled={isLoading}
                                         >
@@ -637,12 +637,12 @@ export default function ReceiptsFilters({
                                             className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
                                                 setStatusFilter('pending');
-                                                setMethodFilter('');
-                                                setTypeFilter('');
+                                                setMethodFilter('all');
+                                                setTypeFilter('all');
                                                 setDateFrom('');
                                                 setDateTo('');
-                                                setAmountRange('');
-                                                setPrintedStatusFilter('');
+                                                setAmountRange('all');
+                                                setPrintedStatusFilter('all');
                                             }}
                                             disabled={isLoading}
                                         >

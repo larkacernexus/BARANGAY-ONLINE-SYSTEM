@@ -56,9 +56,9 @@ export function CommitteesFilters({
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [localSearch, setLocalSearch] = useState<string>(search);
 
-    // Positions range options
+    // Positions range options - FIXED: Use 'all' instead of empty string
     const positionsRanges = [
-        { value: '', label: 'All Committees', color: 'gray' },
+        { value: 'all', label: 'All Committees', color: 'gray' },
         { value: '0', label: 'No Positions (0)', color: 'red' },
         { value: '1-3', label: 'Few Positions (1-3)', color: 'blue' },
         { value: '4-6', label: 'Moderate Positions (4-6)', color: 'emerald' },
@@ -126,11 +126,11 @@ export function CommitteesFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
-    // Helper to get active filter count
+    // Helper to get active filter count - FIXED: Check for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
         if (status && status !== 'all') count++;
-        if (positionsRange && positionsRange !== '') count++;
+        if (positionsRange && positionsRange !== 'all') count++;
         if (localSearch && localSearch !== '') count++;
         return count;
     };
@@ -219,7 +219,7 @@ export function CommitteesFilters({
                         </div>
                     </div>
 
-                    {/* Active Filters Info and Clear Button */}
+                    {/* Active Filters Info and Clear Button - FIXED: Check for 'all' instead of empty string */}
                     <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                         <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/30 px-3 py-1.5 rounded-lg">
                             {activeFilters ? (
@@ -245,7 +245,7 @@ export function CommitteesFilters({
                                             Status: {status === 'active' ? 'Active' : 'Inactive'}
                                         </Badge>
                                     )}
-                                    {positionsRange && positionsRange !== '' && (
+                                    {positionsRange && positionsRange !== 'all' && (
                                         <Badge variant="secondary" className={`${
                                             getPositionsRangeColor(positionsRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
                                             getPositionsRangeColor(positionsRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
@@ -294,7 +294,7 @@ export function CommitteesFilters({
                                 Status
                             </Label>
                             <Select
-                                value={status}
+                                value={status || 'all'}
                                 onValueChange={handleStatusChange}
                                 disabled={isLoading}
                             >
@@ -309,14 +309,14 @@ export function CommitteesFilters({
                             </Select>
                         </div>
 
-                        {/* Positions Count Filter */}
+                        {/* Positions Count Filter - FIXED: Use 'all' instead of empty string */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <Users className="h-3 w-3" />
                                 Positions Count
                             </Label>
                             <Select
-                                value={positionsRange}
+                                value={positionsRange || 'all'}
                                 onValueChange={handlePositionsRangeChange}
                                 disabled={isLoading}
                             >
@@ -399,7 +399,7 @@ export function CommitteesFilters({
                                     </div>
                                 </div>
 
-                                {/* Quick Positions Filters */}
+                                {/* Quick Positions Filters - FIXED: Use 'all' for reset */}
                                 <div className="space-y-3 bg-gray-50/40 dark:bg-gray-800/20 p-3 rounded-xl">
                                     <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                                         <TrendingUp className="h-4 w-4 text-purple-500" />

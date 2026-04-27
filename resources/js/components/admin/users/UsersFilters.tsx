@@ -1,5 +1,3 @@
-// components/admin/users/UsersFilters.tsx
-
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +38,18 @@ export default function UsersFilters({
   setRoleFilter,
   statusFilter,
   setStatusFilter,
+  accountTypeFilter,
+  setAccountTypeFilter,
+  twoFactorFilter,
+  setTwoFactorFilter,
+  emailVerifiedFilter,
+  setEmailVerifiedFilter,
+  lastLoginFilter,
+  setLastLoginFilter,
+  dateFrom,
+  setDateFrom,
+  dateTo,
+  setDateTo,
   showAdvancedFilters,
   setShowAdvancedFilters,
   hasActiveFilters,
@@ -58,18 +68,16 @@ export default function UsersFilters({
   isLoading = false,
   perPage,
   onPerPageChange,
-  emailVerifiedFilter,
-  setEmailVerifiedFilter,
   lastLoginRange,
-  setLastLoginRange
+  setLastLoginRange,
+  searchInputRef,
 }: UsersFiltersProps) {
   const [showSelectionOptions, setShowSelectionOptions] = useState(false);
   const selectionRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Last login range options
+  // Last login range options - FIXED: No empty string values
   const lastLoginRanges = [
-    { value: '', label: 'Any Time', color: 'gray' },
+    { value: 'all', label: 'Any Time', color: 'gray' },
     { value: 'today', label: 'Today', color: 'blue' },
     { value: 'last_7_days', label: 'Last 7 days', color: 'emerald' },
     { value: 'last_30_days', label: 'Last 30 days', color: 'amber' },
@@ -77,25 +85,25 @@ export default function UsersFilters({
     { value: 'never', label: 'Never logged in', color: 'red' }
   ];
 
-  // Email verification options
+  // Email verification options - FIXED: No empty string values
   const emailVerifiedOptions = [
-    { value: '', label: 'All Users', color: 'gray' },
+    { value: 'all', label: 'All Users', color: 'gray' },
     { value: 'verified', label: 'Email Verified', color: 'emerald' },
     { value: 'unverified', label: 'Email Not Verified', color: 'amber' }
   ];
 
   const handleSelectAllOnPage = () => {
     const pageIds = users.data.map(user => user.id);
-    const isSelectAll = selectedUsers.length === pageIds.length && 
+    const allSelected = selectedUsers.length === pageIds.length && 
                        pageIds.every(id => selectedUsers.includes(id));
     
-    if (isSelectAll) {
+    if (allSelected) {
       setSelectedUsers(selectedUsers.filter(id => !pageIds.includes(id)));
     } else {
       const newSelected = [...new Set([...selectedUsers, ...pageIds])];
       setSelectedUsers(newSelected);
     }
-    setIsSelectAll(!isSelectAll);
+    setIsSelectAll(!allSelected);
     setSelectionMode('page');
     setShowSelectionOptions(false);
   };
@@ -137,8 +145,8 @@ export default function UsersFilters({
     let count = 0;
     if (roleFilter && roleFilter !== 'all') count++;
     if (statusFilter && statusFilter !== 'all') count++;
-    if (emailVerifiedFilter && emailVerifiedFilter !== '') count++;
-    if (lastLoginRange && lastLoginRange !== '') count++;
+    if (emailVerifiedFilter && emailVerifiedFilter !== 'all') count++;
+    if (lastLoginRange && lastLoginRange !== 'all') count++;
     if (departmentFilter && departmentFilter !== 'all') count++;
     return count;
   };
@@ -261,7 +269,7 @@ export default function UsersFilters({
               <span className="ml-1">users</span>
               {search && (
                 <span className="ml-1">
-                  matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                  matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                 </span>
               )}
             </div>
@@ -287,7 +295,7 @@ export default function UsersFilters({
                       {getStatusLabel(statusFilter)}
                     </Badge>
                   )}
-                  {emailVerifiedFilter && emailVerifiedFilter !== '' && (
+                  {emailVerifiedFilter && emailVerifiedFilter !== 'all' && (
                     <Badge variant="secondary" className={`${
                       getEmailVerificationInfo(emailVerifiedFilter).color === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
                       'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
@@ -296,7 +304,7 @@ export default function UsersFilters({
                       {getEmailVerificationInfo(emailVerifiedFilter).label}
                     </Badge>
                   )}
-                  {lastLoginRange && lastLoginRange !== '' && (
+                  {lastLoginRange && lastLoginRange !== 'all' && (
                     <Badge variant="secondary" className={`${
                       getLastLoginInfo(lastLoginRange).color === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
                       getLastLoginInfo(lastLoginRange).color === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
@@ -390,7 +398,7 @@ export default function UsersFilters({
                 Email Verification
               </Label>
               <Select
-                value={emailVerifiedFilter || ''}
+                value={emailVerifiedFilter || 'all'}
                 onValueChange={(value) => setEmailVerifiedFilter?.(value)}
                 disabled={isLoading}
               >
@@ -421,7 +429,7 @@ export default function UsersFilters({
                 Last Login
               </Label>
               <Select
-                value={lastLoginRange || ''}
+                value={lastLoginRange || 'all'}
                 onValueChange={(value) => setLastLoginRange?.(value)}
                 disabled={isLoading}
               >
@@ -593,8 +601,8 @@ export default function UsersFilters({
                     onClick={() => {
                       setRoleFilter('all');
                       setStatusFilter('all');
-                      setEmailVerifiedFilter?.('');
-                      setLastLoginRange?.('');
+                      setEmailVerifiedFilter?.('all');
+                      setLastLoginRange?.('all');
                       if (setDepartmentFilter) setDepartmentFilter('all');
                       setShowAdvancedFilters(false);
                     }}

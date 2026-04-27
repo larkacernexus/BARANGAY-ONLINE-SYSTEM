@@ -1,5 +1,4 @@
-<?php
-
+<!-- 
 namespace App\Http\Controllers\ResidentSettings;
 
 use App\Http\Controllers\Controller;
@@ -12,16 +11,38 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use App\Http\Requests\Privacy\CorrectionRequest;
+use App\Http\Requests\Privacy\ExportDataRequest;
 
+/**
+ * Privacy Controller
+ * 
+ * Handles privacy settings and data management for household heads.
+ * 
+ * SECURITY NOTE: All data access is scoped to the authenticated user's household.
+ * PortalMiddleware already verifies Household Head role and authentication.
+ * 
+ * @method \Illuminate\Routing\ControllerMiddlewareOptions middleware(string|array $middleware, array $options = [])
+ */
 class PrivacyController extends Controller
 {
+    // SECURITY NOTE: Cache TTL constants
+    private const CACHE_TTL_PRIVILEGES = 3600; // 1 hour
+    private const CACHE_TTL_MEMBER_DATA = 300; // 5 minutes
+    
+    // LOGIC NOTE: No constructor needed - middleware is applied via routes/web.php
+    
     /**
      * Get all privileges - DYNAMIC FROM DATABASE
+     * 
+     * SECURITY NOTE: Cache is safe as privileges are not user-specific
      */
     private function getAllPrivileges(): array
     {
-        return Cache::remember('all_privileges', 3600, function () {
+        return Cache::remember('all_privileges', self::CACHE_TTL_PRIVILEGES, function () {
             return Privilege::where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'description'])
@@ -37,6 +58,8 @@ class PrivacyController extends Controller
 
     /**
      * Get resident's active privileges
+     * 
+     * SECURITY NOTE: Always load relationship if not already loaded
      */
     private function getResidentPrivileges(Resident $resident): array
     {
@@ -64,7 +87,7 @@ class PrivacyController extends Controller
      */
     private function getPrivilegesRequiringId(): array
     {
-        return Cache::remember('privileges_requiring_id', 3600, function () {
+        return Cache::remember('privileges_requiring_id', self::CACHE_TTL_PRIVILEGES, function () {
             return Privilege::where('is_active', true)
                 ->where('requires_id_number', true)
                 ->pluck('code')
@@ -74,29 +97,47 @@ class PrivacyController extends Controller
 
     /**
      * Display privacy dashboard for household
+     * 
+     * SECURITY NOTE: All data access is scoped to the authenticated user's household
      */
-    public function index()
+    public function index(): \Inertia\Response|\Illuminate\Http\RedirectResponse
     {
         $user = Auth::user();
+        
+        // SECURITY NOTE: Verify user has household access
+        if (!$user->household_id) {
+            Log::warning('User attempted to access privacy dashboard without household', [
+                'user_id' => $user->id,
+                'ip' => request()->ip()
+            ]);
+            
+            return redirect()->route('portal.dashboard')
+                ->with('error', 'You must be associated with a household to access privacy settings.');
+        }
+        
         $allPrivileges = $this->getAllPrivileges();
         $privilegesRequiringId = $this->getPrivilegesRequiringId();
         
-        \Log::info('Current User:', [
-            'id' => $user->id,
-            'username' => $user->username,
-            'resident_id' => $user->resident_id,
-            'current_resident_id' => $user->current_resident_id,
+        // SECURITY NOTE: Log only non-sensitive metadata
+        Log::info('Privacy dashboard accessed', [
+            'user_id' => $user->id,
             'household_id' => $user->household_id,
+            'ip' => request()->ip()
         ]);
         
-        $household = Household::with(['purok', 'user'])
+        // SECURITY NOTE: Use find to prevent null pointer issues
+        $household = Household::with(['purok'])
             ->find($user->household_id);
         
-        \Log::info('Household found:', [
-            'exists' => $household ? 'yes' : 'no',
-            'id' => $household?->id,
-            'number' => $household?->household_number,
-        ]);
+        if (!$household) {
+            Log::error('Household not found for user', [
+                'user_id' => $user->id,
+                'household_id' => $user->household_id
+            ]);
+            
+            return redirect()->route('portal.dashboard')
+                ->with('error', 'Household information not found. Please contact support.');
+        }
         
         $residentId = $user->current_resident_id ?? $user->resident_id;
         
@@ -106,23 +147,25 @@ class PrivacyController extends Controller
                 ->find($residentId);
         }
         
-        \Log::info('Current Resident:', [
-            'found' => $currentResident ? 'yes' : 'no',
-            'id' => $currentResident?->id,
-            'name' => $currentResident?->full_name,
-        ]);
-        
-        $householdMembers = collect();
-        if ($user->household_id) {
-            $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege'])
-                ->where('household_id', $user->household_id)
-                ->get();
+        // SECURITY NOTE: Verify resident belongs to user's household
+        if ($currentResident && $currentResident->household_id !== $user->household_id) {
+            Log::warning('Resident household mismatch', [
+                'user_id' => $user->id,
+                'resident_id' => $currentResident->id,
+                'resident_household' => $currentResident->household_id,
+                'user_household' => $user->household_id
+            ]);
             
-            \Log::info('Household Members found:', ['count' => $householdMembers->count()]);
+            $currentResident = null;
         }
         
+        // SECURITY NOTE: Scope household members query to user's household
+        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege'])
+            ->where('household_id', $user->household_id)
+            ->get();
+        
         $residentIds = $householdMembers->pluck('resident_id')->toArray();
-        if ($currentResident && !in_array($currentResident->id, $residentIds)) {
+        if ($currentResident && !in_array($currentResident->id, $residentIds, true)) {
             $residentIds[] = $currentResident->id;
         }
         
@@ -131,13 +174,7 @@ class PrivacyController extends Controller
         $accessLogs = $this->getAccessLogsForFrontend($residentIds, $user);
         $documents = $this->getDocumentsForFrontend($residentIds);
         
-        \Log::info('Formatted Data:', [
-            'residentData_fullName' => $residentData['fullName'],
-            'household_count' => count($formattedHousehold),
-            'accessLogs_count' => count($accessLogs),
-            'documents_count' => count($documents),
-        ]);
-        
+        // SECURITY NOTE: Only return necessary data to frontend
         return Inertia::render('residentsettings/privacy', [
             'residentData' => $residentData,
             'accessLogs' => $accessLogs,
@@ -152,15 +189,26 @@ class PrivacyController extends Controller
 
     /**
      * Format resident data for frontend - DYNAMIC with privileges
+     * 
+     * SECURITY NOTE: Redacts sensitive information when appropriate
      */
-    private function formatResidentDataForFrontend(?Resident $resident, ?Household $household, array $allPrivileges, array $privilegesRequiringId)
+    private function formatResidentDataForFrontend(?Resident $resident, ?Household $household, array $allPrivileges, array $privilegesRequiringId): array
     {
         if (!$resident) {
-            \Log::warning('No resident found, using default data');
             return $this->getDefaultResidentData();
         }
         
-        \Log::info('Formatting resident:', ['id' => $resident->id, 'name' => $resident->full_name]);
+        // SECURITY NOTE: Verify resident belongs to user's household
+        if ($resident->household_id !== Auth::user()->household_id) {
+            Log::warning('Attempted to format resident data from different household', [
+                'user_id' => Auth::id(),
+                'resident_id' => $resident->id,
+                'resident_household' => $resident->household_id,
+                'user_household' => Auth::user()->household_id
+            ]);
+            
+            return $this->getDefaultResidentData();
+        }
         
         // Get resident's active privileges
         $activePrivileges = $this->getResidentPrivileges($resident);
@@ -186,35 +234,36 @@ class PrivacyController extends Controller
             }
         }
         
+        // SECURITY NOTE: Sanitize emergency contact data
         $emergencyContact = [
-            'name' => $resident->emergency_contact_name ?? 'Not specified',
-            'relation' => $resident->emergency_contact_relation ?? 'Not specified',
-            'number' => $resident->emergency_contact_number ?? 'Not specified',
+            'name' => $this->sanitizeOutput($resident->emergency_contact_name) ?? 'Not specified',
+            'relation' => $this->sanitizeOutput($resident->emergency_contact_relation) ?? 'Not specified',
+            'number' => $this->maskPhoneNumber($resident->emergency_contact_number) ?? 'Not specified',
         ];
         
-        $address = $resident->address ?? ($household->address ?? 'Not specified');
-        $zone = $resident->purok ? $resident->purok->name : ($household->purok?->name ?? 'Not specified');
-        $householdNumber = $household->household_number ?? 'Not specified';
+        $address = $this->sanitizeOutput($resident->address ?? $household->address) ?? 'Not specified';
+        $zone = $this->sanitizeOutput($resident->purok?->name ?? $household->purok?->name) ?? 'Not specified';
+        $householdNumber = $this->sanitizeOutput($household->household_number) ?? 'Not specified';
         
-        $occupation = $resident->occupation ?? 'Not specified';
-        $education = $resident->education ?? 'Not specified';
-        $religion = $resident->religion ?? 'Not specified';
+        $occupation = $this->sanitizeOutput($resident->occupation) ?? 'Not specified';
+        $education = $this->sanitizeOutput($resident->education) ?? 'Not specified';
+        $religion = $this->sanitizeOutput($resident->religion) ?? 'Not specified';
         
         $monthlyIncome = $this->formatIncomeRange($household->income_range ?? null);
         
         return array_merge([
             'id' => $resident->id,
-            'fullName' => $resident->full_name,
-            'firstName' => $resident->first_name ?? '',
-            'lastName' => $resident->last_name ?? '',
-            'middleName' => $resident->middle_name ?? '',
-            'suffix' => $resident->suffix ?? '',
+            'fullName' => $this->sanitizeOutput($resident->full_name),
+            'firstName' => $this->sanitizeOutput($resident->first_name) ?? '',
+            'lastName' => $this->sanitizeOutput($resident->last_name) ?? '',
+            'middleName' => $this->sanitizeOutput($resident->middle_name) ?? '',
+            'suffix' => $this->sanitizeOutput($resident->suffix) ?? '',
             'birthDate' => $resident->birth_date ? $resident->birth_date->format('F j, Y') : 'Not specified',
             'age' => $resident->age ?? $this->calculateAge($resident->birth_date),
-            'gender' => $resident->gender ?? 'Not specified',
-            'civilStatus' => $resident->civil_status ?? 'Not specified',
-            'contactNumber' => $resident->contact_number ?? 'Not specified',
-            'email' => $resident->email ?? 'Not specified',
+            'gender' => $this->sanitizeOutput($resident->gender) ?? 'Not specified',
+            'civilStatus' => $this->sanitizeOutput($resident->civil_status) ?? 'Not specified',
+            'contactNumber' => $this->maskPhoneNumber($resident->contact_number) ?? 'Not specified',
+            'email' => $this->maskEmail($resident->email) ?? 'Not specified',
             'occupation' => $occupation,
             'education' => $education,
             'religion' => $religion,
@@ -236,7 +285,7 @@ class PrivacyController extends Controller
     /**
      * Get default resident data
      */
-    private function getDefaultResidentData()
+    private function getDefaultResidentData(): array
     {
         return [
             'id' => 0,
@@ -274,18 +323,22 @@ class PrivacyController extends Controller
     /**
      * Calculate age from birth date
      */
-    private function calculateAge($birthDate)
+    private function calculateAge($birthDate): int
     {
-        if (!$birthDate) return 0;
+        if (!$birthDate) {
+            return 0;
+        }
         return $birthDate->age;
     }
 
     /**
      * Format income range
      */
-    private function formatIncomeRange($range)
+    private function formatIncomeRange($range): string
     {
-        if (!$range) return 'Not specified';
+        if (!$range) {
+            return 'Not specified';
+        }
         
         $ranges = [
             'below_5000' => 'Below ₱5,000',
@@ -302,7 +355,7 @@ class PrivacyController extends Controller
     /**
      * Format household members for frontend - DYNAMIC with privileges
      */
-    private function formatHouseholdMembersForFrontend($members, ?Resident $currentResident, array $allPrivileges)
+    private function formatHouseholdMembersForFrontend($members, ?Resident $currentResident, array $allPrivileges): array
     {
         if ($members->isEmpty()) {
             return [];
@@ -310,7 +363,14 @@ class PrivacyController extends Controller
         
         return $members->map(function($member) use ($currentResident, $allPrivileges) {
             $resident = $member->resident;
-            if (!$resident) return null;
+            if (!$resident) {
+                return null;
+            }
+            
+            // SECURITY NOTE: Verify resident belongs to same household
+            if ($resident->household_id !== Auth::user()->household_id) {
+                return null;
+            }
             
             // Get member's privileges
             $activePrivileges = $this->getResidentPrivileges($resident);
@@ -324,14 +384,14 @@ class PrivacyController extends Controller
             
             return array_merge([
                 'id' => $resident->id,
-                'name' => $resident->full_name,
-                'relation' => $member->relationship_to_head ?? 'Member',
+                'name' => $this->sanitizeOutput($resident->full_name),
+                'relation' => $this->sanitizeOutput($member->relationship_to_head) ?? 'Member',
                 'age' => $resident->age ?? $this->calculateAge($resident->birth_date),
-                'occupation' => $resident->occupation ?? null,
+                'occupation' => $this->sanitizeOutput($resident->occupation) ?? null,
                 'isHead' => (bool) ($member->is_head ?? false),
                 'isCurrentUser' => $currentResident && $resident->id === $currentResident->id,
-                'gender' => $resident->gender ?? 'Unknown',
-                'civilStatus' => $resident->civil_status ?? 'Unknown',
+                'gender' => $this->sanitizeOutput($resident->gender) ?? 'Unknown',
+                'civilStatus' => $this->sanitizeOutput($resident->civil_status) ?? 'Unknown',
                 'privileges' => $activePrivileges,
                 'privileges_count' => count($activePrivileges),
                 'has_privileges' => count($activePrivileges) > 0,
@@ -341,12 +401,24 @@ class PrivacyController extends Controller
 
     /**
      * Get real access logs from database
+     * 
+     * SECURITY NOTE: Only returns logs for residents in user's household
      */
-    private function getAccessLogsForFrontend(array $residentIds, User $user)
+    private function getAccessLogsForFrontend(array $residentIds, User $user): array
     {
         try {
+            // SECURITY NOTE: Validate resident IDs belong to user's household
+            $validResidentIds = Resident::whereIn('id', $residentIds)
+                ->where('household_id', $user->household_id)
+                ->pluck('id')
+                ->toArray();
+            
+            if (empty($validResidentIds)) {
+                return [];
+            }
+            
             $logs = DB::table('access_logs')
-                ->whereIn('resource_id', $residentIds)
+                ->whereIn('resource_id', $validResidentIds)
                 ->where('resource_type', 'Resident')
                 ->orderBy('accessed_at', 'desc')
                 ->limit(50)
@@ -370,9 +442,9 @@ class PrivacyController extends Controller
                     return [
                         'id' => $log->id,
                         'date' => date('M d, Y h:i A', strtotime($log->accessed_at)),
-                        'official' => $official,
-                        'position' => $position,
-                        'reason' => $log->description ?? 'Data access for barangay services',
+                        'official' => $this->sanitizeOutput($official),
+                        'position' => $this->sanitizeOutput($position),
+                        'reason' => $this->sanitizeOutput($log->description) ?? 'Data access for barangay services',
                         'dataAccessed' => $this->parseDataAccessed($log->description),
                         'department' => 'Barangay Hall',
                     ];
@@ -380,7 +452,7 @@ class PrivacyController extends Controller
             }
             
             $activities = DB::table('activity_log')
-                ->whereIn('subject_id', $residentIds)
+                ->whereIn('subject_id', $validResidentIds)
                 ->where('subject_type', 'App\Models\Resident')
                 ->orderBy('created_at', 'desc')
                 ->limit(50)
@@ -388,7 +460,6 @@ class PrivacyController extends Controller
             
             if ($activities->isNotEmpty()) {
                 return $activities->map(function($activity) {
-                    $causer = null;
                     $official = 'System';
                     $position = 'System';
                     
@@ -405,9 +476,9 @@ class PrivacyController extends Controller
                     return [
                         'id' => $activity->id,
                         'date' => date('M d, Y h:i A', strtotime($activity->created_at)),
-                        'official' => $official,
-                        'position' => $position,
-                        'reason' => $activity->description,
+                        'official' => $this->sanitizeOutput($official),
+                        'position' => $this->sanitizeOutput($position),
+                        'reason' => $this->sanitizeOutput($activity->description),
                         'dataAccessed' => $this->parseDataAccessed($activity->description),
                         'department' => 'Barangay Hall',
                     ];
@@ -417,7 +488,10 @@ class PrivacyController extends Controller
             return [];
             
         } catch (\Exception $e) {
-            \Log::error('Error fetching access logs: ' . $e->getMessage());
+            Log::error('Error fetching access logs', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -425,19 +499,27 @@ class PrivacyController extends Controller
     /**
      * Parse data accessed from description
      */
-    private function parseDataAccessed($description)
+    private function parseDataAccessed($description): array
     {
         $description = strtolower($description ?? '');
         
-        if (strpos($description, 'document') !== false) {
+        if (str_contains($description, 'document')) {
             return ['Documents'];
-        } elseif (strpos($description, 'payment') !== false) {
+        }
+        
+        if (str_contains($description, 'payment')) {
             return ['Payment Records'];
-        } elseif (strpos($description, 'clearance') !== false) {
+        }
+        
+        if (str_contains($description, 'clearance')) {
             return ['Clearance Records'];
-        } elseif (strpos($description, 'profile') !== false || strpos($description, 'resident') !== false) {
+        }
+        
+        if (str_contains($description, 'profile') || str_contains($description, 'resident')) {
             return ['Personal Information'];
-        } elseif (strpos($description, 'household') !== false) {
+        }
+        
+        if (str_contains($description, 'household')) {
             return ['Household Information'];
         }
         
@@ -447,11 +529,21 @@ class PrivacyController extends Controller
     /**
      * Get real documents from database
      */
-    private function getDocumentsForFrontend(array $residentIds)
+    private function getDocumentsForFrontend(array $residentIds): array
     {
         try {
+            // SECURITY NOTE: Validate resident IDs belong to user's household
+            $validResidentIds = Resident::whereIn('id', $residentIds)
+                ->where('household_id', Auth::user()->household_id)
+                ->pluck('id')
+                ->toArray();
+            
+            if (empty($validResidentIds)) {
+                return [];
+            }
+            
             $documents = DB::table('resident_documents')
-                ->whereIn('resident_id', $residentIds)
+                ->whereIn('resident_id', $validResidentIds)
                 ->orderBy('created_at', 'desc')
                 ->limit(50)
                 ->get();
@@ -468,15 +560,18 @@ class PrivacyController extends Controller
                     'dateIssued' => $doc->issue_date 
                         ? date('M d, Y', strtotime($doc->issue_date))
                         : date('M d, Y', strtotime($doc->created_at)),
-                    'referenceNumber' => $doc->reference_number ?? 'DOC-' . str_pad($doc->id, 6, '0', STR_PAD_LEFT),
-                    'purpose' => $doc->purpose ?? 'General purpose',
-                    'status' => $doc->status ?? 'active',
-                    'residentName' => $resident ? $resident->full_name : 'Unknown',
+                    'referenceNumber' => $this->sanitizeOutput($doc->reference_number) ?? 'DOC-' . str_pad((string) $doc->id, 6, '0', STR_PAD_LEFT),
+                    'purpose' => $this->sanitizeOutput($doc->purpose) ?? 'General purpose',
+                    'status' => $this->sanitizeOutput($doc->status) ?? 'active',
+                    'residentName' => $resident ? $this->sanitizeOutput($resident->full_name) : 'Unknown',
                 ];
             })->toArray();
             
         } catch (\Exception $e) {
-            \Log::error('Error fetching documents: ' . $e->getMessage());
+            Log::error('Error fetching documents', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage()
+            ]);
             return [];
         }
     }
@@ -484,7 +579,7 @@ class PrivacyController extends Controller
     /**
      * Get document type name
      */
-    private function getDocumentTypeName($categoryId)
+    private function getDocumentTypeName($categoryId): string
     {
         try {
             $category = DB::table('document_categories')
@@ -498,17 +593,18 @@ class PrivacyController extends Controller
     }
 
     /**
-     * Get consents (you may need to create a consents table)
+     * Get consents
      */
-    private function getConsentsForFrontend(User $user)
+    private function getConsentsForFrontend(User $user): array
     {
+        // TODO: Implement consents table
         return [];
     }
 
     /**
      * Get data categories - DYNAMIC with privileges
      */
-    private function getDataCategoriesForFrontend(array $allPrivileges)
+    private function getDataCategoriesForFrontend(array $allPrivileges): array
     {
         // Build privilege categories dynamically
         $privilegeFields = [];
@@ -577,12 +673,15 @@ class PrivacyController extends Controller
     /**
      * Get privacy score - DYNAMIC with privileges
      */
-    private function getPrivacyScoreForFrontend(User $user, ?Resident $resident, array $allPrivileges, array $privilegesRequiringId)
+    private function getPrivacyScoreForFrontend(User $user, ?Resident $resident, array $allPrivileges, array $privilegesRequiringId): array
     {
         $score = 85;
         $recommendations = [];
         
-        if (!$user->hasEnabledTwoFactorAuthentication()) {
+        // SECURITY NOTE: Check 2FA status using method that exists or property
+        if (method_exists($user, 'hasEnabledTwoFactorAuthentication') 
+            ? !$user->hasEnabledTwoFactorAuthentication() 
+            : empty($user->two_factor_confirmed_at)) {
             $score -= 10;
             $recommendations[] = 'Enable two-factor authentication for better account security';
         }
@@ -597,7 +696,9 @@ class PrivacyController extends Controller
             $recommendations[] = 'Add your contact number for important notifications';
         }
         
-        if (!$user->password_changed_at || now()->diffInDays($user->password_changed_at) > 180) {
+        // SECURITY NOTE: Check password age
+        $passwordChangedAt = $user->password_changed_at ?? $user->created_at;
+        if (!$passwordChangedAt || now()->diffInDays($passwordChangedAt) > 180) {
             $score -= 5;
             $recommendations[] = 'Consider changing your password - it\'s been over 6 months';
         }
@@ -614,7 +715,7 @@ class PrivacyController extends Controller
             $privilegeCodes = collect($activePrivileges)->pluck('code')->toArray();
             
             foreach ($privilegesRequiringId as $code) {
-                if (in_array($code, $privilegeCodes)) {
+                if (in_array($code, $privilegeCodes, true)) {
                     // Check if this privilege has an ID number
                     $hasId = collect($activePrivileges)->firstWhere('code', $code)['id_number'] ?? false;
                     
@@ -635,118 +736,163 @@ class PrivacyController extends Controller
 
     /**
      * Request correction for household member's data
+     * 
+     * SECURITY NOTE: Validates household membership before processing
      */
-    public function requestCorrection(Request $request)
+    public function requestCorrection(CorrectionRequest $request): \Illuminate\Http\JsonResponse
     {
-        $validated = $request->validate([
-            'resident_id' => 'required|integer|exists:residents,id',
-            'field' => 'required|string',
-            'current_value' => 'nullable|string',
-            'requested_value' => 'required|string',
-            'reason' => 'required|string',
-        ]);
-
         $user = Auth::user();
         
-        $member = HouseholdMember::where('household_id', $user->household_id)
-            ->where('resident_id', $validated['resident_id'])
-            ->first();
-
-        if (!$member && $validated['resident_id'] != $user->current_resident_id) {
+        // SECURITY NOTE: Rate limiting for correction requests
+        $rateLimitKey = 'correction-request:' . $user->id;
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            
+            Log::warning('Correction request rate limit exceeded', [
+                'user_id' => $user->id,
+                'ip' => $request->ip()
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized: This resident does not belong to your household.',
-            ], 403);
+                'message' => "Too many requests. Please try again in {$seconds} seconds."
+            ], 429);
+        }
+        
+        RateLimiter::hit($rateLimitKey, 3600); // 5 attempts per hour
+        
+        $validated = $request->validated();
+        
+        // SECURITY NOTE: Verify resident belongs to user's household
+        $resident = Resident::where('id', $validated['resident_id'])
+            ->where('household_id', $user->household_id)
+            ->first();
+        
+        if (!$resident) {
+            // Check if it's the current resident
+            if ($validated['resident_id'] != $user->current_resident_id && 
+                $validated['resident_id'] != $user->resident_id) {
+                
+                Log::warning('Unauthorized correction request attempt', [
+                    'user_id' => $user->id,
+                    'target_resident_id' => $validated['resident_id'],
+                    'ip' => $request->ip()
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: This resident does not belong to your household.',
+                ], 403);
+            }
+            
+            $resident = Resident::find($validated['resident_id']);
         }
 
-        $resident = Resident::find($validated['resident_id']);
-
+        // SECURITY NOTE: Use transaction for atomic operations
+        DB::beginTransaction();
+        
         try {
+            // SECURITY NOTE: Log only non-sensitive metadata
             activity()
                 ->performedOn($resident)
                 ->causedBy($user)
                 ->withProperties([
-                    'resident_name' => $resident->full_name,
                     'field' => $validated['field'],
-                    'current_value' => $validated['current_value'],
-                    'requested_value' => $validated['requested_value'],
-                    'reason' => $validated['reason'],
+                    'reason' => $this->sanitizeOutput($validated['reason']),
                     'household_id' => $user->household_id,
                 ])
-                ->log("Correction requested for {$resident->full_name}: {$validated['field']}");
+                ->log("Correction requested for field: {$validated['field']}");
 
-            try {
-                DB::table('access_logs')->insert([
-                    'user_id' => $user->id,
-                    'session_id' => session()->getId(),
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                    'method' => 'POST',
-                    'url' => $request->url(),
-                    'action_type' => 'update',
-                    'resource_type' => 'Resident',
-                    'resource_id' => $resident->id,
-                    'description' => "Correction requested for {$resident->full_name} - {$validated['field']}",
-                    'is_sensitive' => 1,
-                    'accessed_at' => now(),
-                    'created_at' => now(),
-                ]);
-            } catch (\Exception $e) {
-                // Table might not exist, ignore
-            }
+            // Log access for audit trail
+            $this->logAccess($user, $request, $resident, 'correction_request', [
+                'field' => $validated['field'],
+                'reason' => $this->sanitizeOutput($validated['reason'])
+            ]);
 
+            DB::commit();
+            
+            Log::info('Correction request submitted', [
+                'user_id' => $user->id,
+                'resident_id' => $resident->id,
+                'field' => $validated['field'],
+                'ip' => $request->ip()
+            ]);
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Correction request submitted successfully. Barangay secretary will review it.',
             ]);
             
         } catch (\Exception $e) {
-            \Log::error('Correction request failed: ' . $e->getMessage());
+            DB::rollBack();
+            
+            Log::error('Correction request failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit correction request.',
+                'message' => 'Failed to submit correction request. Please try again.',
             ], 500);
         }
     }
 
     /**
      * Export all household data
+     * 
+     * SECURITY NOTE: Rate limited and requires additional verification
      */
-    public function exportData(Request $request)
+    public function exportData(ExportDataRequest $request): \Illuminate\Http\JsonResponse
     {
         $user = Auth::user();
-
+        
+        // SECURITY NOTE: Stricter rate limiting for exports
+        $rateLimitKey = 'export-data:' . $user->id;
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            
+            Log::warning('Data export rate limit exceeded', [
+                'user_id' => $user->id,
+                'ip' => $request->ip()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => "Too many export requests. Please try again in {$seconds} seconds."
+            ], 429);
+        }
+        
+        RateLimiter::hit($rateLimitKey, 86400); // 3 attempts per day
+        
         try {
-            try {
-                DB::table('access_logs')->insert([
-                    'user_id' => $user->id,
-                    'session_id' => session()->getId(),
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                    'method' => 'POST',
-                    'url' => $request->url(),
-                    'action_type' => 'export',
-                    'resource_type' => 'HouseholdData',
-                    'resource_id' => $user->household_id,
-                    'description' => "Exported all household data",
-                    'is_sensitive' => 1,
-                    'accessed_at' => now(),
-                    'created_at' => now(),
-                ]);
-            } catch (\Exception $e) {
-                // Table might not exist, ignore
-            }
+            // SECURITY NOTE: Log export request for audit
+            $this->logAccess($user, $request, null, 'export_data', [
+                'household_id' => $user->household_id
+            ]);
+            
+            Log::info('Data export requested', [
+                'user_id' => $user->id,
+                'household_id' => $user->household_id,
+                'ip' => $request->ip()
+            ]);
 
+            // TODO: Implement actual data export and email sending
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Data export request received. A copy of your household data will be sent to your email.',
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Export failed: ' . $e->getMessage());
+            Log::error('Export failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to export data.',
+                'message' => 'Failed to export data. Please try again.',
             ], 500);
         }
     }
@@ -754,21 +900,41 @@ class PrivacyController extends Controller
     /**
      * Get data for a specific household member
      */
-    public function getMemberData($residentId)
+    public function getMemberData($residentId): \Inertia\Response
     {
         $user = Auth::user();
-        $allPrivileges = $this->getAllPrivileges();
-        $privilegesRequiringId = $this->getPrivilegesRequiringId();
         
+        // SECURITY NOTE: Verify resident ID is numeric
+        if (!is_numeric($residentId)) {
+            abort(400, 'Invalid resident ID');
+        }
+        
+        // SECURITY NOTE: Verify resident belongs to user's household
         $member = HouseholdMember::where('household_id', $user->household_id)
             ->where('resident_id', $residentId)
             ->first();
 
-        if (!$member && $residentId != $user->current_resident_id) {
+        if (!$member && $residentId != $user->current_resident_id && $residentId != $user->resident_id) {
+            Log::warning('Unauthorized member data access attempt', [
+                'user_id' => $user->id,
+                'target_resident_id' => $residentId,
+                'ip' => request()->ip()
+            ]);
+            
             abort(403, 'Unauthorized');
         }
 
-        $resident = Resident::with(['purok', 'household', 'residentPrivileges.privilege'])->find($residentId);
+        $allPrivileges = $this->getAllPrivileges();
+        $privilegesRequiringId = $this->getPrivilegesRequiringId();
+        
+        $resident = Resident::with(['purok', 'household', 'residentPrivileges.privilege'])
+            ->findOrFail((int) $residentId);
+        
+        // SECURITY NOTE: Verify resident's household matches user's
+        if ($resident->household_id !== $user->household_id) {
+            abort(403, 'Unauthorized');
+        }
+        
         $household = Household::find($user->household_id);
         
         return Inertia::render('residentsettings/member-data', [
@@ -776,4 +942,114 @@ class PrivacyController extends Controller
             'allPrivileges' => $allPrivileges,
         ]);
     }
-}
+    
+    /**
+     * Log access for audit trail
+     * 
+     * SECURITY NOTE: Safely logs access without exposing sensitive data
+     */
+    private function logAccess(User $user, Request $request, $resource, string $action, array $metadata = []): void
+    {
+        try {
+            DB::table('access_logs')->insert([
+                'user_id' => $user->id,
+                'session_id' => $request->session()->getId(),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'method' => $request->method(),
+                'url' => $request->path(),
+                'action_type' => $action,
+                'resource_type' => $resource ? get_class($resource) : 'HouseholdData',
+                'resource_id' => $resource ? $resource->id : $user->household_id,
+                'description' => $this->buildLogDescription($action, $metadata),
+                'is_sensitive' => 1,
+                'accessed_at' => now(),
+                'created_at' => now(),
+            ]);
+        } catch (\Exception $e) {
+            // Fail silently - don't break main functionality if logging fails
+            Log::warning('Failed to log access', [
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Build log description safely
+     */
+    private function buildLogDescription(string $action, array $metadata): string
+    {
+        $descriptions = [
+            'correction_request' => 'Correction requested for resident data',
+            'export_data' => 'Exported household data',
+            'view_privacy' => 'Viewed privacy dashboard',
+            'view_member' => 'Viewed household member data',
+        ];
+        
+        return $descriptions[$action] ?? $action;
+    }
+    
+    /**
+     * Sanitize output for safe display
+     */
+    private function sanitizeOutput(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        
+        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+    
+    /**
+     * Mask phone number for privacy
+     */
+    private function maskPhoneNumber(?string $phone): ?string
+    {
+        if (!$phone) {
+            return null;
+        }
+        
+        $length = strlen($phone);
+        if ($length <= 4) {
+            return $phone;
+        }
+        
+        $visibleCount = min(4, (int) floor($length / 2));
+        $maskedCount = $length - $visibleCount;
+        
+        return str_repeat('*', $maskedCount) . substr($phone, -$visibleCount);
+    }
+    
+    /**
+     * Mask email for privacy
+     */
+    private function maskEmail(?string $email): ?string
+    {
+        if (!$email) {
+            return null;
+        }
+        
+        $parts = explode('@', $email);
+        if (count($parts) !== 2) {
+            return $email;
+        }
+        
+        $name = $parts[0];
+        $domain = $parts[1];
+        
+        $nameLength = strlen($name);
+        if ($nameLength <= 2) {
+            return substr($name, 0, 1) . '***@' . $domain;
+        }
+        
+        $visibleStart = min(2, (int) floor($nameLength / 3));
+        $visibleEnd = min(1, (int) floor($nameLength / 4));
+        
+        $masked = substr($name, 0, $visibleStart) 
+                . str_repeat('*', $nameLength - $visibleStart - $visibleEnd)
+                . substr($name, -$visibleEnd);
+        
+        return $masked . '@' . $domain;
+    }
+} -->

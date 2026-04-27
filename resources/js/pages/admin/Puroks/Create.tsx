@@ -1,5 +1,5 @@
 // pages/admin/puroks/create.tsx
-import { router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
@@ -12,7 +12,6 @@ import { FormErrors } from '@/components/adminui/form/form-errors';
 import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
 import { useFormManager } from '@/hooks/admin/use-form-manager';
 import { MapPin, User, Globe } from 'lucide-react';
-import { Resident } from '@/types/admin/puroks/purok';
 import { BasicInfoTab } from '@/components/admin/puroks/create/basic-info-tab';
 import { LeadershipTab } from '@/components/admin/puroks/create/leadership-tab';
 import { LocationTab } from '@/components/admin/puroks/create/location-tab';
@@ -41,11 +40,6 @@ const requiredFieldsMap = {
 };
 
 export default function CreatePurok() {
-    const { props } = usePage<{
-        nextOrder?: number;
-        availableResidents?: Resident[];
-    }>();
-    const { nextOrder = 0, availableResidents = [] } = props;
     const [showPreview, setShowPreview] = useState(true);
 
     const {
@@ -81,7 +75,7 @@ export default function CreatePurok() {
                     router.visit(route('admin.puroks.index'));
                 },
                 onError: (errs) => {
-                    toast.error('Failed to create purok');
+                    toast.error('Failed to create purok. Please check the form for errors.');
                 },
                 onFinish: () => {
                     // setIsSubmitting handled by hook
@@ -90,7 +84,6 @@ export default function CreatePurok() {
         }
     });
 
-    // Fix: Explicitly type the tab statuses
     const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
         basic: getTabStatus('basic'),
         leadership: getTabStatus('leadership'),
@@ -121,6 +114,19 @@ export default function CreatePurok() {
                     onBack={() => router.visit(route('admin.puroks.index'))}
                     showPreview={showPreview}
                     onTogglePreview={() => setShowPreview(!showPreview)}
+                    actions={
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (confirm('Are you sure you want to reset the form?')) {
+                                    window.location.reload();
+                                }
+                            }}
+                            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                            Reset Form
+                        </button>
+                    }
                 />
 
                 <FormErrors errors={errors} />
@@ -136,7 +142,10 @@ export default function CreatePurok() {
 
                         {activeTab === 'basic' && (
                             <>
-                                <FormContainer title="Basic Information" description="Enter the core details for this purok">
+                                <FormContainer 
+                                    title="Basic Information" 
+                                    description="Enter the core details for this purok"
+                                >
                                     <BasicInfoTab
                                         formData={formData}
                                         errors={errors}
@@ -159,11 +168,13 @@ export default function CreatePurok() {
 
                         {activeTab === 'leadership' && (
                             <>
-                                <FormContainer title="Purok Leadership" description="Select a resident as the purok leader (optional)">
+                                <FormContainer 
+                                    title="Purok Leadership" 
+                                    description="Search and select a resident as the purok leader (optional)"
+                                >
                                     <LeadershipTab
                                         formData={formData}
                                         errors={errors}
-                                        availableResidents={availableResidents}
                                         onLeaderSelect={(id) => handleSelectChange('leader_id', id)}
                                         isSubmitting={isSubmitting}
                                     />
@@ -183,7 +194,10 @@ export default function CreatePurok() {
 
                         {activeTab === 'location' && (
                             <>
-                                <FormContainer title="Google Maps Location" description="Paste a Google Maps link - coordinates will be extracted automatically">
+                                <FormContainer 
+                                    title="Google Maps Location" 
+                                    description="Paste a Google Maps link - coordinates will be extracted automatically"
+                                >
                                     <LocationTab
                                         formData={formData}
                                         errors={errors}
@@ -220,18 +234,22 @@ export default function CreatePurok() {
                                 />
                                 
                                 {/* Purok Summary Preview Card */}
-                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
-                                    <div className="p-4 border-b">
-                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">Purok Summary</h3>
+                                <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm border-gray-200 dark:border-gray-700">
+                                    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                        <h3 className="font-semibold text-gray-700 dark:text-gray-300">
+                                            Purok Summary
+                                        </h3>
                                     </div>
                                     <div className="p-4 space-y-3">
                                         <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                             <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 flex items-center justify-center">
                                                 <MapPin className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                                             </div>
-                                            <div className="flex-1">
-                                                <div className="font-medium dark:text-gray-200">
-                                                    {formData.name || <span className="text-gray-400 italic">Not set</span>}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium dark:text-gray-200 truncate">
+                                                    {formData.name || (
+                                                        <span className="text-gray-400 dark:text-gray-500 italic">Not set</span>
+                                                    )}
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     {formData.status === 'active' ? (
@@ -240,7 +258,7 @@ export default function CreatePurok() {
                                                         </span>
                                                     ) : (
                                                         <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400 rounded-full">
-                                                            Inactive
+                                                            {formData.status || 'Inactive'}
                                                         </span>
                                                     )}
                                                 </div>
@@ -254,6 +272,56 @@ export default function CreatePurok() {
                                                 </p>
                                             </div>
                                         )}
+
+                                        {formData.leader_id && (
+                                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                                <p className="text-xs text-blue-600 dark:text-blue-400">
+                                                    <span className="font-medium">Leader:</span> Selected
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {formData.google_maps_url && (
+                                            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                                <p className="text-xs text-green-600 dark:text-green-400">
+                                                    <span className="font-medium">Map:</span> Location set
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Progress indicators */}
+                                        <div className="space-y-2 pt-2">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-gray-500 dark:text-gray-400">Basic Info</span>
+                                                <span className={`font-medium ${
+                                                    formData.name && formData.status 
+                                                        ? 'text-green-600 dark:text-green-400' 
+                                                        : 'text-gray-400 dark:text-gray-500'
+                                                }`}>
+                                                    {formData.name && formData.status ? '✓' : '○'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-gray-500 dark:text-gray-400">Leadership</span>
+                                                <span className={`font-medium ${
+                                                    formData.leader_id 
+                                                        ? 'text-green-600 dark:text-green-400' 
+                                                        : 'text-gray-400 dark:text-gray-500'
+                                                }`}>
+                                                    {formData.leader_id ? '✓' : 'Optional'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-gray-500 dark:text-gray-400">Location</span>
+                                                <span className={`font-medium ${
+                                                    formData.google_maps_url 
+                                                        ? 'text-green-600 dark:text-green-400' 
+                                                        : 'text-gray-400 dark:text-gray-500'
+                                                }`}>
+                                                    {formData.google_maps_url ? '✓' : 'Optional'}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

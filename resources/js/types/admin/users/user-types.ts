@@ -1,9 +1,8 @@
-// types/admin/users/user-types.ts
-
 // ============================================
 // Import Inertia Types
 // ============================================
 import { PageProps as InertiaPageProps } from '@inertiajs/core';
+import React from 'react';
 
 // ============================================
 // Core User Types (Matches Laravel Model)
@@ -65,6 +64,8 @@ export interface User {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  resident_name?: string;
+  username?: string;
   [key: string]: any;
 }
 
@@ -86,12 +87,12 @@ export interface LaravelPaginatedData<T> {
   total: number;
   from: number;
   to: number;
-  path: string;
-  first_page_url: string;
-  last_page_url: string;
-  next_page_url: string | null;
-  prev_page_url: string | null;
-  links: LaravelPaginationLink[];
+  path?: string;
+  first_page_url?: string;
+  last_page_url?: string;
+  next_page_url?: string | null;
+  prev_page_url?: string | null;
+  links?: LaravelPaginationLink[];
 }
 
 // ============================================
@@ -101,11 +102,15 @@ export interface LaravelPaginatedData<T> {
 export type SortOrder = 'asc' | 'desc';
 
 export interface UserFilters {
-  email_verified(email_verified: any, arg1: string): string | (() => string);
-  last_login_range(last_login_range: any, arg1: string): string | (() => string);
   search?: string;
   role_id?: string | number;
   status?: UserStatus | string;
+  account_type?: string;
+  two_factor?: string;
+  email_verified?: string;
+  last_login?: string;
+  date_from?: string;
+  date_to?: string;
   department_id?: string | number;
   sort_by?: string;
   sort_order?: SortOrder;
@@ -119,13 +124,9 @@ export interface UserFilters {
 }
 
 // ============================================
-// Page Props Types (Inertia.js + Laravel) - FIXED
+// Page Props Types (Inertia.js + Laravel)
 // ============================================
 
-/**
- * Base Page Props that extend Inertia's PageProps
- * This includes the required index signature [key: string]: any
- */
 export interface PageProps extends InertiaPageProps {
   auth: {
     user: User | null;
@@ -147,17 +148,27 @@ export interface PageProps extends InertiaPageProps {
   errors?: Record<string, string>;
 }
 
-/**
- * Shared Page Props (alias for backward compatibility)
- */
 export type SharedPageProps = PageProps;
 
-/**
- * Users Page Props - extends the base PageProps
- */
+export interface UserStatsData {
+  total: number;
+  active: number;
+  inactive: number;
+  new_this_month?: number;
+  by_role?: Record<string, number>;
+  by_status?: {
+    active: number;
+    inactive: number;
+    suspended: number;
+    pending: number;
+  };
+  email_verified?: number;
+  never_logged_in?: number;
+}
+
 export interface UsersPageProps extends PageProps {
   users: LaravelPaginatedData<User>;
-  stats: UserStat[];
+  stats: UserStatsData | UserStat[];
   roles: UserRole[];
   departments?: UserDepartment[];
   filters: UserFilters;
@@ -323,13 +334,9 @@ export interface UserIndexRequest {
   trashed?: 'with' | 'only';
 }
 
-export interface UserStoreRequest extends UserFormData {
-  // Additional fields specific to creation
-}
+export interface UserStoreRequest extends UserFormData {}
 
-export interface UserUpdateRequest extends UserUpdateData {
-  // Additional fields specific to update
-}
+export interface UserUpdateRequest extends UserUpdateData {}
 
 // ============================================
 // Export/Import Types
@@ -387,21 +394,7 @@ export interface UsersHeaderProps {
 }
 
 export interface UsersStatsProps {
-  stats: UserStat[] | {
-    total: number;
-    active: number;
-    inactive: number;
-    new_this_month?: any;
-    by_role?: Record<string, number>;
-    by_status?: {
-      active: number;
-      inactive: number;
-      suspended: number;
-      pending: number;
-    };
-    email_verified?: number;
-    never_logged_in?: number;
-  };
+  stats: UserStatsData | UserStat[];
   isLoading?: boolean;
   onStatClick?: (stat: UserStat | { label: string; value: number }) => void;
 }
@@ -413,6 +406,18 @@ export interface UsersFiltersProps {
   setRoleFilter: (value: string) => void;
   statusFilter: string;
   setStatusFilter: (value: string) => void;
+  accountTypeFilter?: string;
+  setAccountTypeFilter?: (value: string) => void;
+  twoFactorFilter?: string;
+  setTwoFactorFilter?: (value: string) => void;
+  emailVerifiedFilter?: string;
+  setEmailVerifiedFilter?: (value: string) => void;
+  lastLoginFilter?: string;
+  setLastLoginFilter?: (value: string) => void;
+  dateFrom?: string;
+  setDateFrom?: (value: string) => void;
+  dateTo?: string;
+  setDateTo?: (value: string) => void;
   showAdvancedFilters: boolean;
   setShowAdvancedFilters: (value: boolean) => void;
   hasActiveFilters: boolean;
@@ -431,12 +436,9 @@ export interface UsersFiltersProps {
   isLoading?: boolean;
   perPage?: number;
   onPerPageChange?: (perPage: number) => void;
-  
-  // Add these missing properties:
-  emailVerifiedFilter?: string;
-  setEmailVerifiedFilter?: (value: string) => void;
   lastLoginRange?: string;
   setLastLoginRange?: (value: string) => void;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export interface UsersContentProps {
@@ -447,9 +449,9 @@ export interface UsersContentProps {
   setIsBulkMode: (value: boolean) => void;
   isSelectAll: boolean;
   viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void; // This should accept ViewMode, not SetStateAction
+  setViewMode: (mode: ViewMode) => void;
   isMobile: boolean;
-  hasActiveFilters: boolean; // This should be boolean, not string | boolean
+  hasActiveFilters: boolean;
   handleClearFilters: () => void;
   handleSelectAllOnPage: () => void;
   handleItemSelect: (id: number) => void;
@@ -460,10 +462,12 @@ export interface UsersContentProps {
   roles: UserRole[];
   sortBy: string;
   sortOrder: SortOrder;
-  onSort: (column: string) => void;
+  onSort?: (column: string) => void;
+  onSortChange?: (value: string) => void;
+  getCurrentSortValue?: () => string;
   onClearSelection: () => void;
   onBulkOperation: (operation: BulkOperation) => void;
-  onCopySelectedData: () => void;
+  onCopySelectedData?: () => void;
   isLoading?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
@@ -494,7 +498,6 @@ export interface UsersDialogsProps {
   onBulkDepartmentConfirm?: (departmentId: number) => void;
 }
 
-// ✅ ADD THIS MISSING EXPORT
 export interface UsersKeyboardShortcutsProps {
   isBulkMode: boolean;
   setIsBulkMode: (value: boolean) => void;

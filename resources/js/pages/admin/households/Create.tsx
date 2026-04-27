@@ -3,12 +3,11 @@ import AppLayout from '@/layouts/admin-app-layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save, Upload, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import { Link, useForm, usePage } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import { useState, useMemo, useCallback } from 'react';
 import { PageProps } from '@/types/admin/households/household.types';
 
 // Import components
-import HouseholdFormHeader from '@/components/admin/households/create/HouseholdFormHeader';
 import BasicInfoCard from '@/components/admin/households/create/BasicInfoCard';
 import AddressInfoCard from '@/components/admin/households/create/AddressInfoCard';
 import MembersCard from '@/components/admin/households/create/MembersCard';
@@ -16,33 +15,30 @@ import HousingInfoCard from '@/components/admin/households/create/HousingInfoCar
 import AdditionalInfoCard from '@/components/admin/households/create/AdditionalInfoCard';
 import SummaryCard from '@/components/admin/households/create/SummaryCard';
 import QuickActionsCard from '@/components/admin/households/create/QuickActionsCard';
-import CredentialsModal from '@/components/admin/households/create/CredentialsModal';
 import ImportHouseholdModal from '@/components/admin/households/create/import/ImportHouseholdModal';
+import ChecklistCard from '@/components/admin/households/create/ChecklistCard';
+import WaterSourceGuide from '@/components/admin/households/create/WaterSourceGuide';
 
 // Import hooks and utils
 import { useHouseholdForm } from '@/components/admin/households/create/hooks/useHouseholdForm';
 import { downloadTemplate, downloadGuide, downloadEmptyTemplate } from '@/components/admin/households/create/utils/csv-utils';
-import ChecklistCard from '@/components/admin/households/create/ChecklistCard';
-import WaterSourceGuide from '@/components/admin/households/create/WaterSourceGuide';
 
 // Import types
 import type { HouseholdFormData, Resident, Purok, Role } from '@/types/admin/households/household.types';
 
 interface CreateHouseholdProps extends PageProps {
-    heads: Resident[];
-    available_residents: Resident[];
     puroks: Purok[];
     roles: Role[];
+    preselectedHead?: Resident | null;
+    fromResident?: string | number;
 }
 
-// Constants for better maintainability
 const REQUIRED_FIELDS = ['head_of_family', 'address', 'purok_id'] as const;
 const OPTIONAL_FIELDS = ['remarks', 'housing_type', 'water_source', 'electricity', 'internet'] as const;
 
 type RequiredField = typeof REQUIRED_FIELDS[number];
 type OptionalField = typeof OPTIONAL_FIELDS[number];
 
-// Utility functions for form validation
 const isFieldEmpty = (value: unknown): boolean => {
     if (value === null || value === undefined) return true;
     if (typeof value === 'string') return value === '';
@@ -64,15 +60,19 @@ const isFieldCompleted = <T extends keyof HouseholdFormData>(
 };
 
 export default function CreateHousehold({ 
-    heads, 
-    available_residents, 
     puroks,
-    roles 
+    roles,
+    preselectedHead = null,
+    fromResident,
 }: CreateHouseholdProps) {
     const [importModalOpen, setImportModalOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useHouseholdForm();
+    const { data, setData, post, processing, errors, reset } = useHouseholdForm(
+        preselectedHead ? { 
+            selected_head: preselectedHead,
+            head_of_family: `${preselectedHead.first_name} ${preselectedHead.last_name}` 
+        } : undefined
+    );
 
-    // Memoized form completion calculations
     const formProgress = useMemo(() => {
         const completedRequired = REQUIRED_FIELDS.filter(field => 
             isFieldCompleted(field, data[field])
@@ -93,7 +93,6 @@ export default function CreateHousehold({
         };
     }, [data]);
 
-    // Memoized error list for better performance
     const errorList = useMemo(() => {
         return Object.entries(errors).map(([field, error]) => ({
             field,
@@ -101,7 +100,6 @@ export default function CreateHousehold({
         }));
     }, [errors]);
 
-    // Handlers
     const handleSubmit = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         post('/admin/households', {
@@ -120,7 +118,6 @@ export default function CreateHousehold({
         }
     }, [reset]);
 
-    // Determine progress bar color based on completion percentage
     const getProgressBarColor = useCallback((progress: number): string => {
         if (progress === 100) return 'bg-gradient-to-r from-green-500 to-emerald-500 dark:from-green-600 dark:to-emerald-600';
         if (progress >= 50) return 'bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-600 dark:to-indigo-600';
@@ -138,7 +135,7 @@ export default function CreateHousehold({
                 ]}
             >
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Header with Actions */}
+                    {/* Header */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <Link href="/admin/households">
@@ -204,28 +201,16 @@ export default function CreateHousehold({
                                 <div className="flex-1">
                                     <h3 className="font-medium text-blue-800 dark:text-blue-300">Need to import multiple households?</h3>
                                     <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                                        Download our CSV template to import households in bulk. The template includes sample data and follows the exact format required.
+                                        Download our CSV template to import households in bulk.
                                     </p>
                                     <div className="flex flex-wrap items-center gap-4 mt-2">
-                                        <button
-                                            type="button"
-                                            onClick={downloadTemplate}
-                                            className="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline transition-colors"
-                                        >
+                                        <button type="button" onClick={downloadTemplate} className="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline transition-colors">
                                             Download Template
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={downloadEmptyTemplate}
-                                            className="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline transition-colors"
-                                        >
+                                        <button type="button" onClick={downloadEmptyTemplate} className="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline transition-colors">
                                             Download Empty Template
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={downloadGuide}
-                                            className="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline transition-colors"
-                                        >
+                                        <button type="button" onClick={downloadGuide} className="text-sm text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium underline transition-colors">
                                             View Guide
                                         </button>
                                     </div>
@@ -241,9 +226,7 @@ export default function CreateHousehold({
                                 <div className="flex items-start gap-3">
                                     <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
                                     <div className="flex-1">
-                                        <p className="font-medium text-red-800 dark:text-red-300 mb-2">
-                                            Please fix the following errors:
-                                        </p>
+                                        <p className="font-medium text-red-800 dark:text-red-300 mb-2">Please fix the following errors:</p>
                                         <ul className="space-y-1">
                                             {errorList.map(({ field, error }) => (
                                                 <li key={field} className="text-sm text-red-600 dark:text-red-400">
@@ -287,14 +270,11 @@ export default function CreateHousehold({
 
                     {/* Main Form Grid */}
                     <div className="grid gap-6 lg:grid-cols-3">
-                        {/* Left Column - Main Form */}
                         <div className="lg:col-span-2 space-y-6">
                             <BasicInfoCard 
                                 data={data}
                                 setData={setData}
-                                errors={errors}
-                                heads={heads}
-                            />
+                                errors={errors} heads={[]}                            />
                             <AddressInfoCard 
                                 data={data}
                                 setData={setData}
@@ -304,10 +284,7 @@ export default function CreateHousehold({
                             <MembersCard 
                                 data={data}
                                 setData={setData}
-                                errors={errors}
-                                availableResidents={available_residents}
-                                heads={heads}
-                            />
+                                errors={errors} availableResidents={[]} heads={[]}                            />
                             <HousingInfoCard 
                                 data={data}
                                 setData={setData}
@@ -320,7 +297,6 @@ export default function CreateHousehold({
                             />
                         </div>
 
-                        {/* Right Column - Summary & Actions */}
                         <div className="space-y-6">
                             <SummaryCard 
                                 data={data}
@@ -371,8 +347,6 @@ export default function CreateHousehold({
                 </form>
             </AppLayout>
 
-            {/* Modals */}
-            <CredentialsModal />
             <ImportHouseholdModal
                 open={importModalOpen}
                 onOpenChange={setImportModalOpen}

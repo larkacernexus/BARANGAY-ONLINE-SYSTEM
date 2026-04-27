@@ -68,9 +68,9 @@ export default function PrivilegesFilters({
     searchInputRef,
     isLoading = false,
     discountTypes,
-    assignmentsRange = '',
+    assignmentsRange = 'all',
     setAssignmentsRange,
-    discountPercentageRange = '',
+    discountPercentageRange = 'all',
     setDiscountPercentageRange
 }: PrivilegesFiltersProps) {
     
@@ -97,24 +97,24 @@ export default function PrivilegesFilters({
         updateFilter('requires_id_number', value);
     };
 
-    // Assignments range options
+    // ✅ FIXED: Assignments range options - use 'all' instead of empty string
     const assignmentsRanges = [
-        { value: '', label: 'All Privileges' },
-        { value: '0', label: 'No Assignments (0)' },
-        { value: '1-10', label: 'Low Usage (1-10)' },
-        { value: '11-50', label: 'Moderate Usage (11-50)' },
-        { value: '51-100', label: 'High Usage (51-100)' },
-        { value: '100+', label: 'Very Popular (100+)' }
+        { value: 'all', label: 'All Privileges', color: 'gray' },
+        { value: '0', label: 'No Assignments (0)', color: 'red' },
+        { value: '1-10', label: 'Low Usage (1-10)', color: 'blue' },
+        { value: '11-50', label: 'Moderate Usage (11-50)', color: 'emerald' },
+        { value: '51-100', label: 'High Usage (51-100)', color: 'amber' },
+        { value: '100+', label: 'Very Popular (100+)', color: 'purple' }
     ];
 
-    // Discount percentage range options
+    // ✅ FIXED: Discount percentage range options - use 'all' instead of empty string
     const discountPercentageRanges = [
-        { value: '', label: 'All Discounts' },
-        { value: '0-10', label: 'Low Discount (0-10%)' },
-        { value: '11-25', label: 'Moderate Discount (11-25%)' },
-        { value: '26-50', label: 'High Discount (26-50%)' },
-        { value: '51-75', label: 'Very High Discount (51-75%)' },
-        { value: '75+', label: 'Maximum Discount (75%+)' }
+        { value: 'all', label: 'All Discounts', color: 'gray' },
+        { value: '0-10', label: 'Low Discount (0-10%)', color: 'blue' },
+        { value: '11-25', label: 'Moderate Discount (11-25%)', color: 'emerald' },
+        { value: '26-50', label: 'High Discount (26-50%)', color: 'amber' },
+        { value: '51-75', label: 'Very High Discount (51-75%)', color: 'orange' },
+        { value: '75+', label: 'Maximum Discount (75%+)', color: 'red' }
     ];
 
     const exportData = () => {
@@ -124,8 +124,8 @@ export default function PrivilegesFilters({
         if (filtersState.discount_type && filtersState.discount_type !== 'all') queryParams.append('discount_type', filtersState.discount_type);
         if (filtersState.requires_verification && filtersState.requires_verification !== 'all') queryParams.append('requires_verification', filtersState.requires_verification);
         if (filtersState.requires_id_number && filtersState.requires_id_number !== 'all') queryParams.append('requires_id_number', filtersState.requires_id_number);
-        if (assignmentsRange) queryParams.append('assignments_range', assignmentsRange);
-        if (discountPercentageRange) queryParams.append('discount_percentage_range', discountPercentageRange);
+        if (assignmentsRange && assignmentsRange !== 'all') queryParams.append('assignments_range', assignmentsRange);
+        if (discountPercentageRange && discountPercentageRange !== 'all') queryParams.append('discount_percentage_range', discountPercentageRange);
         window.location.href = `/admin/privileges/export?${queryParams.toString()}`;
     };
 
@@ -140,13 +140,13 @@ export default function PrivilegesFilters({
         ? hasActiveFilters === 'true' || hasActiveFilters === '1'
         : Boolean(hasActiveFilters);
 
-    // Helper to get active filter count
+    // ✅ FIXED: Helper to get active filter count - check for 'all' instead of empty string
     const getActiveFilterCount = () => {
         let count = 0;
         if (currentStatus !== 'all') count++;
         if (currentDiscountType !== 'all') count++;
-        if (assignmentsRange && assignmentsRange !== '') count++;
-        if (discountPercentageRange && discountPercentageRange !== '') count++;
+        if (assignmentsRange && assignmentsRange !== 'all') count++;
+        if (discountPercentageRange && discountPercentageRange !== 'all') count++;
         if (currentRequiresVerification !== 'all') count++;
         if (currentRequiresIdNumber !== 'all') count++;
         return count;
@@ -175,10 +175,22 @@ export default function PrivilegesFilters({
         return range?.label || value;
     };
 
+    // Get assignments range color
+    const getAssignmentsRangeColor = (value: string) => {
+        const range = assignmentsRanges.find(r => r.value === value);
+        return range?.color || 'gray';
+    };
+
     // Get discount percentage range label
     const getDiscountPercentageRangeLabel = (value: string) => {
         const range = discountPercentageRanges.find(r => r.value === value);
         return range?.label || value;
+    };
+
+    // Get discount percentage range color
+    const getDiscountPercentageRangeColor = (value: string) => {
+        const range = discountPercentageRanges.find(r => r.value === value);
+        return range?.color || 'gray';
     };
 
     return (
@@ -193,7 +205,7 @@ export default function PrivilegesFilters({
                             </div>
                             <Input
                                 ref={searchInputRef}
-                                placeholder="Search privileges by name, code, or description..."
+                                placeholder="Search privileges by name, code, or description... (Ctrl+F)"
                                 className="pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                 value={search}
                                 onChange={(e) => handleSearch(e.target.value)}
@@ -251,13 +263,13 @@ export default function PrivilegesFilters({
                             <span className="ml-1">privileges</span>
                             {search && (
                                 <span className="ml-1">
-                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                 </span>
                             )}
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Active filter badges */}
+                            {/* ✅ FIXED: Active filter badges - check for 'all' instead of empty string */}
                             {activeFilters && (
                                 <>
                                     {currentStatus !== 'all' && (
@@ -272,14 +284,26 @@ export default function PrivilegesFilters({
                                             Type: {getDiscountTypeName(currentDiscountType)}
                                         </Badge>
                                     )}
-                                    {assignmentsRange && assignmentsRange !== '' && (
-                                        <Badge variant="secondary" className="bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                    {assignmentsRange && assignmentsRange !== 'all' && (
+                                        <Badge variant="secondary" className={`${
+                                            getAssignmentsRangeColor(assignmentsRange) === 'red' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' :
+                                            getAssignmentsRangeColor(assignmentsRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                            getAssignmentsRangeColor(assignmentsRange) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                            getAssignmentsRangeColor(assignmentsRange) === 'amber' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                            'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                        } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
                                             <Users className="h-3 w-3 mr-1 inline" />
                                             {getAssignmentsRangeLabel(assignmentsRange)}
                                         </Badge>
                                     )}
-                                    {discountPercentageRange && discountPercentageRange !== '' && (
-                                        <Badge variant="secondary" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
+                                    {discountPercentageRange && discountPercentageRange !== 'all' && (
+                                        <Badge variant="secondary" className={`${
+                                            getDiscountPercentageRangeColor(discountPercentageRange) === 'blue' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                            getDiscountPercentageRangeColor(discountPercentageRange) === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' :
+                                            getDiscountPercentageRangeColor(discountPercentageRange) === 'amber' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
+                                            getDiscountPercentageRangeColor(discountPercentageRange) === 'orange' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
+                                            'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                        } border-0 rounded-full px-2.5 py-1 text-xs font-medium`}>
                                             <TrendingUp className="h-3 w-3 mr-1 inline" />
                                             {getDiscountPercentageRangeLabel(discountPercentageRange)}
                                         </Badge>
@@ -359,7 +383,7 @@ export default function PrivilegesFilters({
                             </Select>
                         </div>
 
-                        {/* Assignments Range */}
+                        {/* ✅ FIXED: Assignments Range - using 'all' as default */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <Users className="h-3 w-3" />
@@ -376,14 +400,24 @@ export default function PrivilegesFilters({
                                 <SelectContent>
                                     {assignmentsRanges.map(range => (
                                         <SelectItem key={range.value} value={range.value}>
-                                            {range.label}
+                                            <span className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${
+                                                    range.color === 'red' ? 'bg-red-500' :
+                                                    range.color === 'blue' ? 'bg-blue-500' :
+                                                    range.color === 'emerald' ? 'bg-emerald-500' :
+                                                    range.color === 'amber' ? 'bg-amber-500' :
+                                                    range.color === 'purple' ? 'bg-purple-500' :
+                                                    'bg-gray-400'
+                                                }`} />
+                                                {range.label}
+                                            </span>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        {/* Discount % Range */}
+                        {/* ✅ FIXED: Discount % Range - using 'all' as default */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1">
                                 <Percent className="h-3 w-3" />
@@ -400,7 +434,17 @@ export default function PrivilegesFilters({
                                 <SelectContent>
                                     {discountPercentageRanges.map(range => (
                                         <SelectItem key={range.value} value={range.value}>
-                                            {range.label}
+                                            <span className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${
+                                                    range.color === 'blue' ? 'bg-blue-500' :
+                                                    range.color === 'emerald' ? 'bg-emerald-500' :
+                                                    range.color === 'amber' ? 'bg-amber-500' :
+                                                    range.color === 'orange' ? 'bg-orange-500' :
+                                                    range.color === 'red' ? 'bg-red-500' :
+                                                    'bg-gray-400'
+                                                }`} />
+                                                {range.label}
+                                            </span>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

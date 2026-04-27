@@ -51,11 +51,9 @@ const requiredFieldsMap = {
     settings: []
 };
 
-// Add index signature to PageProps
 interface PageProps {
     positions: Position[];
     committees: Committee[];
-    availableResidents: Resident[];
     availableUsers: User[];
     defaultTermStart: string;
     defaultTermEnd: string;
@@ -68,7 +66,6 @@ export default function CreateOfficial() {
     const {
         positions = [],
         committees = [],
-        availableResidents = [],
         availableUsers = [],
         defaultTermStart = '',
         defaultTermEnd = '',
@@ -140,19 +137,15 @@ export default function CreateOfficial() {
         }
     });
 
-    // Helper to check if position requires account
     const requiresAccount = selectedPosition?.requires_account === true;
     
-    // Helper to check if position requires committee
     const requiresCommittee = selectedPosition?.code === 'KAGAWAD' || 
         selectedPosition?.name?.toLowerCase().includes('kagawad');
 
-    // Dynamic required fields based on selections
     const dynamicRequiredFields = [...requiredFieldsMap.position];
     if (requiresCommittee) dynamicRequiredFields.push('committee_id');
     if (requiresAccount) dynamicRequiredFields.push('user_id');
 
-    // Update required fields dynamically
     const getDynamicTabStatus = (tabId: string) => {
         if (tabId === 'position') {
             const hasError = dynamicRequiredFields.some(field => errors[field]);
@@ -167,26 +160,16 @@ export default function CreateOfficial() {
         return getTabStatus(tabId);
     };
 
-    // Handle resident selection with auto-fill
     const handleResidentSelect = (residentId: number | null) => {
         updateFormData({ resident_id: residentId });
-        const resident = availableResidents.find(r => r.id === residentId);
-        setSelectedResident(resident || null);
-        
-        if (resident) {
-            if (!formData.contact_number && resident.contact_number) {
-                updateFormData({ contact_number: resident.contact_number });
-            }
-            if (!formData.email && resident.email) {
-                updateFormData({ email: resident.email });
-            }
-            if (resident.photo_url) {
-                updateFormData({ use_resident_photo: true });
-            }
+        if (residentId) {
+            // The resident object comes from the server search response
+            // We'll set it in the BasicInfoTab directly
+        } else {
+            setSelectedResident(null);
         }
     };
 
-    // Handle position selection
     const handlePositionSelect = (positionId: number | null) => {
         updateFormData({ position_id: positionId });
         const position = positions.find(p => p.id === positionId);
@@ -205,7 +188,6 @@ export default function CreateOfficial() {
         }
     };
 
-    // Custom handlers for different value types
     const handlePhotoChange = (file: File | null) => {
         updateFormData({ photo: file });
     };
@@ -261,13 +243,19 @@ export default function CreateOfficial() {
 
                         {activeTab === 'basic' && (
                             <>
-                                <FormContainer title="Resident Assignment" description="Select the resident who will hold the position">
+                                <FormContainer title="Resident Assignment" description="Search and select the resident who will hold the position">
                                     <BasicInfoTab
                                         formData={formData}
                                         errors={errors}
-                                        availableResidents={availableResidents}
                                         selectedResident={selectedResident}
-                                        onResidentSelect={handleResidentSelect}
+                                        onResidentSelect={(id) => {
+                                            handleResidentSelect(id);
+                                            if (id) {
+                                                // The resident is set inside BasicInfoTab via the search
+                                                // We just update the form data here
+                                                updateFormData({ resident_id: id });
+                                            }
+                                        }}
                                         isSubmitting={isSubmitting}
                                     />
                                 </FormContainer>
@@ -391,7 +379,6 @@ export default function CreateOfficial() {
                                     missingFields={missingFields}
                                 />
                                 
-                                {/* Official Summary Preview Card */}
                                 <div className="bg-white dark:bg-gray-900 rounded-lg border shadow-sm">
                                     <div className="p-4 border-b">
                                         <h3 className="font-semibold text-gray-700 dark:text-gray-300">Official Summary</h3>
@@ -431,14 +418,6 @@ export default function CreateOfficial() {
                                                 </span>
                                             </div>
                                         </div>
-
-                                        {formData.responsibilities && (
-                                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3">
-                                                    <span className="font-medium">Responsibilities:</span> {formData.responsibilities}
-                                                </p>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </div>

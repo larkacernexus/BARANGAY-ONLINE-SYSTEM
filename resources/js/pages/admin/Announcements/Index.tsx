@@ -103,6 +103,9 @@ export default function AnnouncementsIndex({
         (initialFilters.sort_order as 'asc' | 'desc') || 'desc'
     );
     
+    // ✅ Per page state
+    const [perPage, setPerPage] = useState<string>(initialFilters.per_page || '15');
+    
     // UI states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -156,8 +159,8 @@ export default function AnnouncementsIndex({
         total: safeAnnouncements.total || 0,
         from: safeAnnouncements.from || 0,
         to: safeAnnouncements.to || 0,
-        per_page: safeAnnouncements.per_page || 15,
-    }), [safeAnnouncements]);
+        per_page: safeAnnouncements.per_page || parseInt(perPage) || 15,
+    }), [safeAnnouncements, perPage]);
 
     const getCurrentFilters = useCallback(() => ({
         search: debouncedSearch,
@@ -167,11 +170,12 @@ export default function AnnouncementsIndex({
         priority: priorityFilter,
         from_date: debouncedFromDate,
         to_date: debouncedToDate,
-        sort_by: sortBy,        // ✅ Include sorting in filters
-        sort_order: sortOrder,  // ✅ Include sorting in filters
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        per_page: perPage,
     }), [
         debouncedSearch, typeFilter, statusFilter, audienceTypeFilter, 
-        priorityFilter, debouncedFromDate, debouncedToDate, sortBy, sortOrder
+        priorityFilter, debouncedFromDate, debouncedToDate, sortBy, sortOrder, perPage
     ]);
 
     const reloadData = useCallback((page = 1) => {
@@ -194,7 +198,7 @@ export default function AnnouncementsIndex({
         });
     }, [getCurrentFilters]);
 
-    // ✅ Server-side filtering & sorting - reload when filters OR sort changes
+    // ✅ Server-side filtering & sorting - reload when filters OR sort OR perPage changes
     useEffect(() => {
         if (isFirstMount.current) {
             isFirstMount.current = false;
@@ -204,8 +208,14 @@ export default function AnnouncementsIndex({
         reloadData();
     }, [
         debouncedSearch, typeFilter, statusFilter, audienceTypeFilter,
-        priorityFilter, debouncedFromDate, debouncedToDate, sortBy, sortOrder
+        priorityFilter, debouncedFromDate, debouncedToDate, sortBy, sortOrder, perPage
     ]);
+
+    // Handle per page change
+    const handlePerPageChange = useCallback((value: string) => {
+        setPerPage(value);
+        reloadData(1);
+    }, [reloadData]);
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -409,6 +419,7 @@ export default function AnnouncementsIndex({
         setDateRangePreset('');
         setSortBy('created_at');
         setSortOrder('desc');
+        setPerPage('15');
     }, []);
 
     const handleClearSelection = useCallback(() => {
@@ -470,8 +481,9 @@ export default function AnnouncementsIndex({
         from_date: fromDate,
         to_date: toDate,
         search,
-        priority: priorityFilter
-    }), [typeFilter, statusFilter, audienceTypeFilter, fromDate, toDate, search, priorityFilter]);
+        priority: priorityFilter,
+        per_page: perPage
+    }), [typeFilter, statusFilter, audienceTypeFilter, fromDate, toDate, search, priorityFilter, perPage]);
 
     // Keyboard shortcuts
     const bulkModeRef = useRef(isBulkMode);
@@ -579,6 +591,8 @@ export default function AnnouncementsIndex({
                         setAudienceTypeFilter={setAudienceTypeFilter}
                         dateRangePreset={dateRangePreset}
                         setDateRangePreset={setDateRangePreset}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                     />
 
                     <AnnouncementsContent
@@ -595,6 +609,8 @@ export default function AnnouncementsIndex({
                         totalPages={paginationData.last_page}
                         totalItems={paginationData.total}
                         itemsPerPage={paginationData.per_page}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onSelectAllFiltered={() => {}}
@@ -613,7 +629,6 @@ export default function AnnouncementsIndex({
                         selectionStats={selectionStats}
                         types={types}
                         priorities={priorities}
-                        // ✅ Pass clean sorting props
                         sortBy={sortBy}
                         sortOrder={sortOrder}
                         onSortChange={handleSortChange}

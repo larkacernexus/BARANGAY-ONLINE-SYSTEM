@@ -1,5 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/admin-app-layout';
 import { 
@@ -34,6 +34,7 @@ interface HouseholdsPageProps {
         total: number;
         from: number;
         to: number;
+        per_page: number;
     };
     stats: any[];
     puroks: Purok[];
@@ -96,6 +97,7 @@ export default function Households({
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(
         (initialFilters.sort_order as 'asc' | 'desc') || 'desc'
     );
+    const [perPage, setPerPage] = useState<string>(initialFilters.per_page || '15');
     
     // UI states
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -165,25 +167,30 @@ export default function Households({
         total: initialHouseholds?.total || 0,
         from: initialHouseholds?.from || 0,
         to: initialHouseholds?.to || 0,
+        per_page: initialHouseholds?.per_page || parseInt(perPage) || 15,
     };
 
-    const getCurrentFilters = () => {
+    const getCurrentFilters = useCallback(() => {
         const filters: Record<string, any> = {};
         
         if (debouncedSearch) filters.search = debouncedSearch;
         if (statusFilter !== 'all') filters.status = statusFilter;
-        if (purokFilter !== 'all') filters.purok_id = purokFilter; // Send as string
-        if (minMembers) filters.min_members = parseInt(minMembers, 10); // Convert to number for API
-        if (maxMembers) filters.max_members = parseInt(maxMembers, 10); // Convert to number for API
+        if (purokFilter !== 'all') filters.purok_id = purokFilter;
+        if (minMembers) filters.min_members = parseInt(minMembers, 10);
+        if (maxMembers) filters.max_members = parseInt(maxMembers, 10);
         if (debouncedFromDate) filters.from_date = debouncedFromDate;
         if (debouncedToDate) filters.to_date = debouncedToDate;
         if (sortBy) filters.sort_by = sortBy;
         if (sortOrder) filters.sort_order = sortOrder;
+        if (perPage) filters.per_page = perPage;
         
         return filters;
-    };
+    }, [
+        debouncedSearch, statusFilter, purokFilter, minMembers, maxMembers,
+        debouncedFromDate, debouncedToDate, sortBy, sortOrder, perPage
+    ]);
 
-    const reloadData = (page = 1) => {
+    const reloadData = useCallback((page = 1) => {
         setIsLoading(true);
         
         const filters = { ...getCurrentFilters(), page };
@@ -204,7 +211,7 @@ export default function Households({
                 }
             }
         );
-    };
+    }, [getCurrentFilters]);
 
     // Server-side filtering - reload data when filters change
     useEffect(() => {
@@ -223,8 +230,15 @@ export default function Households({
         debouncedFromDate, 
         debouncedToDate, 
         sortBy, 
-        sortOrder
+        sortOrder,
+        perPage
     ]);
+
+    // Handle per page change
+    const handlePerPageChange = (value: string) => {
+        setPerPage(value);
+        reloadData(1);
+    };
 
     // Reset selection when exiting bulk mode
     useEffect(() => {
@@ -559,6 +573,7 @@ export default function Households({
         setToDate('');
         setSortBy('created_at');
         setSortOrder('desc');
+        setPerPage('15');
     };
 
     const handleClearSelection = () => {
@@ -586,7 +601,8 @@ export default function Households({
         max_members: maxMembers,
         sort_by: sortBy,
         sort_order: sortOrder,
-        search: search
+        search: search,
+        per_page: perPage
     };
 
     const updateFilter = (key: string, value: string) => {
@@ -608,6 +624,9 @@ export default function Households({
                 break;
             case 'max_members':
                 setMaxMembers(value);
+                break;
+            case 'per_page':
+                handlePerPageChange(value);
                 break;
         }
     };
@@ -672,6 +691,8 @@ export default function Households({
                         filteredHouseholds={currentHouseholds}
                         searchInputRef={searchInputRef}
                         isLoading={isLoading}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                     />
 
                     <HouseholdsContent
@@ -688,7 +709,9 @@ export default function Households({
                         currentPage={paginationData.current_page}
                         totalPages={paginationData.last_page}
                         totalItems={paginationData.total}
-                        itemsPerPage={15}
+                        itemsPerPage={paginationData.per_page}
+                        perPage={perPage}
+                        onPerPageChange={handlePerPageChange}
                         onPageChange={handlePageChange}
                         onSelectAllOnPage={handleSelectAllOnPage}
                         onItemSelect={handleItemSelect}

@@ -123,6 +123,7 @@ export interface ClearanceType {
 
 // ========== RESIDENT ==========
 export interface Resident {
+    photo_path: string | undefined;
     purok: any;
     id: number;
     first_name: string;

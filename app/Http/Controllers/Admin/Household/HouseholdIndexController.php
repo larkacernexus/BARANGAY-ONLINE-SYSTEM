@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\Cache;
 
 class HouseholdIndexController extends Controller
 {
+    /**
+     * Allowed per page options
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500'];
+    
+    /**
+     * Default per page value
+     */
+    protected const DEFAULT_PER_PAGE = 15;
+
     public function index(Request $request)
     {
         // Get paginated and filtered households from server
@@ -34,6 +44,7 @@ class HouseholdIndexController extends Controller
         Log::info('Households index response (Server-Side)', [
             'total_households' => $totalCount,
             'current_page' => $households->currentPage(),
+            'per_page' => $request->input('per_page', self::DEFAULT_PER_PAGE),
             'filters_applied' => $request->only(['search', 'status', 'purok_id']),
         ]);
 
@@ -44,9 +55,28 @@ class HouseholdIndexController extends Controller
             'totalCount' => $totalCount,
             'filters' => $request->only([
                 'search', 'status', 'purok_id', 'min_members', 'max_members',
-                'from_date', 'to_date', 'sort_by', 'sort_order'
+                'from_date', 'to_date', 'sort_by', 'sort_order', 'per_page'
             ]),
         ]);
+    }
+
+    /**
+     * Get the per page value from request
+     *
+     * @param Request $request
+     * @return int
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
     }
 
     private function getPaginatedHouseholds(Request $request)
@@ -62,7 +92,7 @@ class HouseholdIndexController extends Controller
         // Apply sorting
         $this->applySorting($query, $request);
         
-        $perPage = $request->input('per_page', 15);
+        $perPage = $this->getPerPage($request);
         
         return $query->paginate($perPage)
             ->withQueryString()

@@ -24,7 +24,8 @@ import {
     AlertCircle,
     ChevronLeft,
     ChevronRight,
-    ArrowUpDown
+    ArrowUpDown,
+    Rows3
 } from 'lucide-react';
 import { memo, useCallback, useMemo, useState, useEffect } from 'react';
 
@@ -65,6 +66,8 @@ interface ClearancesContentProps {
     currentPage: number;
     totalPages: number;
     itemsPerPage: number;
+    perPage?: string;
+    onPerPageChange?: (value: string) => void;
     onPageChange: (page: number) => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
@@ -85,6 +88,41 @@ interface ClearancesContentProps {
     getCurrentSortValue?: () => string;
 }
 
+// ✅ Dynamic per-page options generator - 15 IS THE DEFAULT, NO 20
+const getDynamicPerPageOptions = (totalItems: number) => {
+    const options: { value: string; label: string }[] = [];
+    
+    // Always show 15
+    options.push({ value: '15', label: '15 per page' });
+    
+    // Show 30 if total > 15
+    if (totalItems > 15) {
+        options.push({ value: '30', label: '30 per page' });
+    }
+    
+    // Show 50 if total > 30
+    if (totalItems > 30) {
+        options.push({ value: '50', label: '50 per page' });
+    }
+    
+    // Show 100 if total > 50
+    if (totalItems > 50) {
+        options.push({ value: '100', label: '100 per page' });
+    }
+    
+    // Show 500 if total > 100
+    if (totalItems > 100) {
+        options.push({ value: '500', label: '500 per page' });
+    }
+    
+    // Show All only if total <= 550
+    if (totalItems > 0 && totalItems <= 550) {
+        options.push({ value: 'all', label: `Show All (${totalItems})` });
+    }
+    
+    return options;
+};
+
 // Separate component for the header to reduce re-renders
 const ClearancesHeader = memo(({ 
     viewMode, 
@@ -97,11 +135,16 @@ const ClearancesHeader = memo(({
     onSelectAllOnPage,
     currentPage,
     totalPages,
+    totalItems,
+    itemsPerPage,
     onClearSelection,
     sortBy,
     sortOrder,
     onSortChange,
-    getCurrentSortValue
+    getCurrentSortValue,
+    perPage,
+    onPerPageChange,
+    isLoading
 }: {
     viewMode: 'table' | 'grid';
     setViewMode: (mode: 'table' | 'grid') => void;
@@ -113,11 +156,16 @@ const ClearancesHeader = memo(({
     onSelectAllOnPage: () => void;
     currentPage: number;
     totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
     onClearSelection: () => void;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     onSortChange?: (value: string) => void;
     getCurrentSortValue?: () => string;
+    perPage?: string;
+    onPerPageChange?: (value: string) => void;
+    isLoading?: boolean;
 }) => {
     const handleBulkModeToggle = useCallback(() => {
         setIsBulkMode(!isBulkMode);
@@ -125,6 +173,16 @@ const ClearancesHeader = memo(({
             onClearSelection();
         }
     }, [isBulkMode, setIsBulkMode, onClearSelection]);
+
+    const perPageOptions = getDynamicPerPageOptions(totalItems);
+
+    const handlePerPageChange = (value: string) => {
+        if (isLoading) return;
+        onPerPageChange?.(value);
+    };
+
+    const startItem = totalItems > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
     return (
         <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
@@ -147,6 +205,29 @@ const ClearancesHeader = memo(({
                 />
             </div>
             <div className="flex items-center gap-3">
+                {/* Per Page Selector - always show when there are items */}
+                {!isMobile && onPerPageChange && totalItems > 0 && (
+                    <div className="flex items-center gap-2">
+                        <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                        <Select
+                            value={perPage || '15'}
+                            onValueChange={handlePerPageChange}
+                            disabled={isLoading}
+                        >
+                            <SelectTrigger className="w-[140px] h-8 text-xs">
+                                <SelectValue placeholder="15 per page" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {perPageOptions.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+
                 {/* Sort By Dropdown */}
                 {!isMobile && onSortChange && getCurrentSortValue && (
                     <div className="flex items-center gap-2">
@@ -227,7 +308,9 @@ const ClearancesHeader = memo(({
                 
                 {/* Page Info */}
                 <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                    Page {currentPage} of {totalPages}
+                    {totalItems > 0 && (
+                        <>Showing {startItem} - {endItem} of {totalItems}</>
+                    )}
                 </div>
             </div>
         </CardHeader>
@@ -259,6 +342,8 @@ const ClearancesContent = memo(({
     currentPage,
     totalPages,
     itemsPerPage,
+    perPage = '15',  // ✅ DEFAULT IS 15
+    onPerPageChange = () => {},
     onPageChange,
     onSelectAllOnPage,
     onSelectAllFiltered,
@@ -279,7 +364,13 @@ const ClearancesContent = memo(({
     getCurrentSortValue = () => 'created_at-desc'
 }: ClearancesContentProps) => {
     
-    // Memoize bulk actions configuration
+    const perPageOptions = getDynamicPerPageOptions(totalItems);
+
+    const handlePerPageChange = (value: string) => {
+        if (isLoading) return;
+        onPerPageChange(value);
+    };
+    
     const bulkActions = useMemo(() => ({
         primary: [
             {
@@ -338,18 +429,8 @@ const ClearancesContent = memo(({
         ]
     }), [onBulkOperation, onCopySelectedData, setShowBulkDeleteDialog]);
     
-    // Handle bulk mode toggle
-    const handleBulkModeToggle = useCallback(() => {
-        setIsBulkMode(!isBulkMode);
-        if (isBulkMode) {
-            onClearSelection();
-        }
-    }, [isBulkMode, setIsBulkMode, onClearSelection]);
-    
-    // Check if any clearances exist
     const hasClearances = clearances.length > 0;
     
-    // Get appropriate empty state message
     const emptyStateConfig = useMemo(() => {
         if (hasActiveFilters) {
             return {
@@ -367,114 +448,6 @@ const ClearancesContent = memo(({
         };
     }, [hasActiveFilters, onClearFilters]);
     
-    // Memoize view rendering to prevent unnecessary re-renders
-    const renderContentView = useCallback(() => {
-        if (!hasClearances) {
-            return (
-                <EmptyState
-                    icon={emptyStateConfig.icon}
-                    title={emptyStateConfig.title}
-                    description={emptyStateConfig.description}
-                    action={emptyStateConfig.action}
-                />
-            );
-        }
-        
-        return (
-            <>
-                {/* Table View */}
-                {viewMode === 'table' && (
-                    <ClearancesTableView
-                        clearances={clearances}
-                        isBulkMode={isBulkMode}
-                        selectedClearances={selectedClearances}
-                        filtersState={filtersState}
-                        onItemSelect={onItemSelect}
-                        onSort={onSort}
-                        hasActiveFilters={hasActiveFilters}
-                        onClearFilters={onClearFilters}
-                        onDelete={onDelete}
-                        onViewPhoto={onViewPhoto}
-                        onSelectAllOnPage={onSelectAllOnPage}
-                        isSelectAll={isSelectAll}
-                        handleRecordPayment={handleRecordPayment}
-                        isLoading={isLoading}
-                        clearanceTypes={clearanceTypes}
-                        statusOptions={statusOptions}
-                    />
-                )}
-                
-                {/* Grid View */}
-                {viewMode === 'grid' && (
-                    <ClearancesGridView
-                        clearances={clearances}
-                        isBulkMode={isBulkMode}
-                        selectedClearances={selectedClearances}
-                        onItemSelect={onItemSelect}
-                        hasActiveFilters={hasActiveFilters}
-                        onClearFilters={onClearFilters}
-                        onDelete={onDelete}
-                        onViewPhoto={onViewPhoto}
-                        handleRecordPayment={handleRecordPayment}
-                    />
-                )}
-                
-                {/* Grid Selection Summary */}
-                {viewMode === 'grid' && isBulkMode && selectedClearances.length > 0 && (
-                    <GridSelectionSummary
-                        selectedCount={selectedClearances.length}
-                        totalCount={clearances.length}
-                        isSelectAll={isSelectAll}
-                        onSelectAll={onSelectAllOnPage}
-                        onClearSelection={onClearSelection}
-                        className="mt-4 mx-4"
-                    />
-                )}
-                
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            totalItems={totalItems}
-                            itemsPerPage={itemsPerPage}
-                            onPageChange={onPageChange}
-                            showCount={true}
-                            className="justify-between"
-                        />
-                    </div>
-                )}
-            </>
-        );
-    }, [
-        hasClearances,
-        viewMode,
-        clearances,
-        isBulkMode,
-        selectedClearances,
-        filtersState,
-        onItemSelect,
-        onSort,
-        hasActiveFilters,
-        onClearFilters,
-        onDelete,
-        onViewPhoto,
-        onSelectAllOnPage,
-        isSelectAll,
-        handleRecordPayment,
-        isLoading,
-        clearanceTypes,
-        statusOptions,
-        totalPages,
-        currentPage,
-        totalItems,
-        itemsPerPage,
-        onPageChange,
-        onClearSelection,
-        emptyStateConfig
-    ]);
-    
     return (
         <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
             <ClearancesHeader
@@ -488,15 +461,19 @@ const ClearancesContent = memo(({
                 onSelectAllOnPage={onSelectAllOnPage}
                 currentPage={currentPage}
                 totalPages={totalPages}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
                 onClearSelection={onClearSelection}
                 sortBy={sortBy}
                 sortOrder={sortOrder}
                 onSortChange={onSortChange}
                 getCurrentSortValue={getCurrentSortValue}
+                perPage={perPage}
+                onPerPageChange={handlePerPageChange}
+                isLoading={isLoading}
             />
             
             <CardContent className="p-0 dark:bg-gray-900">
-                {/* Enhanced Bulk Actions Bar */}
                 {isBulkMode && selectedClearances.length > 0 && (
                     <ClearancesBulkActions
                         selectedClearances={selectedClearances}
@@ -517,7 +494,6 @@ const ClearancesContent = memo(({
                     />
                 )}
                 
-                {/* Floating Select All for Grid View */}
                 {viewMode === 'grid' && 
                  hasClearances && 
                  selectedClearances.length < clearances.length && 
@@ -531,8 +507,99 @@ const ClearancesContent = memo(({
                     />
                 )}
                 
-                {/* Main Content */}
-                {renderContentView()}
+                {!hasClearances ? (
+                    <EmptyState
+                        icon={emptyStateConfig.icon}
+                        title={emptyStateConfig.title}
+                        description={emptyStateConfig.description}
+                        action={emptyStateConfig.action}
+                    />
+                ) : (
+                    <>
+                        {viewMode === 'table' && (
+                            <ClearancesTableView
+                                clearances={clearances}
+                                isBulkMode={isBulkMode}
+                                selectedClearances={selectedClearances}
+                                filtersState={filtersState}
+                                onItemSelect={onItemSelect}
+                                onSort={onSort}
+                                hasActiveFilters={hasActiveFilters}
+                                onClearFilters={onClearFilters}
+                                onDelete={onDelete}
+                                onViewPhoto={onViewPhoto}
+                                onSelectAllOnPage={onSelectAllOnPage}
+                                isSelectAll={isSelectAll}
+                                handleRecordPayment={handleRecordPayment}
+                                isLoading={isLoading}
+                                clearanceTypes={clearanceTypes}
+                                statusOptions={statusOptions}
+                            />
+                        )}
+                        
+                        {viewMode === 'grid' && (
+                            <ClearancesGridView
+                                clearances={clearances}
+                                isBulkMode={isBulkMode}
+                                selectedClearances={selectedClearances}
+                                onItemSelect={onItemSelect}
+                                hasActiveFilters={hasActiveFilters}
+                                onClearFilters={onClearFilters}
+                                onDelete={onDelete}
+                                onViewPhoto={onViewPhoto}
+                                handleRecordPayment={handleRecordPayment}
+                            />
+                        )}
+                        
+                        {viewMode === 'grid' && isBulkMode && selectedClearances.length > 0 && (
+                            <GridSelectionSummary
+                                selectedCount={selectedClearances.length}
+                                totalCount={clearances.length}
+                                isSelectAll={isSelectAll}
+                                onSelectAll={onSelectAllOnPage}
+                                onClearSelection={onClearSelection}
+                                className="mt-4 mx-4"
+                            />
+                        )}
+                        
+                        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                {isMobile && totalItems > 0 && (
+                                    <div className="flex items-center gap-2 w-full">
+                                        <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                        <Select
+                                            value={perPage}
+                                            onValueChange={handlePerPageChange}
+                                            disabled={isLoading}
+                                        >
+                                            <SelectTrigger className="w-full h-8 text-xs">
+                                                <SelectValue placeholder="15 per page" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {perPageOptions.map((option) => (
+                                                    <SelectItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                <div className="w-full">
+                                    <Pagination
+                                        currentPage={currentPage}
+                                        totalPages={totalPages}
+                                        totalItems={totalItems}
+                                        itemsPerPage={itemsPerPage}
+                                        onPageChange={onPageChange}
+                                        showCount={true}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
             </CardContent>
         </Card>
     );

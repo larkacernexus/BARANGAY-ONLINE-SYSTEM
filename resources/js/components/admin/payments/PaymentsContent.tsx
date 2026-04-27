@@ -13,7 +13,8 @@ import {
 } from '@/components/ui/select';
 import { 
     Receipt,
-    ArrowUpDown
+    ArrowUpDown,
+    Rows3
 } from 'lucide-react';
 
 import { ViewToggle } from '@/components/adminui/view-toggle';
@@ -64,6 +65,8 @@ interface PaymentsContentProps {
     totalPages: number;
     totalItems: number;
     itemsPerPage: number;
+    perPage?: string;
+    onPerPageChange?: (value: string) => void;
     onPageChange: (page: number) => void;
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
@@ -115,6 +118,8 @@ export default function PaymentsContent({
     totalPages,
     totalItems,
     itemsPerPage,
+    perPage = '20',
+    onPerPageChange = () => {},
     onPageChange,
     onSelectAllOnPage,
     onSelectAllFiltered,
@@ -161,6 +166,21 @@ export default function PaymentsContent({
     onSortChange = () => {},
     getCurrentSortValue = () => 'payment_date-desc'
 }: PaymentsContentProps) {
+    
+    // Per page options
+    const perPageOptions = [
+        { value: '15', label: '15 per page' },
+        { value: '30', label: '30 per page' },
+        { value: '50', label: '50 per page' },
+        { value: '100', label: '100 per page' },
+        { value: '500', label: '500 per page' },
+    ];
+
+    // Handle per page change
+    const handlePerPageChange = (value: string) => {
+        if (isLoading) return;
+        onPerPageChange(value);
+    };
     
     // Toggle handler for bulk mode
     const handleBulkModeToggle = () => {
@@ -241,6 +261,29 @@ export default function PaymentsContent({
                         )}
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Per Page Selector */}
+                        {!isMobile && (
+                            <div className="flex items-center gap-2">
+                                <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <Select
+                                    value={perPage}
+                                    onValueChange={handlePerPageChange}
+                                    disabled={isLoading}
+                                >
+                                    <SelectTrigger className="w-[130px] h-8 text-xs">
+                                        <SelectValue placeholder="Per page..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {perPageOptions.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         {/* Sort By Dropdown */}
                         {!isMobile && (
                             <div className="flex items-center gap-2">
@@ -312,7 +355,11 @@ export default function PaymentsContent({
                         
                         {/* Page Info */}
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
-                            Page {currentPage} of {totalPages}
+                            {totalItems > 0 && (
+                                <>
+                                    Showing {payments.length > 0 ? '1' : '0'} - {payments.length} of {totalItems}
+                                </>
+                            )}
                         </div>
                     </div>
                 </CardHeader>
@@ -392,19 +439,45 @@ export default function PaymentsContent({
                                 />
                             )}
 
-                            {/* Pagination with dark mode */}
-                            {totalPages > 1 && (
-                                <div className="px-4 py-4 border-t border-gray-200 dark:border-gray-700">
-                                    <Pagination
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        totalItems={totalItems}
-                                        itemsPerPage={itemsPerPage}
-                                        onPageChange={onPageChange}
-                                        showCount={true}
-                                    />
+                            {/* Per Page & Pagination Footer */}
+                            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    {/* Mobile Per Page Selector */}
+                                    {isMobile && (
+                                        <div className="flex items-center gap-2 w-full">
+                                            <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                            <Select
+                                                value={perPage}
+                                                onValueChange={handlePerPageChange}
+                                                disabled={isLoading}
+                                            >
+                                                <SelectTrigger className="w-full h-8 text-xs">
+                                                    <SelectValue placeholder="Per page..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {perPageOptions.map((option) => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+
+                                    {/* Pagination */}
+                                    <div className="w-full">
+                                        <Pagination
+                                            currentPage={currentPage}
+                                            totalPages={totalPages}
+                                            totalItems={totalItems}
+                                            itemsPerPage={itemsPerPage}
+                                            onPageChange={onPageChange}
+                                            showCount={true}
+                                        />
+                                    </div>
                                 </div>
-                            )}
+                            </div>
                         </>
                     )}
                 </CardContent>

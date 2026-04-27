@@ -1,5 +1,4 @@
 <?php
-// app/Http/Controllers/Admin/AnnouncementController.php
 
 namespace App\Http\Controllers\Admin;
 
@@ -16,10 +15,19 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
 
 class AnnouncementController extends Controller
 {
+    /**
+     * Allowed per page options
+     */
+    protected const ALLOWED_PER_PAGE = ['15', '30', '50', '100', '500', 'all'];
+    
+    /**
+     * Default per page value
+     */
+    protected const DEFAULT_PER_PAGE = 15;
+
     /**
      * Display a listing of announcements.
      */
@@ -27,7 +35,6 @@ class AnnouncementController extends Controller
     {
         $query = Announcement::query()->with(['creator', 'updater']);
         
-        // Search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -40,23 +47,18 @@ class AnnouncementController extends Controller
             });
         }
         
-        // Filter by type
         if ($request->filled('type') && $request->type !== 'all') {
             $query->where('type', $request->type);
         }
         
-        // Filter by audience type
         if ($request->filled('audience_type') && $request->audience_type !== 'all') {
             $query->where('audience_type', $request->audience_type);
         }
         
-        // ✅ FIXED: Filter by priority (convert to integer for database)
         if ($request->filled('priority') && $request->priority !== 'all') {
-            $priorityValue = (int) $request->priority;
-            $query->where('priority', $priorityValue);
+            $query->where('priority', (int) $request->priority);
         }
         
-        // Filter by status
         if ($request->filled('status') && $request->status !== 'all') {
             switch ($request->status) {
                 case 'active':
@@ -74,7 +76,6 @@ class AnnouncementController extends Controller
             }
         }
         
-        // Date range filter (created_at)
         if ($request->filled('from_date')) {
             $query->whereDate('created_at', '>=', $request->from_date);
         }
@@ -83,9 +84,11 @@ class AnnouncementController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
         
-        // ✅ REMOVED sorting from filters - sorting is now handled client-side by table header
+        // Dynamic per page
+        $perPage = $this->getPerPage($request);
         
-        $announcements = $query->paginate($request->get('per_page', 15))
+        $announcements = $query->orderBy('created_at', 'desc')
+            ->paginate($perPage)
             ->withQueryString()
             ->through(function ($announcement) {
                 return [
@@ -118,7 +121,6 @@ class AnnouncementController extends Controller
                 ];
             });
         
-        // Stats
         $stats = [
             'total' => Announcement::count(),
             'active' => Announcement::published()->count(),
@@ -141,8 +143,10 @@ class AnnouncementController extends Controller
         
         return Inertia::render('admin/Announcements/Index', [
             'announcements' => $announcements,
-            // ✅ Include priority in filters
-            'filters' => $request->only(['search', 'type', 'audience_type', 'priority', 'status', 'from_date', 'to_date']),
+            'filters' => $request->only([
+                'search', 'type', 'audience_type', 'priority', 'status', 
+                'from_date', 'to_date', 'per_page'
+            ]),
             'types' => Announcement::getTypes(),
             'priorities' => Announcement::getPriorityOptions(),
             'audience_types' => Announcement::getAudienceTypes(),
@@ -150,22 +154,36 @@ class AnnouncementController extends Controller
             'stats' => $stats,
         ]);
     }
-    
+
+    /**
+     * Get the per page value from request
+     */
+    private function getPerPage(Request $request): int
+    {
+        $perPage = $request->input('per_page', self::DEFAULT_PER_PAGE);
+        
+        // Handle 'all' option
+        if ($perPage === 'all') {
+            return Announcement::count() ?: self::DEFAULT_PER_PAGE;
+        }
+        
+        // Validate that per_page is in allowed values
+        if (in_array($perPage, self::ALLOWED_PER_PAGE)) {
+            return (int) $perPage;
+        }
+        
+        // Return default if invalid value
+        return self::DEFAULT_PER_PAGE;
+    }
     /**
      * Show the form for creating a new announcement.
+     * Only loads small datasets (roles, puroks). Households, businesses, and users
+     * are fetched via AJAX search to improve page load performance.
      */
     public function create()
     {
         $roles = Role::orderBy('name')->get(['id', 'name']);
         $puroks = Purok::orderBy('name')->get(['id', 'name']);
-        $households = Household::with('purok')
-            ->orderBy('household_number')
-            ->get(['id', 'household_number', 'purok_id', 'address']);
-        $businesses = Business::orderBy('business_name')
-            ->get(['id', 'business_name', 'owner_name', 'owner_id']);
-        $users = User::with(['role', 'household'])
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name', 'email', 'role_id', 'household_id']);
         
         return Inertia::render('admin/Announcements/Create', [
             'types' => Announcement::getTypes(),
@@ -173,22 +191,178 @@ class AnnouncementController extends Controller
             'audience_types' => Announcement::getAudienceTypes(),
             'roles' => $roles,
             'puroks' => $puroks,
-            'households' => $households,
-            'businesses' => $businesses,
-            'users' => $users,
+            'households' => [],  // Fetched via AJAX: /admin/announcements/search-households
+            'businesses' => [],  // Fetched via AJAX: /admin/announcements/search-businesses
+            'users' => [],       // Fetched via AJAX: /admin/announcements/search-users
             'maxFileSize' => config('announcements.max_file_size', 10),
             'allowedFileTypes' => config('announcements.allowed_file_types', [
-                'image/*', 
-                '.pdf', 
-                '.doc', 
-                '.docx', 
-                '.xls', 
-                '.xlsx', 
-                '.txt', 
-                '.csv',
-                '.ppt',
-                '.pptx'
+                'image/*', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv', '.ppt', '.pptx'
             ]),
+            'templates' => [
+                [
+                    'title' => 'Barangay Assembly',
+                    'content' => 'Barangay Assembly will be held on [DATE] at [TIME] at the Barangay Hall. All residents are invited to attend.',
+                    'type' => 'event',
+                    'priority' => 2,
+                ],
+                [
+                    'title' => 'Medical Mission',
+                    'content' => 'Free medical mission with dental check-up, blood pressure monitoring, and medicine distribution.',
+                    'type' => 'event',
+                    'priority' => 3,
+                ],
+                [
+                    'title' => 'Clean-Up Drive',
+                    'content' => 'Community clean-up drive. Meet at the Barangay Hall at 7 AM. Please bring your own gloves and trash bags.',
+                    'type' => 'general',
+                    'priority' => 1,
+                ],
+                [
+                    'title' => 'Water Interruption Notice',
+                    'content' => 'Please be advised that there will be water interruption on [DATE] from [TIME] to [TIME] due to pipeline maintenance.',
+                    'type' => 'maintenance',
+                    'priority' => 3,
+                ],
+            ],
+        ]);
+    }
+    
+    /**
+     * Search households via AJAX for announcement audience selection.
+     */
+    public function searchHouseholds(Request $request)
+    {
+        $search = $request->get('search', '');
+        $page = $request->get('page', 1);
+        $perPage = 50;
+        
+        $query = Household::with('purok')
+            ->select(['id', 'household_number', 'purok_id', 'address'])
+            ->orderBy('household_number');
+        
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('household_number', 'like', "%{$search}%")
+                  ->orWhere('address', 'like', "%{$search}%")
+                  ->orWhereHas('purok', function($pq) use ($search) {
+                      $pq->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+        
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        
+        $data = $paginator->map(function($household) {
+            return [
+                'id' => $household->id,
+                'household_number' => $household->household_number,
+                'address' => $household->address,
+                'purok' => $household->purok ? [
+                    'id' => $household->purok->id,
+                    'name' => $household->purok->name,
+                ] : null,
+            ];
+        });
+        
+        return response()->json([
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ]);
+    }
+    
+    /**
+     * Search businesses via AJAX for announcement audience selection.
+     */
+    public function searchBusinesses(Request $request)
+    {
+        $search = $request->get('search', '');
+        $page = $request->get('page', 1);
+        $perPage = 50;
+        
+        $query = Business::select(['id', 'business_name', 'owner_name', 'owner_id'])
+            ->orderBy('business_name');
+        
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('business_name', 'like', "%{$search}%")
+                  ->orWhere('owner_name', 'like', "%{$search}%");
+            });
+        }
+        
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        
+        $data = $paginator->map(function($business) {
+            return [
+                'id' => $business->id,
+                'business_name' => $business->business_name,
+                'owner_name' => $business->owner_name,
+            ];
+        });
+        
+        return response()->json([
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
+        ]);
+    }
+    
+    /**
+     * Search users via AJAX for announcement audience selection.
+     */
+    public function searchUsers(Request $request)
+    {
+        $search = $request->get('search', '');
+        $page = $request->get('page', 1);
+        $perPage = 50;
+        
+        $query = User::with(['role', 'household'])
+            ->select(['id', 'first_name', 'last_name', 'email', 'role_id', 'household_id'])
+            ->orderBy('first_name')
+            ->orderBy('last_name');
+        
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+        
+        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
+        
+        $data = $paginator->map(function($user) {
+            return [
+                'id' => $user->id,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'email' => $user->email,
+                'role' => $user->role ? [
+                    'id' => $user->role->id,
+                    'name' => $user->role->name,
+                ] : null,
+            ];
+        });
+        
+        return response()->json([
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'has_more' => $paginator->hasMorePages(),
+            ],
         ]);
     }
     
@@ -293,16 +467,14 @@ class AnnouncementController extends Controller
             case 'households':
             case 'household_members':
                 $audienceDetails['households'] = Household::whereIn('id', $announcement->target_households ?? [])
-                    ->with('purok')
-                    ->get();
+                    ->with('purok')->get();
                 break;
             case 'businesses':
                 $audienceDetails['businesses'] = Business::whereIn('id', $announcement->target_businesses ?? [])->get();
                 break;
             case 'specific_users':
                 $audienceDetails['users'] = User::whereIn('id', $announcement->target_users ?? [])
-                    ->with(['role', 'household'])
-                    ->get();
+                    ->with(['role', 'household'])->get();
                 break;
         }
         
@@ -319,7 +491,7 @@ class AnnouncementController extends Controller
                 'priority_label' => $announcement->priority_label,
                 'is_active' => $announcement->is_active,
                 'audience_type' => $announcement->audience_type,
-                'audience_type_label' => Announcement::getAudienceTypes()[$announcement->audience_type],
+                'audience_type_label' => Announcement::getAudienceTypes()[$announcement->audience_type] ?? $announcement->audience_type,
                 'audience_summary' => $announcement->audience_summary,
                 'estimated_reach' => $announcement->estimated_reach,
                 'target_roles' => $announcement->target_roles,
@@ -377,14 +549,6 @@ class AnnouncementController extends Controller
         
         $roles = Role::orderBy('name')->get(['id', 'name']);
         $puroks = Purok::orderBy('name')->get(['id', 'name']);
-        $households = Household::with('purok')
-            ->orderBy('household_number')
-            ->get(['id', 'household_number', 'purok_id', 'address']);
-        $businesses = Business::orderBy('business_name')
-            ->get(['id', 'business_name', 'owner_name', 'owner_id']);
-        $users = User::with(['role', 'household'])
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name', 'email', 'role_id', 'household_id']);
         
         return Inertia::render('admin/Announcements/Edit', [
             'announcement' => [
@@ -423,25 +587,18 @@ class AnnouncementController extends Controller
             'audience_types' => Announcement::getAudienceTypes(),
             'roles' => $roles,
             'puroks' => $puroks,
-            'households' => $households,
-            'businesses' => $businesses,
-            'users' => $users,
+            'households' => [],  // Fetched via AJAX
+            'businesses' => [],  // Fetched via AJAX
+            'users' => [],       // Fetched via AJAX
             'maxFileSize' => config('announcements.max_file_size', 10),
             'allowedFileTypes' => config('announcements.allowed_file_types', [
-                'image/*', 
-                '.pdf', 
-                '.doc', 
-                '.docx', 
-                '.xls', 
-                '.xlsx', 
-                '.txt', 
-                '.csv'
+                'image/*', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.csv'
             ]),
         ]);
     }
     
     /**
-     * Update the specified announcement with optional attachments.
+     * Update the specified announcement.
      */
     public function update(Request $request, Announcement $announcement)
     {
@@ -499,9 +656,7 @@ class AnnouncementController extends Controller
             
             if ($request->has('keep_attachments')) {
                 $keepIds = $validated['keep_attachments'] ?? [];
-                $toDelete = $announcement->attachments()
-                    ->whereNotIn('id', $keepIds)
-                    ->get();
+                $toDelete = $announcement->attachments()->whereNotIn('id', $keepIds)->get();
                     
                 foreach ($toDelete as $attachment) {
                     Storage::disk('public')->delete($attachment->file_path);
@@ -699,7 +854,7 @@ class AnnouncementController extends Controller
             DB::commit();
             
             return redirect()->route('admin.announcements.edit', $newAnnouncement->id)
-                ->with('success', 'Announcement duplicated successfully. Review and publish when ready.');
+                ->with('success', 'Announcement duplicated successfully.');
                 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -721,15 +876,13 @@ class AnnouncementController extends Controller
                 return Purok::orderBy('name')->get(['id', 'name']);
             case 'households':
             case 'household_members':
-                return Household::with('purok')
-                    ->orderBy('household_number')
+                return Household::with('purok')->orderBy('household_number')
                     ->get(['id', 'household_number', 'purok_id', 'address']);
             case 'businesses':
                 return Business::orderBy('business_name')
                     ->get(['id', 'business_name', 'owner_name']);
             case 'specific_users':
-                return User::with(['role', 'household'])
-                    ->orderBy('first_name')
+                return User::with(['role', 'household'])->orderBy('first_name')
                     ->get(['id', 'first_name', 'last_name', 'email', 'role_id', 'household_id']);
             default:
                 return [];
@@ -755,25 +908,16 @@ class AnnouncementController extends Controller
             $query->where('audience_type', $request->audience_type);
         }
         
-        // ✅ FIXED: Convert priority to integer for export filter
         if ($request->filled('priority') && $request->priority !== 'all') {
             $query->where('priority', (int) $request->priority);
         }
         
         if ($request->filled('status') && $request->status !== 'all') {
             switch ($request->status) {
-                case 'active':
-                    $query->published();
-                    break;
-                case 'inactive':
-                    $query->where('is_active', false);
-                    break;
-                case 'expired':
-                    $query->expired();
-                    break;
-                case 'upcoming':
-                    $query->upcoming();
-                    break;
+                case 'active': $query->published(); break;
+                case 'inactive': $query->where('is_active', false); break;
+                case 'expired': $query->expired(); break;
+                case 'upcoming': $query->upcoming(); break;
             }
         }
         
@@ -789,21 +933,9 @@ class AnnouncementController extends Controller
             $file = fopen('php://output', 'w');
             
             fputcsv($file, [
-                'ID',
-                'Title',
-                'Type',
-                'Priority',
-                'Audience Type',
-                'Audience Summary',
-                'Estimated Reach',
-                'Status',
-                'Start Date',
-                'End Date',
-                'Has Attachments',
-                'Attachments Count',
-                'Created By',
-                'Created At',
-                'Notification Stats (Read/Total)'
+                'ID', 'Title', 'Type', 'Priority', 'Audience Type', 'Audience Summary',
+                'Estimated Reach', 'Status', 'Start Date', 'End Date', 'Has Attachments',
+                'Attachments Count', 'Created By', 'Created At', 'Notification Stats (Read/Total)'
             ]);
             
             foreach ($announcements as $announcement) {

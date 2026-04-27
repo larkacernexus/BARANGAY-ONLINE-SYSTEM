@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Link } from '@inertiajs/react';
 import MemberSearchModal from './MemberSearchModal';
 
+// Updated Resident interface to match MemberSearchModal expectations
 interface Resident {
     id: number;
     first_name: string;
@@ -20,6 +21,17 @@ interface Resident {
     purok_id?: number;
     photo_path?: string;
     photo_url?: string;
+    household_status: 'none' | 'member' | 'head';
+    status_label: string;
+    status_color: string;
+    can_be_added: boolean;
+    restriction_reason?: string | null;
+    current_household?: {
+        id: number;
+        number: string;
+        is_head: boolean;
+        relationship: string;
+    } | null;
 }
 
 interface Member {
@@ -50,7 +62,7 @@ const relationshipTypes = [
 
 export default function MembersCard({ data, setData, errors, availableResidents, heads }: Props) {
     const [showMemberSearch, setShowMemberSearch] = useState(false);
-    const [members, setMembers] = useState<Member[]>(data.members);
+    const [members, setMembers] = useState<Member[]>(data.members || []);
 
     const updateMembers = (newMembers: Member[]) => {
         setMembers(newMembers);
@@ -76,7 +88,7 @@ export default function MembersCard({ data, setData, errors, availableResidents,
     };
 
     const addMembers = (selectedResidents: Resident[], relationship: string) => {
-        const existingResidentIds = members.map(m => m.resident_id).filter(id => id !== undefined);
+        const existingResidentIds = members.map(m => m.resident_id).filter((id): id is number => id !== undefined);
         const newId = members.length > 0 ? Math.max(...members.map(m => m.id)) + 1 : 1;
         
         const newMembers = selectedResidents
@@ -91,7 +103,9 @@ export default function MembersCard({ data, setData, errors, availableResidents,
                 purok_name: resident.purok,
             }));
 
-        updateMembers([...members, ...newMembers]);
+        if (newMembers.length > 0) {
+            updateMembers([...members, ...newMembers]);
+        }
         setShowMemberSearch(false);
     };
 
@@ -141,7 +155,7 @@ export default function MembersCard({ data, setData, errors, availableResidents,
                     {availableResidents.length === 0 && (
                         <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
                             <AlertCircle className="h-3 w-3" />
-                            All residents already belong to households. <Link href="/residents/create" className="text-blue-600 dark:text-blue-400 hover:underline">Create new residents</Link>
+                            All residents already belong to households. <Link href="/admin/residents/create" className="text-blue-600 dark:text-blue-400 hover:underline">Create new residents</Link>
                         </div>
                     )}
                 </CardHeader>

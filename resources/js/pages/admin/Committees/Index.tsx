@@ -8,9 +8,9 @@ import { CommitteesQuickActions } from '@/components/admin/committees/Committees
 import { CommitteesDistribution } from '@/components/admin/committees/CommitteesDistribution';
 import { KeyboardShortcutsHelp } from '@/components/admin/committees/KeyboardShortcutsHelp';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useCommitteesSelection } from '@/hooks/useCommitteesSelection';
-import { useCommitteesFilters } from '@/hooks/useCommitteesFilters';
-import { useCommitteesBulkActions } from '@/hooks/useCommitteesBulkActions';
+// import { useCommitteesSelection } from '@/hooks/useCommitteesSelection';
+// import { useCommitteesFilters } from '@/hooks/useCommitteesFilters';
+// import { useCommitteesBulkActions } from '@/hooks/useCommitteesBulkActions';
 import { Committee, CommitteesIndexProps } from '@/types/admin/committees/committees';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -54,7 +54,7 @@ export default function CommitteesIndex({ committees, filters = {
     // Filter states - client-side only
     const [search, setSearch] = useState<string>(getSafeString(safeFilters.search));
     const [statusFilter, setStatusFilter] = useState<string>(getSafeString(safeFilters.status, 'all'));
-    const [positionsRange, setPositionsRange] = useState<string>(getSafeString(safeFilters.positions_range, ''));
+    const [positionsRange, setPositionsRange] = useState<string>(getSafeString(safeFilters.positions_range, 'all'));
     const [sortBy, setSortBy] = useState<string>(getSafeString(safeFilters.sort_by, 'order'));
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(getSafeSortOrder(safeFilters.sort_order));
     
@@ -479,7 +479,7 @@ export default function CommitteesIndex({ committees, filters = {
     const handleResetFilters = useCallback(() => {
         setSearch('');
         setStatusFilter('all');
-        setPositionsRange('');
+        setPositionsRange('all'); 
         setSortBy('order');
         setSortOrder('asc');
         setCurrentPage(1);
