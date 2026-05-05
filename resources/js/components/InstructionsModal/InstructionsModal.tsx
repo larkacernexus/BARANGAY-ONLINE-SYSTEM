@@ -1,50 +1,19 @@
 // resources/js/Components/InstructionsModal.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  X, 
-  BookOpen, 
-  HelpCircle, 
-  Video, 
-  FileText, 
-  Download,
-  Search,
-  Filter,
-  Printer,
-  Share2,
-  Eye,
-  EyeOff,
-  ChevronRight,
-  ChevronDown,
-  CheckCircle,
-  AlertCircle,
-  Info,
-  Users,
-  Home,
-  CreditCard,
-  FileText as FileTextIcon,
-  Keyboard,
-  Bell,
-  Settings,
-  UserPlus,
-  UserCheck,
-  BarChart3,
-  PieChart,
-  Calendar,
-  Clock,
-  MapPin,
-  Phone,
-  Mail,
-  Globe,
-  Lock,
-  Unlock,
-  Database,
-  HardDrive,
-  Server,
-  Network,
-  Shield,
-  AlertTriangle
+  X, BookOpen, HelpCircle, Video, FileText, Download,
+  Search, Filter, Printer, Share2, Eye, EyeOff, ChevronRight,
+  ChevronDown, CheckCircle, AlertCircle, Info, Users, Home,
+  CreditCard, FileText as FileTextIcon, Keyboard, Bell, Settings,
+  UserPlus, UserCheck, BarChart3, PieChart, Calendar, Clock,
+  MapPin, Phone, Mail, Globe, Lock, Unlock, Database, HardDrive,
+  Server, Network, Shield, AlertTriangle, ExternalLink, ArrowRight,
+  Copy, Check, Zap, Mic, Command
 } from 'lucide-react';
 
+// Types
 interface InstructionsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -55,6 +24,470 @@ interface InstructionsModalProps {
   userRole?: 'admin' | 'staff' | 'resident';
 }
 
+interface ModuleContent {
+  title: string;
+  content: React.ReactNode;
+}
+
+// Animation variants
+const backdropVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 }
+};
+
+const modalVariants = {
+  hidden: { 
+    opacity: 0, 
+    scale: 0.95, 
+    y: 20 
+  },
+  visible: { 
+    opacity: 1, 
+    scale: 1, 
+    y: 0,
+    transition: { 
+      type: 'spring', 
+      damping: 25, 
+      stiffness: 300 
+    }
+  },
+  exit: { 
+    opacity: 0, 
+    scale: 0.95, 
+    y: 20,
+    transition: { 
+      duration: 0.2 
+    }
+  }
+};
+
+const slideInRight = {
+  hidden: { opacity: 0, x: -20 },
+  visible: { opacity: 1, x: 0 }
+};
+
+// Sub-components
+const IconBadge: React.FC<{ icon: React.ReactNode; color?: string }> = ({ 
+  icon, 
+  color = 'blue' 
+}) => {
+  const colorClasses: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+    emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+    purple: 'bg-purple-50 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+    amber: 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+    rose: 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400',
+  };
+
+  return (
+    <div className={`rounded-xl p-2.5 ${colorClasses[color] || colorClasses.blue}`}>
+      {icon}
+    </div>
+  );
+};
+
+const StepCard: React.FC<{ 
+  step: number; 
+  title: string; 
+  description: string; 
+  color?: string 
+}> = ({ step, title, description, color = 'purple' }) => {
+  const colors: Record<string, string> = {
+    purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+    blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    emerald: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+    amber: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  };
+
+  return (
+    <div className="flex items-start gap-4">
+      <div className={`flex h-8 w-8 items-center justify-center rounded-xl font-bold ${colors[color] || colors.purple}`}>
+        {step}
+      </div>
+      <div>
+        <div className="font-semibold text-gray-900 dark:text-white">{title}</div>
+        <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description}</div>
+      </div>
+    </div>
+  );
+};
+
+const ResourceLink: React.FC<{ 
+  href: string; 
+  icon: React.ReactNode; 
+  title: string; 
+  description: string;
+  color?: string;
+}> = ({ href, icon, title, description, color = 'blue' }) => {
+  const colors: Record<string, string> = {
+    blue: 'hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20',
+    purple: 'hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20',
+    emerald: 'hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20',
+  };
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`group flex items-center gap-4 rounded-xl border border-gray-200 p-4 transition-all duration-200 hover:shadow-md dark:border-gray-700 ${colors[color] || colors.blue}`}
+    >
+      <div className="rounded-lg bg-gray-50 p-2 transition-colors group-hover:bg-white dark:bg-gray-800 dark:group-hover:bg-gray-700">
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="font-semibold text-gray-900 dark:text-white">{title}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">{description}</div>
+      </div>
+      <ExternalLink className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-1 group-hover:text-gray-600" />
+    </a>
+  );
+};
+
+// Module content components
+const DashboardContent: React.FC = () => (
+  <div className="space-y-8">
+    <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 p-6 dark:from-blue-900/10 dark:to-indigo-900/10">
+      <div className="mb-4 flex items-center gap-3">
+        <IconBadge icon={<BarChart3 className="h-5 w-5" />} color="blue" />
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h3>
+      </div>
+      
+      <div className="grid gap-6 lg:grid-cols-2">
+        <motion.div 
+          variants={slideInRight}
+          initial="hidden"
+          animate="visible"
+          className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80"
+        >
+          <h4 className="mb-4 flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-400">
+            <CheckCircle className="h-4 w-4" />
+            Key Performance Indicators
+          </h4>
+          <div className="space-y-3">
+            {[
+              { icon: Users, label: 'Total Residents', desc: 'Current registered population', color: 'text-blue-500' },
+              { icon: Home, label: 'Total Households', desc: 'Number of family units', color: 'text-emerald-500' },
+              { icon: CreditCard, label: "Today's Collections", desc: 'Daily revenue tracking', color: 'text-amber-500' },
+              { icon: FileTextIcon, label: 'Pending Clearances', desc: 'Needs immediate attention', color: 'text-purple-500' }
+            ].map((item, index) => (
+              <div key={index} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <item.icon className={`h-5 w-5 ${item.color}`} />
+                <div>
+                  <div className="font-medium text-gray-900 dark:text-white">{item.label}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{item.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <motion.div 
+          variants={slideInRight}
+          initial="hidden"
+          animate="visible"
+          transition={{ delay: 0.1 }}
+          className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80"
+        >
+          <h4 className="mb-4 flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400">
+            <Zap className="h-4 w-4" />
+            Quick Actions
+          </h4>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: UserPlus, label: 'Register Resident', color: 'from-purple-500 to-pink-500' },
+              { icon: FileTextIcon, label: 'New Clearance', color: 'from-blue-500 to-cyan-500' },
+              { icon: CreditCard, label: 'Process Payment', color: 'from-emerald-500 to-teal-500' },
+              { icon: AlertTriangle, label: 'Alert System', color: 'from-amber-500 to-orange-500' }
+            ].map((action, index) => (
+              <button
+                key={index}
+                className={`rounded-xl bg-gradient-to-r ${action.color} p-4 text-white transition-transform hover:scale-105 hover:shadow-lg`}
+              >
+                <action.icon className="mb-2 h-6 w-6" />
+                <div className="text-sm font-medium">{action.label}</div>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  </div>
+);
+
+const ResidentsContent: React.FC = () => (
+  <div className="space-y-8">
+    <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 p-6 dark:from-emerald-900/10 dark:to-teal-900/10">
+      <div className="mb-4 flex items-center gap-3">
+        <IconBadge icon={<Users className="h-5 w-5" />} color="emerald" />
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Resident Management</h3>
+      </div>
+      
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80">
+          <h4 className="mb-4 font-semibold text-emerald-700 dark:text-emerald-400">Registration Process</h4>
+          <div className="space-y-4">
+            <StepCard step={1} title="Initiate Registration" description="Click 'Register Resident' and fill in personal details" color="emerald" />
+            <StepCard step={2} title="Document Upload" description="Upload valid ID and proof of residency" color="blue" />
+            <StepCard step={3} title="Household Assignment" description="Assign to existing or create new household" color="purple" />
+            <StepCard step={4} title="Verification" description="System validates and activates the record" color="amber" />
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80">
+          <h4 className="mb-4 font-semibold text-blue-700 dark:text-blue-400">Search & Filter</h4>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+              <Search className="h-5 w-5 text-blue-500" />
+              <div>
+                <div className="font-medium">Quick Search</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Search by name, ID, or address</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+              <Filter className="h-5 w-5 text-purple-500" />
+              <div>
+                <div className="font-medium">Advanced Filters</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Filter by age, gender, location</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+              <Download className="h-5 w-5 text-emerald-500" />
+              <div>
+                <div className="font-medium">Export Data</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Generate reports in PDF/Excel</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ClearanceContent: React.FC = () => (
+  <div className="space-y-8">
+    <div className="rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50 p-6 dark:from-purple-900/10 dark:to-pink-900/10">
+      <div className="mb-4 flex items-center gap-3">
+        <IconBadge icon={<FileTextIcon className="h-5 w-5" />} color="purple" />
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Clearance Processing</h3>
+      </div>
+      
+      <div className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80">
+        <h4 className="mb-6 font-semibold text-purple-700 dark:text-purple-400">Workflow Process</h4>
+        <div className="relative">
+          <div className="absolute left-8 top-0 h-full w-0.5 bg-gray-200 dark:bg-gray-700" />
+          <div className="space-y-6">
+            <StepCard step={1} title="Document Verification" description="Check submitted documents and requirements" color="purple" />
+            <StepCard step={2} title="Background Check" description="Verify records for dues or violations" color="blue" />
+            <StepCard step={3} title="Payment Processing" description="Process fees and issue official receipt" color="emerald" />
+            <StepCard step={4} title="Certificate Issuance" description="Generate clearance with QR verification" color="amber" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const PaymentsContent: React.FC = () => (
+  <div className="space-y-8">
+    <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 p-6 dark:from-amber-900/10 dark:to-yellow-900/10">
+      <div className="mb-4 flex items-center gap-3">
+        <IconBadge icon={<CreditCard className="h-5 w-5" />} color="amber" />
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Payment Processing</h3>
+      </div>
+      
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80">
+          <h4 className="mb-4 font-semibold text-amber-700 dark:text-amber-400">Payment Methods</h4>
+          <div className="space-y-3">
+            {[
+              { method: 'Cash', color: 'bg-emerald-100 text-emerald-800', icon: CreditCard },
+              { method: 'GCash', color: 'bg-blue-100 text-blue-800', icon: Phone },
+              { method: 'PayMaya', color: 'bg-purple-100 text-purple-800', icon: Phone },
+              { method: 'Bank Transfer', color: 'bg-cyan-100 text-cyan-800', icon: Globe }
+            ].map((payment, index) => (
+              <div key={index} className="flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+                <span className={`rounded-lg px-3 py-1 text-sm font-medium ${payment.color}`}>
+                  {payment.method}
+                </span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Over-the-counter transaction
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80">
+          <h4 className="mb-4 font-semibold text-blue-700 dark:text-blue-400">Processing Schedule</h4>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { day: 'Weekdays', time: '8:00 AM - 5:00 PM', color: 'border-blue-500' },
+              { day: 'Saturday', time: '8:00 AM - 12:00 PM', color: 'border-emerald-500' },
+              { day: 'Cut-off', time: 'Daily 3:00 PM', color: 'border-amber-500' },
+              { day: 'Emergency', time: '24/7 On-call', color: 'border-rose-500' }
+            ].map((schedule, index) => (
+              <div key={index} className={`rounded-lg border-l-4 ${schedule.color} bg-gray-50 p-3 dark:bg-gray-700/50`}>
+                <div className="font-medium text-gray-900 dark:text-white">{schedule.day}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">{schedule.time}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const GeneralContent: React.FC<{ showQuickGuide: boolean }> = ({ showQuickGuide }) => (
+  <div className="space-y-8">
+    <div className="rounded-2xl bg-gradient-to-br from-gray-50 to-blue-50 p-6 dark:from-gray-900/50 dark:to-blue-900/10">
+      <div className="mb-4 flex items-center gap-3">
+        <IconBadge icon={<Shield className="h-5 w-5" />} color="blue" />
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Role-Based Access</h3>
+      </div>
+      
+      <div className="grid gap-6 lg:grid-cols-3">
+        {[
+          {
+            role: 'Administrator',
+            icon: Shield,
+            color: 'blue',
+            permissions: ['Full system access', 'User management', 'System configuration', 'Report generation']
+          },
+          {
+            role: 'Barangay Staff',
+            icon: UserCheck,
+            color: 'emerald',
+            permissions: ['Resident management', 'Clearance processing', 'Payment collection', 'Document generation']
+          },
+          {
+            role: 'Residents (Portal)',
+            icon: Users,
+            color: 'purple',
+            permissions: ['Apply for clearances', 'View personal records', 'Track applications']
+          }
+        ].map((role, index) => (
+          <motion.div
+            key={index}
+            variants={slideInRight}
+            initial="hidden"
+            animate="visible"
+            transition={{ delay: index * 0.1 }}
+            className="rounded-xl bg-white/80 p-5 shadow-sm backdrop-blur dark:bg-gray-800/80"
+          >
+            <div className="mb-3 flex items-center gap-2">
+              <role.icon className={`h-5 w-5 text-${role.color}-600 dark:text-${role.color}-400`} />
+              <h4 className="font-semibold text-gray-900 dark:text-white">{role.role}</h4>
+            </div>
+            <ul className="space-y-2">
+              {role.permissions.map((perm, pIndex) => (
+                <li key={pIndex} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <CheckCircle className="h-4 w-4 text-emerald-500" />
+                  {perm}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+
+    {showQuickGuide && (
+      <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-gray-800">
+        <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900 dark:text-white">
+          <BookOpen className="h-5 w-5" />
+          Getting Started Checklist
+        </h3>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <h4 className="mb-3 font-semibold text-gray-800 dark:text-gray-300">Initial Setup</h4>
+            <div className="space-y-2">
+              {['Complete staff profile', 'Configure security settings', 'Review barangay fees', 'Test with sample data'].map((task, index) => (
+                <div key={index} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-gray-700 dark:text-gray-300">{task}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="mb-3 font-semibold text-gray-800 dark:text-gray-300">Daily Best Practices</h4>
+            <div className="space-y-2 text-sm">
+              {[
+                'Verify resident identity before processing',
+                'Keep digital records updated in real-time',
+                'Backup data at the end of each day',
+                'Log out when stepping away from system'
+              ].map((practice, index) => (
+                <div key={index} className="flex items-start gap-2">
+                  <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />
+                  <span className="text-gray-700 dark:text-gray-300">{practice}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-gray-800">
+      <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900 dark:text-white">
+        <Command className="h-5 w-5" />
+        Keyboard Shortcuts
+      </h3>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { keys: ['⌘', 'K'], action: 'Command Palette' },
+          { keys: ['⌘', 'N'], action: 'New Record' },
+          { keys: ['⌘', 'S'], action: 'Save Changes' },
+          { keys: ['Esc'], action: 'Close Modal' }
+        ].map((shortcut, index) => (
+          <div key={index} className="rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
+            <div className="mb-1 flex items-center gap-1">
+              {shortcut.keys.map((key, kIndex) => (
+                <React.Fragment key={kIndex}>
+                  {kIndex > 0 && <span className="text-gray-400">+</span>}
+                  <kbd className="rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-700 shadow-sm dark:bg-gray-600 dark:text-gray-300">
+                    {key}
+                  </kbd>
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">{shortcut.action}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// NOW define MODULE_CONTENT after all component declarations
+const MODULE_CONTENT: Record<string, ModuleContent> = {
+  dashboard: {
+    title: 'Dashboard Guide',
+    content: <DashboardContent />
+  },
+  residents: {
+    title: 'Residents Management',
+    content: <ResidentsContent />
+  },
+  clearance: {
+    title: 'Clearance Processing',
+    content: <ClearanceContent />
+  },
+  payments: {
+    title: 'Payment Collection',
+    content: <PaymentsContent />
+  },
+  general: {
+    title: 'System Guide',
+    content: <GeneralContent showQuickGuide={true} />
+  }
+};
+
+// Main Component
 const InstructionsModal: React.FC<InstructionsModalProps> = ({
   isOpen,
   onClose,
@@ -64,716 +497,213 @@ const InstructionsModal: React.FC<InstructionsModalProps> = ({
   showQuickGuide = true,
   userRole = 'staff'
 }) => {
-  // Close modal on Escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
 
-  if (!isOpen) return null;
-
-  // Module-specific content for barangay system
-  const getModuleContent = () => {
-    const modules: Record<string, { title: string; content: React.ReactNode }> = {
-      dashboard: {
-        title: 'Dashboard Guide - Barangay Management System',
-        content: (
-          <div className="space-y-6">
-            <div className="rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 p-4 dark:from-blue-900/20 dark:to-blue-800/20">
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-blue-900 dark:text-blue-300">
-                <BarChart3 className="h-5 w-5" />
-                Dashboard Overview
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800 dark:text-blue-400">
-                    <CheckCircle className="h-4 w-4" />
-                    Key Metrics
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                    <li className="flex items-start gap-2">
-                      <ChevronRight className="mt-0.5 h-3 w-3 flex-shrink-0 text-blue-500" />
-                      <span><strong>Total Residents:</strong> Current registered population</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <ChevronRight className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-500" />
-                      <span><strong>Total Households:</strong> Number of family units</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <ChevronRight className="mt-0.5 h-3 w-3 flex-shrink-0 text-amber-500" />
-                      <span><strong>Today's Collections:</strong> Daily revenue from barangay fees</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <ChevronRight className="mt-0.5 h-3 w-3 flex-shrink-0 text-purple-500" />
-                      <span><strong>Pending Clearances:</strong> Applications needing processing</span>
-                    </li>
-                  </ul>
-                </div>
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800 dark:text-blue-400">
-                    <Activity className="h-4 w-4" />
-                    Quick Actions
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                    <li className="flex items-start gap-2">
-                      <UserPlus className="mt-0.5 h-3 w-3 flex-shrink-0 text-purple-500" />
-                      <span><strong>Register Resident:</strong> Add new resident to database</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <FileTextIcon className="mt-0.5 h-3 w-3 flex-shrink-0 text-blue-500" />
-                      <span><strong>Request Clearance:</strong> Create new clearance application</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CreditCard className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-500" />
-                      <span><strong>Process Payment:</strong> Record barangay fee payments</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0 text-rose-500" />
-                      <span><strong>Emergency Alert:</strong> Send urgent notifications</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Dashboard Views */}
-            <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                <Eye className="h-5 w-5" />
-                Dashboard Views
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-gray-800 dark:text-gray-300">
-                    <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">Overview</span>
-                    Default View
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Quick glance at key metrics, recent activities, and quick action buttons.
-                  </p>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-gray-800 dark:text-gray-300">
-                    <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">Detailed</span>
-                    Analytics View
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    In-depth charts, trends, and detailed statistics for advanced analysis.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      },
-      residents: {
-        title: 'Residents Module - Management Guide',
-        content: (
-          <div className="space-y-6">
-            <div className="rounded-lg bg-gradient-to-r from-emerald-50 to-emerald-100 p-4 dark:from-emerald-900/20 dark:to-emerald-800/20">
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-emerald-900 dark:text-emerald-300">
-                <Users className="h-5 w-5" />
-                Resident Management
-              </h3>
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-400">
-                    <UserPlus className="h-4 w-4" />
-                    Adding Residents
-                  </h4>
-                  <ol className="space-y-2 text-sm">
-                    <li className="flex items-start gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">1</span>
-                      <span>Click "Register Resident" from Quick Actions</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">2</span>
-                      <span>Fill in all required personal information</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">3</span>
-                      <span>Upload valid ID and proof of residency</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">4</span>
-                      <span>Assign to existing household or create new</span>
-                    </li>
-                  </ol>
-                </div>
-                
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-400">
-                    <UserCheck className="h-4 w-4" />
-                    Resident Search
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                    <li className="flex items-start gap-2">
-                      <Search className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                      <span><strong>Quick Search:</strong> Name, household number, or address</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Filter className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                      <span><strong>Advanced Filters:</strong> Age range, gender, purok</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Printer className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                      <span><strong>Export Data:</strong> Generate reports in PDF/Excel</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Resident Categories */}
-            <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-              <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">Resident Categories</h3>
-              <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-                  <div className="font-medium text-blue-800 dark:text-blue-300">Regular</div>
-                  <div className="text-xs text-blue-700 dark:text-blue-400">Permanent residents</div>
-                </div>
-                <div className="rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
-                  <div className="font-medium text-purple-800 dark:text-purple-300">Senior</div>
-                  <div className="text-xs text-purple-700 dark:text-purple-400">60+ years old</div>
-                </div>
-                <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
-                  <div className="font-medium text-amber-800 dark:text-amber-300">PWD</div>
-                  <div className="text-xs text-amber-700 dark:text-amber-400">With disability</div>
-                </div>
-                <div className="rounded-lg bg-rose-50 p-3 dark:bg-rose-900/20">
-                  <div className="font-medium text-rose-800 dark:text-rose-300">Transient</div>
-                  <div className="text-xs text-rose-700 dark:text-rose-400">Temporary residents</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      },
-      clearance: {
-        title: 'Clearance System - Processing Guide',
-        content: (
-          <div className="space-y-6">
-            <div className="rounded-lg bg-gradient-to-r from-purple-50 to-purple-100 p-4 dark:from-purple-900/20 dark:to-purple-800/20">
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-purple-900 dark:text-purple-300">
-                <FileTextIcon className="h-5 w-5" />
-                Clearance Processing Workflow
-              </h3>
-              
-              <div className="space-y-4">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-3 font-medium text-purple-800 dark:text-purple-400">Step-by-Step Process</h4>
-                  <ol className="space-y-3 text-sm">
-                    <li className="flex items-start gap-3">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-purple-800 font-bold">1</span>
-                      <div>
-                        <div className="font-medium">Receive & Verify Request</div>
-                        <div className="mt-1 text-gray-600 dark:text-gray-400">
-                          Check submitted documents: Valid ID, Proof of Residency, Purpose Letter
-                        </div>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-800 font-bold">2</span>
-                      <div>
-                        <div className="font-medium">Background Check</div>
-                        <div className="mt-1 text-gray-600 dark:text-gray-400">
-                          Verify barangay records for dues, violations, or pending issues
-                        </div>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 font-bold">3</span>
-                      <div>
-                        <div className="font-medium">Payment Processing</div>
-                        <div className="mt-1 text-gray-600 dark:text-gray-400">
-                          Collect fees and issue official barangay receipt
-                        </div>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-amber-800 font-bold">4</span>
-                      <div>
-                        <div className="font-medium">Approval & Issuance</div>
-                        <div className="mt-1 text-gray-600 dark:text-gray-400">
-                          Approve request and generate clearance certificate with QR code
-                        </div>
-                      </div>
-                    </li>
-                  </ol>
-                </div>
-              </div>
-            </div>
-
-            {/* Clearance Types */}
-            <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-              <h3 className="mb-3 font-semibold text-gray-900 dark:text-white">Clearance Types & Requirements</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b dark:border-gray-700">
-                      <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Type</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Fee</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Processing</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Validity</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y dark:divide-gray-700">
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Barangay Clearance</td>
-                      <td className="px-4 py-2">₱100</td>
-                      <td className="px-4 py-2">1-3 days</td>
-                      <td className="px-4 py-2">6 months</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Business Permit</td>
-                      <td className="px-4 py-2">₱500+</td>
-                      <td className="px-4 py-2">3-5 days</td>
-                      <td className="px-4 py-2">1 year</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Good Moral</td>
-                      <td className="px-4 py-2">₱150</td>
-                      <td className="px-4 py-2">2-4 days</td>
-                      <td className="px-4 py-2">6 months</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2 font-medium">Residency</td>
-                      <td className="px-4 py-2">₱100</td>
-                      <td className="px-4 py-2">1-2 days</td>
-                      <td className="px-4 py-2">1 year</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )
-      },
-      payments: {
-        title: 'Payment System - Collection Guide',
-        content: (
-          <div className="space-y-6">
-            <div className="rounded-lg bg-gradient-to-r from-amber-50 to-amber-100 p-4 dark:from-amber-900/20 dark:to-amber-800/20">
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-amber-900 dark:text-amber-300">
-                <CreditCard className="h-5 w-5" />
-                Payment Processing
-              </h3>
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-amber-800 dark:text-amber-400">
-                    <DollarSign className="h-4 w-4" />
-                    Payment Methods
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                    <li className="flex items-center gap-2">
-                      <div className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Cash</div>
-                      <span>Over-the-counter at barangay hall</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">GCash</div>
-                      <span>Mobile payment via 0917-XXX-XXXX</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800">PayMaya</div>
-                      <span>Mobile payment via 0918-XXX-XXXX</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <div className="rounded-full bg-cyan-100 px-2 py-1 text-xs font-medium text-cyan-800">Bank Transfer</div>
-                      <span>BPI/KB Barangay Account</span>
-                    </li>
-                  </ul>
-                </div>
-                
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-amber-800 dark:text-amber-400">
-                    <Receipt className="h-4 w-4" />
-                    Official Receipts
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-500" />
-                      <span>All payments must have official barangay receipt</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-500" />
-                      <span>Receipt number is auto-generated by system</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-500" />
-                      <span>Keep duplicate copy for barangay records</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-500" />
-                      <span>Digital receipts can be sent via SMS/Email</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Collection Schedule */}
-            <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                <Calendar className="h-5 w-5" />
-                Collection Schedule
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-                  <div className="font-medium text-blue-800 dark:text-blue-300">Monday - Friday</div>
-                  <div className="text-xs text-blue-700 dark:text-blue-400">8:00 AM - 5:00 PM</div>
-                </div>
-                <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-900/20">
-                  <div className="font-medium text-emerald-800 dark:text-emerald-300">Saturday</div>
-                  <div className="text-xs text-emerald-700 dark:text-emerald-400">8:00 AM - 12:00 PM</div>
-                </div>
-                <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20">
-                  <div className="font-medium text-amber-800 dark:text-amber-300">Cut-off</div>
-                  <div className="text-xs text-amber-700 dark:text-amber-400">Daily 3:00 PM</div>
-                </div>
-                <div className="rounded-lg bg-rose-50 p-3 dark:bg-rose-900/20">
-                  <div className="font-medium text-rose-800 dark:text-rose-300">Emergency</div>
-                  <div className="text-xs text-rose-700 dark:text-rose-400">24/7 On-call</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      },
-      general: {
-        title: 'Barangay Management System - User Guide',
-        content: (
-          <div className="space-y-6">
-            {/* Role-Based Access */}
-            <div className="rounded-lg bg-gradient-to-r from-blue-50 to-blue-100 p-4 dark:from-blue-900/20 dark:to-blue-800/20">
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-blue-900 dark:text-blue-300">
-                <Shield className="h-5 w-5" />
-                Role-Based Access Control
-              </h3>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-blue-800 dark:text-blue-400">
-                    <Shield className="h-4 w-4" />
-                    Administrator
-                  </h4>
-                  <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                    <li>• Full system access</li>
-                    <li>• User management</li>
-                    <li>• System configuration</li>
-                    <li>• Report generation</li>
-                  </ul>
-                </div>
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-400">
-                    <UserCheck className="h-4 w-4" />
-                    Barangay Staff
-                  </h4>
-                  <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                    <li>• Resident management</li>
-                    <li>• Clearance processing</li>
-                    <li>• Payment collection</li>
-                    <li>• Document generation</li>
-                  </ul>
-                </div>
-                <div className="rounded-lg bg-white p-4 dark:bg-gray-900">
-                  <h4 className="mb-2 flex items-center gap-2 font-medium text-purple-800 dark:text-purple-400">
-                    <Users className="h-4 w-4" />
-                    Residents (Portal)
-                  </h4>
-                  <ul className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                    <li>• Apply for clearances</li>
-                    <li>• View personal records</li>
-                    {/* <li>• Make payments</li> */}
-                    <li>• Track applications</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Start Guide */}
-            {showQuickGuide && (
-              <div className="rounded-lg border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                  <BookOpen className="h-5 w-5" />
-                  Quick Start Guide
-                </h3>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
-                      <h4 className="mb-1 font-medium text-gray-800 dark:text-gray-300">First-Time Setup</h4>
-                      <ol className="ml-4 list-decimal space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                        <li>Complete your staff profile</li>
-                        <li>Set up your security preferences</li>
-                        <li>Review barangay fees and rates</li>
-                        <li>Test the system with sample data</li>
-                      </ol>
-                    </div>
-                    <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900/50">
-                      <h4 className="mb-1 font-medium text-gray-800 dark:text-gray-300">Daily Tasks</h4>
-                      <ul className="ml-4 list-disc space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                        <li>Check pending clearances</li>
-                        <li>Process resident applications</li>
-                        <li>Record daily collections</li>
-                        <li>Update resident records</li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-                      <h4 className="mb-1 font-medium text-blue-800 dark:text-blue-400">Best Practices</h4>
-                      <ul className="space-y-2 text-sm text-blue-700 dark:text-blue-400">
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                          <span>Always verify resident identity</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                          <span>Keep digital records updated daily</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                          <span>Backup system data regularly</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
-                          <span>Log out when not using system</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Keyboard Shortcuts */}
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
-              <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                <Keyboard className="h-5 w-5" />
-                Keyboard Shortcuts
-              </h3>
-              <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
-                  <div className="flex items-center gap-2">
-                    <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">F1</kbd>
-                    <span className="font-medium text-gray-900 dark:text-white">Help</span>
-                  </div>
-                  <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">Open this guide</div>
-                </div>
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
-                  <div className="flex items-center gap-2">
-                    <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">Ctrl</kbd>
-                    <span className="font-medium">+</span>
-                    <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">K</kbd>
-                  </div>
-                  <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">Command palette</div>
-                </div>
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
-                  <div className="flex items-center gap-2">
-                    <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">Ctrl</kbd>
-                    <span className="font-medium">+</span>
-                    <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">N</kbd>
-                  </div>
-                  <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">New record</div>
-                </div>
-                <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
-                  <div className="flex items-center gap-2">
-                    <kbd className="rounded bg-gray-100 px-2 py-1 font-mono text-xs dark:bg-gray-700">Esc</kbd>
-                    <span className="font-medium text-gray-900 dark:text-white">Close</span>
-                  </div>
-                  <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">Close modals/panels</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      }
-    };
-
-    return modules[module] || modules.general;
-  };
-
-  const moduleContent = getModuleContent();
-  const modalTitle = title || moduleContent.title;
-
-  // Handle click outside to close
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
+  // Handle Escape key
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isOpen) {
       onClose();
     }
-  };
+  }, [isOpen, onClose]);
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/50 transition-opacity"
-        onClick={handleBackdropClick}
-        aria-hidden="true"
-      />
+  // Focus trap
+  useEffect(() => {
+    if (isOpen) {
+      previousActiveElement.current = document.activeElement as HTMLElement;
+      document.addEventListener('keydown', handleKeyDown);
+      
+      // Focus modal on open
+      setTimeout(() => {
+        modalRef.current?.focus();
+      }, 100);
+    }
 
-      {/* Modal */}
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-4xl transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all dark:bg-gray-900">
-          {/* Header */}
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-sidebar-border/70 bg-white px-6 py-4 dark:border-sidebar-border dark:bg-gray-900">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
-                <HelpCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {modalTitle}
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Barangay Kibawe Management System
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onClose}
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                aria-label="Close help guide"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      
+      // Restore focus
+      if (previousActiveElement.current) {
+        previousActiveElement.current.focus();
+      }
+    };
+  }, [isOpen, handleKeyDown]);
 
-          {/* Content */}
-          <div className="max-h-[70vh] overflow-y-auto p-6">
-            {customContent ? customContent : moduleContent.content}
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
 
-            {/* Additional Resources Section */}
-            <div className="mt-8 border-t border-sidebar-border/70 pt-6 dark:border-sidebar-border">
-              <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
-                <FileText className="h-5 w-5" />
-                Additional Resources
-              </h3>
-              <div className="grid gap-3 md:grid-cols-3">
-                <a
-                  href="/user-guide.pdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-center gap-3 rounded-lg border border-sidebar-border/70 p-3 hover:border-blue-500 hover:bg-blue-50 dark:border-sidebar-border dark:hover:bg-blue-900/20"
-                >
-                  <div className="rounded-lg bg-blue-100 p-2 group-hover:bg-blue-200 dark:bg-blue-900/30 dark:group-hover:bg-blue-900/40">
-                    <Download className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-white">Complete User Guide</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">PDF Manual (50 pages)</div>
-                  </div>
-                </a>
-                <a
-                  href="/training-videos"
-                  className="group flex items-center gap-3 rounded-lg border border-sidebar-border/70 p-3 hover:border-purple-500 hover:bg-purple-50 dark:border-sidebar-border dark:hover:bg-purple-900/20"
-                >
-                  <div className="rounded-lg bg-purple-100 p-2 group-hover:bg-purple-200 dark:bg-purple-900/30 dark:group-hover:bg-purple-900/40">
-                    <Video className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-white">Video Tutorials</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Step-by-step guides</div>
-                  </div>
-                </a>
-                <a
-                  href="/faq"
-                  className="group flex items-center gap-3 rounded-lg border border-sidebar-border/70 p-3 hover:border-emerald-500 hover:bg-emerald-50 dark:border-sidebar-border dark:hover:bg-emerald-900/20"
-                >
-                  <div className="rounded-lg bg-emerald-100 p-2 group-hover:bg-emerald-200 dark:bg-emerald-900/30 dark:group-hover:bg-emerald-900/40">
-                    <HelpCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-white">FAQ & Troubleshooting</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Common questions</div>
-                  </div>
-                </a>
-              </div>
-            </div>
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
-            {/* Contact Information */}
-            <div className="mt-6 rounded-lg bg-gray-50 p-4 dark:bg-gray-900/50">
-              <h4 className="mb-3 font-medium text-gray-900 dark:text-white">Need Assistance?</h4>
-              <div className="grid gap-4 text-sm md:grid-cols-2">
-                <div>
-                  <div className="mb-2 flex items-center gap-2 font-medium text-gray-800 dark:text-gray-300">
-                    <Phone className="h-4 w-4" />
-                    Contact Support
+  const moduleContent = MODULE_CONTENT[module] || MODULE_CONTENT.general;
+  const modalTitle = title || moduleContent.title;
+
+  const modal = (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          {/* Backdrop */}
+          <motion.div
+            variants={backdropVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+
+          {/* Modal Container */}
+          <div className="flex min-h-full items-center justify-center p-4">
+            <motion.div
+              ref={modalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-title"
+              tabIndex={-1}
+              variants={modalVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="relative w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
+            >
+              {/* Header */}
+              <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-xl dark:border-gray-700 dark:bg-gray-900/80">
+                <div className="flex items-center justify-between px-6 py-4">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-blue-100 p-2.5 dark:bg-blue-900/30">
+                      <HelpCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h2 id="modal-title" className="text-xl font-bold text-gray-900 dark:text-white">
+                        {modalTitle}
+                      </h2>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Barangay Kibawe Management System
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                    <div>Barangay IT Officer: (02) 1234-5678</div>
-                    <div>Emergency Hotline: 911</div>
-                    <div>Mobile: 0917-XXX-XXXX</div>
-                  </div>
-                </div>
-                <div>
-                  <div className="mb-2 flex items-center gap-2 font-medium text-gray-800 dark:text-gray-300">
-                    <Mail className="h-4 w-4" />
-                    Email Support
-                  </div>
-                  <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                    <div>Technical: support@barangaykibawe.gov.ph</div>
-                    <div>Administrative: admin@barangaykibawe.gov.ph</div>
-                    <div>Clearance: clearance@barangaykibawe.gov.ph</div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={onClose}
+                      className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                      aria-label="Close help guide"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Footer */}
-          <div className="border-t border-sidebar-border/70 bg-gray-50 px-6 py-4 dark:border-sidebar-border dark:bg-gray-900/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                <Eye className="h-4 w-4" />
-                <span>Press <kbd className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs dark:bg-gray-700">ESC</kbd> to close</span>
+              {/* Content */}
+              <div className="max-h-[70vh] overflow-y-auto p-6">
+                {customContent || moduleContent.content}
+
+                {/* Resources Section */}
+                <div className="mt-8 border-t border-gray-200 pt-8 dark:border-gray-700">
+                  <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900 dark:text-white">
+                    <FileText className="h-5 w-5" />
+                    Additional Resources
+                  </h3>
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    <ResourceLink
+                      href="/user-guide.pdf"
+                      icon={<Download className="h-5 w-5 text-blue-600" />}
+                      title="Complete User Guide"
+                      description="PDF Manual • 50 pages"
+                      color="blue"
+                    />
+                    <ResourceLink
+                      href="/training-videos"
+                      icon={<Video className="h-5 w-5 text-purple-600" />}
+                      title="Video Tutorials"
+                      description="Step-by-step visual guides"
+                      color="purple"
+                    />
+                    <ResourceLink
+                      href="/faq"
+                      icon={<HelpCircle className="h-5 w-5 text-emerald-600" />}
+                      title="FAQ & Support"
+                      description="Common questions answered"
+                      color="emerald"
+                    />
+                  </div>
+                </div>
+
+                {/* Contact Section */}
+                <div className="mt-8 rounded-2xl bg-gradient-to-r from-gray-50 to-blue-50 p-6 dark:from-gray-800 dark:to-blue-900/10">
+                  <h4 className="mb-4 font-bold text-gray-900 dark:text-white">Need Assistance?</h4>
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+                        <Phone className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 dark:text-white">Phone Support</div>
+                        <div className="mt-1 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                          <div>IT Officer: (02) 1234-5678</div>
+                          <div>Emergency: 911</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
+                        <Mail className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 dark:text-white">Email Support</div>
+                        <div className="mt-1 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                          <div>support@barangaykibawe.gov.ph</div>
+                          <div>admin@barangaykibawe.gov.ph</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={onClose}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                >
-                  Close Guide
-                </button>
-                <button
-                  onClick={() => window.open('/admin/instructions', '_blank')}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                >
-                  Open Full Manual
-                </button>
+
+              {/* Footer */}
+              <div className="border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <Eye className="h-4 w-4" />
+                    <span>Press <kbd className="rounded-md bg-white px-2 py-0.5 text-xs font-medium shadow-sm dark:bg-gray-700">ESC</kbd> to close</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={onClose}
+                      className="rounded-xl px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      Close Guide
+                    </button>
+                    <button
+                      onClick={() => window.open('/admin/instructions', '_blank')}
+                      className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-blue-700 hover:shadow-lg active:scale-95 dark:bg-blue-500 dark:hover:bg-blue-600"
+                    >
+                      Open Full Manual
+                      <ArrowRight className="ml-2 inline-block h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   );
+
+  // Use portal to render at document body level
+  if (typeof document === 'undefined') return null;
+  return createPortal(modal, document.body);
 };
-
-// Add missing icon components
-const Activity = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-  </svg>
-);
-
-const DollarSign = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const Receipt = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
 
 export default InstructionsModal;

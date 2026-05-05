@@ -10,7 +10,19 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { toast } from 'sonner';
+
+interface FilterOption {
+    value: string;
+    label: string;
+}
+
+interface TabCounts {
+    all: number;
+    pending: number;
+    paid: number;
+    overdue: number;
+    cancelled: number;
+}
 
 interface ModernFeeFiltersProps {
     search: string;
@@ -24,18 +36,20 @@ interface ModernFeeFiltersProps {
     yearFilter: string;
     handleYearChange: (year: string) => void;
     loading: boolean;
-    availableFeeTypes: Array<any>;
+    availableFeeTypes: Array<{ id: number; name: string }>;
     availableYears: number[];
-    householdResidents: Array<any>;
+    householdResidents: Array<{ id: number; first_name: string; last_name: string }>;
     printFees: () => void;
     exportToCSV: () => void;
     isExporting: boolean;
     hasActiveFilters: boolean;
     handleClearFilters: () => void;
+    tabCounts?: TabCounts;
+    statusFilter?: string;
     onCopySummary?: () => void;
 }
 
-export const ModernFeeFilters = ({
+export function ModernFeeFilters({
     search,
     setSearch,
     handleSearchSubmit,
@@ -55,28 +69,29 @@ export const ModernFeeFilters = ({
     isExporting,
     hasActiveFilters,
     handleClearFilters,
+    tabCounts,
+    statusFilter = 'all',
     onCopySummary,
-}: ModernFeeFiltersProps) => {
-    const feeTypeOptions = availableFeeTypes.map(type => ({
+}: ModernFeeFiltersProps) {
+    const feeTypeOptions: FilterOption[] = (availableFeeTypes ?? []).map((type) => ({
         value: type.id.toString(),
-        label: type.name
+        label: type.name,
     }));
 
-    const residentOptions = householdResidents.map(resident => ({
+    const residentOptions: FilterOption[] = (householdResidents ?? []).map((resident) => ({
         value: resident.id.toString(),
-        label: `${resident.first_name} ${resident.last_name}`
+        label: `${resident.first_name} ${resident.last_name}`,
     }));
 
-    const yearOptions = availableYears.map(year => ({
+    const yearOptions: FilterOption[] = (availableYears ?? []).map((year) => ({
         value: year.toString(),
-        label: year.toString()
+        label: year.toString(),
     }));
 
     return (
         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
             <CardContent className="p-6">
                 <div className="space-y-4">
-                    {/* Search Bar */}
                     <div className="relative group">
                         <form onSubmit={handleSearchSubmit} className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -99,7 +114,6 @@ export const ModernFeeFilters = ({
                         </form>
                     </div>
 
-                    {/* Filters Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <ModernSelect
                             value={feeTypeFilter}
@@ -130,10 +144,12 @@ export const ModernFeeFilters = ({
                             icon={Calendar}
                         />
 
-                        {/* Actions Dropdown */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="h-10 rounded-xl border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
+                                <Button
+                                    variant="outline"
+                                    className="h-10 rounded-xl border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                >
                                     <DownloadCloud className="h-4 w-4 mr-2" />
                                     Export
                                     <ChevronDown className="h-4 w-4 ml-2" />
@@ -157,9 +173,28 @@ export const ModernFeeFilters = ({
                         </DropdownMenu>
                     </div>
 
-                    {/* Active Filters */}
+                    {tabCounts && (
+                        <div className="flex flex-wrap gap-2">
+                            {Object.entries(tabCounts).map(([key, count]) => (
+                                <div
+                                    key={key}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                                        statusFilter === key || (statusFilter === 'all' && key === 'all')
+                                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
+                                            : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
+                                    }`}
+                                >
+                                    <span className="capitalize font-medium">
+                                        {key.replace('_', ' ')}
+                                    </span>
+                                    <span className="font-bold">{count}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {hasActiveFilters && (
-                        <div className="overflow-hidden">
+                        <div>
                             <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <div className="flex items-center gap-2">
                                     <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
@@ -183,4 +218,4 @@ export const ModernFeeFilters = ({
             </CardContent>
         </Card>
     );
-};
+}

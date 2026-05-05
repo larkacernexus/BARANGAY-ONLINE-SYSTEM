@@ -8,25 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-// Notification interface matching your backend
+// Updated notification interface to match your backend format
 export interface Notification {
   id: string;
   type: string;
   data: any;
   read_at: string | null;
+  is_read: boolean;
   created_at: string;
-  created_at_diff: string;
-  is_fee_notification: boolean;
-  message: string;
-  title: string;
-  resident_name?: string;
-  formatted_amount?: string;
-  fee_code?: string;
-  fee_type?: string;
-  link?: string;
-  url?: string;
-  is_system?: boolean;
-  notification_type?: 'fee' | 'payment' | 'report' | 'clearance' | 'system';
+  created_at_raw: string;
 }
 
 // Props interface
@@ -41,6 +31,72 @@ interface NotificationCenterProps {
   userType?: 'admin' | 'staff' | 'kagawad';
 }
 
+// Helper function to extract title from notification data
+const getNotificationTitle = (notification: Notification): string => {
+  if (notification.data?.title) return notification.data.title;
+  if (notification.data?.message) {
+    return notification.data.message.substring(0, 50) + (notification.data.message.length > 50 ? '...' : '');
+  }
+  
+  // Generate title based on notification type
+  switch (notification.type) {
+    case 'Fee':
+    case 'FeeNotification':
+      return 'Fee Notification';
+    case 'Payment':
+    case 'PaymentNotification':
+      return 'Payment Notification';
+    case 'Report':
+    case 'ReportNotification':
+      return 'Report Notification';
+    case 'Clearance':
+    case 'ClearanceNotification':
+      return 'Clearance Notification';
+    case 'System':
+    case 'SystemNotification':
+      return 'System Notification';
+    default:
+      return notification.type.replace(/([A-Z])/g, ' $1').trim();
+  }
+};
+
+// Helper function to extract message from notification data
+const getNotificationMessage = (notification: Notification): string => {
+  if (notification.data?.message) return notification.data.message;
+  if (notification.data?.description) return notification.data.description;
+  if (notification.data?.content) return notification.data.content;
+  
+  // Try to generate message from data
+  const data = notification.data || {};
+  const relevantFields = Object.entries(data)
+    .filter(([key]) => !['title', 'type', 'icon'].includes(key))
+    .slice(0, 2)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(', ');
+  
+  return relevantFields || 'No details available';
+};
+
+// Helper function to determine notification type for icon
+const getNotificationCategory = (notification: Notification): 'fee' | 'payment' | 'report' | 'clearance' | 'system' => {
+  const type = notification.type.toLowerCase();
+  
+  if (type.includes('fee') || notification.data?.fee_code || notification.data?.formatted_amount) {
+    return 'fee';
+  }
+  if (type.includes('payment') || notification.data?.or_number) {
+    return 'payment';
+  }
+  if (type.includes('report') || notification.data?.report_number) {
+    return 'report';
+  }
+  if (type.includes('clearance') || notification.data?.reference_number) {
+    return 'clearance';
+  }
+  
+  return 'system';
+};
+
 // Notification Item Component
 const NotificationItem = ({ 
   notification, 
@@ -49,57 +105,76 @@ const NotificationItem = ({
   notification: Notification; 
   onClick: () => void;
 }) => {
+  const category = getNotificationCategory(notification);
+  
   const getIcon = () => {
-    if (notification.is_fee_notification || notification.notification_type === 'fee') return CheckCircle2;
-    if (notification.notification_type === 'payment') return CheckCircle;
-    if (notification.notification_type === 'report') return AlertCircle;
-    if (notification.notification_type === 'clearance') return Info;
-    return Bell;
+    switch (category) {
+      case 'fee': return CheckCircle2;
+      case 'payment': return CheckCircle;
+      case 'report': return AlertCircle;
+      case 'clearance': return Info;
+      default: return Bell;
+    }
   };
 
   const getIconColor = () => {
-    if (notification.is_fee_notification || notification.notification_type === 'fee') return 'text-emerald-500';
-    if (notification.notification_type === 'payment') return 'text-green-500';
-    if (notification.notification_type === 'report') return 'text-orange-500';
-    if (notification.notification_type === 'clearance') return 'text-blue-500';
-    return 'text-purple-500';
+    switch (category) {
+      case 'fee': return 'text-emerald-500';
+      case 'payment': return 'text-green-500';
+      case 'report': return 'text-orange-500';
+      case 'clearance': return 'text-blue-500';
+      default: return 'text-purple-500';
+    }
   };
 
   const getBgGradient = () => {
-    if (notification.read_at) return '';
+    if (notification.is_read) return '';
     
-    if (notification.is_fee_notification || notification.notification_type === 'fee') {
-      return 'from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 hover:from-emerald-100 hover:to-teal-100 dark:hover:from-emerald-900/30 dark:hover:to-teal-900/30';
+    switch (category) {
+      case 'fee':
+        return 'from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20';
+      case 'payment':
+        return 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
+      case 'report':
+        return 'from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20';
+      case 'clearance':
+        return 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20';
+      default:
+        return 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20';
     }
-    if (notification.notification_type === 'payment') {
-      return 'from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 hover:from-green-100 hover:to-emerald-100 dark:hover:from-green-900/30 dark:hover:to-emerald-900/30';
-    }
-    if (notification.notification_type === 'report') {
-      return 'from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 hover:from-orange-100 hover:to-amber-100 dark:hover:from-orange-900/30 dark:hover:to-amber-900/30';
-    }
-    return 'from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30';
   };
 
   const Icon = getIcon();
+  const title = getNotificationTitle(notification);
+  const message = getNotificationMessage(notification);
+  
+  // Extract resident name from notification data
+  const residentName = notification.data?.resident_name || notification.data?.payer_name || null;
+  
+  // Extract amount from notification data
+  const formattedAmount = notification.data?.formatted_amount || notification.data?.amount || null;
+  
+  // Extract fee code from notification data
+  const feeCode = notification.data?.fee_code || notification.data?.clearance_type || null;
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        "w-full text-left p-4 rounded-xl transition-all duration-200 relative overflow-hidden group hover:scale-[1.02] active:scale-[0.98]",
-        notification.read_at 
+        "w-full text-left p-4 rounded-xl transition-all duration-200 relative overflow-hidden group",
+        notification.is_read 
           ? 'bg-transparent hover:bg-gray-50 dark:hover:bg-gray-900/50' 
           : cn("bg-gradient-to-r", getBgGradient())
       )}
     >
       {/* Unread indicator */}
-      {!notification.read_at && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full animate-pulse" />
+      {!notification.is_read && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full" />
       )}
 
       <div className="flex items-start gap-3">
         <div className={cn(
-          "p-2 rounded-lg bg-white dark:bg-gray-900 shadow-sm",
+          "p-2 rounded-lg bg-white dark:bg-gray-900 shadow-sm flex-shrink-0",
           getIconColor()
         )}>
           <Icon className="h-4 w-4" />
@@ -108,38 +183,38 @@ const NotificationItem = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
             <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
-              {notification.title}
+              {title}
             </p>
-            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-              {notification.created_at_diff}
+            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap flex-shrink-0">
+              {notification.created_at || 'Just now'}
             </span>
           </div>
           
-          {notification.resident_name && (
+          {residentName && (
             <div className="flex items-center gap-1 mb-1">
-              <User className="h-3 w-3 text-purple-500" />
-              <span className="text-xs text-purple-600 dark:text-purple-400">
-                From: {notification.resident_name}
+              <User className="h-3 w-3 text-purple-500 flex-shrink-0" />
+              <span className="text-xs text-purple-600 dark:text-purple-400 truncate">
+                {residentName}
               </span>
             </div>
           )}
           
           <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
-            {notification.message}
+            {message}
           </p>
           
-          {notification.formatted_amount && notification.formatted_amount !== '₱0.00' && (
+          {formattedAmount && formattedAmount !== '0' && formattedAmount !== '0.00' && (
             <div className="mt-2">
-              <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
-                {notification.formatted_amount}
+              <span className="inline-block text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full">
+                {typeof formattedAmount === 'number' ? `₱${formattedAmount.toFixed(2)}` : formattedAmount}
               </span>
             </div>
           )}
 
-          {notification.fee_code && (
+          {feeCode && (
             <div className="mt-2">
-              <span className="text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-full">
-                {notification.fee_code}
+              <span className="inline-block text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-full">
+                {feeCode}
               </span>
             </div>
           )}
@@ -165,17 +240,25 @@ export function NotificationCenter({
 }: NotificationCenterProps) {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [isNavigating, setIsNavigating] = useState(false);
-  const [localNotifications, setLocalNotifications] = useState<Notification[]>(notifications);
-  const [localUnreadCount, setLocalUnreadCount] = useState(unreadCount);
+  const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
+  const [localUnreadCount, setLocalUnreadCount] = useState(0);
 
   // Update local state when props change
   useEffect(() => {
-    setLocalNotifications(notifications);
-    setLocalUnreadCount(unreadCount);
+    console.log('Notifications received:', notifications); // Debug log
+    setLocalNotifications(Array.isArray(notifications) ? notifications : []);
+    setLocalUnreadCount(unreadCount || 0);
   }, [notifications, unreadCount]);
 
+  // Reset filter when sheet opens
+  useEffect(() => {
+    if (isOpen) {
+      setFilter('all');
+    }
+  }, [isOpen]);
+
   const filteredNotifications = localNotifications.filter(n => 
-    filter === 'all' || (filter === 'unread' && !n.read_at)
+    filter === 'all' || (filter === 'unread' && !n.is_read)
   );
 
   const handleNotificationClick = (notification: Notification) => {
@@ -183,42 +266,38 @@ export function NotificationCenter({
     if (isNavigating) return;
 
     // Mark as read if unread
-    if (!notification.read_at) {
+    if (!notification.is_read) {
       onMarkAsRead(notification.id);
       
       // Update local state immediately for better UX
       setLocalNotifications(prev =>
         prev.map(n =>
-          n.id === notification.id ? { ...n, read_at: new Date().toISOString() } : n
+          n.id === notification.id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
         )
       );
       setLocalUnreadCount(prev => Math.max(0, prev - 1));
     }
 
-    // Check for link
-    const notificationLink = notification.link || notification.url;
+    // Check for link in notification data
+    const actionUrl = notification.data?.action_url || notification.data?.url || notification.data?.link;
     
-    if (notificationLink && notificationLink !== '#') {
-      let targetUrl = notificationLink;
+    if (actionUrl && actionUrl !== '#') {
+      let targetUrl = actionUrl;
       
-      // Handle empty or invalid links
-      if (targetUrl === '#' || targetUrl === '') {
-        onClose();
-        return;
-      }
-      
-      // Extract path from full URL
+      // Handle the URL properly
       try {
         if (targetUrl.startsWith('http')) {
           const urlObj = new URL(targetUrl);
           targetUrl = urlObj.pathname + urlObj.search + urlObj.hash;
         }
       } catch (e) {
-        // Not a valid URL, use as is
+        console.error('Invalid URL:', targetUrl);
       }
       
-      // Remove prefixes and ensure leading slash
-      targetUrl = targetUrl.replace(/^\/?(admin|portal)\//, '');
+      // Remove any existing admin/portal prefix
+      targetUrl = targetUrl.replace(/^\/?(admin|portal)\//, '/');
+      
+      // Ensure leading slash
       if (!targetUrl.startsWith('/')) {
         targetUrl = '/' + targetUrl;
       }
@@ -231,6 +310,8 @@ export function NotificationCenter({
       
       targetUrl = basePath + targetUrl;
       
+      console.log('Navigating to:', targetUrl); // Debug log
+      
       // Close sheet and navigate
       onClose();
       setIsNavigating(true);
@@ -241,6 +322,7 @@ export function NotificationCenter({
         });
       }, 150);
     } else {
+      // No link, just close the sheet
       onClose();
     }
   };
@@ -250,66 +332,57 @@ export function NotificationCenter({
     
     // Update local state immediately for better UX
     setLocalNotifications(prev =>
-      prev.map(n => ({ ...n, read_at: new Date().toISOString() }))
+      prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
     );
     setLocalUnreadCount(0);
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center justify-between">
-            <div>
-              <SheetTitle className="text-xl font-semibold flex items-center gap-2">
-                <Bell className="h-5 w-5 text-blue-500" />
-                Notifications
-                {localUnreadCount > 0 && (
-                  <Badge variant="destructive" className="ml-2">
-                    {localUnreadCount} new
-                  </Badge>
-                )}
-              </SheetTitle>
-              <SheetDescription>
-                Stay updated with system activities
-              </SheetDescription>
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col h-full">
+        <SheetHeader className="px-6 pt-6 pb-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+          <SheetTitle className="text-xl font-semibold flex items-center gap-2">
+            <Bell className="h-5 w-5 text-blue-500" />
+            Notifications
+            {localUnreadCount > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {localUnreadCount} new
+              </Badge>
+            )}
+          </SheetTitle>
+          <SheetDescription>
+            Stay updated with system activities
+          </SheetDescription>
 
           {/* Filter Tabs */}
-          {localNotifications.length > 0 && (
-            <div className="flex items-center gap-2 mt-4">
-              <Button
-                variant={filter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('all')}
-                className="flex-1 transition-all"
-              >
-                All
-              </Button>
-              <Button
-                variant={filter === 'unread' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('unread')}
-                className="flex-1 transition-all"
-              >
-                Unread
-                {localUnreadCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
-                    {localUnreadCount}
-                  </span>
-                )}
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2 mt-4">
+            <Button
+              variant={filter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilter('all')}
+              className="flex-1 transition-all"
+            >
+              All
+            </Button>
+            <Button
+              variant={filter === 'unread' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilter('unread')}
+              className="flex-1 transition-all"
+            >
+              Unread
+              {localUnreadCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-white/20 rounded-full">
+                  {localUnreadCount}
+                </span>
+              )}
+            </Button>
+          </div>
         </SheetHeader>
 
-        <div className="mt-4 space-y-2 max-h-[calc(100dvh-280px)] overflow-y-auto px-6 pb-6">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
           {filteredNotifications.length === 0 ? (
-            <div className="text-center py-16 animate-fade-in">
+            <div className="text-center py-16">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 mb-6">
                 <Bell className="h-8 w-8 text-gray-400" />
               </div>
@@ -318,12 +391,12 @@ export function NotificationCenter({
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {filter === 'unread' 
-                  ? 'You\'ve read all your notifications' 
-                  : 'You\'re all caught up'}
+                  ? "You've read all your notifications" 
+                  : "You're all caught up"}
               </p>
             </div>
           ) : (
-            <>
+            <div className="space-y-2">
               {filter === 'unread' && localUnreadCount > 0 && (
                 <div className="flex justify-end mb-2">
                   <Button 
@@ -338,26 +411,24 @@ export function NotificationCenter({
                 </div>
               )}
               
-              <div className="space-y-2">
-                {filteredNotifications.map((notification, index) => (
-                  <div
-                    key={notification.id}
-                    className="animate-slide-in-right"
-                    style={{ animationDelay: `${index * 50}ms` }}
-                  >
-                    <NotificationItem
-                      notification={notification}
-                      onClick={() => handleNotificationClick(notification)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </>
+              {filteredNotifications.map((notification, index) => (
+                <div
+                  key={notification.id || index}
+                  className="animate-slide-in-right"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <NotificationItem
+                    notification={notification}
+                    onClick={() => handleNotificationClick(notification)}
+                  />
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* All Notifications Button */}
-        <div className="border-t border-gray-100 dark:border-gray-800 p-4 mt-2">
+        {/* All Notifications Button - Fixed at bottom */}
+        <div className="border-t border-gray-100 dark:border-gray-800 p-4 flex-shrink-0">
           <Button
             onClick={onViewAll}
             variant="outline"

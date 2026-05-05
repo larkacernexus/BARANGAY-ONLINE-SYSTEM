@@ -1,10 +1,20 @@
-// components/residentui/receipts/modern-receipt-filters.tsx
-
 import { Search, X, Filter, Printer, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ModernSelect } from '@/components/residentui/modern-select';
-import { cn } from '@/lib/utils';
+
+interface TabCounts {
+    all: number;
+    paid: number;
+    partial: number;
+    pending: number;
+    cancelled: number;
+}
+
+interface FilterOption {
+    value: string;
+    label: string;
+}
 
 interface ModernReceiptFiltersProps {
     search: string;
@@ -27,6 +37,8 @@ interface ModernReceiptFiltersProps {
     onPrint: () => void;
     onExport: () => void;
     isExporting: boolean;
+    tabCounts?: TabCounts;
+    statusFilter?: string;
 }
 
 export function ModernReceiptFilters({
@@ -49,8 +61,20 @@ export function ModernReceiptFilters({
     handleClearFilters,
     onPrint,
     onExport,
-    isExporting
+    isExporting,
+    tabCounts,
+    statusFilter = 'all',
 }: ModernReceiptFiltersProps) {
+    const receiptTypeOptions: FilterOption[] = [
+        { value: 'all', label: 'All receipt types' },
+        ...(receiptTypes ?? []),
+    ];
+
+    const paymentMethodOptions: FilterOption[] = [
+        { value: 'all', label: 'All payment methods' },
+        ...(paymentMethods ?? []),
+    ];
+
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap gap-3 items-end">
@@ -78,12 +102,7 @@ export function ModernReceiptFilters({
                 </div>
 
                 <div className="flex gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onPrint}
-                        className="gap-2"
-                    >
+                    <Button variant="outline" size="sm" onClick={onPrint} className="gap-2">
                         <Printer className="h-4 w-4" />
                         Print
                     </Button>
@@ -127,7 +146,7 @@ export function ModernReceiptFilters({
                         value={receiptTypeFilter}
                         onValueChange={handleReceiptTypeChange}
                         placeholder="All receipt types"
-                        options={receiptTypes}
+                        options={receiptTypeOptions}
                         disabled={loading}
                     />
                 </div>
@@ -137,7 +156,7 @@ export function ModernReceiptFilters({
                         value={paymentMethodFilter}
                         onValueChange={handlePaymentMethodChange}
                         placeholder="All payment methods"
-                        options={paymentMethods}
+                        options={paymentMethodOptions}
                         disabled={loading}
                     />
                 </div>
@@ -154,6 +173,24 @@ export function ModernReceiptFilters({
                     </Button>
                 )}
             </div>
+
+            {tabCounts && (
+                <div className="flex flex-wrap gap-2">
+                    {Object.entries(tabCounts).map(([key, count]) => (
+                        <div
+                            key={key}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                                statusFilter === key || (statusFilter === 'all' && key === 'all')
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
+                                    : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
+                            }`}
+                        >
+                            <span className="capitalize font-medium">{key}</span>
+                            <span className="font-bold">{count}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

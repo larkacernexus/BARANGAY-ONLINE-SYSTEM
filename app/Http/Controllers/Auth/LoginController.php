@@ -14,22 +14,15 @@ use Carbon\Carbon;
 
 class LoginController extends Controller
 {
-    // SECURITY NOTE: Role constants - should match database
     private const ROLE_HOUSEHOLD_HEAD = 13;
     private const MAX_ATTEMPTS = 5;
     private const LOCKOUT_MINUTES = 15;
     
-    /**
-     * Get the rate limiter key for the request.
-     */
     private function getThrottleKey(Request $request): string
     {
         return 'login_attempts_' . strtolower($request->email) . '_' . $request->ip();
     }
     
-    /**
-     * Check if the request is rate limited.
-     */
     private function isRateLimited(Request $request): bool
     {
         $key = $this->getThrottleKey($request);
@@ -37,9 +30,6 @@ class LoginController extends Controller
         return $attempts >= self::MAX_ATTEMPTS;
     }
     
-    /**
-     * Get remaining attempts.
-     */
     private function getRemainingAttempts(Request $request): int
     {
         $key = $this->getThrottleKey($request);
@@ -47,9 +37,6 @@ class LoginController extends Controller
         return max(0, self::MAX_ATTEMPTS - $attempts);
     }
     
-    /**
-     * Get lockout time remaining in seconds.
-     */
     private function getLockoutTimeRemaining(Request $request): int
     {
         $key = $this->getThrottleKey($request);
@@ -62,9 +49,6 @@ class LoginController extends Controller
         return 0;
     }
     
-    /**
-     * Increment rate limiter.
-     */
     private function incrementRateLimiter(Request $request): void
     {
         $key = $this->getThrottleKey($request);
@@ -73,15 +57,11 @@ class LoginController extends Controller
         
         Cache::put($key, $attempts, now()->addMinutes(self::LOCKOUT_MINUTES));
         
-        // If max attempts reached, set lockout
         if ($attempts >= self::MAX_ATTEMPTS) {
             Cache::put($key . '_lockout', now()->addMinutes(self::LOCKOUT_MINUTES), now()->addMinutes(self::LOCKOUT_MINUTES));
         }
     }
     
-    /**
-     * Clear rate limiter.
-     */
     private function clearRateLimiter(Request $request): void
     {
         $key = $this->getThrottleKey($request);
@@ -89,12 +69,8 @@ class LoginController extends Controller
         Cache::forget($key . '_lockout');
     }
     
-    /**
-     * Show the login form.
-     */
     public function create(Request $request)
     {
-        // If already logged in, redirect
         if (Auth::check()) {
             return redirect()->intended('/dashboard');
         }
@@ -107,13 +83,11 @@ class LoginController extends Controller
         $isRateLimited = false;
         $rateLimitReset = null;
         
-        // Get email from old input
         $email = old('email');
         
         if ($email) {
             $user = User::with('role')->where('email', $email)->first();
             
-            // Create a mock request for rate limiting check
             $mockRequest = new Request();
             $mockRequest->merge(['email' => $email]);
             $mockRequest->server->set('REMOTE_ADDR', $request->ip());
@@ -126,13 +100,11 @@ class LoginController extends Controller
             }
             
             if ($user && !$isRateLimited) {
-                // Get last successful login
                 $lastLogin = UserLoginLog::where('user_id', $user->id)
                     ->where('is_successful', true)
                     ->latest('login_at')
                     ->first();
                 
-                // Get failed attempts in last 15 minutes
                 $failedAttempts = UserLoginLog::where('user_id', $user->id)
                     ->where('is_successful', false)
                     ->where('created_at', '>', Carbon::now()->subMinutes(15))
@@ -163,18 +135,13 @@ class LoginController extends Controller
         ]);
     }
     
-    /**
-     * Handle a login request.
-     */
     public function store(Request $request)
     {
-        // Validate credentials
         $request->validate([
             'email' => 'required|string|email|max:255',
             'password' => 'required|string|min:1',
         ]);
         
-        // Check if rate limited
         if ($this->isRateLimited($request)) {
             $seconds = $this->getLockoutTimeRemaining($request);
             
@@ -186,27 +153,20 @@ class LoginController extends Controller
             ]);
         }
         
-        // Find user
         $user = User::with('role')->where('email', $request->email)->first();
         
-        // Timing attack prevention - always perform hash check
         $passwordValid = false;
         
         if ($user) {
             $passwordValid = Hash::check($request->password, $user->password);
         } else {
-            // Create fake hash for non-existent users to prevent timing attacks
             $fakeUser = new User();
             $fakeUser->password = Hash::make(fake()->password(20));
             Hash::check($request->password, $fakeUser->password);
         }
         
-        // Handle failed login
         if (!$user || !$passwordValid) {
-            // Increment rate limiter
             $this->incrementRateLimiter($request);
-            
-            // Log the failed attempt
             $this->logFailedAttempt($request, $user, 'Invalid credentials');
             
             if ($user) {
@@ -223,7 +183,6 @@ class LoginController extends Controller
             ]);
         }
         
-        // Check if user account is active
         if (!$user->isActive()) {
             $this->incrementRateLimiter($request);
             $this->logFailedAttempt($request, $user, 'Account not active');
@@ -233,7 +192,6 @@ class LoginController extends Controller
             ]);
         }
         
-        // Check if account is locked (database level)
         if ($this->isAccountLocked($user)) {
             $this->logFailedAttempt($request, $user, 'Account locked');
             
@@ -245,7 +203,6 @@ class LoginController extends Controller
             ]);
         }
         
-        // Check if user has any role assigned
         if (!$user->role) {
             $this->logFailedAttempt($request, $user, 'No role assigned');
             
@@ -254,40 +211,42 @@ class LoginController extends Controller
             ]);
         }
         
-        // CRITICAL FIX: Reset failed attempts BEFORE login
         $this->resetFailedAttempts($user);
-        
-        // CRITICAL FIX: Clear rate limiter BEFORE login
         $this->clearRateLimiter($request);
         
-        // Log the user in
         Auth::login($user, $request->boolean('remember'));
-        
-        // Regenerate session to prevent fixation
         $request->session()->regenerate();
         
-        // Log successful login
         $this->logSuccessfulLogin($request, $user);
-        
-        // Update user's last login info
         $user->recordLogin($request->ip());
         
-        // Redirect based on user's role
         return $this->redirectBasedOnRole($user);
     }
     
     /**
-     * Check if user is a household user
+     * Handle forgot password - simply flags the user for admin review.
      */
+    public function forgotPassword(Request $request)
+    {
+        $request->validate([
+            'email' => ['required', 'email', 'exists:users,email'],
+        ], [
+            'email.exists' => 'No account found with this email address.',
+        ]);
+
+        User::where('email', $request->email)->update([
+            'password_requested_at' => now(),
+        ]);
+
+        return back()->with('status', 'Barangay officials have been notified. They will assist you shortly.');
+    }
+    
     private function isHouseholdUser(User $user): bool
     {
         $householdRoleId = config('auth.roles.household_head', self::ROLE_HOUSEHOLD_HEAD);
         return $user->role_id === $householdRoleId;
     }
     
-    /**
-     * Check if user is an admin/official user
-     */
     private function isAdminUser(User $user): bool
     {
         $roleId = $user->role_id;
@@ -296,9 +255,6 @@ class LoginController extends Controller
         return $roleId !== null && $roleId !== $householdRoleId;
     }
     
-    /**
-     * Redirect user based on their role.
-     */
     private function redirectBasedOnRole(User $user)
     {
         $roleName = $user->role?->name;
@@ -322,10 +278,6 @@ class LoginController extends Controller
         ]);
         
         if ($this->isHouseholdUser($user)) {
-            if (!$user->resident_id) {
-                \Log::warning('Household user has no resident_id', ['user_id' => $user->id]);
-            }
-            
             return redirect()->intended('/portal/dashboard')
                 ->with('status', 'Login successful. Welcome to your household portal.');
         }
@@ -340,9 +292,6 @@ class LoginController extends Controller
             ->withErrors(['email' => __('auth.failed')]);
     }
     
-    /**
-     * Check if account is locked.
-     */
     private function isAccountLocked(User $user): bool
     {
         $lockThreshold = config('auth.lockout.attempts', 5);
@@ -361,9 +310,6 @@ class LoginController extends Controller
         return false;
     }
     
-    /**
-     * Log successful login.
-     */
     private function logSuccessfulLogin(Request $request, User $user): void
     {
         UserLoginLog::create([
@@ -380,9 +326,6 @@ class LoginController extends Controller
         ]);
     }
     
-    /**
-     * Log failed login attempt.
-     */
     private function logFailedAttempt(Request $request, ?User $user, string $reason): void
     {
         UserLoginLog::create([
@@ -399,9 +342,6 @@ class LoginController extends Controller
         ]);
     }
     
-    /**
-     * Increment failed login attempts.
-     */
     private function incrementFailedAttempts(User $user): void
     {
         $user->update([
@@ -410,9 +350,6 @@ class LoginController extends Controller
         ]);
     }
     
-    /**
-     * Reset failed login attempts.
-     */
     private function resetFailedAttempts(User $user): void
     {
         $user->update([
@@ -421,27 +358,16 @@ class LoginController extends Controller
         ]);
     }
     
-    /**
-     * Get device type from request.
-     */
     private function getDeviceType(Request $request): string
     {
         $agent = strtolower($request->userAgent() ?? '');
         
-        if (str_contains($agent, 'mobile')) {
-            return 'Mobile';
-        }
-        
-        if (str_contains($agent, 'tablet') || str_contains($agent, 'ipad')) {
-            return 'Tablet';
-        }
+        if (str_contains($agent, 'mobile')) return 'Mobile';
+        if (str_contains($agent, 'tablet') || str_contains($agent, 'ipad')) return 'Tablet';
         
         return 'Desktop';
     }
     
-    /**
-     * Get browser from request.
-     */
     private function getBrowser(Request $request): string
     {
         $agent = strtolower($request->userAgent() ?? '');
@@ -454,9 +380,6 @@ class LoginController extends Controller
         return 'Unknown';
     }
     
-    /**
-     * Get platform from request.
-     */
     private function getPlatform(Request $request): string
     {
         $agent = strtolower($request->userAgent() ?? '');
@@ -470,9 +393,6 @@ class LoginController extends Controller
         return 'Unknown';
     }
     
-    /**
-     * Format device info for display.
-     */
     private function formatDeviceInfo(UserLoginLog $log): string
     {
         $browser = $log->browser ?? 'Unknown';
@@ -482,14 +402,9 @@ class LoginController extends Controller
         return "{$browser} on {$platform} ({$deviceType})";
     }
     
-    /**
-     * Mask IP address for privacy
-     */
     private function maskIpAddress(?string $ip): ?string
     {
-        if (!$ip) {
-            return null;
-        }
+        if (!$ip) return null;
         
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
             $parts = explode('.', $ip);
@@ -498,26 +413,14 @@ class LoginController extends Controller
             }
         }
         
-        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
-            $parts = explode(':', $ip);
-            $visible = array_slice($parts, 0, 3);
-            return implode(':', $visible) . ':****:****';
-        }
-        
         return '***.***.***.***';
     }
     
-    /**
-     * Get location from IP.
-     */
     private function getLocation(string $ip): ?string
     {
         return null;
     }
     
-    /**
-     * Log the user out.
-     */
     public function destroy(Request $request)
     {
         if (Auth::check()) {
@@ -539,17 +442,12 @@ class LoginController extends Controller
         }
         
         Auth::logout();
-        
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         
-        return redirect('/')
-            ->with('status', 'You have been logged out.');
+        return redirect('/')->with('status', 'You have been logged out.');
     }
 
-    /**
-     * Show password change form
-     */
     public function showChangeForm(Request $request)
     {
         if (!Auth::check()) {
@@ -561,9 +459,6 @@ class LoginController extends Controller
         ]);
     }
 
-    /**
-     * Handle password change request
-     */
     public function changePassword(Request $request)
     {
         $user = Auth::user();
@@ -579,13 +474,9 @@ class LoginController extends Controller
             'password_changed_at' => Carbon::now(),
         ]);
 
-        return redirect()->back()
-            ->with('success', 'Password changed successfully.');
+        return redirect()->back()->with('success', 'Password changed successfully.');
     }
     
-    /**
-     * Mark password as changed (dismiss modal)
-     */
     public function dismissPasswordChange(Request $request)
     {
         $user = Auth::user();

@@ -16,7 +16,7 @@ import {
     CheckSquare,
     Square
 } from 'lucide-react';
-import { SelectionMode, SelectionStats, BulkOperation } from '@/types/admin/announcements/announcement.types'; // ← Add BulkOperation import
+import { SelectionMode, SelectionStats, BulkOperation } from '@/types/admin/announcements/announcement.types';
 
 interface BulkActionItem {
     label: string;
@@ -41,7 +41,7 @@ interface AnnouncementsBulkActionsProps {
     onSelectAllOnPage: () => void;
     onSelectAllFiltered: () => void;
     onSelectAll: () => void;
-    onBulkOperation: (operation: BulkOperation, additionalData?: any) => void; // ← CHANGE THIS LINE
+    onBulkOperation: (operation: BulkOperation, additionalData?: any) => void;
     onCopySelectedData: () => void;
     setShowBulkDeleteDialog?: (show: boolean) => void;
     setShowBulkNotifyDialog?: (show: boolean) => void;
@@ -79,21 +79,21 @@ export default function AnnouncementsBulkActions({
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('export'),
                 tooltip: 'Export selected announcements',
                 variant: 'default' as const
             },
             {
                 label: 'Publish',
                 icon: <Send className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('publish' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('publish'),
                 tooltip: 'Publish selected announcements',
                 variant: 'default' as const
             },
             {
                 label: 'Print',
                 icon: <Printer className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('print' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('print'),
                 tooltip: 'Print selected announcements',
                 variant: 'default' as const
             }
@@ -102,35 +102,35 @@ export default function AnnouncementsBulkActions({
             {
                 label: 'Activate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('activate' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('activate'),
                 tooltip: 'Activate selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Deactivate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('deactivate' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('deactivate'),
                 tooltip: 'Deactivate selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Archive',
                 icon: <Archive className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('archive' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('archive'),
                 tooltip: 'Archive selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Change Status',
                 icon: <Edit className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_status' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('change_status'),
                 tooltip: 'Change status for selected announcements',
                 variant: 'outline' as const
             },
             {
                 label: 'Change Type',
                 icon: <AlertCircle className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('change_type' as BulkOperation), // ← Add as BulkOperation
+                onClick: () => onBulkOperation('change_type'),
                 tooltip: 'Change type for selected announcements',
                 variant: 'outline' as const
             },
@@ -178,7 +178,7 @@ export default function AnnouncementsBulkActions({
                         </div>
                     </div>
                     
-                    {/* Selection Stats using SelectionStats type */}
+                    {/* Selection Stats */}
                     {selectionStats && (
                         <div className="hidden sm:flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                             {selectionStats.active > 0 && (
@@ -205,7 +205,6 @@ export default function AnnouncementsBulkActions({
                                     {selectionStats.upcoming} upcoming
                                 </span>
                             )}
-                            {/* Show top priority type if available */}
                             {selectionStats.priorities && Object.keys(selectionStats.priorities).length > 0 && (
                                 <span className="flex items-center gap-1">
                                     <div className="w-2 h-2 rounded-full bg-orange-500"></div>

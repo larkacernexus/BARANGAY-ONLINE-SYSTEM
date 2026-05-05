@@ -240,7 +240,7 @@ export default function PermissionCreate({
             title="Create New Permission"
             breadcrumbs={[
                 { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Permissions', href: route('permissions.index') },
+                { title: 'Permissions', href: route('admin.permissions.index') },
                 { title: 'Create', href: '#' }
             ]}
         >
@@ -254,7 +254,7 @@ export default function PermissionCreate({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => router.visit(route('permissions.index'))}
+                                onClick={() => router.visit(route('admin.permissions.index'))}
                                 className="h-8 w-8 p-0"
                             >
                                 <ArrowLeft className="h-4 w-4" />
@@ -550,7 +550,7 @@ export default function PermissionCreate({
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => router.visit(route('permissions.index'))}
+                                        onClick={() => router.visit(route('admin.permissions.index'))}
                                         disabled={processing}
                                     >
                                         Cancel
@@ -716,7 +716,7 @@ export default function PermissionCreate({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => router.visit(route('permissions.index'))}
+                                    onClick={() => router.visit(route('admin.permissions.index'))}
                                     className="w-full"
                                 >
                                     <Key className="mr-2 h-4 w-4" />

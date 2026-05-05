@@ -35,13 +35,14 @@ interface AnnouncementsFiltersProps {
     searchInputRef?: RefObject<HTMLInputElement | null>;
     isLoading?: boolean;
     handleExport?: () => void;
-    // Separate filter states (not in filtersState)
-    priorityFilter?: string;
-    setPriorityFilter?: (value: string) => void;
-    audienceTypeFilter?: string;
-    setAudienceTypeFilter?: (value: string) => void;
-    dateRangePreset?: string;
-    setDateRangePreset?: (value: string) => void;
+    priorityFilter: string;
+    setPriorityFilter: (value: string) => void;
+    audienceTypeFilter: string;
+    setAudienceTypeFilter: (value: string) => void;
+    dateRangePreset: string;
+    setDateRangePreset: (value: string) => void;
+    perPage?: string;
+    onPerPageChange?: (value: string) => void;
 }
 
 export default function AnnouncementsFilters({
@@ -63,21 +64,21 @@ export default function AnnouncementsFilters({
     searchInputRef,
     isLoading = false,
     handleExport,
-    priorityFilter = 'all',
+    priorityFilter,
     setPriorityFilter,
-    audienceTypeFilter = 'all',
+    audienceTypeFilter,
     setAudienceTypeFilter,
-    dateRangePreset = '',
-    setDateRangePreset
+    dateRangePreset,
+    setDateRangePreset,
+    perPage,
+    onPerPageChange,
 }: AnnouncementsFiltersProps) {
     
-    // Format type options for select
     const typeOptions = Object.entries(types).map(([key, value]) => ({
         id: key,
         name: value
     }));
 
-    // Status options
     const statusOptions = [
         { value: 'all', label: 'All Status', color: 'gray' },
         { value: 'active', label: 'Active', color: 'emerald' },
@@ -86,7 +87,6 @@ export default function AnnouncementsFilters({
         { value: 'upcoming', label: 'Upcoming', color: 'blue' }
     ];
 
-    // Priority options - matching database values (0-4)
     const priorityOptions = [
         { value: 'all', label: 'All Priorities', color: 'gray' },
         { value: '0', label: 'Normal', color: 'gray' },
@@ -96,13 +96,11 @@ export default function AnnouncementsFilters({
         { value: '4', label: 'Urgent', color: 'red' }
     ];
 
-    // Audience type options
     const audienceTypeOptions = Object.entries(audienceTypes).map(([key, value]) => ({
         id: key,
         name: value
     }));
 
-    // Date range presets
     const dateRangePresets = [
         { value: '', label: 'Custom Range' },
         { value: 'today', label: 'Today' },
@@ -113,12 +111,6 @@ export default function AnnouncementsFilters({
         { value: 'last_month', label: 'Last Month' }
     ];
 
-    // Convert hasActiveFilters to boolean
-    const activeFilters = typeof hasActiveFilters === 'string' 
-        ? hasActiveFilters === 'true' || hasActiveFilters === '1'
-        : Boolean(hasActiveFilters);
-
-    // Helper to get active filter count
     const getActiveFilterCount = () => {
         let count = 0;
         if (filtersState.type && filtersState.type !== 'all') count++;
@@ -132,9 +124,8 @@ export default function AnnouncementsFilters({
 
     const activeFilterCount = getActiveFilterCount();
 
-    // Handle date range preset change
     const handleDateRangePresetChange = (preset: string) => {
-        setDateRangePreset?.(preset);
+        setDateRangePreset(preset);
         
         const today = new Date();
         let fromDate = '';
@@ -187,35 +178,21 @@ export default function AnnouncementsFilters({
         if (toDate) updateFilter('to_date', toDate);
     };
 
-    // Handle priority filter change - converts to string for parent
-    const handlePriorityChange = (value: string) => {
-        setPriorityFilter?.(value);
-    };
-
-    // Handle audience type filter change
-    const handleAudienceTypeChange = (value: string) => {
-        setAudienceTypeFilter?.(value);
-    };
-
-    // Get priority label and color
     const getPriorityInfo = (value: string) => {
         const option = priorityOptions.find(o => o.value === value);
         return { label: option?.label || value, color: option?.color || 'gray' };
     };
 
-    // Get status label and color
     const getStatusInfo = (value: string) => {
         const option = statusOptions.find(o => o.value === value);
         return { label: option?.label || value, color: option?.color || 'gray' };
     };
 
-    // Get audience type label
     const getAudienceTypeLabel = (value: string) => {
         const type = audienceTypeOptions.find(t => t.id === value);
         return type?.name || value;
     };
 
-    // Get type label
     const getTypeLabel = (value: string) => {
         const type = typeOptions.find(t => t.id === value);
         return type?.name || value;
@@ -225,7 +202,7 @@ export default function AnnouncementsFilters({
         <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-gray-900 rounded-xl">
             <CardContent className="p-5 md:p-6">
                 <div className="flex flex-col space-y-5">
-                    {/* Search Bar - Enhanced */}
+                    {/* Search Bar */}
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative group">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -294,14 +271,13 @@ export default function AnnouncementsFilters({
                             <span className="ml-1">announcements</span>
                             {search && (
                                 <span className="ml-1">
-                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">“{search}”</span>
+                                    matching <span className="font-medium text-indigo-600 dark:text-indigo-400">"{search}"</span>
                                 </span>
                             )}
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap">
-                            {/* Active filter badges */}
-                            {activeFilters && (
+                            {hasActiveFilters && (
                                 <>
                                     {filtersState.type && filtersState.type !== 'all' && (
                                         <Badge variant="secondary" className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-0 rounded-full px-2.5 py-1 text-xs font-medium">
@@ -350,7 +326,7 @@ export default function AnnouncementsFilters({
                                 </>
                             )}
                             
-                            {activeFilters && (
+                            {hasActiveFilters && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
@@ -365,7 +341,7 @@ export default function AnnouncementsFilters({
                         </div>
                     </div>
 
-                    {/* Basic Filters - Modern Grid */}
+                    {/* Basic Filters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                         {/* Type Filter */}
                         <div className="space-y-1.5">
@@ -424,7 +400,7 @@ export default function AnnouncementsFilters({
                             </Label>
                             <Select
                                 value={priorityFilter}
-                                onValueChange={handlePriorityChange}
+                                onValueChange={setPriorityFilter}
                                 disabled={isLoading}
                             >
                                 <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
@@ -459,7 +435,7 @@ export default function AnnouncementsFilters({
                             </Label>
                             <Select
                                 value={audienceTypeFilter}
-                                onValueChange={handleAudienceTypeChange}
+                                onValueChange={setAudienceTypeFilter}
                                 disabled={isLoading}
                             >
                                 <SelectTrigger className="h-9 bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 rounded-lg text-sm">
@@ -477,7 +453,7 @@ export default function AnnouncementsFilters({
                         </div>
                     </div>
 
-                    {/* Advanced Filters - Modern Accordion Style */}
+                    {/* Advanced Filters */}
                     {showAdvancedFilters && (
                         <div className="border-t border-gray-100 dark:border-gray-800 pt-5 mt-2 space-y-5">
                             <div className="flex items-center gap-2">
@@ -493,7 +469,6 @@ export default function AnnouncementsFilters({
                                         Date Range (Created At)
                                     </Label>
                                     
-                                    {/* Date Presets */}
                                     <Select
                                         value={dateRangePreset}
                                         onValueChange={handleDateRangePresetChange}
@@ -511,7 +486,6 @@ export default function AnnouncementsFilters({
                                         </SelectContent>
                                     </Select>
                                     
-                                    {/* Custom Date Range */}
                                     <div className="grid grid-cols-2 gap-2 pt-1">
                                         <div className="space-y-1">
                                             <Label className="text-xs text-gray-500">From</Label>
@@ -584,7 +558,7 @@ export default function AnnouncementsFilters({
                                             size="sm"
                                             className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
-                                                setPriorityFilter?.('4');
+                                                setPriorityFilter('4');
                                                 setShowAdvancedFilters(false);
                                             }}
                                             disabled={isLoading}
@@ -597,8 +571,8 @@ export default function AnnouncementsFilters({
                                             size="sm"
                                             className="text-xs rounded-lg border-gray-200 dark:border-gray-700"
                                             onClick={() => {
-                                                setAudienceTypeFilter?.('all');
-                                                setPriorityFilter?.('all');
+                                                setAudienceTypeFilter('all');
+                                                setPriorityFilter('all');
                                                 updateFilter('from_date', '');
                                                 updateFilter('to_date', '');
                                                 setShowAdvancedFilters(false);
@@ -612,7 +586,7 @@ export default function AnnouncementsFilters({
                                 </div>
                             </div>
 
-                            {/* Information Section - Modern */}
+                            {/* Information Section */}
                             <div className="mt-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800/30 dark:to-gray-800/10 rounded-xl border border-gray-100 dark:border-gray-800">
                                 <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide flex items-center gap-2">
                                     <Megaphone className="h-3 w-3" />

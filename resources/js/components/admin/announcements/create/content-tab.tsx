@@ -14,7 +14,6 @@ interface ContentTabProps {
     errors: Record<string, string>;
     onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
     isSubmitting: boolean;
-    // Optional props for edit mode
     originalTitle?: string;
     originalContent?: string;
 }
@@ -27,7 +26,6 @@ export function ContentTab({
     originalTitle,
     originalContent
 }: ContentTabProps) {
-    // Check if title or content has been modified from original
     const isTitleModified = originalTitle !== undefined && formData.title !== originalTitle;
     const isContentModified = originalContent !== undefined && formData.content !== originalContent;
 
@@ -106,29 +104,27 @@ export function ContentTab({
                 )}
             </div>
 
-            {/* Writing Tips Card */}
             <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-start gap-3">
                     <Megaphone className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                     <div className="flex-1">
-                        <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">📝 Writing Tips</h4>
+                        <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">Writing Tips</h4>
                         <ul className="list-disc list-inside space-y-1 text-xs text-blue-700 dark:text-blue-300">
-                            <li><strong>Title:</strong> Keep it short (under 100 characters) and descriptive</li>
-                            <li><strong>Content:</strong> Include who, what, when, where, and why</li>
-                            <li><strong>Tone:</strong> Be clear, professional, and empathetic</li>
-                            <li><strong>Call to Action:</strong> Tell residents what they need to do</li>
-                            <li><strong>Formatting:</strong> Use line breaks to separate sections for readability</li>
+                            <li><span className="font-semibold">Title:</span> Keep it short (under 100 characters) and descriptive</li>
+                            <li><span className="font-semibold">Content:</span> Include who, what, when, where, and why</li>
+                            <li><span className="font-semibold">Tone:</span> Be clear, professional, and empathetic</li>
+                            <li><span className="font-semibold">Call to Action:</span> Tell residents what they need to do</li>
+                            <li><span className="font-semibold">Formatting:</span> Use line breaks to separate sections for readability</li>
                         </ul>
                     </div>
                 </div>
             </div>
 
-            {/* Preview Helper */}
             <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
                 <div className="flex items-start gap-3">
                     <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
                     <div className="flex-1">
-                        <h4 className="font-medium text-amber-800 dark:text-amber-300 mb-2">📱 Preview Help</h4>
+                        <h4 className="font-medium text-amber-800 dark:text-amber-300 mb-2">Preview Help</h4>
                         <p className="text-xs text-amber-700 dark:text-amber-300">
                             Use the preview panel on the right to see how your announcement will appear to residents.
                             The preview updates in real-time as you type.

@@ -59,7 +59,7 @@ export default function PrivilegesHeader({
                 </Tooltip>
                 
                 {canCreate && (
-                    <Link href="/admin/privileges/privileges/create">
+                    <Link href="/admin/privileges/create">
                         <Button asChild>
                             <a>
                                 <Plus className="h-4 w-4 mr-2" />

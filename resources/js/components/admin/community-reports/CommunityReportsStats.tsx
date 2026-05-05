@@ -2,15 +2,10 @@ import {
     FileText, 
     AlertTriangle, 
     CheckCircle, 
-    Globe, 
-    Clock, 
-    TrendingUp, 
-    Zap, 
-    ShieldAlert,
-    Timer 
+    Globe
 } from 'lucide-react';
 import { StatCard } from '@/components/adminui/stats-grid';
-import { Stats } from '@/types/admin/reports/communityReportTypes';
+import type { Stats } from '@/types/admin/reports/community-report';
 
 interface CommunityReportsStatsProps {
     stats: Stats;

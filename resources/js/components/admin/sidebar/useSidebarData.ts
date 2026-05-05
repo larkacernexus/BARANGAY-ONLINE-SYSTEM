@@ -31,6 +31,8 @@ const getBadgeColor = (
     return condition ? trueColor : falseColor;
 };
 
+const QUICK_ACTION_LIMIT = 5; // Show first 5 in main, ALL remaining in overflow
+
 export function useSidebarData() {
     const { props } = usePage() as any;
     const user = props?.auth?.user || {};
@@ -99,7 +101,6 @@ export function useSidebarData() {
                         color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
                         isActive: (url: string) => url.startsWith('/admin/community-reports') && !url.includes('/create'),
                         requiredPermission: 'view-reports',
-                        // ✅ KEEP BADGE - gives sense of scale
                         badge: formatNumber(reportStats.total),
                         badgeColor: 'default'
                     },
@@ -109,7 +110,6 @@ export function useSidebarData() {
                         color: 'bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-400',
                         isActive: (url: string) => url.includes('status=pending'),
                         requiredPermission: 'review-reports',
-                        // ✅ KEEP BADGE - actionable
                         badge: formatNumber(reportStats.pending),
                         badgeColor: 'warning'
                     },
@@ -119,7 +119,6 @@ export function useSidebarData() {
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) => url.includes('status=in_progress'),
                         requiredPermission: 'view-reports',
-                        // ❌ REMOVE BADGE - not critical
                     },
                     { 
                         title: 'Assigned', href: '/admin/community-reports?status=assigned', icon: UserCheck,
@@ -127,7 +126,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url.includes('status=assigned'),
                         requiredPermission: 'view-reports',
-                        // ❌ REMOVE BADGE - not critical
                     },
                     { 
                         title: 'High Priority', href: '/admin/community-reports?priority=high', icon: Zap,
@@ -135,7 +133,6 @@ export function useSidebarData() {
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) => url.includes('priority=high'),
                         requiredPermission: 'view-reports',
-                        // ✅ KEEP BADGE - critical/urgent
                         badge: formatNumber(reportStats.high_priority),
                         badgeColor: 'destructive',
                         isNew: true
@@ -146,7 +143,6 @@ export function useSidebarData() {
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) => url.startsWith('/admin/blotters') && !url.includes('/create'),
                         requiredPermission: 'manage-blotters',
-                        // ✅ KEEP BADGE - informative
                         badge: formatNumber(reportStats.blotters),
                         badgeColor: 'destructive',
                         isUpdated: true 
@@ -163,7 +159,6 @@ export function useSidebarData() {
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) => url.startsWith('/admin/residents') && !url.includes('/create'),
                         requiredPermission: 'manage-residents',
-                        // ✅ KEEP BADGE - sense of scale
                         badge: formatNumber(residentStats.total),
                         badgeColor: 'default'
                     },
@@ -173,7 +168,6 @@ export function useSidebarData() {
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) => url.startsWith('/admin/households') && !url.includes('/create'),
                         requiredPermission: 'manage-households',
-                        // ✅ KEEP BADGE - informative
                         badge: formatNumber(residentStats.households),
                         badgeColor: 'success'
                     },
@@ -183,7 +177,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url.startsWith('/admin/businesses') && !url.includes('/create'),
                         requiredPermission: 'manage-businesses',
-                        // ✅ KEEP BADGE - informative
                         badge: formatNumber(residentStats.businesses),
                         badgeColor: 'secondary'
                     },
@@ -193,7 +186,6 @@ export function useSidebarData() {
                         color: 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400',
                         isActive: (url: string) => url.includes('filter=senior'),
                         requiredPermission: 'view-residents',
-                        // ❌ REMOVE BADGE - filter view, not main entity
                     },
                     { 
                         title: 'PWD', href: '/admin/residents?filter=pwd', icon: Heart,
@@ -201,7 +193,6 @@ export function useSidebarData() {
                         color: 'bg-pink-100 dark:bg-pink-800 text-pink-600 dark:text-pink-400',
                         isActive: (url: string) => url.includes('filter=pwd'),
                         requiredPermission: 'view-residents',
-                        // ❌ REMOVE BADGE - filter view, not main entity
                     },
                 ],
             },
@@ -215,7 +206,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url.startsWith('/admin/forms') && !url.includes('/create'),
                         requiredPermission: 'manage-forms',
-                        // ❌ REMOVE BADGE - not critical
                     },
                     { 
                         title: 'Privileges', href: '/admin/privileges', icon: Award,
@@ -223,7 +213,6 @@ export function useSidebarData() {
                         color: 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400',
                         isActive: (url: string) => url.startsWith('/admin/privileges') && !url.includes('/create'),
                         requiredPermission: 'manage-privileges',
-                        // ❌ REMOVE BADGE - configuration item
                     },
                     { 
                         title: 'Announcements', href: '/admin/announcements', icon: Megaphone,
@@ -231,7 +220,6 @@ export function useSidebarData() {
                         color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
                         isActive: (url: string) => url.startsWith('/admin/announcements') && !url.includes('/create'),
                         requiredPermission: 'view-announcements',
-                        // ✅ KEEP BADGE - shows active count
                         badge: formatNumber(serviceStats.active_announcements),
                         badgeColor: 'info'
                     },
@@ -241,7 +229,6 @@ export function useSidebarData() {
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) => url.startsWith('/admin/clearances') && !url.startsWith('/admin/clearances/approval') && !url.includes('/create'),
                         requiredPermission: 'view-clearances',
-                        // ✅ KEEP BADGE - informative
                         badge: formatNumber(serviceStats.total_clearances),
                         badgeColor: 'success'
                     },
@@ -251,7 +238,6 @@ export function useSidebarData() {
                         color: 'bg-violet-100 dark:bg-violet-800 text-violet-600 dark:text-violet-400',
                         isActive: (url: string) => url.startsWith('/admin/clearances/approval'),
                         requiredPermission: 'issue-clearances',
-                        // ✅ KEEP BADGE - actionable!
                         badge: formatNumber(reportStats.pending_clearances),
                         badgeColor: getBadgeColor(reportStats.pending_clearances > 0, 'destructive', 'default'),
                         isNew: true 
@@ -268,7 +254,6 @@ export function useSidebarData() {
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) => url.startsWith('/admin/fees') && !url.includes('/create'),
                         requiredPermission: 'view-fees',
-                        // ❌ REMOVE BADGE - configuration item
                     },
                     { 
                         title: 'Payments', href: '/admin/payments', icon: CreditCard,
@@ -276,7 +261,6 @@ export function useSidebarData() {
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) => url.startsWith('/admin/payments') && !url.includes('/create'),
                         requiredPermission: 'view-payments',
-                        // ✅ KEEP BADGE - informative
                         badge: formatNumber(paymentStats.total_payments),
                         badgeColor: 'info'
                     },
@@ -286,7 +270,6 @@ export function useSidebarData() {
                         color: 'bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-400',
                         isActive: (url: string) => url.includes('status=pending'),
                         requiredPermission: 'view-payments',
-                        // ✅ KEEP BADGE - actionable!
                         badge: formatNumber(paymentStats.pending_payments),
                         badgeColor: getBadgeColor(paymentStats.pending_payments > 0, 'warning', 'default'),
                     },
@@ -296,7 +279,6 @@ export function useSidebarData() {
                         color: 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400',
                         isActive: (url: string) => url.startsWith('/admin/receipts'),
                         requiredPermission: 'manage-payments' 
-                        // ❌ REMOVE BADGE - action, not list
                     },
                 ],
             },
@@ -310,7 +292,6 @@ export function useSidebarData() {
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) => url === '/admin/reports/collections',
                         requiredPermission: 'view-reports',
-                        // ✅ KEEP BADGE - KPI
                         badge: formatCurrency(paymentStats.total_revenue),
                         badgeColor: 'success'
                     },
@@ -320,7 +301,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url === '/admin/reports/revenue',
                         requiredPermission: 'view-reports',
-                        // ✅ KEEP BADGE - KPI
                         badge: formatCurrency(paymentStats.monthly_collections),
                         badgeColor: 'info'
                     },
@@ -358,7 +338,6 @@ export function useSidebarData() {
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) => url.startsWith('/admin/puroks') && !url.includes('/create'),
                         requiredPermission: 'manage-puroks',
-                        // ❌ REMOVE BADGE - configuration
                     },
                     { 
                         title: 'Positions', href: '/admin/positions', icon: Briefcase,
@@ -366,7 +345,6 @@ export function useSidebarData() {
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) => url.startsWith('/admin/positions') && !url.includes('/create'),
                         requiredPermission: 'manage-positions',
-                        // ❌ REMOVE BADGE - configuration
                     },
                     { 
                         title: 'Committees', href: '/admin/committees', icon: Users2,
@@ -374,7 +352,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url.startsWith('/admin/committees') && !url.includes('/create'),
                         requiredPermission: 'manage-committees',
-                        // ❌ REMOVE BADGE - configuration
                     },
                     { 
                         title: 'Officials', href: '/admin/officials', icon: Award,
@@ -382,7 +359,6 @@ export function useSidebarData() {
                         color: 'bg-amber-100 dark:bg-amber-800 text-amber-600 dark:text-amber-400',
                         isActive: (url: string) => url.startsWith('/admin/officials') && !url.includes('/create'),
                         requiredPermission: 'manage-officials',
-                        // ❌ REMOVE BADGE - configuration
                     },
                 ],
             },
@@ -396,7 +372,6 @@ export function useSidebarData() {
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) => url.startsWith('/admin/users') && !url.includes('/create'),
                         requiredPermission: 'manage-users',
-                        // ✅ KEEP BADGE - admin needs user count
                         badge: formatNumber(systemStats.total_users),
                         badgeColor: 'default'
                     },
@@ -406,7 +381,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url.startsWith('/admin/roles') && !url.includes('/create'),
                         requiredPermission: 'manage-roles',
-                        // ❌ REMOVE BADGE - configuration
                     },
                     { 
                         title: 'Permissions', href: '/admin/permissions', icon: Key,
@@ -414,7 +388,6 @@ export function useSidebarData() {
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) => url.startsWith('/admin/permissions') && !url.includes('/create'),
                         requiredPermission: 'manage-permissions',
-                        // ❌ REMOVE BADGE - configuration
                     },
                     { 
                         title: 'Assign Permissions', href: '/admin/role-permissions', icon: LinkIcon,
@@ -436,7 +409,6 @@ export function useSidebarData() {
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) => url === '/admin/security/security-audit',
                         requiredPermission: 'view-security-logs',
-                        // ❌ REMOVE BADGE - logs are informational
                     },
                     { 
                         title: 'Access Logs', href: '/admin/security/access-logs', icon: Eye,
@@ -444,7 +416,6 @@ export function useSidebarData() {
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) => url === '/admin/security/access-logs',
                         requiredPermission: 'view-security-logs',
-                        // ❌ REMOVE BADGE - logs are informational
                     },
                     { 
                         title: 'Audit Logs', href: '/admin/reports/audit-logs', icon: History,
@@ -452,7 +423,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url === '/admin/reports/audit-logs',
                         requiredPermission: 'view-reports',
-                        // ❌ REMOVE BADGE - logs are informational
                     },
                     { 
                         title: 'Activity Logs', href: '/admin/reports/activity-logs', icon: Activity,
@@ -460,7 +430,6 @@ export function useSidebarData() {
                         color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
                         isActive: (url: string) => url.startsWith('/admin/reports/activity-logs'),
                         requiredPermission: 'view-reports',
-                        // ❌ REMOVE BADGE - logs are informational
                     },
                     { 
                         title: 'Login Logs', href: '/admin/reports/login-logs', icon: LogIn,
@@ -468,7 +437,6 @@ export function useSidebarData() {
                         color: 'bg-red-100 dark:bg-red-800 text-red-600 dark:text-red-400',
                         isActive: (url: string) => url.startsWith('/admin/reports/login-logs'),
                         requiredPermission: 'view-reports',
-                        // ❌ REMOVE BADGE - logs are informational
                     },
                     { 
                         title: 'Sessions', href: '/admin/security/sessions', icon: Monitor,
@@ -476,7 +444,6 @@ export function useSidebarData() {
                         color: 'bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-400',
                         isActive: (url: string) => url === '/admin/security/sessions',
                         requiredPermission: 'view-security-logs',
-                        // ✅ KEEP BADGE - actionable if too many sessions
                         badge: formatNumber(securityStats.active_sessions),
                         badgeColor: getBadgeColor(securityStats.active_sessions > 10, 'warning', 'default'),
                     },
@@ -492,7 +459,6 @@ export function useSidebarData() {
                         color: 'bg-pink-100 dark:bg-pink-800 text-pink-600 dark:text-pink-400',
                         isActive: (url: string) => url.startsWith('/admin/banners'),
                         requiredPermission: 'manage-portal-banner',
-                        // ✅ KEEP BADGE - shows if banner is active
                         badge: systemStats.portal_banner_active ? 'Active' : 'Inactive',
                         badgeColor: systemStats.portal_banner_active ? 'success' : 'default',
                         isNew: true
@@ -510,7 +476,6 @@ export function useSidebarData() {
                         color: 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-400',
                         isActive: (url: string) => url.startsWith('/admin/clearance-types') && !url.includes('/create'),
                         requiredPermission: 'manage-clearance-types',
-                        // ❌ REMOVE BADGE - configuration
                     },
                     { 
                         title: 'Fee Types', href: '/admin/fee-types', icon: Tag,
@@ -518,7 +483,6 @@ export function useSidebarData() {
                         color: 'bg-purple-100 dark:bg-purple-800 text-purple-600 dark:text-purple-400',
                         isActive: (url: string) => url.startsWith('/admin/fee-types') && !url.includes('/create'),
                         requiredPermission: 'manage-fee-types',
-                        // ❌ REMOVE BADGE - configuration
                     },
                     { 
                         title: 'Report Types', href: '/admin/report-types', icon: FileText,
@@ -526,7 +490,6 @@ export function useSidebarData() {
                         color: 'bg-orange-100 dark:bg-orange-800 text-orange-600 dark:text-orange-400',
                         isActive: (url: string) => url.startsWith('/admin/report-types') && !url.includes('/create'),
                         requiredPermission: 'manage-report-types',
-                        // ❌ REMOVE BADGE - configuration
                         isNew: true 
                     },
                     { 
@@ -535,7 +498,6 @@ export function useSidebarData() {
                         color: 'bg-indigo-100 dark:bg-indigo-800 text-indigo-600 dark:text-indigo-400',
                         isActive: (url: string) => url.startsWith('/admin/document-types') && !url.includes('/create'),
                         requiredPermission: 'manage-document-types',
-                        // ❌ REMOVE BADGE - configuration
                         isNew: true 
                     },
                 ],
@@ -547,11 +509,11 @@ export function useSidebarData() {
             .filter((category) => category.items.length > 0);
     }, [userPermissions, userRoleName, systemStats, securityStats]);
 
-    // ... rest of the file remains exactly the same (quick actions, etc.)
+    // Quick action groups
     const operationsQuickActionGroups = useMemo(() => {
         const groups = {
             reports: [
-                { title: 'New Report', href: '/admin/community-reports/community-reports/create', icon: AlertCircle, color: 'orange' as const, requiredPermission: 'create-reports', description: 'Create incident report', isNew: true },
+                { title: 'New Report', href: '/admin/community-reports/create', icon: AlertCircle, color: 'orange' as const, requiredPermission: 'create-reports', description: 'Create incident report', isNew: true },
                 { title: 'New Blotter', href: '/admin/blotters/create', icon: Scale, color: 'red' as const, requiredPermission: 'manage-blotters', description: 'File new blotter case', isUpdated: true },
             ],
             residents: [
@@ -561,13 +523,11 @@ export function useSidebarData() {
             ],
             services: [
                 { title: 'Issue Clearance', href: '/admin/clearances/create', icon: CheckCircle, color: 'emerald' as const, requiredPermission: 'issue-clearances', description: 'Issue barangay clearance' },
-                // { title: 'Approval Requests', href: '/admin/clearances/approval/requests', icon: CheckCircle, color: 'violet' as const, requiredPermission: 'issue-clearances', description: 'Review clearance requests', badge: formatNumber(reportStats.pending_clearances), isNew: true },
                 { title: 'Record Payment', href: '/admin/payments/create', icon: CreditCard, color: 'cyan' as const, requiredPermission: 'manage-payments', description: 'Record new payment' },
                 { title: 'Create Fee', href: '/admin/fees/create', icon: DollarSign, color: 'yellow' as const, requiredPermission: 'manage-fees', description: 'Add new fee type' },
                 { title: 'Upload Form', href: '/admin/forms/create', icon: FileText, color: 'indigo' as const, requiredPermission: 'manage-forms', description: 'Upload new form' },
                 { title: 'New Announcement', href: '/admin/announcements/create', icon: Megaphone, color: 'pink' as const, requiredPermission: 'manage-announcements', description: 'Create announcement' },
                 { title: 'Add Privilege', href: '/admin/privileges/create', icon: Award, color: 'amber' as const, requiredPermission: 'manage-privileges', description: 'Create new privilege' },
-                // { title: 'Assign Privilege', href: '/admin/privileges/assign', icon: UserCheck, color: 'violet' as const, requiredPermission: 'assign-privileges', description: 'Assign privilege to resident', isNew: true },
             ],
         };
 
@@ -576,14 +536,13 @@ export function useSidebarData() {
             residents: groups.residents.filter(a => hasPermission(a.requiredPermission)),
             services: groups.services.filter(a => hasPermission(a.requiredPermission)),
         };
-    }, [userPermissions, userRoleName, reportStats]);
+    }, [userPermissions, userRoleName]);
 
     const settingsQuickActionGroups = useMemo(() => {
         const groups = {
             personal: [
                 { title: 'Edit Profile', href: '/admin/settings/profile', icon: User, color: 'blue' as const, requiredPermission: undefined, description: 'Update personal info' },
-                { title: 'Change Password', href: '/admin/settings/password', icon: Lock, color: 'red' as const, requiredPermission: undefined, description: 'Update password' },
-                { title: 'Customize Theme', href: '/admin/settings/appearance', icon: Palette, color: 'purple' as const, requiredPermission: undefined, description: 'Change appearance' },
+                { title: 'Change Password', href: '/admin/settings/profile', icon: Lock, color: 'red' as const, requiredPermission: undefined, description: 'Update password' },
             ],
             barangay: [
                 { title: 'Add Purok', href: '/admin/puroks/create', icon: Briefcase, color: 'violet' as const, requiredPermission: 'manage-puroks', description: 'Create new purok' },
@@ -620,62 +579,80 @@ export function useSidebarData() {
         };
     }, [userPermissions, userRoleName]);
 
-    const mainOperationsQuickActions = useMemo(() => {
+    // ==========================================
+    // Show first 5 in main, ALL remaining in overflow
+    // ==========================================
+    
+    // Get ALL quick actions combined
+    const allOperationsQuickActions = useMemo(() => {
         return [
-            ...operationsQuickActionGroups.reports.slice(0, 2),
-            ...operationsQuickActionGroups.residents.slice(0, 1),
-            ...operationsQuickActionGroups.services.slice(0, 2),
-        ].slice(0, 5);
-    }, [operationsQuickActionGroups]);
-
-    const mainSettingsQuickActions = useMemo(() => {
-        return [
-            ...settingsQuickActionGroups.personal.slice(0, 1),
-            ...settingsQuickActionGroups.barangay.slice(0, 1),
-            ...settingsQuickActionGroups.users.slice(0, 1),
-            ...settingsQuickActionGroups.system.slice(0, 1),
-            ...settingsQuickActionGroups.security.slice(0, 1),
-        ].slice(0, 5);
-    }, [settingsQuickActionGroups]);
-
-    const remainingOperationsActions = useMemo(() => {
-        const mainActionHrefs = new Set(mainOperationsQuickActions.map(a => a.href));
-        const allOperationsActions = [
             ...operationsQuickActionGroups.reports,
             ...operationsQuickActionGroups.residents,
             ...operationsQuickActionGroups.services,
         ];
-        return allOperationsActions.filter(action => !mainActionHrefs.has(action.href));
-    }, [operationsQuickActionGroups, mainOperationsQuickActions]);
+    }, [operationsQuickActionGroups]);
 
-    const remainingSettingsActions = useMemo(() => {
-        const mainActionHrefs = new Set(mainSettingsQuickActions.map(a => a.href));
-        const allSettingsActions = [
+    const allSettingsQuickActions = useMemo(() => {
+        return [
             ...settingsQuickActionGroups.personal,
             ...settingsQuickActionGroups.barangay,
             ...settingsQuickActionGroups.users,
             ...settingsQuickActionGroups.system,
             ...settingsQuickActionGroups.security,
         ];
-        return allSettingsActions.filter(action => !mainActionHrefs.has(action.href));
-    }, [settingsQuickActionGroups, mainSettingsQuickActions]);
+    }, [settingsQuickActionGroups]);
 
+    // Main shows first 5
+    const mainOperationsQuickActions = useMemo(() => {
+        return allOperationsQuickActions.slice(0, QUICK_ACTION_LIMIT);
+    }, [allOperationsQuickActions]);
+
+    const mainSettingsQuickActions = useMemo(() => {
+        return allSettingsQuickActions.slice(0, QUICK_ACTION_LIMIT);
+    }, [allSettingsQuickActions]);
+
+    // Overflow shows ALL remaining (no limit)
+    const remainingOperationsActions = useMemo(() => {
+        return allOperationsQuickActions.slice(QUICK_ACTION_LIMIT);
+    }, [allOperationsQuickActions]);
+
+    const remainingSettingsActions = useMemo(() => {
+        return allSettingsQuickActions.slice(QUICK_ACTION_LIMIT);
+    }, [allSettingsQuickActions]);
+
+    // Group remaining actions by category
     const remainingOperationsByCategory = useMemo(() => {
-        const grouped = {
-            reports: remainingOperationsActions.filter(action => operationsQuickActionGroups.reports.some(r => r.href === action.href)),
-            residents: remainingOperationsActions.filter(action => operationsQuickActionGroups.residents.some(r => r.href === action.href)),
-            services: remainingOperationsActions.filter(action => operationsQuickActionGroups.services.some(s => s.href === action.href)),
+        const grouped: Record<string, QuickAction[]> = {
+            'Quick Reports': remainingOperationsActions.filter(action => 
+                operationsQuickActionGroups.reports.some(r => r.href === action.href)
+            ),
+            'Residents': remainingOperationsActions.filter(action => 
+                operationsQuickActionGroups.residents.some(r => r.href === action.href)
+            ),
+            'Services': remainingOperationsActions.filter(action => 
+                operationsQuickActionGroups.services.some(s => s.href === action.href)
+            ),
         };
         return Object.entries(grouped).filter(([_, items]) => items.length > 0);
     }, [remainingOperationsActions, operationsQuickActionGroups]);
 
     const remainingSettingsByCategory = useMemo(() => {
-        const grouped = {
-            personal: remainingSettingsActions.filter(action => settingsQuickActionGroups.personal.some(p => p.href === action.href)),
-            barangay: remainingSettingsActions.filter(action => settingsQuickActionGroups.barangay.some(b => b.href === action.href)),
-            users: remainingSettingsActions.filter(action => settingsQuickActionGroups.users.some(u => u.href === action.href)),
-            system: remainingSettingsActions.filter(action => settingsQuickActionGroups.system.some(s => s.href === action.href)),
-            security: remainingSettingsActions.filter(action => settingsQuickActionGroups.security.some(s => s.href === action.href)),
+        const grouped: Record<string, QuickAction[]> = {
+            'Personal': remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.personal.some(p => p.href === action.href)
+            ),
+            'Barangay': remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.barangay.some(b => b.href === action.href)
+            ),
+            'Users & Roles': remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.users.some(u => u.href === action.href)
+            ),
+            'System': remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.system.some(s => s.href === action.href)
+            ),
+            'Security': remainingSettingsActions.filter(action => 
+                settingsQuickActionGroups.security.some(s => s.href === action.href)
+            ),
         };
         return Object.entries(grouped).filter(([_, items]) => items.length > 0);
     }, [remainingSettingsActions, settingsQuickActionGroups]);

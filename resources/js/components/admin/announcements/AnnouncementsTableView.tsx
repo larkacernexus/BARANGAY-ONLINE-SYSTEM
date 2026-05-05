@@ -28,11 +28,11 @@ import {
     BellRing, 
     BarChart 
 } from 'lucide-react';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { ActionDropdown, ActionDropdownItem, ActionDropdownSeparator } from '@/components/adminui/action-dropdown';
-import { Announcement, AnnouncementFilters } from '@/types/admin/announcements/announcement.types';
+import { Announcement } from '@/types/admin/announcements/announcement.types';
 import { announcementUtils } from '@/admin-utils/announcement-utils';
 
 interface AnnouncementsTableViewProps {
@@ -40,7 +40,6 @@ interface AnnouncementsTableViewProps {
     isBulkMode: boolean;
     selectedAnnouncements: number[];
     isMobile: boolean;
-    filtersState?: AnnouncementFilters;
     onItemSelect: (id: number) => void;
     hasActiveFilters: boolean;
     onClearFilters: () => void;
@@ -48,18 +47,13 @@ interface AnnouncementsTableViewProps {
     onToggleStatus: (announcement: Announcement) => void;
     onSelectAllOnPage: () => void;
     isSelectAll: boolean;
-    
-    // Notification-related props
     onSendNotifications?: (announcement: Announcement) => void;
     onResendNotifications?: (announcement: Announcement) => void;
     onViewNotificationStats?: (announcement: Announcement) => void;
     onDuplicate?: (announcement: Announcement) => void;
-    
-    // ✅ CLEAN SORTING PROPS
     sortBy: string;
     sortOrder: 'asc' | 'desc';
     onSortChange: (value: string) => void;
-    getCurrentSortValue: () => string;
 }
 
 export default function AnnouncementsTableView({
@@ -67,15 +61,6 @@ export default function AnnouncementsTableView({
     isBulkMode,
     selectedAnnouncements,
     isMobile,
-    filtersState = {
-        search: '',
-        type: 'all',
-        status: 'all',
-        audience_type: 'all',
-        priority: 'all',
-        from_date: '',
-        to_date: ''
-    },
     onItemSelect,
     hasActiveFilters,
     onClearFilters,
@@ -87,15 +72,11 @@ export default function AnnouncementsTableView({
     onResendNotifications,
     onViewNotificationStats,
     onDuplicate,
-    
-    // ✅ CLEAN SORTING PROPS
     sortBy,
     sortOrder,
     onSortChange,
-    getCurrentSortValue,
 }: AnnouncementsTableViewProps) {
     
-    // ✅ SIMPLE: Get sort icon based on current sort
     const getSortIcon = (column: string) => {
         if (sortBy !== column) return null;
         return sortOrder === 'asc' ? 
@@ -103,19 +84,19 @@ export default function AnnouncementsTableView({
             <ChevronDown className="h-4 w-4" />;
     };
 
-    // ✅ SIMPLE: Handle sort click
     const handleSort = (column: string) => {
         const newOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
         onSortChange(`${column}-${newOrder}`);
     };
 
     const getTruncationLength = (): number => {
-        if (isMobile) return 30;
-        return 50;
+        return isMobile ? 30 : 50;
     };
 
     const handleCopyTitle = (title: string) => {
-        navigator.clipboard.writeText(title);
+        navigator.clipboard.writeText(title).catch(() => {
+            // Silently handle clipboard write failure
+        });
     };
 
     const renderTableRow = (announcement: Announcement) => {
@@ -170,16 +151,12 @@ export default function AnnouncementsTableView({
                     </div>
                 </TableCell>
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3">
-                    <Badge 
-                        className={announcementUtils.getTypeColor(announcement.type)}
-                    >
+                    <Badge className={announcementUtils.getTypeColor(announcement.type)}>
                         {announcement.type_label}
                     </Badge>
                 </TableCell>
                 <TableCell className="px-3 py-2 sm:px-4 sm:py-3">
-                    <Badge 
-                        className={announcementUtils.getPriorityColor(announcement.priority)}
-                    >
+                    <Badge className={announcementUtils.getPriorityColor(announcement.priority)}>
                         {announcement.priority_label}
                     </Badge>
                 </TableCell>
@@ -320,7 +297,7 @@ export default function AnnouncementsTableView({
     const calculateColumnSpan = () => {
         let baseCols = isMobile ? 4 : 5;
         if (isBulkMode) baseCols += 1;
-        return baseCols + 1; // +1 for actions column
+        return baseCols + 1;
     };
 
     return (
@@ -342,7 +319,6 @@ export default function AnnouncementsTableView({
                                     </TableHead>
                                 )}
                                 
-                                {/* ✅ SORTABLE HEADERS */}
                                 <TableHead 
                                     className="px-3 py-2 sm:px-4 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] sm:min-w-[200px] cursor-pointer hover:bg-gray-100"
                                     onClick={() => handleSort('title')}
@@ -412,7 +388,7 @@ export default function AnnouncementsTableView({
                                             icon={<Megaphone className="h-12 w-12 text-gray-300 dark:text-gray-700" />}
                                             hasFilters={hasActiveFilters}
                                             onClearFilters={onClearFilters}
-                                            onCreateNew={() => window.location.href = '/admin/announcements/create'}
+                                            onCreateNew={() => router.get('/admin/announcements/create')}
                                             createLabel="Create Announcement"
                                         />
                                     </TableCell>

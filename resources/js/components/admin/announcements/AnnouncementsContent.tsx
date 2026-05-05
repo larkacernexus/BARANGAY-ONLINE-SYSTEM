@@ -154,34 +154,27 @@ export default function AnnouncementsContent({
     sortOptions = DEFAULT_SORT_OPTIONS,
 }: AnnouncementsContentProps) {
     
-    // ✅ Dynamic per-page options based on total items
     const getAllowedPerPageOptions = () => {
         const options: { value: string; label: string }[] = [];
         
-        // Always show 15
         options.push({ value: '15', label: '15 per page' });
         
-        // Show 30 if total > 15
         if (totalItems > 15) {
             options.push({ value: '30', label: '30 per page' });
         }
         
-        // Show 50 if total > 30
         if (totalItems > 30) {
             options.push({ value: '50', label: '50 per page' });
         }
         
-        // Show 100 if total > 50
         if (totalItems > 50) {
             options.push({ value: '100', label: '100 per page' });
         }
         
-        // Show 500 if total > 100
         if (totalItems > 100) {
             options.push({ value: '500', label: '500 per page' });
         }
         
-        // Show All only if total <= 550
         if (totalItems > 0 && totalItems <= 550) {
             options.push({ value: 'all', label: `Show All (${totalItems})` });
         }
@@ -191,7 +184,6 @@ export default function AnnouncementsContent({
 
     const perPageOptions = getAllowedPerPageOptions();
 
-    // Handle per page change
     const handlePerPageChange = (value: string) => {
         onPerPageChange(value);
     };
@@ -208,13 +200,13 @@ export default function AnnouncementsContent({
             {
                 label: 'Export',
                 icon: <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('export' as BulkOperation),
+                onClick: () => onBulkOperation('export'),
                 tooltip: 'Export selected announcements'
             },
             {
                 label: 'Publish',
                 icon: <Send className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('publish' as BulkOperation),
+                onClick: () => onBulkOperation('publish'),
                 tooltip: 'Publish selected announcements'
             }
         ],
@@ -222,19 +214,19 @@ export default function AnnouncementsContent({
             {
                 label: 'Activate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('activate' as BulkOperation),
+                onClick: () => onBulkOperation('activate'),
                 tooltip: 'Activate selected announcements'
             },
             {
                 label: 'Deactivate',
                 icon: <Bell className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('deactivate' as BulkOperation),
+                onClick: () => onBulkOperation('deactivate'),
                 tooltip: 'Deactivate selected announcements'
             },
             {
                 label: 'Archive',
                 icon: <Archive className="h-3.5 w-3.5 mr-1.5" />,
-                onClick: () => onBulkOperation('archive' as BulkOperation),
+                onClick: () => onBulkOperation('archive'),
                 tooltip: 'Archive selected announcements'
             },
             {
@@ -272,7 +264,6 @@ export default function AnnouncementsContent({
 
     return (
         <>
-            {/* Enhanced Bulk Actions Bar */}
             {isBulkMode && selectedAnnouncements.length > 0 && (
                 <AnnouncementsBulkActions
                     selectedAnnouncements={selectedAnnouncements}
@@ -294,7 +285,6 @@ export default function AnnouncementsContent({
                 />
             )}
 
-            {/* Floating Select All for Grid View */}
             {viewMode === 'grid' && hasAnnouncements && selectedAnnouncements.length < announcements.length && isBulkMode && (
                 <SelectAllFloat
                     isSelectAll={isSelectAll}
@@ -305,7 +295,6 @@ export default function AnnouncementsContent({
                 />
             )}
 
-            {/* Announcements List/Grid View */}
             <Card className="overflow-hidden border border-gray-200 dark:border-gray-700 dark:bg-gray-900">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-3">
@@ -327,7 +316,6 @@ export default function AnnouncementsContent({
                         />
                     </div>
                     <div className="flex items-center gap-3">
-                        {/* ✅ Per Page Selector with Dynamic Options */}
                         {!isMobile && perPageOptions.length > 1 && (
                             <div className="flex items-center gap-2">
                                 <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -349,7 +337,6 @@ export default function AnnouncementsContent({
                             </div>
                         )}
 
-                        {/* Sort Dropdown */}
                         {!isMobile && (
                             <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -371,7 +358,6 @@ export default function AnnouncementsContent({
                             </div>
                         )}
 
-                        {/* Grid view select all checkbox */}
                         {viewMode === 'grid' && isBulkMode && hasAnnouncements && (
                             <div className="flex items-center gap-2">
                                 <Checkbox
@@ -386,7 +372,6 @@ export default function AnnouncementsContent({
                             </div>
                         )}
                         
-                        {/* Bulk Mode Toggle */}
                         {!isMobile && (
                             <div className="flex items-center gap-2">
                                 <Tooltip>
@@ -410,7 +395,6 @@ export default function AnnouncementsContent({
                             </div>
                         )}
                         
-                        {/* Page Info */}
                         <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 hidden sm:block">
                             {totalItems > 0 && (
                                 <>Showing {announcements.length > 0 ? '1' : '0'} - {announcements.length} of {totalItems}</>
@@ -419,7 +403,6 @@ export default function AnnouncementsContent({
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 dark:bg-gray-900">
-                    {/* Empty State */}
                     {!hasAnnouncements ? (
                         <div className="py-12 sm:py-16 dark:bg-gray-900">
                             <EmptyState
@@ -436,14 +419,12 @@ export default function AnnouncementsContent({
                         </div>
                     ) : (
                         <>
-                            {/* Table View */}
                             {viewMode === 'table' ? (
                                 <AnnouncementsTableView
                                     announcements={announcements}
                                     isBulkMode={isBulkMode}
                                     selectedAnnouncements={selectedAnnouncements}
                                     isMobile={isMobile}
-                                    filtersState={filtersState}
                                     onItemSelect={onItemSelect}
                                     hasActiveFilters={hasActiveFilters}
                                     onClearFilters={onClearFilters}
@@ -461,7 +442,6 @@ export default function AnnouncementsContent({
                                     getCurrentSortValue={getCurrentSortValue}
                                 />
                             ) : (
-                                // Grid View
                                 <AnnouncementsGridView
                                     announcements={announcements}
                                     isBulkMode={isBulkMode}
@@ -479,7 +459,6 @@ export default function AnnouncementsContent({
                                 />
                             )}
 
-                            {/* Grid Selection Summary */}
                             {viewMode === 'grid' && isBulkMode && selectedAnnouncements.length > 0 && (
                                 <GridSelectionSummary
                                     selectedCount={selectedAnnouncements.length}
@@ -491,10 +470,8 @@ export default function AnnouncementsContent({
                                 />
                             )}
 
-                            {/* ✅ Per Page & Pagination Footer */}
                             <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
                                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                                    {/* Mobile Per Page Selector */}
                                     {isMobile && perPageOptions.length > 1 && (
                                         <div className="flex items-center gap-2 w-full">
                                             <Rows3 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -516,7 +493,6 @@ export default function AnnouncementsContent({
                                         </div>
                                     )}
 
-                                    {/* Pagination */}
                                     <div className="w-full">
                                         <Pagination
                                             currentPage={currentPage}

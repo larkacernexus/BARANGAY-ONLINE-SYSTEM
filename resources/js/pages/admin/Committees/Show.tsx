@@ -104,7 +104,7 @@ import { PageProps } from '@/types/admin/committees/committees';
 import { useState, useMemo } from 'react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
-// Import Admin Tabs Component - FIXED IMPORT PATH
+// Import Admin Tabs Component
 import { AdminTabsWithContent, AdminTabPanel } from '@/components/adminui/admin-tabs';
 
 interface Position {
@@ -128,7 +128,7 @@ interface Committee {
     is_active: boolean;
     created_at: string;
     updated_at: string;
-    positions?: Position[];
+    primary_positions?: Position[];  // FIXED: Changed from 'positions' to 'primary_positions'
     positions_count?: number;
 }
 
@@ -805,7 +805,7 @@ export default function CommitteeShow({ committee }: CommitteeShowProps) {
         const data = {
             committee: {
                 ...committee,
-                positions: committee.positions?.map(p => ({
+                positions: committee.primary_positions?.map(p => ({
                     id: p.id,
                     code: p.code,
                     name: p.name,
@@ -823,9 +823,11 @@ export default function CommitteeShow({ committee }: CommitteeShowProps) {
         a.click();
     };
 
-    const hasPositions = committee.positions && committee.positions.length > 0;
-    const activeCount = committee.positions?.filter(p => p.is_active).length || 0;
-    const inactiveCount = committee.positions?.filter(p => !p.is_active).length || 0;
+    // FIXED: Use primary_positions instead of positions
+    const positions = committee.primary_positions || [];
+    const hasPositions = positions.length > 0;
+    const activeCount = positions.filter(p => p.is_active).length || 0;
+    const inactiveCount = positions.filter(p => !p.is_active).length || 0;
 
     // Tab definitions
     const tabs = [
@@ -1108,7 +1110,7 @@ export default function CommitteeShow({ committee }: CommitteeShowProps) {
                                                 </CardHeader>
                                                 <CardContent>
                                                     <div className="grid gap-3 md:grid-cols-2">
-                                                        {committee.positions?.slice(0, 4).map((position) => (
+                                                        {positions.slice(0, 4).map((position) => (
                                                             <PositionCard key={position.id} position={position} committeeId={committee.id} />
                                                         ))}
                                                     </div>
@@ -1138,7 +1140,7 @@ export default function CommitteeShow({ committee }: CommitteeShowProps) {
 
                             <AdminTabPanel value="positions">
                                 {hasPositions ? (
-                                    <PositionsGrid positions={committee.positions!} committeeId={committee.id} />
+                                    <PositionsGrid positions={positions} committeeId={committee.id} />
                                 ) : (
                                     <Card className="dark:bg-gray-900">
                                         <CardHeader>

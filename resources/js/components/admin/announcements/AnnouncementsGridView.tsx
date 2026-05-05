@@ -3,7 +3,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,11 +12,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { EmptyState } from '@/components/adminui/empty-state';
 import { GridLayout } from '@/components/adminui/grid-layout';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { 
-    Megaphone, Calendar, Clock, AlertCircle, Eye, 
+    Megaphone, Calendar, AlertCircle, Eye, 
     Edit, Trash2, PlayCircle, PauseCircle, Copy, Bell, AlertTriangle, BellRing, BarChart,
     ChevronDown, ChevronUp, ExternalLink, Users, Globe, Building, Home,
     MoreVertical, FileSpreadsheet, Archive, Send, CheckSquare, Square
@@ -42,14 +41,12 @@ interface AnnouncementsGridViewProps {
     windowWidth?: number;
 }
 
-// Status color classes
 const getStatusColor = (isActive: boolean) => {
     return isActive
         ? 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800'
         : 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700';
 };
 
-// Priority color classes
 const getPriorityColorClass = (priority: number) => {
     switch (priority) {
         case 1:
@@ -65,7 +62,6 @@ const getPriorityColorClass = (priority: number) => {
     }
 };
 
-// Audience icon helper
 const getAudienceIcon = (audience?: string) => {
     switch (audience?.toLowerCase()) {
         case 'all':
@@ -96,69 +92,41 @@ export default function AnnouncementsGridView({
     onResendNotifications,
     onViewNotificationStats,
     onDuplicate,
-    windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1024
+    windowWidth = 1024
 }: AnnouncementsGridViewProps) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
-    const [devicePixelRatio, setDevicePixelRatio] = useState(1);
-    
-    useEffect(() => {
-        setDevicePixelRatio(window.devicePixelRatio || 1);
-    }, []);
     
     const isCompactView = isMobile;
     
-    // Determine grid columns - 3 for laptops, 4 for wide screens
     const gridCols = useMemo(() => {
-        if (windowWidth < 640) return 1;      // Mobile: 1 column
-        if (windowWidth < 1024) return 2;     // Tablet: 2 columns
-        if (windowWidth < 1800) return 3;     // Laptop (including 110% scaling): 3 columns
-        return 4;                              // Wide desktop: 4 columns
+        if (windowWidth < 640) return 1;
+        if (windowWidth < 1024) return 2;
+        if (windowWidth < 1800) return 3;
+        return 4;
     }, [windowWidth]);
 
-    // Toggle card expansion
     const handleToggleExpand = useCallback((id: number, e: React.MouseEvent) => {
         e.stopPropagation();
         setExpandedId(prev => prev === id ? null : id);
     }, []);
 
-    // Handle card click
     const handleCardClick = (announcementId: number, e: React.MouseEvent) => {
         if (isBulkMode) {
             e.stopPropagation();
             return;
         }
         e.stopPropagation();
-        handleToggleExpand(announcementId, e);
+        setExpandedId(prev => prev === announcementId ? null : announcementId);
     };
 
-    // Handle view details
-    const handleViewDetails = (announcementId: number, e: React.MouseEvent) => {
-        e.stopPropagation();
-        router.get(route('admin.announcements.show', announcementId));
-    };
-
-    // Handle edit
-    const handleEdit = (announcementId: number, e: React.MouseEvent) => {
-        e.stopPropagation();
-        router.get(route('admin.announcements.edit', announcementId));
-    };
-
-    // Handle export
-    const handleExport = (announcementId: number, e: React.MouseEvent) => {
-        e.stopPropagation();
-        router.get(route('admin.announcements.export', announcementId));
-    };
-
-    // Handle archive
-    const handleArchive = (announcementId: number, e: React.MouseEvent) => {
-        e.stopPropagation();
-        router.post(route('admin.announcements.archive', announcementId));
+    const handleCopyTitle = (title: string) => {
+        navigator.clipboard.writeText(title).catch(() => {
+            // Silently handle clipboard failure
+        });
     };
     
-    // Memoize selected set for quick lookup
     const selectedSet = useMemo(() => new Set(selectedAnnouncements), [selectedAnnouncements]);
 
-    // Create empty state component
     const emptyState = (
         <EmptyState
             title="No announcements found"
@@ -173,7 +141,6 @@ export default function AnnouncementsGridView({
         />
     );
 
-    // Early return for empty state
     if (announcements.length === 0) {
         return emptyState;
     }
@@ -195,7 +162,6 @@ export default function AnnouncementsGridView({
                     : null;
                 const hasTargetAudience = !!(announcement.audience_summary && announcement.audience_summary.length > 0);
                 
-                // Truncation lengths based on view
                 const titleLength = isCompactView ? 25 : 35;
                 const contentLength = isCompactView ? 60 : 100;
                 
@@ -212,7 +178,6 @@ export default function AnnouncementsGridView({
                         onClick={(e) => handleCardClick(announcement.id, e)}
                     >
                         <CardContent className="p-4">
-                            {/* Header */}
                             <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className={`h-10 w-10 rounded-full ${
@@ -260,12 +225,18 @@ export default function AnnouncementsGridView({
                                             </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-56">
-                                            <DropdownMenuItem onClick={(e) => handleViewDetails(announcement.id, e)}>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.get(route('admin.announcements.show', announcement.id));
+                                            }}>
                                                 <Eye className="h-4 w-4 mr-2" />
                                                 View Details
                                             </DropdownMenuItem>
                                             
-                                            <DropdownMenuItem onClick={(e) => handleEdit(announcement.id, e)}>
+                                            <DropdownMenuItem onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.get(route('admin.announcements.edit', announcement.id));
+                                            }}>
                                                 <Edit className="h-4 w-4 mr-2" />
                                                 Edit Announcement
                                             </DropdownMenuItem>
@@ -282,7 +253,6 @@ export default function AnnouncementsGridView({
                                             
                                             <DropdownMenuSeparator />
                                             
-                                            {/* Send Notifications */}
                                             {onSendNotifications && isActive && (
                                                 <DropdownMenuItem onClick={(e) => {
                                                     e.stopPropagation();
@@ -315,7 +285,6 @@ export default function AnnouncementsGridView({
                                             
                                             <DropdownMenuSeparator />
                                             
-                                            {/* Toggle Status */}
                                             <DropdownMenuItem onClick={(e) => {
                                                 e.stopPropagation();
                                                 onToggleStatus(announcement);
@@ -333,21 +302,11 @@ export default function AnnouncementsGridView({
                                                 )}
                                             </DropdownMenuItem>
                                             
-                                            {/* Export */}
-                                            <DropdownMenuItem onClick={(e) => handleExport(announcement.id, e)}>
-                                                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                                                Export
-                                            </DropdownMenuItem>
-                                            
-                                            {/* Archive */}
-                                            <DropdownMenuItem onClick={(e) => handleArchive(announcement.id, e)}>
-                                                <Archive className="h-4 w-4 mr-2" />
-                                                Archive
-                                            </DropdownMenuItem>
-                                            
                                             <DropdownMenuItem onClick={(e) => {
                                                 e.stopPropagation();
-                                                navigator.clipboard.writeText(announcement.title);
+                                                navigator.clipboard.writeText(announcement.title).catch(() => {
+                                                    // Silently handle clipboard failure
+                                                });
                                             }}>
                                                 <Copy className="h-4 w-4 mr-2" />
                                                 Copy Title
@@ -377,7 +336,6 @@ export default function AnnouncementsGridView({
                                             
                                             <DropdownMenuSeparator />
                                             
-                                            {/* Delete */}
                                             <DropdownMenuItem 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -393,7 +351,6 @@ export default function AnnouncementsGridView({
                                 </div>
                             </div>
 
-                            {/* Status Badges */}
                             <div className="flex flex-wrap gap-1.5 mb-3">
                                 <Badge 
                                     variant="outline" 
@@ -421,16 +378,13 @@ export default function AnnouncementsGridView({
                                 )}
                             </div>
 
-                            {/* Primary Info - always visible */}
                             <div className="space-y-2 mb-2">
-                                {/* Content preview */}
                                 {announcement.content && (
                                     <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
                                         {announcementUtils.truncateText(announcement.content, contentLength)}
                                     </p>
                                 )}
                                 
-                                {/* Date Range */}
                                 <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                     <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
                                     <span>
@@ -441,7 +395,6 @@ export default function AnnouncementsGridView({
                                     </span>
                                 </div>
                                 
-                                {/* Target Audience */}
                                 {hasTargetAudience && (
                                     <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
                                         <Users className="h-3.5 w-3.5 flex-shrink-0" />
@@ -452,7 +405,6 @@ export default function AnnouncementsGridView({
                                     </div>
                                 )}
 
-                                {/* Days remaining indicator */}
                                 {daysRemaining !== null && daysRemaining >= 0 && (
                                     <div className="flex items-center gap-1.5 text-sm">
                                         <AlertCircle className={`h-3.5 w-3.5 flex-shrink-0 ${
@@ -477,7 +429,6 @@ export default function AnnouncementsGridView({
                                 )}
                             </div>
 
-                            {/* Expand/Collapse indicator */}
                             {!isBulkMode && (
                                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -496,10 +447,8 @@ export default function AnnouncementsGridView({
                                 </div>
                             )}
 
-                            {/* Expanded Details */}
                             {isExpanded && (
                                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-2 space-y-3 animate-in fade-in-50">
-                                    {/* Full Content */}
                                     {announcement.content && (
                                         <div className="text-sm">
                                             <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Content:</p>
@@ -509,7 +458,6 @@ export default function AnnouncementsGridView({
                                         </div>
                                     )}
 
-                                    {/* Audience Details */}
                                     <div className="text-sm">
                                         <p className="font-medium text-gray-700 dark:text-gray-300 mb-1">Target Audience:</p>
                                         <Badge variant="outline" className="text-xs px-2 py-0.5">
@@ -523,7 +471,6 @@ export default function AnnouncementsGridView({
                                         )}
                                     </div>
 
-                                    {/* Metadata */}
                                     <div className="grid grid-cols-2 gap-2 text-sm">
                                         <div>
                                             <span className="text-gray-500 dark:text-gray-400">Created:</span>
@@ -539,7 +486,6 @@ export default function AnnouncementsGridView({
                                         </div>
                                     </div>
 
-                                    {/* Views count */}
                                     {announcement.views_count && announcement.views_count > 0 && (
                                         <div className="flex items-center gap-2 text-sm">
                                             <Eye className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -548,7 +494,6 @@ export default function AnnouncementsGridView({
                                         </div>
                                     )}
 
-                                    {/* Attachments info */}
                                     {announcement.has_attachments && (
                                         <div className="flex items-center gap-2 text-sm">
                                             <Bell className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -557,11 +502,13 @@ export default function AnnouncementsGridView({
                                         </div>
                                     )}
 
-                                    {/* View full details link and collapse button */}
                                     <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
                                         <button
                                             className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1.5"
-                                            onClick={(e) => handleViewDetails(announcement.id, e)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.get(route('admin.announcements.show', announcement.id));
+                                            }}
                                         >
                                             <ExternalLink className="h-3.5 w-3.5" />
                                             View full details

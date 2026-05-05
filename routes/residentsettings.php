@@ -212,15 +212,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // =========================================================================
     // PASSWORD CONFIRMATION (RESIDENT CONTEXT)
+    // FIX: Added both GET and POST routes for password confirmation
+    // The password.confirm middleware redirects to 'resident.password.confirm'
     // =========================================================================
     Route::prefix('resident')->name('resident.')->group(function () {
-        Route::get('/confirm-password', [ConfirmablePasswordController::class, 'show'])
+        // Primary password confirmation route (matches Laravel's default pattern)
+        Route::get('/password/confirm', [ConfirmablePasswordController::class, 'show'])
             ->middleware('throttle:10,60')
             ->name('password.confirm');
         
-        Route::post('/confirm-password', [ConfirmablePasswordController::class, 'store'])
+        Route::post('/password/confirm', [ConfirmablePasswordController::class, 'store'])
             ->middleware('throttle:10,60')
             ->name('password.confirm.store');
+        
+        // Alternative route for backward compatibility
+        Route::get('/confirm-password', [ConfirmablePasswordController::class, 'show'])
+            ->middleware('throttle:10,60');
+        
+        Route::post('/confirm-password', [ConfirmablePasswordController::class, 'store'])
+            ->middleware('throttle:10,60');
     });
 
     // =========================================================================

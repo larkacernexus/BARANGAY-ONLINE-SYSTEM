@@ -11,7 +11,7 @@ import { FormHeader } from '@/components/adminui/form/form-header';
 import { FormErrors } from '@/components/adminui/form/form-errors';
 import { RequiredFieldsChecklist } from '@/components/adminui/form/required-fields-checklist';
 import { useFormManager } from '@/hooks/admin/use-form-manager';
-import { Megaphone, Paperclip, Settings, Users, Sparkles, Copy, RefreshCw, AlertCircle, Bell, Briefcase, Calendar, FileArchive, FileImage, FileSpreadsheet, FileText, Globe, Home, MapPin, Tag, UserCog, Wrench } from 'lucide-react';
+import { Megaphone, Paperclip, Settings, Users, Sparkles, Copy, RefreshCw, AlertCircle, Bell, Calendar, FileArchive, FileImage, FileSpreadsheet, FileText, Globe, Home, MapPin, Tag, UserCog, Wrench, Briefcase } from 'lucide-react';
 import { ContentTab } from '@/components/admin/announcements/create/content-tab';
 import { AttachmentsTab } from '@/components/admin/announcements/create/attachments-tab';
 import { SettingsTab } from '@/components/admin/announcements/create/settings-tab';
@@ -35,19 +35,42 @@ import type {
     User
 } from '@/types/admin/announcements/announcement.types';
 
-const tabs: TabConfig[] = [
+const TABS: TabConfig[] = [
     { id: 'content', label: 'Content', icon: Megaphone, requiredFields: ['title', 'content'] },
     { id: 'attachments', label: 'Attachments', icon: Paperclip, requiredFields: [] },
     { id: 'settings', label: 'Settings', icon: Settings, requiredFields: [] },
     { id: 'audience', label: 'Audience', icon: Users, requiredFields: [] }
 ];
 
-const requiredFieldsMap = {
+const TAB_ORDER = ['content', 'attachments', 'settings', 'audience'] as const;
+
+const REQUIRED_FIELDS_MAP = {
     content: ['title', 'content'],
     attachments: [],
     settings: [],
     audience: []
 };
+
+const DEFAULT_TEMPLATES = [
+    {
+        title: 'Barangay Assembly',
+        content: 'Barangay Assembly will be held on [DATE] at [TIME] at the Barangay Hall. All residents are invited to attend.',
+        type: 'event' as AnnouncementType,
+        priority: 2 as PriorityLevel,
+    },
+    {
+        title: 'Medical Mission',
+        content: 'Free medical mission with dental check-up, blood pressure monitoring, and medicine distribution.',
+        type: 'event' as AnnouncementType,
+        priority: 3 as PriorityLevel,
+    },
+    {
+        title: 'Clean-Up Drive',
+        content: 'Community clean-up drive. Meet at the Barangay Hall at 7 AM. Please bring your own gloves and trash bags.',
+        type: 'general' as AnnouncementType,
+        priority: 1 as PriorityLevel,
+    },
+];
 
 interface Attachment {
     id?: number;
@@ -156,7 +179,7 @@ export default function CreateAnnouncement() {
             end_time: '',
             attachments: [],
         },
-        requiredFields: requiredFieldsMap,
+        requiredFields: REQUIRED_FIELDS_MAP,
         onSubmit: (data) => {
             const submitData = new FormData();
             Object.entries(data).forEach(([key, value]) => {
@@ -322,13 +345,16 @@ export default function CreateAnnouncement() {
     }, []);
 
     const removeAttachment = useCallback((index: number) => {
-        if (attachments[index]?.preview) {
-            URL.revokeObjectURL(attachments[index].preview!);
-        }
-        setAttachments(prev => prev.filter((_, i) => i !== index));
+        setAttachments(prev => {
+            const attachment = prev[index];
+            if (attachment?.preview) {
+                URL.revokeObjectURL(attachment.preview);
+            }
+            return prev.filter((_, i) => i !== index);
+        });
         const updatedAttachments = formData.attachments.filter((_, i) => i !== index);
         updateFormData({ attachments: updatedAttachments });
-    }, [attachments, formData.attachments, updateFormData]);
+    }, [formData.attachments, updateFormData]);
 
     const clearAttachments = useCallback(() => {
         attachments.forEach(att => {
@@ -344,7 +370,7 @@ export default function CreateAnnouncement() {
                 if (att?.preview) URL.revokeObjectURL(att.preview);
             });
         };
-    }, [attachments]);
+    }, []);
 
     const handleMultiSelectChange = useCallback((name: string, value: number[]) => {
         updateFormData({ [name]: value });
@@ -397,7 +423,7 @@ export default function CreateAnnouncement() {
             setActiveTab('content');
             toast.info('Form reset');
         }
-    }, [resetForm, clearAttachments]);
+    }, [resetForm, clearAttachments, setActiveTab]);
 
     const handleCancel = useCallback(() => {
         if (hasUnsavedChanges) {
@@ -409,44 +435,19 @@ export default function CreateAnnouncement() {
         }
     }, [hasUnsavedChanges]);
 
-    const defaultTemplates = [
-        {
-            title: 'Barangay Assembly',
-            content: 'Barangay Assembly will be held on [DATE] at [TIME] at the Barangay Hall. All residents are invited to attend.',
-            type: 'event' as AnnouncementType,
-            priority: 2 as PriorityLevel,
-        },
-        {
-            title: 'Medical Mission',
-            content: 'Free medical mission with dental check-up, blood pressure monitoring, and medicine distribution.',
-            type: 'event' as AnnouncementType,
-            priority: 3 as PriorityLevel,
-        },
-        {
-            title: 'Clean-Up Drive',
-            content: 'Community clean-up drive. Meet at the Barangay Hall at 7 AM. Please bring your own gloves and trash bags.',
-            type: 'general' as AnnouncementType,
-            priority: 1 as PriorityLevel,
-        },
-    ];
-
-    const displayTemplates = templates.length > 0 ? templates : defaultTemplates;
-
-    const tabStatuses: Record<string, 'complete' | 'incomplete' | 'error' | 'optional'> = {
-        content: getTabStatus('content'),
-        attachments: getTabStatus('attachments'),
-        settings: getTabStatus('settings'),
-        audience: getTabStatus('audience')
-    };
+    const displayTemplates = templates.length > 0 ? templates : DEFAULT_TEMPLATES;
 
     const missingFields = getMissingFields();
 
-    const requiredFieldsList = [
-        { label: 'Title', value: !!formData.title, tabId: 'content' },
-        { label: 'Content', value: !!formData.content, tabId: 'content' },
-    ];
-
-    const tabOrder = ['content', 'attachments', 'settings', 'audience'];
+    const requiredFieldsList = TABS
+        .filter(tab => tab.requiredFields.length > 0)
+        .flatMap(tab => 
+            tab.requiredFields.map(field => ({
+                label: field.charAt(0).toUpperCase() + field.slice(1),
+                value: !missingFields.includes(field),
+                tabId: tab.id
+            }))
+        );
 
     return (
         <AppLayout
@@ -478,7 +479,6 @@ export default function CreateAnnouncement() {
                     }
                 />
 
-                {/* Quick Templates Card */}
                 <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
                     <div className="flex items-start gap-3">
                         <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
@@ -509,10 +509,15 @@ export default function CreateAnnouncement() {
                 <div className={`grid ${showPreview ? 'lg:grid-cols-3' : 'grid-cols-1'} gap-6`}>
                     <div className={`${showPreview ? 'lg:col-span-2' : 'col-span-1'} space-y-4`}>
                         <FormTabs
-                            tabs={tabs}
+                            tabs={TABS}
                             activeTab={activeTab}
                             onTabChange={setActiveTab}
-                            tabStatuses={tabStatuses}
+                            tabStatuses={{
+                                content: getTabStatus('content'),
+                                attachments: getTabStatus('attachments'),
+                                settings: getTabStatus('settings'),
+                                audience: getTabStatus('audience')
+                            }}
                         />
 
                         {activeTab === 'content' && (
@@ -526,7 +531,7 @@ export default function CreateAnnouncement() {
                                     />
                                 </FormContainer>
                                 <FormNavigation
-                                    onNext={() => goToNextTab(tabOrder)}
+                                    onNext={() => goToNextTab(TAB_ORDER)}
                                     onCancel={handleCancel}
                                     onSubmit={handleSubmit}
                                     isSubmitting={isSubmitting}
@@ -559,8 +564,8 @@ export default function CreateAnnouncement() {
                                     />
                                 </FormContainer>
                                 <FormNavigation
-                                    onPrevious={() => goToPrevTab(tabOrder)}
-                                    onNext={() => goToNextTab(tabOrder)}
+                                    onPrevious={() => goToPrevTab(TAB_ORDER)}
+                                    onNext={() => goToNextTab(TAB_ORDER)}
                                     onCancel={handleCancel}
                                     onSubmit={handleSubmit}
                                     isSubmitting={isSubmitting}
@@ -594,8 +599,8 @@ export default function CreateAnnouncement() {
                                     />
                                 </FormContainer>
                                 <FormNavigation
-                                    onPrevious={() => goToPrevTab(tabOrder)}
-                                    onNext={() => goToNextTab(tabOrder)}
+                                    onPrevious={() => goToPrevTab(TAB_ORDER)}
+                                    onNext={() => goToNextTab(TAB_ORDER)}
                                     onCancel={handleCancel}
                                     onSubmit={handleSubmit}
                                     isSubmitting={isSubmitting}
@@ -632,7 +637,7 @@ export default function CreateAnnouncement() {
                                     />
                                 </FormContainer>
                                 <FormNavigation
-                                    onPrevious={() => goToPrevTab(tabOrder)}
+                                    onPrevious={() => goToPrevTab(TAB_ORDER)}
                                     onCancel={handleCancel}
                                     onSubmit={handleSubmit}
                                     isSubmitting={isSubmitting}

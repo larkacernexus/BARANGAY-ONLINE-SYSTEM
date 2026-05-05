@@ -1,3 +1,5 @@
+import { memo, useMemo } from 'react';
+import { usePage } from '@inertiajs/react';
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from '@/components/ui/sidebar';
 import { Zap } from 'lucide-react';
 import { SidebarTab, SidebarCategory, QuickAction } from './types';
@@ -21,7 +23,7 @@ interface SidebarContentProps {
     remainingSettingsActions: QuickAction[];
 }
 
-export function SidebarContentComponent({
+export const SidebarContentComponent = memo(function SidebarContentComponent({
     activeTab,
     isCollapsed,
     reportStats,
@@ -35,12 +37,50 @@ export function SidebarContentComponent({
     remainingSettingsActions,
 }: SidebarContentProps) {
     
-    const renderOperationsContent = () => (
+    // Get user permissions from Inertia props
+    const { props } = usePage() as any;
+    const user = props?.auth?.user || {};
+    const userPermissions = Array.isArray(user?.permissions) ? user.permissions : [];
+    const userRoleName = user?.role_name || user?.role?.name || '';
+
+    // Permission check helper
+    const hasPermission = (permission: string | undefined): boolean => {
+        if (!permission) return true;
+        if (userRoleName === 'admin' || userRoleName === 'barangay_officer') return true;
+        return userPermissions.includes(permission);
+    };
+
+    // Check if user can view reports (for alerts visibility)
+    const canViewReports = hasPermission('view-reports');
+    const canViewResidents = hasPermission('view-residents');
+    const canViewClearances = hasPermission('view-clearances');
+    const canViewPayments = hasPermission('view-payments');
+    const canReviewReports = hasPermission('review-reports');
+    const canManageBlotters = hasPermission('manage-blotters');
+
+    const renderOperationsContent = useMemo(() => (
         <>
-            <TodayStats reportStats={reportStats} isCollapsed={isCollapsed} />
-            <PendingAlert reportStats={reportStats} isCollapsed={isCollapsed} />
-            <UrgentAlert reportStats={reportStats} isCollapsed={isCollapsed} />
-            <CollapsedStats reportStats={reportStats} isCollapsed={isCollapsed} />
+            {/* Only show alerts if user has view-reports permission */}
+            {canViewReports && (
+                <>
+                    <TodayStats 
+                        reportStats={reportStats} 
+                        isCollapsed={isCollapsed} 
+                    />
+                    <PendingAlert 
+                        reportStats={reportStats} 
+                        isCollapsed={isCollapsed} 
+                    />
+                    <UrgentAlert 
+                        reportStats={reportStats} 
+                        isCollapsed={isCollapsed} 
+                    />
+                    <CollapsedStats 
+                        reportStats={reportStats} 
+                        isCollapsed={isCollapsed} 
+                    />
+                </>
+            )}
 
             {mainOperationsQuickActions.length > 0 && (
                 <SidebarGroup className="mb-2">
@@ -54,9 +94,9 @@ export function SidebarContentComponent({
                     )}
                     
                     <SidebarMenu className="space-y-0.5">
-                        {mainOperationsQuickActions.map((action) => (
+                        {mainOperationsQuickActions.map((action, index) => (
                             <QuickActionItem
-                                key={`${action.title}-${action.href}`}
+                                key={`${action.title}-${action.href}-${index}`}
                                 action={action}
                                 isCollapsed={isCollapsed}
                             />
@@ -95,9 +135,17 @@ export function SidebarContentComponent({
                 </SidebarGroup>
             )}
         </>
-    );
+    ), [
+        reportStats, 
+        isCollapsed, 
+        mainOperationsQuickActions, 
+        remainingOperationsByCategory, 
+        remainingOperationsActions, 
+        operationsCategories,
+        canViewReports
+    ]);
 
-    const renderSettingsContent = () => (
+    const renderSettingsContent = useMemo(() => (
         <>
             {mainSettingsQuickActions.length > 0 && (
                 <SidebarGroup className="mb-2">
@@ -111,9 +159,9 @@ export function SidebarContentComponent({
                     )}
                     
                     <SidebarMenu className="space-y-0.5">
-                        {mainSettingsQuickActions.map((action) => (
+                        {mainSettingsQuickActions.map((action, index) => (
                             <QuickActionItem
-                                key={`${action.title}-${action.href}`}
+                                key={`${action.title}-${action.href}-${index}`}
                                 action={action}
                                 isCollapsed={isCollapsed}
                             />
@@ -143,9 +191,9 @@ export function SidebarContentComponent({
                         {settingsCategories.map((category) => {
                             // For Personal category, render each item as a direct link
                             if (category.title === 'Personal') {
-                                return category.items.map((item) => (
+                                return category.items.map((item, itemIndex) => (
                                     <RegularMenuItem
-                                        key={item.title}
+                                        key={`personal-${item.title}-${itemIndex}`}
                                         item={item}
                                         isCollapsed={isCollapsed}
                                         type="settings"
@@ -166,7 +214,13 @@ export function SidebarContentComponent({
                 </SidebarGroup>
             )}
         </>
-    );
+    ), [
+        isCollapsed, 
+        mainSettingsQuickActions, 
+        remainingSettingsByCategory, 
+        remainingSettingsActions, 
+        settingsCategories
+    ]);
 
-    return activeTab === 'operations' ? renderOperationsContent() : renderSettingsContent();
-}
+    return activeTab === 'operations' ? renderOperationsContent : renderSettingsContent;
+});

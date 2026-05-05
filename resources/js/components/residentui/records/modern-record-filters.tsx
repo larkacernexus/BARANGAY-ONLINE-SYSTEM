@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, X, DownloadCloud, ChevronDown, FolderOpen, User, Calendar, FileText, Printer, Share2 } from 'lucide-react';
+import { Search, X, DownloadCloud, ChevronDown, FolderOpen, User, FileText, Printer, Share2 } from 'lucide-react';
 import { ModernSelect } from '../modern-select';
 import {
     DropdownMenu,
@@ -10,7 +10,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { toast } from 'sonner';
+
+interface FilterOption {
+    value: string;
+    label: string;
+}
 
 interface ModernRecordFiltersProps {
     search: string;
@@ -22,8 +26,8 @@ interface ModernRecordFiltersProps {
     residentFilter: string;
     handleResidentChange: (resident: string) => void;
     loading: boolean;
-    allCategories: Array<any>;
-    householdResidents: Array<any>;
+    allCategories: Array<{ id: string; name: string; count: number }>;
+    householdResidents: Array<{ id: number; first_name: string; last_name: string; full_name?: string }>;
     printRecords: () => void;
     exportToCSV: () => void;
     isExporting: boolean;
@@ -32,7 +36,7 @@ interface ModernRecordFiltersProps {
     onCopySummary?: () => void;
 }
 
-export const ModernRecordFilters = ({
+export function ModernRecordFilters({
     search,
     setSearch,
     handleSearchSubmit,
@@ -50,22 +54,28 @@ export const ModernRecordFilters = ({
     hasActiveFilters,
     handleClearFilters,
     onCopySummary,
-}: ModernRecordFiltersProps) => {
-    const categoryOptions = allCategories.map(cat => ({
-        value: cat.id,
-        label: cat.name
-    }));
+}: ModernRecordFiltersProps) {
+    const categoryOptions: FilterOption[] = [
+        { value: 'all', label: 'All categories' },
+        ...(allCategories ?? [])
+            .filter((cat) => cat.id !== 'all')
+            .map((cat) => ({
+                value: cat.id,
+                label: cat.name,
+            })),
+    ];
 
-    const residentOptions = householdResidents.map(resident => ({
+    const residentOptions: FilterOption[] = (householdResidents ?? []).map((resident) => ({
         value: resident.id.toString(),
-        label: `${resident.first_name} ${resident.last_name}`
+        label:
+            resident.full_name ||
+            `${resident.first_name ?? ''} ${resident.last_name ?? ''}`.trim(),
     }));
 
     return (
         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
             <CardContent className="p-6">
                 <div className="space-y-4">
-                    {/* Search Bar */}
                     <div className="relative group">
                         <form onSubmit={handleSearchSubmit} className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -88,7 +98,6 @@ export const ModernRecordFilters = ({
                         </form>
                     </div>
 
-                    {/* Filters Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                         <ModernSelect
                             value={activeTab}
@@ -104,19 +113,20 @@ export const ModernRecordFilters = ({
                                 value={residentFilter}
                                 onValueChange={handleResidentChange}
                                 placeholder="All residents"
-                                options={residentOptions}
+                                options={[{ value: 'all', label: 'All residents' }, ...residentOptions]}
                                 disabled={loading}
                                 icon={User}
                             />
                         )}
 
-                        {/* Empty placeholder for alignment */}
                         <div className="hidden md:block" />
 
-                        {/* Actions Dropdown */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="h-10 rounded-xl border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
+                                <Button
+                                    variant="outline"
+                                    className="h-10 rounded-xl border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                >
                                     <DownloadCloud className="h-4 w-4 mr-2" />
                                     Export
                                     <ChevronDown className="h-4 w-4 ml-2" />
@@ -140,9 +150,8 @@ export const ModernRecordFilters = ({
                         </DropdownMenu>
                     </div>
 
-                    {/* Active Filters */}
                     {hasActiveFilters && (
-                        <div className="overflow-hidden">
+                        <div>
                             <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <div className="flex items-center gap-2">
                                     <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
@@ -166,4 +175,4 @@ export const ModernRecordFilters = ({
             </CardContent>
         </Card>
     );
-};
+}

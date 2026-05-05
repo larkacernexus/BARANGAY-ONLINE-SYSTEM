@@ -5,76 +5,37 @@ namespace App\Http\Middleware;
 use Inertia\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Models\Household;
 use App\Models\HouseholdMember;
 use App\Models\Resident;
 use App\Models\Business;
-use App\Models\ResidentDocument;
-use App\Models\Purok;
-use App\Models\User;
-use App\Models\Official;
 use App\Models\CommunityReport;
 use App\Models\ClearanceRequest;
-use App\Models\Form;
-use App\Models\Announcement;
 use App\Models\Payment;
 use App\Models\Privilege;
+use App\Models\User;
 use App\Helpers\NotificationHelper;
 
 class ResidentHandleInertiaRequests extends Middleware
 {
     protected $rootView = 'app';
-    
-    /*
-    |--------------------------------------------------------------------------
-    | SECURITY CONFIGURATION
-    |--------------------------------------------------------------------------
-    */
-    
-    /**
-     * Maximum search query length to prevent DoS attacks.
-     */
-    protected const MAX_SEARCH_LENGTH = 100;
-    
-    /**
-     * Minimum search query length.
-     */
-    protected const MIN_SEARCH_LENGTH = 2;
-    
-    /**
-     * Maximum results per entity type.
-     */
-    protected const MAX_SEARCH_RESULTS_PER_TYPE = 10;
-    
-    /**
-     * Sensitive resident fields that should never be exposed.
-     */
-    protected array $sensitiveResidentFields = [
-        'sss_number',
-        'tin_number',
-        'philhealth_number',
-        'password',
-        'remember_token',
-    ];
+
+    private const MAX_SEARCH_LENGTH = 100;
+    private const MIN_SEARCH_LENGTH = 2;
+    private const MAX_SEARCH_RESULTS_PER_TYPE = 10;
+    private const MAX_QUICK_SEARCH_RESULTS = 8;
 
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PRIVILEGE METHODS
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------
+    // PRIVILEGES
+    // ----------------------------------------------------------------
 
-    /**
-     * Get all active privileges - DYNAMIC FROM DATABASE
-     * SECURITY NOTE: Cached to reduce database load
-     */
     private function getAllPrivileges(): array
     {
         return Cache::remember('all_active_privileges_resident', 300, function () {
@@ -82,32 +43,26 @@ class ResidentHandleInertiaRequests extends Middleware
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'description', 'discount_type_id'])
-                ->map(function ($privilege) {
-                    return [
-                        'id' => $privilege->id,
-                        'name' => $privilege->name,
-                        'code' => $privilege->code,
-                        'description' => $privilege->description,
-                        'discount_type_id' => $privilege->discount_type_id,
-                        'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
-                        'discount_type' => $privilege->discountType ? [
-                            'id' => $privilege->discountType->id,
-                            'code' => $privilege->discountType->code,
-                            'name' => $privilege->discountType->name,
-                            'percentage' => (float) $privilege->discountType->percentage,
-                            'requires_id_number' => (bool) $privilege->discountType->requires_id_number,
-                            'requires_verification' => (bool) $privilege->discountType->requires_verification,
-                        ] : null,
-                    ];
-                })
+                ->map(fn ($privilege) => [
+                    'id'                         => $privilege->id,
+                    'name'                       => $privilege->name,
+                    'code'                       => $privilege->code,
+                    'description'                => $privilege->description,
+                    'discount_type_id'           => $privilege->discount_type_id,
+                    'default_discount_percentage' => (float) ($privilege->discountType?->percentage ?? 0),
+                    'discount_type'              => $privilege->discountType ? [
+                        'id'                   => $privilege->discountType->id,
+                        'code'                 => $privilege->discountType->code,
+                        'name'                 => $privilege->discountType->name,
+                        'percentage'           => (float) $privilege->discountType->percentage,
+                        'requires_id_number'   => (bool) $privilege->discountType->requires_id_number,
+                        'requires_verification' => (bool) $privilege->discountType->requires_verification,
+                    ] : null,
+                ])
                 ->toArray();
         });
     }
 
-    /**
-     * Get resident's active privileges
-     * SECURITY NOTE: Only returns data for the authenticated resident
-     */
     private function getResidentPrivileges(Resident $resident): array
     {
         if (!$resident->relationLoaded('residentPrivileges')) {
@@ -115,29 +70,27 @@ class ResidentHandleInertiaRequests extends Middleware
         }
 
         return $resident->residentPrivileges
-            ->filter(function ($rp) {
-                return $rp->isActive();
-            })
+            ->filter(fn ($rp) => $rp->isActive())
             ->map(function ($rp) {
-                $privilege = $rp->privilege;
-                $discountPercentage = $rp->discount_percentage 
-                    ?? $privilege->discountType?->percentage 
+                $privilege         = $rp->privilege;
+                $discountPercentage = $rp->discount_percentage
+                    ?? $privilege->discountType?->percentage
                     ?? 0;
-                
+
                 return [
-                    'id' => $rp->id,
-                    'privilege_id' => $privilege->id,
-                    'code' => $privilege->code,
-                    'name' => $privilege->name,
-                    'id_number' => $rp->id_number,
+                    'id'                  => $rp->id,
+                    'privilege_id'        => $privilege->id,
+                    'code'                => $privilege->code,
+                    'name'                => $privilege->name,
+                    'id_number'           => $rp->id_number,
                     'discount_percentage' => (float) $discountPercentage,
-                    'verified_at' => $rp->verified_at?->toISOString(),
-                    'expires_at' => $rp->expires_at?->toISOString(),
-                    'status' => $this->getPrivilegeStatus($rp),
-                    'discount_type' => $privilege->discountType ? [
-                        'id' => $privilege->discountType->id,
-                        'code' => $privilege->discountType->code,
-                        'name' => $privilege->discountType->name,
+                    'verified_at'         => $rp->verified_at?->toISOString(),
+                    'expires_at'          => $rp->expires_at?->toISOString(),
+                    'status'              => $this->privilegeStatus($rp),
+                    'discount_type'       => $privilege->discountType ? [
+                        'id'         => $privilege->discountType->id,
+                        'code'       => $privilege->discountType->code,
+                        'name'       => $privilege->discountType->name,
                         'percentage' => (float) $privilege->discountType->percentage,
                     ] : null,
                 ];
@@ -146,666 +99,584 @@ class ResidentHandleInertiaRequests extends Middleware
             ->toArray();
     }
 
-    /**
-     * Get privilege status based on expiry
-     */
-    private function getPrivilegeStatus($residentPrivilege): string
+    private function privilegeStatus($rp): string
     {
-        if (!$residentPrivilege->verified_at) {
+        if (!$rp->verified_at) {
             return 'pending';
         }
-        
-        if ($residentPrivilege->expires_at) {
-            $daysUntilExpiry = now()->diffInDays($residentPrivilege->expires_at, false);
-            
-            if ($daysUntilExpiry <= 0) {
-                return 'expired';
-            }
-            
-            if ($daysUntilExpiry <= 30) {
-                return 'expiring_soon';
-            }
+
+        if ($rp->expires_at && now()->diffInDays($rp->expires_at, false) <= 0) {
+            return 'expired';
         }
-        
+
+        if ($rp->expires_at && now()->diffInDays($rp->expires_at, false) <= 30) {
+            return 'expiring_soon';
+        }
+
         return 'active';
     }
 
-    /**
-     * Get privilege icon for display
-     */
-    private function getPrivilegeIcon(string $code): string
+    private function privilegeIcon(string $code): string
     {
-        $icons = [
-            'SC' => '👴', 'OSP' => '👴', 'PWD' => '♿',
-            'SP' => '👨‍👧', 'SOLO_PARENT' => '👨‍👧',
-            'IND' => '🏠', 'INDIGENT' => '🏠',
-            '4PS' => '📦', 'IP' => '🌿',
-            'FRM' => '🌾', 'FSH' => '🎣',
-            'OFW' => '✈️', 'SCH' => '📚',
-            'STUDENT' => '📚', 'UNE' => '💼',
-            'VETERAN' => '🎖️',
-        ];
-        
-        return $icons[$code] ?? '🎫';
+        return match ($code) {
+            'SC', 'OSP'    => '👴',
+            'PWD'           => '♿',
+            'SP', 'SOLO_PARENT' => '👨‍👧',
+            'IND', 'INDIGENT'   => '🏠',
+            '4PS'           => '📦',
+            'IP'            => '🌿',
+            'FRM'           => '🌾',
+            'FSH'           => '🎣',
+            'OFW'           => '✈️',
+            'SCH', 'STUDENT' => '📚',
+            'UNE'           => '💼',
+            'VETERAN'       => '🎖️',
+            default         => '🎫',
+        };
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH VALIDATION AND SANITIZATION
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------
+    // SEARCH VALIDATION
+    // ----------------------------------------------------------------
 
-    /**
-     * Validate search query format and length.
-     * SECURITY NOTE: Prevents SQL injection and DoS attacks
-     *
-     * @param mixed $query
-     * @return bool
-     */
-    private function isValidSearchQuery($query): bool
+    private function isValidSearchQuery(mixed $query): bool
     {
         if (!is_string($query)) {
             return false;
         }
-        
+
         $length = mb_strlen($query);
+
         if ($length < self::MIN_SEARCH_LENGTH || $length > self::MAX_SEARCH_LENGTH) {
             return false;
         }
-        
-        // SECURITY NOTE: Reject queries with suspicious patterns
-        if (preg_match('/[<>"\'%;()]/', $query) && !preg_match('/^[a-zA-Z0-9\s\-_.@]+$/', $query)) {
-            Log::warning('Suspicious search query rejected in resident portal', [
-                'user_id' => Auth::id(),
-                'ip' => request()->ip(),
-            ]);
+
+        if (preg_match('/[<>"\'%;()]/', $query)
+            && !preg_match('/^[a-zA-Z0-9\s\-_.@]+$/', $query)) {
             return false;
         }
-        
+
         return true;
     }
 
-    /**
-     * Sanitize search query for safe use in LIKE clauses.
-     * SECURITY NOTE: Escapes special characters to prevent SQL injection
-     *
-     * @param string $query
-     * @return string
-     */
     private function sanitizeSearchQuery(string $query): string
     {
-        $sanitized = trim($query);
-        // Escape MySQL LIKE special characters
-        $sanitized = addcslashes($sanitized, '%_\\');
-        return $sanitized;
+        return addcslashes(trim($query), '%_\\');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | MAIN SHARE METHOD
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------
+    // SHARE
+    // ----------------------------------------------------------------
 
     public function share(Request $request): array
     {
         $user = $request->user();
-        $isHouseholdHead = false;
-        $residentData = null;
-        $unitNumber = null;
-        $purok = null;
-        $residentId = null;
-        $householdMembersCount = 0;
-        $householdMembers = [];
-        $householdData = null;
-        
-        // Get all privileges for frontend
+
         $allPrivileges = $this->getAllPrivileges();
-        
-        // Notification data
-        $notifications = [];
-        $unreadNotificationCount = 0;
-        
-        // SECURITY NOTE: Validate and sanitize search query
-        $query = $request->input('q');
-        $searchResults = [];
-        $quickResults = [];
-        $recentSearches = [];
-        
-        if ($query && $this->isValidSearchQuery($query)) {
-            $sanitizedQuery = $this->sanitizeSearchQuery($query);
-            $isQuick = $request->input('quick', false);
-            
-            // SECURITY NOTE: Rate limit search requests
-            $rateLimitKey = 'resident_search:' . $request->ip();
-            
-            if (RateLimiter::tooManyAttempts($rateLimitKey, 30)) {
-                Log::warning('Resident search rate limit exceeded', [
-                    'ip' => $request->ip(),
-                    'user_id' => $user?->id,
-                ]);
-            } else {
-                RateLimiter::hit($rateLimitKey, 60);
-                
-                if ($user && $user->resident_id) {
-                    if ($isQuick) {
-                        $quickResults = $this->performResidentQuickSearch($sanitizedQuery, $user->resident_id, $allPrivileges);
-                    } else {
-                        $searchResults = $this->performResidentFullSearch($sanitizedQuery, $user->resident_id, $allPrivileges);
-                        $this->storeSearchQuery($request, $sanitizedQuery);
-                    }
-                }
-            }
-        }
-        
-        $recentSearches = $this->getRecentSearches($request);
-        
-        if ($user) {
+
+        [
+            'searchResults'  => $searchResults,
+            'quickResults'   => $quickResults,
+            'recentSearches' => $recentSearches,
+            'currentQuery'   => $query,
+        ] = $this->search($request);
+
+        $authData = $user ? $this->buildAuthData($user, $allPrivileges) : null;
+
+        return array_merge(parent::share($request), [
+            'auth'          => ['user' => $authData],
+            'flash'         => fn () => [
+                'success' => $request->session()->get('success'),
+                'error'   => $request->session()->get('error'),
+                'warning' => $request->session()->get('warning'),
+                'info'    => $request->session()->get('info'),
+            ],
+            'searchResults'  => $searchResults,
+            'quickResults'   => $quickResults,
+            'recentSearches' => $recentSearches,
+            'currentQuery'   => $query,
+            'allPrivileges'  => $allPrivileges,
+        ]);
+    }
+
+    // ----------------------------------------------------------------
+    // AUTH DATA
+    // ----------------------------------------------------------------
+
+    private function buildAuthData(User $user, array $allPrivileges): array
+    {
+        $residentData   = null;
+        $isHouseholdHead = false;
+        $unitNumber      = null;
+        $purok           = null;
+        $householdMembersCount = 0;
+        $householdMembers      = [];
+        $householdData         = null;
+
+        if ($user->resident_id) {
             $resident = Resident::with([
-                'household', 
+                'household',
                 'purok',
-                'residentPrivileges.privilege.discountType'
-            ])->where('id', $user->resident_id)->first();
-            
+                'residentPrivileges.privilege.discountType',
+            ])->find($user->resident_id);
+
             if ($resident) {
-                $residentId = $resident->id;
-                
-                // Get resident's active privileges
-                $activePrivileges = $this->getResidentPrivileges($resident);
-                
-                // Build privilege flags
-                $privilegeFlags = [];
-                $privilegeIcons = [];
-                foreach ($activePrivileges as $priv) {
-                    $code = strtolower($priv['code']);
-                    $privilegeFlags["is_{$code}"] = true;
-                    $privilegeFlags["has_{$code}"] = true;
-                    $privilegeFlags["{$code}_id_number"] = $priv['id_number'];
-                    $privilegeIcons[] = [
-                        'code' => $priv['code'],
-                        'icon' => $this->getPrivilegeIcon($priv['code']),
-                        'name' => $priv['name'],
-                        'discount_percentage' => $priv['discount_percentage'],
-                    ];
-                }
-                
-                // SECURITY NOTE: Sanitize resident data - only include necessary fields
-                $residentData = array_merge([
-                    'id' => $resident->id,
-                    'first_name' => $resident->first_name,
-                    'middle_name' => $resident->middle_name,
-                    'last_name' => $resident->last_name,
-                    'suffix' => $resident->suffix,
-                    'avatar' => $resident->avatar,
-                    'birth_date' => $resident->birth_date?->format('Y-m-d'),
-                    'gender' => $resident->gender,
-                    'is_voter' => $resident->is_voter,
-                    
-                    // Privilege data
-                    'privileges' => $activePrivileges,
-                    'privileges_count' => count($activePrivileges),
-                    'has_privileges' => count($activePrivileges) > 0,
-                    'privilege_icons' => $privilegeIcons,
-                ], $privilegeFlags);
-                
+                $residentData = $this->buildResidentData($resident);
+
                 if ($user->household_id) {
-                    $isHouseholdHead = HouseholdMember::where('resident_id', $resident->id)
+                    $isHouseholdHead = HouseholdMember::query()
+                        ->where('resident_id', $resident->id)
                         ->where('household_id', $user->household_id)
                         ->where('is_head', true)
                         ->exists();
-                    
-                    $household = Household::with(['purok'])
-                        ->where('id', $user->household_id)
-                        ->first();
-                        
+
+                    $household = Household::with('purok')->find($user->household_id);
+
                     if ($household) {
                         $unitNumber = $household->unit_number ?? $household->household_number;
-                        
-                        // SECURITY NOTE: Only load minimal member data for frontend
-                        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege.discountType'])
+
+                        $householdMembers = HouseholdMember::with('resident.residentPrivileges.privilege.discountType')
                             ->where('household_id', $user->household_id)
                             ->get()
-                            ->map(function ($member) {
-                                $resident = $member->resident;
-                                if (!$resident) {
-                                    return null;
-                                }
-                                
-                                // Get member's active privileges (minimal data)
-                                $memberPrivileges = $resident->residentPrivileges
-                                    ?->filter(fn($rp) => $rp->isActive())
-                                    ->map(function ($rp) {
-                                        $privilege = $rp->privilege;
-                                        return [
-                                            'code' => $privilege->code,
-                                            'name' => $privilege->name,
-                                            'icon' => $this->getPrivilegeIcon($privilege->code),
-                                            'discount_percentage' => (float) ($rp->discount_percentage ?? $privilege->discountType?->percentage ?? 0),
-                                        ];
-                                    })
-                                    ->values()
-                                    ->toArray() ?? [];
-                                
-                                $privilegeFlags = [];
-                                foreach ($memberPrivileges as $priv) {
-                                    $privilegeFlags["is_" . strtolower($priv['code'])] = true;
-                                }
-                                
-                                // SECURITY NOTE: Return only necessary fields
-                                return array_merge([
-                                    'id' => $member->id,
-                                    'resident_id' => $resident->id,
-                                    'first_name' => $resident->first_name,
-                                    'last_name' => $resident->last_name,
-                                    'full_name' => $resident->full_name,
-                                    'age' => $resident->age,
-                                    'gender' => $resident->gender,
-                                    'is_head' => $member->is_head,
-                                    'relationship_to_head' => $member->relationship_to_head,
-                                    'privileges' => $memberPrivileges,
-                                    'has_privileges' => count($memberPrivileges) > 0,
-                                ], $privilegeFlags);
-                            })
+                            ->map(fn ($member) => $this->formatHouseholdMember($member))
                             ->filter()
                             ->values()
                             ->toArray();
-                        
+
                         $householdMembersCount = count($householdMembers);
-                        
-                        // SECURITY NOTE: Only include necessary household fields
+
                         $householdData = [
-                            'id' => $household->id,
+                            'id'               => $household->id,
                             'household_number' => $household->household_number,
-                            'address' => $household->address,
-                            'purok' => $household->purok?->name,
-                            'member_count' => $household->member_count,
+                            'address'          => $household->address,
+                            'purok'            => $household->purok?->name,
+                            'member_count'     => $household->member_count,
                         ];
                     }
                 }
-                
+
                 if ($resident->purok) {
                     $purok = $resident->purok->name;
                 }
             }
-            
-            // SECURITY NOTE: Get notifications for authenticated user
-            try {
-                $rawNotifications = $user->notifications()
-                    ->orderBy('created_at', 'desc')
-                    ->limit(10)
-                    ->get();
-                
-                $notifications = $rawNotifications->map(function ($notification) use ($user) {
-                    $formatted = NotificationHelper::formatNotification($notification, $user);
-                    
-                    $notificationData = $formatted->data ?? [];
-                    
-                    // SECURITY NOTE: Convert admin links to portal links
-                    $link = $notificationData['link'] ?? $formatted->url ?? '#';
-                    if (str_starts_with($link, '/admin/')) {
-                        $link = str_replace('/admin/', '/portal/', $link);
-                    }
-                    
-                    $actionUrl = $notificationData['action_url'] ?? $notificationData['link'] ?? $formatted->url ?? '#';
-                    if (str_starts_with($actionUrl, '/admin/')) {
-                        $actionUrl = str_replace('/admin/', '/portal/', $actionUrl);
-                    }
-                    
-                    // SECURITY NOTE: Return only necessary notification fields
-                    return [
-                        'id' => $formatted->id,
-                        'type' => $formatted->type,
-                        'data' => $notificationData,
-                        'read_at' => $formatted->read_at,
-                        'created_at_diff' => $formatted->created_at->diffForHumans(),
-                        'title' => $formatted->title ?? 'Notification',
-                        'message' => $formatted->message ?? 'New notification',
-                        'link' => $link,
-                        'action_url' => $actionUrl,
-                        'is_announcement' => $formatted->is_announcement ?? false,
-                        'is_fee_notification' => $formatted->is_fee_notification ?? false,
-                        'is_clearance_notification' => $formatted->is_clearance_notification ?? false,
-                        'status' => $formatted->status ?? null,
-                        'type_icon' => $formatted->type_icon ?? null,
-                        'type_color' => $formatted->type_color ?? null,
-                    ];
-                })->toArray();
+        }
 
-                $unreadNotificationCount = NotificationHelper::getUnreadCount($user);
-            } catch (\Exception $e) {
-                // SECURITY NOTE: Log error but don't expose details to user
-                Log::error('Failed to fetch resident notifications', [
-                    'user_id' => $user->id,
-                    'error' => $e->getMessage(),
-                ]);
-                $notifications = [];
-                $unreadNotificationCount = 0;
-            }
+        $notifications         = $this->getNotifications($user);
+        $unreadNotificationCount = $notifications['unread'];
+
+        $data = [
+            'id'                        => $user->id,
+            'name'                      => $user->full_name ?? $user->name,
+            'email'                     => $user->email,
+            'role'                      => $user->role?->name,
+            'resident'                  => $residentData,
+            'is_household_head'         => $isHouseholdHead,
+            'resident_id'               => $user->resident_id,
+            'household_id'              => $user->household_id,
+            'unit_number'               => $unitNumber,
+            'purok'                     => $purok,
+            'household_members_count'   => $householdMembersCount,
+            'household_members'         => $householdMembers,
+            'household'                 => $householdData,
+            'notifications'             => $notifications['items'],
+            'unread_notifications_count' => $unreadNotificationCount,
+        ];
+
+        if ($user->isAdministrator()) {
+            $data['is_admin'] = true;
         }
-        
-        // SECURITY NOTE: Build auth data with minimal required fields
-        $authData = null;
-        if ($user) {
-            $authData = [
-                'id' => $user->id,
-                'name' => $user->full_name ?? $user->name,
-                'email' => $user->email,
-                'role' => $user->role?->name,
-                'resident' => $residentData,
-                'is_household_head' => $isHouseholdHead,
-                'resident_id' => $user->resident_id,
-                'household_id' => $user->household_id,
-                'unit_number' => $unitNumber,
-                'purok' => $purok,
-                'household_members_count' => $householdMembersCount,
-                'household_members' => $householdMembers,
-                'household' => $householdData,
-                'notifications' => $notifications,
-                'unread_notifications_count' => $unreadNotificationCount,
+
+        return $data;
+    }
+
+    private function buildResidentData(Resident $resident): array
+    {
+        $activePrivileges = $this->getResidentPrivileges($resident);
+
+        $privilegeFlags  = [];
+        $privilegeIcons  = [];
+
+        foreach ($activePrivileges as $priv) {
+            $code = strtolower($priv['code']);
+            $privilegeFlags["is_{$code}"]          = true;
+            $privilegeFlags["has_{$code}"]          = true;
+            $privilegeFlags["{$code}_id_number"]    = $priv['id_number'];
+            $privilegeIcons[] = [
+                'code'                => $priv['code'],
+                'icon'                => $this->privilegeIcon($priv['code']),
+                'name'                => $priv['name'],
+                'discount_percentage' => $priv['discount_percentage'],
             ];
-            
-            // SECURITY NOTE: is_admin flag only for actual admins
-            if ($user->isAdministrator()) {
-                $authData['is_admin'] = true;
+        }
+
+        return array_merge([
+            'id'               => $resident->id,
+            'first_name'       => $resident->first_name,
+            'middle_name'      => $resident->middle_name,
+            'last_name'        => $resident->last_name,
+            'suffix'           => $resident->suffix,
+            'avatar'           => $resident->avatar,
+            'birth_date'       => $resident->birth_date?->format('Y-m-d'),
+            'gender'           => $resident->gender,
+            'is_voter'         => $resident->is_voter,
+            'privileges'       => $activePrivileges,
+            'privileges_count' => count($activePrivileges),
+            'has_privileges'   => count($activePrivileges) > 0,
+            'privilege_icons'  => $privilegeIcons,
+        ], $privilegeFlags);
+    }
+
+    private function formatHouseholdMember($member): ?array
+    {
+        $resident = $member->resident;
+        if (!$resident) {
+            return null;
+        }
+
+        $memberPrivileges = $resident->residentPrivileges
+            ?->filter(fn ($rp) => $rp->isActive())
+            ->map(function ($rp) {
+                $privilege = $rp->privilege;
+                return [
+                    'code'                => $privilege->code,
+                    'name'                => $privilege->name,
+                    'icon'                => $this->privilegeIcon($privilege->code),
+                    'discount_percentage' => (float) ($rp->discount_percentage
+                        ?? $privilege->discountType?->percentage
+                        ?? 0),
+                ];
+            })
+            ->values()
+            ->toArray() ?? [];
+
+        $privilegeFlags = [];
+        foreach ($memberPrivileges as $priv) {
+            $privilegeFlags['is_' . strtolower($priv['code'])] = true;
+        }
+
+        return array_merge([
+            'id'                   => $member->id,
+            'resident_id'          => $resident->id,
+            'first_name'           => $resident->first_name,
+            'last_name'            => $resident->last_name,
+            'full_name'            => $resident->full_name,
+            'age'                  => $resident->age,
+            'gender'               => $resident->gender,
+            'is_head'              => $member->is_head,
+            'relationship_to_head' => $member->relationship_to_head,
+            'privileges'           => $memberPrivileges,
+            'has_privileges'       => count($memberPrivileges) > 0,
+        ], $privilegeFlags);
+    }
+
+    // ----------------------------------------------------------------
+    // NOTIFICATIONS
+    // ----------------------------------------------------------------
+
+    private function getNotifications(User $user): array
+    {
+        $raw = $user->notifications()
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
+
+        $items = $raw->map(function ($notification) use ($user) {
+            $formatted = NotificationHelper::formatNotification($notification, $user);
+            $data      = $formatted->data ?? [];
+
+            $link = $data['link'] ?? $formatted->url ?? '#';
+            if (str_starts_with($link, '/admin/')) {
+                $link = str_replace('/admin/', '/portal/', $link);
+            }
+
+            $actionUrl = $data['action_url'] ?? $data['link'] ?? $formatted->url ?? '#';
+            if (str_starts_with($actionUrl, '/admin/')) {
+                $actionUrl = str_replace('/admin/', '/portal/', $actionUrl);
+            }
+
+            return [
+                'id'                       => $formatted->id,
+                'type'                     => $formatted->type,
+                'data'                     => $data,
+                'read_at'                  => $formatted->read_at,
+                'created_at_diff'          => $formatted->created_at->diffForHumans(),
+                'title'                    => $formatted->title ?? 'Notification',
+                'message'                  => $formatted->message ?? 'New notification',
+                'link'                     => $link,
+                'action_url'               => $actionUrl,
+                'is_announcement'          => $formatted->is_announcement ?? false,
+                'is_fee_notification'      => $formatted->is_fee_notification ?? false,
+                'is_clearance_notification' => $formatted->is_clearance_notification ?? false,
+                'status'                   => $formatted->status ?? null,
+                'type_icon'                => $formatted->type_icon ?? null,
+                'type_color'               => $formatted->type_color ?? null,
+            ];
+        })->toArray();
+
+        return [
+            'unread' => NotificationHelper::getUnreadCount($user),
+            'items'  => $items,
+        ];
+    }
+
+    // ----------------------------------------------------------------
+    // SEARCH
+    // ----------------------------------------------------------------
+
+    private function search(Request $request): array
+    {
+        $query = $request->input('q');
+
+        $searchResults  = [];
+        $quickResults   = [];
+        $recentSearches = $this->getRecentSearches($request);
+
+        if ($query && $this->isValidSearchQuery($query)) {
+            $sanitized    = $this->sanitizeSearchQuery($query);
+            $rateLimitKey = 'resident_search:' . $request->ip();
+
+            if (!RateLimiter::tooManyAttempts($rateLimitKey, 30)) {
+                RateLimiter::hit($rateLimitKey, 60);
+
+                $user = $request->user();
+
+                if ($user && $user->resident_id) {
+                    if ($request->input('quick', false)) {
+                        $quickResults = $this->quickSearch($sanitized, $user->resident_id);
+                    } else {
+                        $searchResults = $this->fullSearch($sanitized, $user->resident_id);
+                        $this->storeSearchQuery($request, $sanitized);
+                    }
+                }
             }
         }
-        
-        return array_merge(parent::share($request), [
-            'auth' => [
-                'user' => $authData,
-            ],
-            'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error' => fn () => $request->session()->get('error'),
-                'warning' => fn () => $request->session()->get('warning'),
-                'info' => fn () => $request->session()->get('info'),
-            ],
-            'searchResults' => $searchResults,
-            'quickResults' => $quickResults,
+
+        return [
+            'searchResults'  => $searchResults,
+            'quickResults'   => $quickResults,
             'recentSearches' => $recentSearches,
-            'currentQuery' => $query,
-            'allPrivileges' => $allPrivileges,
-        ]);
+            'currentQuery'   => $query,
+        ];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH METHODS
-    |--------------------------------------------------------------------------
-    */
-
-    /**
-     * SECURITY NOTE: All search methods use parameterized queries and validate ownership
-     */
-    public function performResidentQuickSearch($query, $residentId, array $allPrivileges)
+    private function quickSearch(string $query, int $residentId): array
     {
-        $searchTerm = '%' . $query . '%';
-        $results = [];
+        $term = '%' . $query . '%';
 
-        $results = array_merge($results, $this->searchSelfResident($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchHouseholdMembers($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchOwnClearances($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchOwnPayments($searchTerm, $residentId, $allPrivileges));
-
-        return array_slice($results, 0, 8);
+        return array_slice(array_merge(
+            $this->searchSelf($term, $residentId),
+            $this->searchHouseholdMembers($term, $residentId),
+            $this->searchClearances($term, $residentId),
+            $this->searchPayments($term, $residentId),
+        ), 0, self::MAX_QUICK_SEARCH_RESULTS);
     }
 
-    public function performResidentFullSearch($query, $residentId, array $allPrivileges)
+    private function fullSearch(string $query, int $residentId): array
     {
-        $searchTerm = '%' . $query . '%';
-        $results = [];
+        $term = '%' . $query . '%';
 
-        $results = array_merge($results, $this->searchSelfResident($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchHouseholdMembers($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchOwnClearances($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchOwnBusinesses($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchOwnPayments($searchTerm, $residentId, $allPrivileges));
-        $results = array_merge($results, $this->searchOwnReports($searchTerm, $residentId, $allPrivileges));
+        $results = array_merge(
+            $this->searchSelf($term, $residentId),
+            $this->searchHouseholdMembers($term, $residentId),
+            $this->searchClearances($term, $residentId),
+            $this->searchBusinesses($term, $residentId),
+            $this->searchPayments($term, $residentId),
+            $this->searchReports($term, $residentId),
+        );
 
-        usort($results, function($a, $b) {
-            $priority = [
-                'self' => 1,
-                'household_member' => 2,
-                'clearance' => 3,
-                'business' => 4,
-                'payment' => 5,
-                'report' => 6,
-            ];
-            
-            $aPriority = $priority[$a['type']] ?? 99;
-            $bPriority = $priority[$b['type']] ?? 99;
-            
-            if ($aPriority === $bPriority) {
-                return strcmp($a['title'], $b['title']);
-            }
-            
-            return $aPriority - $bPriority;
-        });
+        usort($results, fn ($a, $b) => ($a['_sort'] ?? 99) <=> ($b['_sort'] ?? 99));
 
         return $results;
     }
 
-    public function searchSelfResident($searchTerm, $residentId, array $allPrivileges)
+    private function searchSelf(string $term, int $residentId): array
     {
-        $resident = Resident::with(['purok', 'residentPrivileges.privilege.discountType'])
+        $resident = Resident::with('purok', 'residentPrivileges.privilege.discountType')
             ->where('id', $residentId)
-            ->where(function($query) use ($searchTerm) {
-                $query->where('first_name', 'like', $searchTerm)
-                    ->orWhere('last_name', 'like', $searchTerm)
-                    ->orWhere('email', 'like', $searchTerm)
-                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$searchTerm]);
-            })
-            ->get();
+            ->where(fn ($q) => $q->where('first_name', 'like', $term)
+                                 ->orWhere('last_name', 'like', $term)
+                                 ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$term]))
+            ->first();
 
-        return $resident->map(function ($resident) use ($allPrivileges) {
-            $activePrivileges = $resident->residentPrivileges
-                ->filter(fn($rp) => $rp->isActive())
-                ->map(function ($rp) {
-                    $privilege = $rp->privilege;
-                    return [
-                        'code' => $privilege->code,
-                        'name' => $privilege->name,
-                        'icon' => $this->getPrivilegeIcon($privilege->code),
-                    ];
-                })
-                ->values()
-                ->toArray();
+        if (!$resident) {
+            return [];
+        }
 
-            $tags = array_map(fn($priv) => $priv['icon'] . ' ' . $priv['name'], $activePrivileges);
+        $tags = $resident->residentPrivileges
+            ->filter(fn ($rp) => $rp->isActive())
+            ->map(fn ($rp) => $this->privilegeIcon($rp->privilege->code) . ' ' . $rp->privilege->name)
+            ->values()
+            ->toArray();
 
-            return [
-                'id' => $resident->id,
-                'type' => 'self',
-                'title' => 'My Profile',
-                'subtitle' => $resident->full_name ?? $resident->first_name . ' ' . $resident->last_name,
-                'url' => route('resident.profile.show'),
-                'icon' => 'User',
-                'badge' => 'You',
-                'tags' => $tags,
-            ];
-        })->toArray();
+        return [[
+            'id'       => $resident->id,
+            'type'     => 'self',
+            'title'    => 'My Profile',
+            'subtitle' => $resident->full_name,
+            'url'      => route('resident.profile.show'),
+            'icon'     => 'User',
+            'badge'    => 'You',
+            'tags'     => $tags,
+            '_sort'    => 1,
+        ]];
     }
 
-    public function searchHouseholdMembers($searchTerm, $residentId, array $allPrivileges)
+    private function searchHouseholdMembers(string $term, int $residentId): array
     {
         $resident = Resident::find($residentId);
-        if (!$resident || !$resident->household_id) {
+        if (!$resident?->household_id) {
             return [];
         }
 
-        $householdMembers = HouseholdMember::with(['resident.residentPrivileges.privilege'])
+        return HouseholdMember::with('resident.residentPrivileges.privilege')
             ->where('household_id', $resident->household_id)
-            ->whereHas('resident', function($q) use ($searchTerm, $residentId) {
-                $q->where('id', '!=', $residentId)
-                    ->where(function($query) use ($searchTerm) {
-                        $query->where('first_name', 'like', $searchTerm)
-                            ->orWhere('last_name', 'like', $searchTerm)
-                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$searchTerm]);
-                    });
-            })
-            ->limit(self::MAX_SEARCH_RESULTS_PER_TYPE)
-            ->get();
-
-        return $householdMembers->map(function ($member) {
-            $resident = $member->resident;
-            
-            $activePrivileges = $resident->residentPrivileges
-                ->filter(fn($rp) => $rp->isActive())
-                ->map(fn($rp) => $this->getPrivilegeIcon($rp->privilege->code))
-                ->values()
-                ->toArray();
-            
-            return [
-                'id' => $resident->id,
-                'type' => 'household_member',
-                'title' => $resident->full_name ?? $resident->first_name . ' ' . $resident->last_name,
-                'subtitle' => $member->is_head ? 'Head of Household' : $member->relationship_to_head,
-                'url' => route('resident.profile.show') . '?tab=members',
-                'icon' => 'Users',
-                'badge' => 'Family Member',
-                'tags' => $activePrivileges,
-            ];
-        })->toArray();
-    }
-
-    public function searchOwnClearances($searchTerm, $residentId, array $allPrivileges)
-    {
-        return ClearanceRequest::with(['clearanceType'])
-            ->where('resident_id', $residentId)
-            ->where(function($query) use ($searchTerm) {
-                $query->where('reference_number', 'like', $searchTerm)
-                    ->orWhere('clearance_number', 'like', $searchTerm)
-                    ->orWhere('purpose', 'like', $searchTerm);
-            })
+            ->whereHas('resident', fn ($q) => $q->where('id', '!=', $residentId)
+                ->where(fn ($q2) => $q2->where('first_name', 'like', $term)
+                                      ->orWhere('last_name', 'like', $term)
+                                      ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$term])))
             ->limit(self::MAX_SEARCH_RESULTS_PER_TYPE)
             ->get()
-            ->map(function ($clearance) {
+            ->map(function ($member) {
+                $r = $member->resident;
+                $icons = $r->residentPrivileges
+                    ->filter(fn ($rp) => $rp->isActive())
+                    ->map(fn ($rp) => $this->privilegeIcon($rp->privilege->code))
+                    ->values()
+                    ->toArray();
+
                 return [
-                    'id' => $clearance->id,
-                    'type' => 'clearance',
-                    'title' => $clearance->clearanceType?->name ?? 'Clearance Request',
-                    'subtitle' => 'Ref: ' . ($clearance->reference_number ?? 'N/A'),
-                    'description' => 'Status: ' . ucfirst($clearance->status),
-                    'url' => route('portal.my.clearances.show', $clearance->id),
-                    'icon' => 'FileCheck',
-                    'badge' => 'My Clearance',
-                    'tags' => [$clearance->status],
+                    'id'       => $r->id,
+                    'type'     => 'household_member',
+                    'title'    => $r->full_name,
+                    'subtitle' => $member->is_head ? 'Head of Household' : $member->relationship_to_head,
+                    'url'      => route('resident.profile.show') . '?tab=members',
+                    'icon'     => 'Users',
+                    'badge'    => 'Family Member',
+                    'tags'     => $icons,
+                    '_sort'    => 2,
                 ];
             })
             ->toArray();
     }
 
-    public function searchOwnBusinesses($searchTerm, $residentId, array $allPrivileges)
+    private function searchClearances(string $term, int $residentId): array
     {
-        if (!class_exists('App\Models\Business')) {
+        return ClearanceRequest::with('clearanceType')
+            ->where('resident_id', $residentId)
+            ->where(fn ($q) => $q->where('reference_number', 'like', $term)
+                                 ->orWhere('clearance_number', 'like', $term)
+                                 ->orWhere('purpose', 'like', $term))
+            ->limit(self::MAX_SEARCH_RESULTS_PER_TYPE)
+            ->get()
+            ->map(fn ($c) => [
+                'id'       => $c->id,
+                'type'     => 'clearance',
+                'title'    => $c->clearanceType?->name ?? 'Clearance Request',
+                'subtitle' => 'Ref: ' . ($c->reference_number ?? 'N/A'),
+                'url'      => route('portal.my.clearances.show', $c->id),
+                'icon'     => 'FileCheck',
+                'badge'    => 'My Clearance',
+                'tags'     => [$c->status],
+                '_sort'    => 3,
+            ])
+            ->toArray();
+    }
+
+    private function searchBusinesses(string $term, int $residentId): array
+    {
+        if (!class_exists(Business::class)) {
             return [];
         }
 
-        return Business::with(['purok'])
+        return Business::with('purok')
             ->where('owner_id', $residentId)
-            ->where(function($query) use ($searchTerm) {
-                $query->where('business_name', 'like', $searchTerm)
-                    ->orWhere('business_type', 'like', $searchTerm);
-            })
+            ->where(fn ($q) => $q->where('business_name', 'like', $term)
+                                 ->orWhere('business_type', 'like', $term))
             ->limit(self::MAX_SEARCH_RESULTS_PER_TYPE)
             ->get()
-            ->map(function ($business) {
-                return [
-                    'id' => $business->id,
-                    'type' => 'business',
-                    'title' => $business->business_name ?? 'Unnamed Business',
-                    'subtitle' => $business->business_type ?? 'Business',
-                    'url' => route('portal.my.businesses.show', $business->id),
-                    'icon' => 'Briefcase',
-                    'badge' => 'My Business',
-                    'tags' => [$business->status],
-                ];
-            })
+            ->map(fn ($b) => [
+                'id'       => $b->id,
+                'type'     => 'business',
+                'title'    => $b->business_name ?? 'Unnamed Business',
+                'subtitle' => $b->business_type ?? 'Business',
+                'url'      => route('portal.my.businesses.show', $b->id),
+                'icon'     => 'Briefcase',
+                'badge'    => 'My Business',
+                'tags'     => [$b->status],
+                '_sort'    => 4,
+            ])
             ->toArray();
     }
 
-    public function searchOwnPayments($searchTerm, $residentId, array $allPrivileges)
+    private function searchPayments(string $term, int $residentId): array
     {
         return Payment::where('payer_type', 'resident')
             ->where('payer_id', $residentId)
-            ->where(function($query) use ($searchTerm) {
-                $query->where('or_number', 'like', $searchTerm)
-                    ->orWhere('reference_number', 'like', $searchTerm);
-            })
+            ->where(fn ($q) => $q->where('or_number', 'like', $term)
+                                 ->orWhere('reference_number', 'like', $term))
             ->limit(self::MAX_SEARCH_RESULTS_PER_TYPE)
             ->get()
-            ->map(function ($payment) {
-                return [
-                    'id' => $payment->id,
-                    'type' => 'payment',
-                    'title' => 'OR #' . ($payment->or_number ?? 'N/A'),
-                    'subtitle' => 'Amount: ₱' . number_format($payment->total_amount ?? 0, 2),
-                    'url' => route('portal.my.payments.show', $payment->id),
-                    'icon' => 'Receipt',
-                    'badge' => 'My Payment',
-                    'tags' => [$payment->status],
-                ];
-            })
+            ->map(fn ($p) => [
+                'id'       => $p->id,
+                'type'     => 'payment',
+                'title'    => 'OR #' . ($p->or_number ?? 'N/A'),
+                'subtitle' => 'Amount: ₱' . number_format($p->total_amount ?? 0, 2),
+                'url'      => route('portal.my.payments.show', $p->id),
+                'icon'     => 'Receipt',
+                'badge'    => 'My Payment',
+                'tags'     => [$p->status],
+                '_sort'    => 5,
+            ])
             ->toArray();
     }
 
-    public function searchOwnReports($searchTerm, $residentId, array $allPrivileges)
+    private function searchReports(string $term, int $residentId): array
     {
         $resident = Resident::find($residentId);
         if (!$resident) {
             return [];
         }
 
-        return CommunityReport::with(['reportType'])
-            ->where(function($query) use ($resident, $searchTerm) {
+        return CommunityReport::with('reportType')
+            ->where(function ($q) use ($resident) {
                 if ($resident->user_id) {
-                    $query->where('user_id', $resident->user_id);
+                    $q->where('user_id', $resident->user_id);
                 } else {
-                    $query->where('reporter_name', 'like', '%' . $resident->first_name . '%')
-                        ->where('is_anonymous', false);
+                    $q->where('reporter_name', 'like', '%' . $resident->first_name . '%')
+                      ->where('is_anonymous', false);
                 }
             })
-            ->where(function($q) use ($searchTerm) {
-                $q->where('title', 'like', $searchTerm)
-                    ->orWhere('report_number', 'like', $searchTerm);
-            })
+            ->where(fn ($q) => $q->where('title', 'like', $term)
+                                 ->orWhere('report_number', 'like', $term))
             ->limit(self::MAX_SEARCH_RESULTS_PER_TYPE)
             ->get()
-            ->map(function ($report) {
-                return [
-                    'id' => $report->id,
-                    'type' => 'report',
-                    'title' => $report->title ?? 'Untitled Report',
-                    'subtitle' => 'Report #' . ($report->report_number ?? $report->id),
-                    'url' => route('portal.community-reports.show', $report->id),
-                    'icon' => 'FileText',
-                    'badge' => 'My Report',
-                    'tags' => [$report->status],
-                ];
-            })
+            ->map(fn ($r) => [
+                'id'       => $r->id,
+                'type'     => 'report',
+                'title'    => $r->title ?? 'Untitled Report',
+                'subtitle' => 'Report #' . ($r->report_number ?? $r->id),
+                'url'      => route('portal.community-reports.show', $r->id),
+                'icon'     => 'FileText',
+                'badge'    => 'My Report',
+                'tags'     => [$r->status],
+                '_sort'    => 6,
+            ])
             ->toArray();
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SEARCH HISTORY MANAGEMENT
-    |--------------------------------------------------------------------------
-    */
+    // ----------------------------------------------------------------
+    // SEARCH HISTORY
+    // ----------------------------------------------------------------
 
-    protected function storeSearchQuery(Request $request, $query): void
+    private function storeSearchQuery(Request $request, string $query): void
     {
-        $query = substr($query, 0, 50);
-        
-        $recentSearches = $request->session()->get('recent_searches', []);
-        
-        $recentSearches = array_values(array_filter($recentSearches, fn($item) => $item !== $query));
-        array_unshift($recentSearches, $query);
-        
-        $recentSearches = array_slice($recentSearches, 0, 5);
-        
-        $request->session()->put('recent_searches', $recentSearches);
+        $recent = $request->session()->get('recent_searches', []);
+        $recent = array_values(array_filter($recent, fn ($item) => $item !== $query));
+        array_unshift($recent, $query);
+        $request->session()->put('recent_searches', array_slice($recent, 0, 5));
     }
 
-    protected function getRecentSearches(Request $request): array
+    private function getRecentSearches(Request $request): array
     {
         return $request->session()->get('recent_searches', []);
     }

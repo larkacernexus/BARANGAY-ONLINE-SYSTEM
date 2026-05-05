@@ -15,22 +15,35 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-// Receipt routes (public/guest accessible ones)
+Route::get('/privacy', function () {
+    return Inertia::render('auth/privacy-policy');
+})->name('privacy');
+
+Route::get('/help', function () {
+    return Inertia::render('auth/support');
+})->name('help');
+
 Route::get('receipts', [App\Http\Controllers\Admin\ReceiptsController::class, 'index'])->name('receipts.index');
 Route::get('receipts/create', [App\Http\Controllers\Admin\ReceiptsController::class, 'create'])->name('receipts.create');
 Route::get('receipts/{receipt}', [App\Http\Controllers\Admin\ReceiptsController::class, 'show'])->name('receipts.show');
 Route::post('receipts/{receipt}/print', [App\Http\Controllers\Admin\ReceiptsController::class, 'print'])->name('receipts.print');
 
-
-// Guest routes (not logged in)
+/*
+|--------------------------------------------------------------------------
+| Guest routes (not logged in)
+|--------------------------------------------------------------------------
+*/
 Route::middleware('guest')->group(function () {
     Route::get('login', [App\Http\Controllers\Auth\LoginController::class, 'create'])->name('login');
     Route::post('login', [App\Http\Controllers\Auth\LoginController::class, 'store']);
+    Route::post('/password/forgot', [App\Http\Controllers\Auth\LoginController::class, 'forgotPassword'])->name('password.forgot');
 });
 
-
-
-// Authenticated routes (logged in)
+/*
+|--------------------------------------------------------------------------
+| Authenticated routes (logged in)
+|--------------------------------------------------------------------------
+*/
 Route::middleware('auth')->group(function () {
     Route::post('logout', [App\Http\Controllers\Auth\LoginController::class, 'destroy'])->name('logout');
     Route::get('password/change', [App\Http\Controllers\Auth\LoginController::class, 'showChangeForm'])->name('password.change');
@@ -39,14 +52,12 @@ Route::middleware('auth')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Load Route Files Based on Authentication and Roles
+| Load Route Files
 |--------------------------------------------------------------------------
 */
-// require __DIR__ . '/auth.php';
 require __DIR__ . '/settings.php';
 require __DIR__ . '/residentsettings.php';
 
-// Load admin routes - protected by admin middleware
 Route::middleware(['auth', 'verified', 'admin'])
     ->prefix('admin')
     ->name('admin.')
@@ -54,7 +65,6 @@ Route::middleware(['auth', 'verified', 'admin'])
         require __DIR__ . '/admin.php';
     });
 
-// Load portal (resident) routes - protected by portal middleware
 Route::middleware(['auth', 'verified', 'portal', 'resident.inertia'])
     ->prefix('portal')
     ->name('portal.')
@@ -62,9 +72,4 @@ Route::middleware(['auth', 'verified', 'portal', 'resident.inertia'])
         require __DIR__ . '/portal.php';
     });
 
-/*
-|--------------------------------------------------------------------------
-| Fallback
-|--------------------------------------------------------------------------
-*/
 Route::fallback(fn() => inertia('Error/404'));

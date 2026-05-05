@@ -10,17 +10,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Label } from '@/components/ui/label';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { SelectionStats, BulkOperation } from '@/types/admin/announcements/announcement.types'; // ← Add import
+import { SelectionStats, BulkOperation } from '@/types/admin/announcements/announcement.types';
 
 interface AnnouncementsDialogsProps {
     showBulkDeleteDialog: boolean;
     setShowBulkDeleteDialog: (value: boolean) => void;
     isPerformingBulkAction: boolean;
     selectedAnnouncements: number[];
-    handleBulkOperation: (operation: BulkOperation) => Promise<void>; // ← Change from string to BulkOperation
-    selectionStats?: SelectionStats; // ← Change to use SelectionStats type and make optional
+    handleBulkOperation: (operation: BulkOperation) => Promise<void>;
+    selectionStats?: SelectionStats;
 }
 
 export default function AnnouncementsDialogs({
@@ -31,7 +30,6 @@ export default function AnnouncementsDialogs({
     handleBulkOperation,
     selectionStats
 }: AnnouncementsDialogsProps) {
-    // Calculate currently active count from selectionStats if needed
     const currentlyActiveCount = selectionStats?.active || 0;
     
     return (
@@ -49,16 +47,18 @@ export default function AnnouncementsDialogs({
                         <div className="flex items-start gap-2">
                             <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
                             <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                                ⚠️ Warning: {currentlyActiveCount} selected announcement(s) are currently active
+                                Warning: {currentlyActiveCount} selected announcement(s) are currently active
                                 and being displayed to residents. They will be removed immediately.
                             </p>
                         </div>
                     </div>
                 )}
                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                    <AlertDialogCancel disabled={isPerformingBulkAction} className="w-full sm:w-auto">Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={isPerformingBulkAction} className="w-full sm:w-auto">
+                        Cancel
+                    </AlertDialogCancel>
                     <AlertDialogAction
-                        onClick={() => handleBulkOperation('delete' as BulkOperation)} // ← Add as BulkOperation
+                        onClick={() => handleBulkOperation('delete')}
                         className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
                         disabled={isPerformingBulkAction}
                     >

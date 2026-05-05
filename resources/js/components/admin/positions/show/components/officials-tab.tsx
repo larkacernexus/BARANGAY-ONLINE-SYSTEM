@@ -68,7 +68,7 @@ export const OfficialsTab = ({ position }: Props) => {
                                     <p>Manage officials assigned to this position:</p>
                                     <ul className="list-disc list-inside mt-2 space-y-1">
                                         <li>View detailed information about each official</li>
-                                        <li>Update official status and任期</li>
+                                        <li>Update official status and term of office</li>
                                         <li>Remove or reassign officials as needed</li>
                                     </ul>
                                 </div>

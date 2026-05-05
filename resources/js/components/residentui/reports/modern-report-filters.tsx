@@ -4,12 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Search, X, Download, ChevronDown, FileText, Printer, Share2, Filter } from 'lucide-react';
 import { ModernSelect } from '../modern-select';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+interface FilterOption {
+    value: string;
+    label: string;
+}
 
 interface ModernReportFiltersProps {
     search: string;
@@ -26,7 +31,7 @@ interface ModernReportFiltersProps {
     handleCategoryChange: (category: string) => void;
     loading: boolean;
     filterOptions: {
-        reportTypes: any[];
+        reportTypes: Array<{ id: number; name: string }>;
         categories: string[];
     };
     printReports: () => void;
@@ -35,9 +40,33 @@ interface ModernReportFiltersProps {
     hasActiveFilters: boolean;
     handleClearFilters: () => void;
     onCopySummary: () => void;
+    tabCounts?: {
+        all: number;
+        pending: number;
+        under_review: number;
+        in_progress: number;
+        resolved: number;
+        rejected: number;
+    };
 }
 
-export const ModernReportFilters = ({
+const STATUS_OPTIONS: FilterOption[] = [
+    { value: 'all', label: 'All Status' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'under_review', label: 'Under Review' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'resolved', label: 'Resolved' },
+    { value: 'rejected', label: 'Rejected' },
+];
+
+const URGENCY_OPTIONS: FilterOption[] = [
+    { value: 'all', label: 'All Urgency' },
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+];
+
+export function ModernReportFilters({
     search,
     setSearch,
     handleSearchSubmit,
@@ -58,38 +87,22 @@ export const ModernReportFilters = ({
     hasActiveFilters,
     handleClearFilters,
     onCopySummary,
-}: ModernReportFiltersProps) => {
-    const statusOptions = [
-        { value: 'all', label: 'All Status' },
-        { value: 'pending', label: 'Pending' },
-        { value: 'under_review', label: 'Under Review' },
-        { value: 'in_progress', label: 'In Progress' },
-        { value: 'resolved', label: 'Resolved' },
-        { value: 'rejected', label: 'Rejected' },
-    ];
-
-    const urgencyOptions = [
-        { value: 'all', label: 'All Urgency' },
-        { value: 'low', label: 'Low' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'high', label: 'High' },
-    ];
-
-    const categoryOptions = filterOptions?.categories?.map(cat => ({
+    tabCounts,
+}: ModernReportFiltersProps) {
+    const categoryOptions: FilterOption[] = (filterOptions.categories ?? []).map((cat) => ({
         value: cat,
-        label: cat
-    })) || [];
+        label: cat,
+    }));
 
-    const typeOptions = filterOptions?.reportTypes?.map(type => ({
+    const typeOptions: FilterOption[] = (filterOptions.reportTypes ?? []).map((type) => ({
         value: type.id.toString(),
-        label: type.name
-    })) || [];
+        label: type.name,
+    }));
 
     return (
         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-800 dark:to-gray-900/50">
             <CardContent className="p-6">
                 <div className="space-y-4">
-                    {/* Search Bar */}
                     <div className="relative group">
                         <form onSubmit={handleSearchSubmit} className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
@@ -112,13 +125,12 @@ export const ModernReportFilters = ({
                         </form>
                     </div>
 
-                    {/* Filters Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                         <ModernSelect
                             value={statusFilter}
                             onValueChange={handleStatusChange}
                             placeholder="All status"
-                            options={statusOptions}
+                            options={STATUS_OPTIONS}
                             disabled={loading}
                             icon={Filter}
                         />
@@ -127,7 +139,7 @@ export const ModernReportFilters = ({
                             value={urgencyFilter}
                             onValueChange={handleUrgencyChange}
                             placeholder="All urgency"
-                            options={urgencyOptions}
+                            options={URGENCY_OPTIONS}
                             disabled={loading}
                         />
 
@@ -151,10 +163,12 @@ export const ModernReportFilters = ({
                             />
                         )}
 
-                        {/* Actions Dropdown */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="h-10 rounded-xl border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all">
+                                <Button
+                                    variant="outline"
+                                    className="h-10 rounded-xl border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                >
                                     <Download className="h-4 w-4 mr-2" />
                                     Export
                                     <ChevronDown className="h-4 w-4 ml-2" />
@@ -178,9 +192,28 @@ export const ModernReportFilters = ({
                         </DropdownMenu>
                     </div>
 
-                    {/* Active Filters */}
+                    {tabCounts && (
+                        <div className="flex flex-wrap gap-2">
+                            {Object.entries(tabCounts).map(([key, count]) => (
+                                <div
+                                    key={key}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                                        statusFilter === key || (statusFilter === 'all' && key === 'all')
+                                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
+                                            : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
+                                    }`}
+                                >
+                                    <span className="capitalize font-medium">
+                                        {key.replace('_', ' ')}
+                                    </span>
+                                    <span className="font-bold">{count}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {hasActiveFilters && (
-                        <div className="overflow-hidden">
+                        <div>
                             <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                                 <div className="flex items-center gap-2">
                                     <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
@@ -204,4 +237,4 @@ export const ModernReportFilters = ({
             </CardContent>
         </Card>
     );
-};
+}
